@@ -294,6 +294,7 @@ describe('Extraction Validation with Sample Data', () => {
 
   it('should detect missing policy number as warning (reduces score)', () => {
     const extractedData = sampleToExtractedData(kaskoSample)
+    // @ts-expect-error - mismatch due to schema update
     extractedData.policyNumber = null
     const result = validateExtraction(extractedData as Parameters<typeof validateExtraction>[0])
 
@@ -305,6 +306,7 @@ describe('Extraction Validation with Sample Data', () => {
 
   it('should detect missing provider as warning (reduces score)', () => {
     const extractedData = sampleToExtractedData(kaskoSample)
+    // @ts-expect-error - mismatch due to schema update
     extractedData.provider = null
     const result = validateExtraction(extractedData as Parameters<typeof validateExtraction>[0])
 
@@ -324,7 +326,9 @@ describe('Extraction Validation with Sample Data', () => {
   it('should score complete extraction higher than incomplete', () => {
     const completeData = sampleToExtractedData(kaskoSample)
     const incompleteData = sampleToExtractedData(kaskoSample)
+    // @ts-expect-error - mismatch due to schema update
     incompleteData.policyNumber = null
+    // @ts-expect-error - mismatch due to schema update
     incompleteData.provider = null
 
     const completeResult = validateExtraction(

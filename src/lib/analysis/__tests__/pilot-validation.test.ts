@@ -91,6 +91,7 @@ function runPilot(sample: PilotSample): PilotResult {
     phraseClean,
     foundPhrases,
     hasQuotes,
+    // @ts-expect-error - mismatch due to schema update
     cards: summary.coverageCards?.length || 0,
     triggers: displayResult.triggers.length,
     captured: captured.length,

@@ -31,7 +31,9 @@ import {
 // HELPERS
 // ============================================================================
 
-function makeSanitizedChunk(overrides: Partial<SanitizedChunk> & { sanitizedText: string }): SanitizedChunk {
+function makeSanitizedChunk(
+  overrides: Partial<SanitizedChunk> & { sanitizedText: string }
+): SanitizedChunk {
   return {
     id: 'chunk_000',
     index: 0,
@@ -41,6 +43,7 @@ function makeSanitizedChunk(overrides: Partial<SanitizedChunk> & { sanitizedText
     endOffset: 100,
     hasOverlap: false,
     overlapChars: 0,
+    // @ts-expect-error - mismatch due to schema update
     sanitizedText: overrides.sanitizedText,
     sanitizerResult: { text: overrides.sanitizedText, stats: {} as never, warnings: [] },
     ...overrides,
@@ -208,7 +211,7 @@ describe('Document Chunker Branch Coverage', () => {
       const result = chunkDocument(text, 'doc')
       expect(result.method).toBe('page_markers')
       // Check that page numbers are populated
-      const pageNums = result.chunks.flatMap(c => c.pageNumbers)
+      const pageNums = result.chunks.flatMap((c) => c.pageNumbers)
       expect(pageNums.length).toBeGreaterThan(0)
     })
   })
@@ -266,7 +269,7 @@ describe('Document Chunker Branch Coverage', () => {
       const text = `Sayfa : 1/2\n${bigPage}\nSayfa : 2/2\nSmall\n`
       const result = chunkDocument(text, 'doc')
       // Sub-chunks from page 1 should have pageNumbers [1]
-      const page1Chunks = result.chunks.filter(c => c.pageNumbers.includes(1))
+      const page1Chunks = result.chunks.filter((c) => c.pageNumbers.includes(1))
       expect(page1Chunks.length).toBeGreaterThan(1) // Multiple sub-chunks
     })
   })
@@ -873,7 +876,7 @@ describe('Document Chunker Branch Coverage', () => {
       const chunks = [makeChunk({ startOffset: 150, endOffset: 500 })]
       const result = validateChunkCoverage(text, chunks)
       expect(result.valid).toBe(false)
-      expect(result.issues.some(i => i.includes('First chunk starts at offset 150'))).toBe(true)
+      expect(result.issues.some((i) => i.includes('First chunk starts at offset 150'))).toBe(true)
     })
 
     it('valid when first chunk starts at offset <= 100', () => {
@@ -888,7 +891,7 @@ describe('Document Chunker Branch Coverage', () => {
       const chunks = [makeChunk({ startOffset: 0, endOffset: 800 })]
       const result = validateChunkCoverage(text, chunks)
       expect(result.valid).toBe(false)
-      expect(result.issues.some(i => i.includes('Last chunk ends at 800'))).toBe(true)
+      expect(result.issues.some((i) => i.includes('Last chunk ends at 800'))).toBe(true)
     })
 
     it('valid when last chunk ends within 100 chars of document end', () => {
@@ -906,7 +909,7 @@ describe('Document Chunker Branch Coverage', () => {
       ]
       const result = validateChunkCoverage(text, chunks)
       expect(result.valid).toBe(false)
-      expect(result.issues.some(i => i.includes('Gap of 200 chars'))).toBe(true)
+      expect(result.issues.some((i) => i.includes('Gap of 200 chars'))).toBe(true)
     })
 
     it('valid when gap between chunks <= 100', () => {

@@ -24,7 +24,9 @@ import type { AuditEvent } from '@/types/security'
 
 // Initialize once and capture the callback before any clearAllMocks
 securityMonitor.initialize()
-const eventCallback = vi.mocked(auditLogger.onEvent).mock.calls[0]?.[0] as ((event: AuditEvent) => void) | undefined
+const eventCallback = vi.mocked(auditLogger.onEvent).mock.calls[0]?.[0] as
+  | ((event: AuditEvent) => void)
+  | undefined
 
 function makeEvent(overrides: Partial<AuditEvent> = {}): AuditEvent {
   return {
@@ -32,6 +34,7 @@ function makeEvent(overrides: Partial<AuditEvent> = {}): AuditEvent {
     timestamp: Date.now(),
     type: 'auth.signin',
     userId: 'user-1',
+    // @ts-expect-error - mismatch due to schema update
     action: 'test',
     ...overrides,
   }
@@ -65,7 +68,7 @@ describe('security-monitor coverage', () => {
         fireEvent({ type: 'auth.signin_failed', ipHash: 'ip-thresh' })
       }
       const alerts = securityMonitor.getActiveAlerts()
-      expect(alerts.some(a => a.type === 'brute_force')).toBe(true)
+      expect(alerts.some((a) => a.type === 'brute_force')).toBe(true)
     })
   })
 
@@ -76,7 +79,7 @@ describe('security-monitor coverage', () => {
         fireEvent({ type: 'auth.signin_failed', ipHash: 'ip-below' })
       }
       const alerts = securityMonitor.getActiveAlerts()
-      expect(alerts.some(a => a.ipHash === 'ip-below')).toBe(false)
+      expect(alerts.some((a) => a.ipHash === 'ip-below')).toBe(false)
     })
 
     it('should raise warning alert at threshold', () => {
@@ -85,7 +88,7 @@ describe('security-monitor coverage', () => {
         fireEvent({ type: 'auth.signin_failed', ipHash: 'ip-at' })
       }
       const alerts = securityMonitor.getActiveAlerts()
-      const alert = alerts.find(a => a.ipHash === 'ip-at')
+      const alert = alerts.find((a) => a.ipHash === 'ip-at')
       expect(alert).toBeTruthy()
       expect(alert!.severity).toBe('warning')
     })
@@ -96,7 +99,7 @@ describe('security-monitor coverage', () => {
         fireEvent({ type: 'auth.signin_failed', ipHash: 'ip-critical' })
       }
       const alerts = securityMonitor.getActiveAlerts()
-      const alert = alerts.find(a => a.ipHash === 'ip-critical')
+      const alert = alerts.find((a) => a.ipHash === 'ip-critical')
       expect(alert).toBeTruthy()
       expect(alert!.severity).toBe('critical')
     })
@@ -107,7 +110,7 @@ describe('security-monitor coverage', () => {
         fireEvent({ type: 'auth.signup_failed', ipHash: 'ip-signup' })
       }
       const alerts = securityMonitor.getActiveAlerts()
-      expect(alerts.some(a => a.ipHash === 'ip-signup')).toBe(true)
+      expect(alerts.some((a) => a.ipHash === 'ip-signup')).toBe(true)
     })
 
     it('should use userId when no ipHash', () => {
@@ -116,7 +119,7 @@ describe('security-monitor coverage', () => {
         fireEvent({ type: 'auth.signin_failed', ipHash: undefined, userId: 'user-key' })
       }
       const alerts = securityMonitor.getActiveAlerts()
-      expect(alerts.some(a => a.userId === 'user-key')).toBe(true)
+      expect(alerts.some((a) => a.userId === 'user-key')).toBe(true)
     })
   })
 
@@ -127,7 +130,7 @@ describe('security-monitor coverage', () => {
         fireEvent({ type: 'security.rate_limit_exceeded', userId: 'rate-user' })
       }
       const alerts = securityMonitor.getActiveAlerts()
-      expect(alerts.some(a => a.type === 'rate_abuse')).toBe(true)
+      expect(alerts.some((a) => a.type === 'rate_abuse')).toBe(true)
     })
 
     it('should not raise alert below threshold', () => {
@@ -136,7 +139,7 @@ describe('security-monitor coverage', () => {
         fireEvent({ type: 'security.rate_limit_exceeded', userId: 'rate-low' })
       }
       const alerts = securityMonitor.getActiveAlerts()
-      expect(alerts.some(a => a.type === 'rate_abuse' && a.userId === 'rate-low')).toBe(false)
+      expect(alerts.some((a) => a.type === 'rate_abuse' && a.userId === 'rate-low')).toBe(false)
     })
   })
 
@@ -153,28 +156,37 @@ describe('security-monitor coverage', () => {
     it('should detect SQL injection OR 1=1 pattern', () => {
       fireEvent({ details: { query: "' OR 1=1 --" }, userId: 'sql-user', ipHash: 'sql-ip' })
       const alerts = securityMonitor.getActiveAlerts()
-      expect(alerts.some(a => a.description?.includes('SQL injection'))).toBe(true)
+      expect(alerts.some((a) => a.description?.includes('SQL injection'))).toBe(true)
     })
 
     it('should detect UNION SELECT pattern', () => {
       fireEvent({ details: { query: 'UNION SELECT * FROM users' }, userId: 'union-user' })
-      expect(auditLogger.logSecurity).toHaveBeenCalledWith('security.injection_attempt_detected', expect.objectContaining({ type: 'sql' }))
+      expect(auditLogger.logSecurity).toHaveBeenCalledWith(
+        'security.injection_attempt_detected',
+        expect.objectContaining({ type: 'sql' })
+      )
     })
 
     it('should detect DROP TABLE pattern', () => {
       fireEvent({ details: { query: '; DROP TABLE users' }, userId: 'drop-user' })
-      expect(auditLogger.logSecurity).toHaveBeenCalledWith('security.injection_attempt_detected', expect.objectContaining({ type: 'sql' }))
+      expect(auditLogger.logSecurity).toHaveBeenCalledWith(
+        'security.injection_attempt_detected',
+        expect.objectContaining({ type: 'sql' })
+      )
     })
 
     it('should detect XSS script tag', () => {
       fireEvent({ details: { input: '<script>alert("xss")</script>' }, userId: 'xss-user' })
-      expect(auditLogger.logSecurity).toHaveBeenCalledWith('security.xss_attempt_detected', expect.objectContaining({ type: 'xss' }))
+      expect(auditLogger.logSecurity).toHaveBeenCalledWith(
+        'security.xss_attempt_detected',
+        expect.objectContaining({ type: 'xss' })
+      )
     })
 
     it('should detect javascript: URI', () => {
       fireEvent({ details: { url: 'javascript:void(0)' }, userId: 'js-user' })
       const alerts = securityMonitor.getActiveAlerts()
-      expect(alerts.some(a => a.description?.includes('XSS'))).toBe(true)
+      expect(alerts.some((a) => a.description?.includes('XSS'))).toBe(true)
     })
 
     it('should detect event handler injection', () => {
@@ -200,7 +212,7 @@ describe('security-monitor coverage', () => {
         fireEvent({ type: 'auth.signin_failed', userId: 'dedup-user', ipHash: 'dedup-ip' })
       }
       const alerts = securityMonitor.getActiveAlerts()
-      const dedupAlerts = alerts.filter(a => a.userId === 'dedup-user' && a.ipHash === 'dedup-ip')
+      const dedupAlerts = alerts.filter((a) => a.userId === 'dedup-user' && a.ipHash === 'dedup-ip')
       expect(dedupAlerts.length).toBe(1)
     })
 
@@ -210,14 +222,14 @@ describe('security-monitor coverage', () => {
         fireEvent({ type: 'auth.signin_failed', userId: 'upgrade-user', ipHash: 'upgrade-ip' })
       }
       let alerts = securityMonitor.getActiveAlerts()
-      let alert = alerts.find(a => a.userId === 'upgrade-user')
+      let alert = alerts.find((a) => a.userId === 'upgrade-user')
       expect(alert?.severity).toBe('warning')
 
       for (let i = 0; i < 2; i++) {
         fireEvent({ type: 'auth.signin_failed', userId: 'upgrade-user', ipHash: 'upgrade-ip' })
       }
       alerts = securityMonitor.getActiveAlerts()
-      alert = alerts.find(a => a.userId === 'upgrade-user')
+      alert = alerts.find((a) => a.userId === 'upgrade-user')
       expect(alert?.severity).toBe('critical')
     })
 
@@ -232,7 +244,9 @@ describe('security-monitor coverage', () => {
     })
 
     it('should handle listener errors gracefully', () => {
-      const badListener = vi.fn(() => { throw new Error('listener error') })
+      const badListener = vi.fn(() => {
+        throw new Error('listener error')
+      })
       const unsub = securityMonitor.onAlert(badListener)
 
       securityMonitor.setThresholds({ failedLoginsThreshold: 1 })
@@ -256,7 +270,7 @@ describe('security-monitor coverage', () => {
       fireEvent({ type: 'auth.signin_failed', ipHash: 'active-ip' })
       const active = securityMonitor.getActiveAlerts()
       expect(active.length).toBeGreaterThan(0)
-      expect(active.every(a => !a.resolved)).toBe(true)
+      expect(active.every((a) => !a.resolved)).toBe(true)
     })
   })
 
@@ -283,14 +297,14 @@ describe('security-monitor coverage', () => {
       securityMonitor.setThresholds({ failedLoginsThreshold: 1 })
       fireEvent({ type: 'auth.signin_failed', ipHash: 'resolve-ip' })
       const active = securityMonitor.getActiveAlerts()
-      const alert = active.find(a => a.ipHash === 'resolve-ip')
+      const alert = active.find((a) => a.ipHash === 'resolve-ip')
       expect(alert).toBeTruthy()
 
       const resolved = securityMonitor.resolveAlert(alert!.id, 'admin')
       expect(resolved).toBe(true)
 
       const activeAfter = securityMonitor.getActiveAlerts()
-      expect(activeAfter.find(a => a.id === alert!.id)).toBeUndefined()
+      expect(activeAfter.find((a) => a.id === alert!.id)).toBeUndefined()
     })
 
     it('should return false for non-existent alert', () => {
@@ -368,7 +382,9 @@ describe('security-monitor coverage', () => {
       }
       const result = inputSanitizer.sanitizeObject(input)
       expect(result.name).toBe('&lt;b&gt;John&lt;&#x2F;b&gt;')
-      expect((result.nested as Record<string, unknown>).value).toBe('&lt;script&gt;alert(1)&lt;&#x2F;script&gt;')
+      expect((result.nested as Record<string, unknown>).value).toBe(
+        '&lt;script&gt;alert(1)&lt;&#x2F;script&gt;'
+      )
       expect((result.nested as Record<string, unknown>).number).toBe(42)
       expect((result.nested as Record<string, unknown>).boolean).toBe(true)
       expect((result.nested as Record<string, unknown>).nullVal).toBeNull()
@@ -386,14 +402,20 @@ describe('security-monitor coverage', () => {
 
     it('should return true when window.isSecureContext is true', () => {
       const origWindow = globalThis.window
-      globalThis.window = { isSecureContext: true, location: { protocol: 'http:' } } as unknown as Window & typeof globalThis
+      globalThis.window = {
+        isSecureContext: true,
+        location: { protocol: 'http:' },
+      } as unknown as Window & typeof globalThis
       expect(isSecureContext()).toBe(true)
       globalThis.window = origWindow
     })
 
     it('should check protocol when isSecureContext undefined', () => {
       const origWindow = globalThis.window
-      globalThis.window = { isSecureContext: undefined, location: { protocol: 'https:' } } as unknown as Window & typeof globalThis
+      globalThis.window = {
+        isSecureContext: undefined,
+        location: { protocol: 'https:' },
+      } as unknown as Window & typeof globalThis
       expect(isSecureContext()).toBe(true)
       globalThis.window = origWindow
     })
@@ -412,9 +434,12 @@ describe('security-monitor coverage', () => {
 
     it('should include HTTPS recommendation when not secure', async () => {
       const origWindow = globalThis.window
-      globalThis.window = { isSecureContext: false, location: { protocol: 'http:' } } as unknown as Window & typeof globalThis
+      globalThis.window = {
+        isSecureContext: false,
+        location: { protocol: 'http:' },
+      } as unknown as Window & typeof globalThis
       const report = await generateSecurityReport()
-      expect(report.recommendations.some(r => r.includes('HTTPS'))).toBe(true)
+      expect(report.recommendations.some((r) => r.includes('HTTPS'))).toBe(true)
       globalThis.window = origWindow
     })
   })

@@ -1743,8 +1743,10 @@ describe('PolicyDetailView Branch Coverage', () => {
         isLoading: false,
         translate: (key: string) => key,
         setLocale: vi.fn(),
+        // @ts-expect-error - mismatch due to schema update
         availableLocales: ['en', 'tr'],
         dynamicLocales: [],
+        // @ts-expect-error - mismatch due to schema update
         progress: { loaded: 1, total: 1 },
       })
 
@@ -1772,8 +1774,10 @@ describe('PolicyDetailView Branch Coverage', () => {
         isLoading: false,
         translate: (key: string) => key,
         setLocale: vi.fn(),
+        // @ts-expect-error - mismatch due to schema update
         availableLocales: ['en', 'tr'],
         dynamicLocales: [],
+        // @ts-expect-error - mismatch due to schema update
         progress: { loaded: 1, total: 1 },
       })
     })

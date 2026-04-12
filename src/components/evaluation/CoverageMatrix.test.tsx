@@ -16,7 +16,11 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { CoverageMatrix, CoverageSummary } from './CoverageMatrix'
-import type { PolicyComparison, CoverageComparison, ComparisonPolicy } from '@/lib/policy-evaluation/types'
+import type {
+  PolicyComparison,
+  CoverageComparison,
+  ComparisonPolicy,
+} from '@/lib/policy-evaluation/types'
 import type { Policy } from '@/types/policy'
 
 // Mock i18n
@@ -83,16 +87,73 @@ const createComparisonPolicy = (id: string, provider: string, logo: string): Com
     grade: 'B',
     status: 'good',
     scoreBreakdown: {
-      premium: { category: 'Premium', categoryTR: 'Prim', score: 80, weight: 20, details: '', detailsTR: '', issues: [], issuesTR: [] },
-      coverage: { category: 'Coverage', categoryTR: 'Teminat', score: 85, weight: 30, details: '', detailsTR: '', issues: [], issuesTR: [] },
-      deductible: { category: 'Deductible', categoryTR: 'Muafiyet', score: 75, weight: 15, details: '', detailsTR: '', issues: [], issuesTR: [] },
-      compliance: { category: 'Compliance', categoryTR: 'Uyum', score: 90, weight: 20, details: '', detailsTR: '', issues: [], issuesTR: [] },
-      value: { category: 'Value', categoryTR: 'Deger', score: 82, weight: 15, details: '', detailsTR: '', issues: [], issuesTR: [] },
+      premium: {
+        category: 'Premium',
+        categoryTR: 'Prim',
+        score: 80,
+        weight: 20,
+        details: '',
+        detailsTR: '',
+        issues: [],
+        issuesTR: [],
+      },
+      coverage: {
+        category: 'Coverage',
+        categoryTR: 'Teminat',
+        score: 85,
+        weight: 30,
+        details: '',
+        detailsTR: '',
+        issues: [],
+        issuesTR: [],
+      },
+      deductible: {
+        category: 'Deductible',
+        categoryTR: 'Muafiyet',
+        score: 75,
+        weight: 15,
+        details: '',
+        detailsTR: '',
+        issues: [],
+        issuesTR: [],
+      },
+      compliance: {
+        category: 'Compliance',
+        categoryTR: 'Uyum',
+        score: 90,
+        weight: 20,
+        details: '',
+        detailsTR: '',
+        issues: [],
+        issuesTR: [],
+      },
+      value: {
+        category: 'Value',
+        categoryTR: 'Deger',
+        score: 82,
+        weight: 15,
+        details: '',
+        detailsTR: '',
+        issues: [],
+        issuesTR: [],
+      },
     },
-    marketComparison: { premiumPercentile: 50, coveragePercentile: 60, isAboveAverageValue: true, competitivePosition: 'competitive' },
+    marketComparison: {
+      premiumPercentile: 50,
+      coveragePercentile: 60,
+      isAboveAverageValue: true,
+      competitivePosition: 'competitive',
+    },
     compliance: { isCompliant: true, mandatoryMet: true, minimumLimitsMet: true, issues: [] },
     recommendations: [],
-    summary: { strengths: [], strengthsTR: [], weaknesses: [], weaknessesTR: [], immediateActions: [], immediateActionsTR: [] },
+    summary: {
+      strengths: [],
+      strengthsTR: [],
+      weaknesses: [],
+      weaknessesTR: [],
+      immediateActions: [],
+      immediateActionsTR: [],
+    },
   },
   label: provider,
 })
@@ -103,7 +164,7 @@ const createCoverageComparison = (
   policies: CoverageComparison['policies'],
   bestPolicyId: string,
   worstPolicyId: string,
-  marketBenchmark?: number,
+  marketBenchmark?: number
 ): CoverageComparison => ({
   coverageName: name,
   coverageNameTR: nameTR,
@@ -124,7 +185,7 @@ const createMockComparison = (): PolicyComparison => {
       ],
       'p2',
       'p1',
-      600000,
+      600000
     ),
     createCoverageComparison(
       'Theft',
@@ -134,7 +195,7 @@ const createMockComparison = (): PolicyComparison => {
         { policyId: 'p2', included: false, limit: 0, deductible: 0, score: 0 },
       ],
       'p1',
-      'p2',
+      'p2'
     ),
     createCoverageComparison(
       'Flood',
@@ -145,7 +206,7 @@ const createMockComparison = (): PolicyComparison => {
       ],
       'p2',
       'p1',
-      250000,
+      250000
     ),
   ]
 
@@ -264,7 +325,7 @@ describe('CoverageMatrix', () => {
     const comparison = createMockComparison()
     render(<CoverageMatrix comparison={comparison} />)
     const trophies = screen.getAllByTestId('trophy')
-    const bestTrophies = trophies.filter(t => t.getAttribute('data-best') === 'true')
+    const bestTrophies = trophies.filter((t) => t.getAttribute('data-best') === 'true')
     expect(bestTrophies.length).toBeGreaterThan(0)
   })
 
@@ -304,7 +365,7 @@ describe('CoverageMatrix', () => {
           { policyId: 'p2', included: true, limit: 10000, deductible: 0, score: 50 },
         ],
         'p2',
-        'p2',
+        'p2'
       )
     )
     render(<CoverageMatrix comparison={comparison} />)
@@ -372,6 +433,7 @@ describe('CoverageSummary', () => {
     // p1: Collision (yes), Theft (yes), Flood (no) = 2/3
     // p2: Collision (yes), Theft (no), Flood (yes) = 2/3
     // Text nodes are split, so use a content matcher
+    // @ts-expect-error - TS6133 unused variable
     const countElements = screen.getAllByText((content, element) => {
       return element?.tagName === 'SPAN' && element.textContent === '2/3 coverages'
     })
@@ -412,11 +474,13 @@ describe('CoverageSummary', () => {
     ]
     render(<CoverageSummary comparison={comparison} />)
     // p1: Collision (yes), Theft (yes), Flood (yes) = 3/3
+    // @ts-expect-error - TS6133 unused variable
     const threeOfThree = screen.getAllByText((content, element) => {
       return element?.tagName === 'SPAN' && element.textContent === '3/3 coverages'
     })
     expect(threeOfThree).toHaveLength(1)
     // p2: Collision (yes), Theft (no), Flood (yes) = 2/3
+    // @ts-expect-error - TS6133 unused variable
     const twoOfThree = screen.getAllByText((content, element) => {
       return element?.tagName === 'SPAN' && element.textContent === '2/3 coverages'
     })

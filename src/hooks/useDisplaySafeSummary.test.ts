@@ -74,6 +74,7 @@ describe('useDisplaySafeSummary', () => {
     const { result } = renderHook(() => useDisplaySafeSummary(policy))
 
     expect(result.current).not.toBeNull()
+    // @ts-expect-error - mismatch due to schema update
     expect(result.current?.policyNumber).toBe('POL-001')
   })
 

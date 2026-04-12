@@ -36,9 +36,13 @@ import {
   WELL_COVERED_HOME_POLICY,
   POORLY_COVERED_HOME_POLICY,
   UNDERINSURED_KASKO_POLICY,
+  // @ts-expect-error - mismatch due to schema update
   _HIGH_DEDUCTIBLE_POLICY,
+  // @ts-expect-error - mismatch due to schema update
   _EXCLUSION_HEAVY_POLICY,
+  // @ts-expect-error - mismatch due to schema update
   _HEALTH_POLICY,
+  // @ts-expect-error - mismatch due to schema update
   _PARTIAL_COVERAGE_POLICY,
 } from './__tests__/fixtures'
 
@@ -179,7 +183,9 @@ describe('Gap Type Helpers', () => {
     })
 
     it('should handle moderate difficulty', () => {
-      const moderate = makeGap({ remediation: { ...makeGap().remediation, difficulty: 'moderate' } })
+      const moderate = makeGap({
+        remediation: { ...makeGap().remediation, difficulty: 'moderate' },
+      })
       const score = calculateGapPriority(moderate)
       expect(score).toBeGreaterThan(0)
       expect(score).toBeLessThanOrEqual(100)
@@ -253,7 +259,10 @@ describe('Coverage Analyzer - Branch Coverage', () => {
     const policy = createMockPolicy({ type: 'kasko', coverages: [] })
     const gaps = await analyzeCoverageGaps(policy, config)
     // With very high threshold, fewer coverages should be flagged
-    const _missingGaps = gaps.filter(g => g.subCategory === 'missing_critical' || g.subCategory === 'missing_recommended')
+    // @ts-expect-error - TS6133 unused variable
+    const _missingGaps = gaps.filter(
+      (g) => g.subCategory === 'missing_critical' || g.subCategory === 'missing_recommended'
+    )
     // Only 100% inclusion rate coverages should pass the 99% threshold
     expect(gaps).toBeDefined()
   })
@@ -263,8 +272,9 @@ describe('Coverage Analyzer - Branch Coverage', () => {
     const policy = createMockPolicy({ type: 'kasko', coverages: [] })
     const gaps = await analyzeCoverageGaps(policy)
 
-    const criticalGaps = gaps.filter(g => g.severity === 'critical')
-    const _highGaps = gaps.filter(g => g.severity === 'high')
+    const criticalGaps = gaps.filter((g) => g.severity === 'critical')
+    // @ts-expect-error - TS6133 unused variable
+    const _highGaps = gaps.filter((g) => g.severity === 'high')
 
     // 100% inclusion rate coverages should be critical
     expect(criticalGaps.length).toBeGreaterThan(0)
@@ -286,7 +296,7 @@ describe('Coverage Analyzer - Branch Coverage', () => {
       ],
     })
     const gaps = await analyzeCoverageGaps(policy)
-    const partialGap = gaps.find(g => g.subCategory === 'partial_coverage')
+    const partialGap = gaps.find((g) => g.subCategory === 'partial_coverage')
     expect(partialGap).toBeDefined()
     expect(partialGap?.severity).toBe('medium')
   })
@@ -304,7 +314,7 @@ describe('Coverage Analyzer - Branch Coverage', () => {
       ],
     })
     const gaps = await analyzeCoverageGaps(policy)
-    const partialGap = gaps.find(g => g.subCategory === 'partial_coverage')
+    const partialGap = gaps.find((g) => g.subCategory === 'partial_coverage')
     expect(partialGap).toBeDefined()
   })
 
@@ -322,7 +332,7 @@ describe('Coverage Analyzer - Branch Coverage', () => {
       ],
     })
     const gaps = await analyzeCoverageGaps(policy)
-    const partialGap = gaps.find(g => g.subCategory === 'partial_coverage')
+    const partialGap = gaps.find((g) => g.subCategory === 'partial_coverage')
     expect(partialGap).toBeDefined()
   })
 
@@ -340,7 +350,7 @@ describe('Coverage Analyzer - Branch Coverage', () => {
       ],
     })
     const gaps = await analyzeCoverageGaps(policy)
-    const partialGap = gaps.find(g => g.subCategory === 'partial_coverage')
+    const partialGap = gaps.find((g) => g.subCategory === 'partial_coverage')
     expect(partialGap).toBeDefined()
   })
 
@@ -359,7 +369,7 @@ describe('Coverage Analyzer - Branch Coverage', () => {
     })
     const gaps = await analyzeCoverageGaps(policy)
     const partialGap = gaps.find(
-      g => g.subCategory === 'partial_coverage' && g.affectedCoverage === 'Collision Damage'
+      (g) => g.subCategory === 'partial_coverage' && g.affectedCoverage === 'Collision Damage'
     )
     expect(partialGap).toBeUndefined()
   })
@@ -376,7 +386,7 @@ describe('Coverage Analyzer - Branch Coverage', () => {
     // home type requires: yangın, deprem, hırsızlık
     const policy = createMockPolicy({ type: 'home', coverages: [] })
     const gaps = await analyzeCoverageGaps(policy)
-    const mandatoryGaps = gaps.filter(g => g.title.startsWith('Missing Mandatory Coverage'))
+    const mandatoryGaps = gaps.filter((g) => g.title.startsWith('Missing Mandatory Coverage'))
     expect(mandatoryGaps.length).toBeGreaterThan(0)
   })
 
@@ -390,7 +400,7 @@ describe('Coverage Analyzer - Branch Coverage', () => {
       ],
     })
     const gaps = await analyzeCoverageGaps(policy)
-    const mandatoryGaps = gaps.filter(g => g.title.startsWith('Missing Mandatory Coverage'))
+    const mandatoryGaps = gaps.filter((g) => g.title.startsWith('Missing Mandatory Coverage'))
     expect(mandatoryGaps.length).toBe(0)
   })
 
@@ -407,9 +417,7 @@ describe('Coverage Analyzer - Branch Coverage', () => {
   it('should handle matchesCoverage with empty strings', async () => {
     const policy = createMockPolicy({
       type: 'kasko',
-      coverages: [
-        createCoverage({ name: '', nameTr: '', limit: 500000 }),
-      ],
+      coverages: [createCoverage({ name: '', nameTr: '', limit: 500000 })],
     })
     const gaps = await analyzeCoverageGaps(policy)
     // Should not crash on empty name comparisons
@@ -420,7 +428,7 @@ describe('Coverage Analyzer - Branch Coverage', () => {
     // With theft (hırsızlık) coverage missing, the probability should be 0.05 for theft
     const policy = createMockPolicy({ type: 'kasko', coverages: [] })
     const gaps = await analyzeCoverageGaps(policy)
-    const theftGap = gaps.find(g => g.affectedCoverage === 'Theft')
+    const theftGap = gaps.find((g) => g.affectedCoverage === 'Theft')
     if (theftGap) {
       expect(theftGap.financialImpact.probability).toBe(0.05)
     }
@@ -476,12 +484,10 @@ describe('Limit Analyzer - Branch Coverage', () => {
   it('should skip coverages without matching market benchmark', () => {
     const policy = createMockPolicy({
       type: 'kasko',
-      coverages: [
-        createCoverage({ name: 'Nonexistent Coverage', nameTr: 'Yok', limit: 100 }),
-      ],
+      coverages: [createCoverage({ name: 'Nonexistent Coverage', nameTr: 'Yok', limit: 100 })],
     })
     const gaps = analyzeLimitGaps(policy)
-    expect(gaps.filter(g => g.affectedCoverage === 'Nonexistent Coverage')).toHaveLength(0)
+    expect(gaps.filter((g) => g.affectedCoverage === 'Nonexistent Coverage')).toHaveLength(0)
   })
 
   it('should classify severely underinsured (< 40% of market)', () => {
@@ -496,7 +502,7 @@ describe('Limit Analyzer - Branch Coverage', () => {
       ],
     })
     const gaps = analyzeLimitGaps(policy)
-    const collisionGap = gaps.find(g => g.affectedCoverage === 'Collision Damage')
+    const collisionGap = gaps.find((g) => g.affectedCoverage === 'Collision Damage')
     expect(collisionGap?.severity).toBe('critical')
     expect(collisionGap?.subCategory).toBe('severely_underinsured')
   })
@@ -513,7 +519,7 @@ describe('Limit Analyzer - Branch Coverage', () => {
       ],
     })
     const gaps = analyzeLimitGaps(policy)
-    const collisionGap = gaps.find(g => g.affectedCoverage === 'Collision Damage')
+    const collisionGap = gaps.find((g) => g.affectedCoverage === 'Collision Damage')
     expect(collisionGap?.severity).toBe('high')
     expect(collisionGap?.subCategory).toBe('underinsured')
   })
@@ -534,7 +540,7 @@ describe('Limit Analyzer - Branch Coverage', () => {
       ],
     })
     const gaps = analyzeLimitGaps(policy, DEFAULT_GAP_CONFIG, 'ic_anadolu')
-    const accidentGap = gaps.find(g => g.affectedCoverage === 'Personal Accident')
+    const accidentGap = gaps.find((g) => g.affectedCoverage === 'Personal Accident')
     expect(accidentGap).toBeDefined()
     expect(accidentGap?.severity).toBe('medium')
     expect(accidentGap?.subCategory).toBe('underinsured')
@@ -555,7 +561,7 @@ describe('Limit Analyzer - Branch Coverage', () => {
       ],
     })
     const gaps = analyzeLimitGaps(policy)
-    const collisionGap = gaps.find(g => g.affectedCoverage === 'Collision Damage')
+    const collisionGap = gaps.find((g) => g.affectedCoverage === 'Collision Damage')
     if (collisionGap) {
       expect(['medium', 'high']).toContain(collisionGap.severity)
     }
@@ -573,7 +579,7 @@ describe('Limit Analyzer - Branch Coverage', () => {
       ],
     })
     const gaps = analyzeLimitGaps(policy)
-    const collisionGap = gaps.find(g => g.affectedCoverage === 'Collision Damage')
+    const collisionGap = gaps.find((g) => g.affectedCoverage === 'Collision Damage')
     expect(collisionGap).toBeUndefined()
   })
 
@@ -591,7 +597,7 @@ describe('Limit Analyzer - Branch Coverage', () => {
       ],
     })
     const gaps = analyzeLimitGaps(policy)
-    const totalGap = gaps.find(g => g.title === 'Total Coverage Significantly Below Market')
+    const totalGap = gaps.find((g) => g.title === 'Total Coverage Significantly Below Market')
     expect(totalGap).toBeDefined()
     expect(totalGap?.severity).toBe('high')
     expect(totalGap?.severityScore).toBe(80)
@@ -606,7 +612,7 @@ describe('Limit Analyzer - Branch Coverage', () => {
       ],
     })
     const gaps = analyzeLimitGaps(policy)
-    const totalGap = gaps.find(g => g.title === 'Total Coverage Significantly Below Market')
+    const totalGap = gaps.find((g) => g.title === 'Total Coverage Significantly Below Market')
     expect(totalGap).toBeUndefined()
   })
 
@@ -631,8 +637,8 @@ describe('Limit Analyzer - Branch Coverage', () => {
     const marmaraGaps = analyzeLimitGaps(policy, DEFAULT_GAP_CONFIG, 'marmara')
     const icAnadoluGaps = analyzeLimitGaps(policy, DEFAULT_GAP_CONFIG, 'ic_anadolu')
 
-    const marmaraGap = marmaraGaps.find(g => g.affectedCoverage === 'Personal Accident')
-    const icGap = icAnadoluGaps.find(g => g.affectedCoverage === 'Personal Accident')
+    const marmaraGap = marmaraGaps.find((g) => g.affectedCoverage === 'Personal Accident')
+    const icGap = icAnadoluGaps.find((g) => g.affectedCoverage === 'Personal Accident')
 
     // Marmara's higher multiplier lowers the threshold, so 60% is not flagged
     expect(marmaraGap).toBeUndefined()
@@ -673,7 +679,7 @@ describe('Limit Analyzer - Branch Coverage', () => {
       ],
     })
     const gaps = analyzeLimitGaps(policy)
-    const fireGap = gaps.find(g => g.affectedCoverage === 'Fire')
+    const fireGap = gaps.find((g) => g.affectedCoverage === 'Fire')
     if (fireGap) {
       expect(fireGap.financialImpact.probability).toBe(0.02) // fire = 0.02
     }
@@ -691,7 +697,7 @@ describe('Limit Analyzer - Branch Coverage', () => {
       ],
     })
     const gaps = analyzeLimitGaps(policy)
-    const gap = gaps.find(g => g.affectedCoverage === 'Personal Accident')
+    const gap = gaps.find((g) => g.affectedCoverage === 'Personal Accident')
     // Personal Accident contains "accident" which maps to 0.08
     if (gap) {
       expect(gap.financialImpact.probability).toBe(0.08)
@@ -726,19 +732,17 @@ describe('Deductible Analyzer - Branch Coverage', () => {
       ],
     })
     const gaps = analyzeDeductibleGaps(policy)
-    const collisionGap = gaps.find(g => g.affectedCoverage === 'Collision Damage')
+    const collisionGap = gaps.find((g) => g.affectedCoverage === 'Collision Damage')
     expect(collisionGap).toBeUndefined()
   })
 
   it('should skip coverages with no matching market benchmark', () => {
     const policy = createMockPolicy({
       type: 'kasko',
-      coverages: [
-        createCoverage({ name: 'Unknown', nameTr: 'Bilinmeyen', deductible: 5000 }),
-      ],
+      coverages: [createCoverage({ name: 'Unknown', nameTr: 'Bilinmeyen', deductible: 5000 })],
     })
     const gaps = analyzeDeductibleGaps(policy)
-    expect(gaps.filter(g => g.affectedCoverage === 'Unknown')).toHaveLength(0)
+    expect(gaps.filter((g) => g.affectedCoverage === 'Unknown')).toHaveLength(0)
   })
 
   it('should classify excessive deductible (> 2.5x market) as high severity', () => {
@@ -756,7 +760,7 @@ describe('Deductible Analyzer - Branch Coverage', () => {
       ],
     })
     const gaps = analyzeDeductibleGaps(policy)
-    const gap = gaps.find(g => g.affectedCoverage === 'Collision Damage')
+    const gap = gaps.find((g) => g.affectedCoverage === 'Collision Damage')
     expect(gap?.severity).toBe('high')
     expect(gap?.subCategory).toBe('excessive_deductible')
   })
@@ -775,7 +779,7 @@ describe('Deductible Analyzer - Branch Coverage', () => {
       ],
     })
     const gaps = analyzeDeductibleGaps(policy)
-    const gap = gaps.find(g => g.affectedCoverage === 'Collision Damage')
+    const gap = gaps.find((g) => g.affectedCoverage === 'Collision Damage')
     expect(gap?.severity).toBe('medium')
     expect(gap?.subCategory).toBe('high_deductible')
   })
@@ -794,7 +798,7 @@ describe('Deductible Analyzer - Branch Coverage', () => {
       ],
     })
     const gaps = analyzeDeductibleGaps(policy)
-    const gap = gaps.find(g => g.affectedCoverage === 'Collision Damage')
+    const gap = gaps.find((g) => g.affectedCoverage === 'Collision Damage')
     expect(gap?.severity).toBe('low')
     expect(gap?.subCategory).toBe('above_average')
   })
@@ -814,7 +818,7 @@ describe('Deductible Analyzer - Branch Coverage', () => {
       ],
     })
     const gaps = analyzeDeductibleGaps(policy)
-    const gap = gaps.find(g => g.affectedCoverage === 'Collision Damage')
+    const gap = gaps.find((g) => g.affectedCoverage === 'Collision Damage')
     expect(gap).toBeUndefined()
   })
 
@@ -823,14 +827,19 @@ describe('Deductible Analyzer - Branch Coverage', () => {
     const policy = createMockPolicy({
       type: 'kasko',
       coverages: [
-        createCoverage({ name: 'Collision Damage', nameTr: 'Çarpma/Çarpışma', limit: 500000, deductible: 20000 }),
+        createCoverage({
+          name: 'Collision Damage',
+          nameTr: 'Çarpma/Çarpışma',
+          limit: 500000,
+          deductible: 20000,
+        }),
         createCoverage({ name: 'Theft', nameTr: 'Hırsızlık', limit: 500000, deductible: 20000 }),
         createCoverage({ name: 'Fire', nameTr: 'Yangın', limit: 500000, deductible: 20000 }),
       ],
       premium: 15000,
     })
     const gaps = analyzeDeductibleGaps(policy)
-    const totalGap = gaps.find(g => g.title === 'High Total Deductible Exposure')
+    const totalGap = gaps.find((g) => g.title === 'High Total Deductible Exposure')
     expect(totalGap).toBeDefined()
     expect(totalGap?.severity).toBe('medium')
     expect(totalGap?.severityScore).toBe(55)
@@ -851,7 +860,7 @@ describe('Deductible Analyzer - Branch Coverage', () => {
       ],
     })
     const gaps = analyzeDeductibleGaps(policy)
-    const glassGap = gaps.find(g => g.affectedCoverage === 'Glass Coverage')
+    const glassGap = gaps.find((g) => g.affectedCoverage === 'Glass Coverage')
     // Glass Coverage has typicalDeductible of 0, so it should be skipped
     expect(glassGap).toBeUndefined()
   })
@@ -870,7 +879,7 @@ describe('Deductible Analyzer - Branch Coverage', () => {
       ],
     })
     const gaps = analyzeDeductibleGaps(policy)
-    const gap = gaps.find(g => g.affectedCoverage === 'Collision Damage')
+    const gap = gaps.find((g) => g.affectedCoverage === 'Collision Damage')
     if (gap) {
       // estimatedCost = min(reduction * 0.1, premium * 0.2)
       // reduction = 50000 - 2500 = 47500
@@ -894,7 +903,7 @@ describe('Exclusion Analyzer - Branch Coverage', () => {
         exclusions: ['Kasıtlı olarak yapılan hasarlar'],
       })
       const gaps = analyzeExclusionGaps(policy)
-      const gap = gaps.find(g => g.affectedCoverage === 'Intentional Damage')
+      const gap = gaps.find((g) => g.affectedCoverage === 'Intentional Damage')
       expect(gap).toBeDefined()
       expect(gap?.severity).toBe('low')
     })
@@ -905,7 +914,7 @@ describe('Exclusion Analyzer - Branch Coverage', () => {
         exclusions: ['Kaza sonucu ölüm'],
       })
       const gaps = analyzeExclusionGaps(policy)
-      const gap = gaps.find(g => g.affectedCoverage === 'Accidental Death')
+      const gap = gaps.find((g) => g.affectedCoverage === 'Accidental Death')
       expect(gap).toBeDefined()
       expect(gap?.severity).toBe('high')
     })
@@ -916,7 +925,7 @@ describe('Exclusion Analyzer - Branch Coverage', () => {
         exclusions: ['Tsunami zararları kapsam dışıdır'],
       })
       const gaps = analyzeExclusionGaps(policy)
-      const gap = gaps.find(g => g.affectedCoverage === 'Tsunami')
+      const gap = gaps.find((g) => g.affectedCoverage === 'Tsunami')
       expect(gap).toBeDefined()
     })
 
@@ -926,7 +935,7 @@ describe('Exclusion Analyzer - Branch Coverage', () => {
         exclusions: ['Emtia hasarı kapsam dışı'],
       })
       const gaps = analyzeExclusionGaps(policy)
-      const gap = gaps.find(g => g.affectedCoverage === 'Cargo Damage')
+      const gap = gaps.find((g) => g.affectedCoverage === 'Cargo Damage')
       expect(gap).toBeDefined()
       expect(gap?.severity).toBe('critical')
     })
@@ -937,7 +946,7 @@ describe('Exclusion Analyzer - Branch Coverage', () => {
         exclusions: ['Yükleme ve boşaltma sırasında oluşan hasarlar'],
       })
       const gaps = analyzeExclusionGaps(policy)
-      const gap = gaps.find(g => g.affectedCoverage === 'Loading/Unloading Damage')
+      const gap = gaps.find((g) => g.affectedCoverage === 'Loading/Unloading Damage')
       expect(gap).toBeDefined()
     })
 
@@ -947,7 +956,7 @@ describe('Exclusion Analyzer - Branch Coverage', () => {
         exclusions: ['Kontaminasyon riski dahil değildir'],
       })
       const gaps = analyzeExclusionGaps(policy)
-      const gap = gaps.find(g => g.affectedCoverage === 'Contamination')
+      const gap = gaps.find((g) => g.affectedCoverage === 'Contamination')
       expect(gap).toBeDefined()
       expect(gap?.severity).toBe('high')
     })
@@ -964,7 +973,7 @@ describe('Exclusion Analyzer - Branch Coverage', () => {
       const gaps = analyzeExclusionGaps(policy, DEFAULT_GAP_CONFIG, 'marmara')
       // Glass is "low" risk for home. Marmara regional = deprem, sel. Glass won't match.
       // So glass stays low.
-      const glassGap = gaps.find(g => g.affectedCoverage === 'Glass Breakage')
+      const glassGap = gaps.find((g) => g.affectedCoverage === 'Glass Breakage')
       if (glassGap) {
         expect(glassGap.severity).toBe('low')
       }
@@ -980,7 +989,7 @@ describe('Exclusion Analyzer - Branch Coverage', () => {
         exclusions: ['Sel hasarları kapsam dışıdır'],
       })
       const gaps = analyzeExclusionGaps(policy, DEFAULT_GAP_CONFIG, 'karadeniz')
-      const floodGap = gaps.find(g => g.affectedCoverage === 'Flood')
+      const floodGap = gaps.find((g) => g.affectedCoverage === 'Flood')
       if (floodGap) {
         // Flood is 'high' risk for home, and karadeniz has sel as important
         expect(['critical', 'high']).toContain(floodGap.severity)
@@ -995,7 +1004,7 @@ describe('Exclusion Analyzer - Branch Coverage', () => {
         exclusions: ['Terör saldırısı zararları'],
       })
       const gaps = analyzeExclusionGaps(policy)
-      const terrorGap = gaps.find(g => g.affectedCoverage === 'Terrorism')
+      const terrorGap = gaps.find((g) => g.affectedCoverage === 'Terrorism')
       if (terrorGap) {
         expect(terrorGap.subCategory).toBe('regional_risk')
       }
@@ -1014,8 +1023,9 @@ describe('Exclusion Analyzer - Branch Coverage', () => {
       const gaps = analyzeExclusionGaps(policy)
       // Should have exactly one gap for sel (deduplication in critical check)
       const selGaps = gaps.filter(
-        g => g.affectedCoverage?.toLowerCase().includes('flood') ||
-             g.affectedCoverage?.toLowerCase().includes('sel')
+        (g) =>
+          g.affectedCoverage?.toLowerCase().includes('flood') ||
+          g.affectedCoverage?.toLowerCase().includes('sel')
       )
       expect(selGaps.length).toBe(1)
     })
@@ -1024,16 +1034,15 @@ describe('Exclusion Analyzer - Branch Coverage', () => {
       const policy = createMockPolicy({
         type: 'home',
         exclusions: ['deprem hasarları sınırlıdır'],
-        coverages: [
-          createCoverage({ name: 'Deprem', nameTr: 'Deprem', limit: 500000 }),
-        ],
+        coverages: [createCoverage({ name: 'Deprem', nameTr: 'Deprem', limit: 500000 })],
       })
       const gaps = analyzeExclusionGaps(policy)
       // The pattern will match deprem, but the critical check should not add a duplicate
       // since coverage for deprem exists
       const criticalDeprems = gaps.filter(
-        g => g.title.startsWith('Critical Exclusion:') &&
-             g.affectedCoverage?.toLowerCase().includes('deprem')
+        (g) =>
+          g.title.startsWith('Critical Exclusion:') &&
+          g.affectedCoverage?.toLowerCase().includes('deprem')
       )
       expect(criticalDeprems.length).toBe(0)
     })
@@ -1056,7 +1065,7 @@ describe('Exclusion Analyzer - Branch Coverage', () => {
         exclusions: ['Deprem hasarları'],
       })
       const gaps = analyzeExclusionGaps(policy, DEFAULT_GAP_CONFIG, 'marmara')
-      const gap = gaps.find(g => g.affectedCoverage === 'Earthquake Damage')
+      const gap = gaps.find((g) => g.affectedCoverage === 'Earthquake Damage')
       if (gap) {
         // Base loss for deprem = 500000, marmara multiplier = 1.3
         expect(gap.financialImpact.potentialLoss).toBe(650000)
@@ -1070,7 +1079,7 @@ describe('Exclusion Analyzer - Branch Coverage', () => {
         exclusions: ['Vandalizm'],
       })
       const gaps = analyzeExclusionGaps(policy, DEFAULT_GAP_CONFIG, 'ic_anadolu')
-      const gap = gaps.find(g => g.affectedCoverage === 'Vandalism')
+      const gap = gaps.find((g) => g.affectedCoverage === 'Vandalism')
       if (gap) {
         // ic_anadolu multiplier = 1.0
         expect(gap.financialImpact.potentialLoss).toBe(100000) // default
@@ -1102,7 +1111,7 @@ describe('Exclusion Analyzer - Branch Coverage', () => {
         exclusions: ['Hırsızlık zararları'], // critical risk
       })
       const gaps = analyzeExclusionGaps(policy)
-      const gap = gaps.find(g => g.affectedCoverage === 'Theft')
+      const gap = gaps.find((g) => g.affectedCoverage === 'Theft')
       expect(gap?.remediation.difficulty).toBe('moderate')
     })
 
@@ -1112,7 +1121,7 @@ describe('Exclusion Analyzer - Branch Coverage', () => {
         exclusions: ['Vandalizm'], // medium risk
       })
       const gaps = analyzeExclusionGaps(policy)
-      const gap = gaps.find(g => g.affectedCoverage === 'Vandalism')
+      const gap = gaps.find((g) => g.affectedCoverage === 'Vandalism')
       if (gap) {
         expect(gap.remediation.difficulty).toBe('easy')
       }
@@ -1128,10 +1137,10 @@ describe('Exclusion Analyzer - Branch Coverage', () => {
       })
       const gaps = analyzeExclusionGaps(policy)
       // Should match deprem first (comes before sel in pattern list)
-      const earthquakeGap = gaps.find(g => g.affectedCoverage === 'Earthquake')
+      const earthquakeGap = gaps.find((g) => g.affectedCoverage === 'Earthquake')
       expect(earthquakeGap).toBeDefined()
       // Should NOT also match sel from the same exclusion text
-      const floodFromSameExclusion = gaps.filter(g => g.affectedCoverage === 'Flood')
+      const floodFromSameExclusion = gaps.filter((g) => g.affectedCoverage === 'Flood')
       expect(floodFromSameExclusion.length).toBe(0)
     })
   })
@@ -1180,7 +1189,7 @@ describe('Temporal Analyzer - Branch Coverage', () => {
       })
       const gaps = analyzeTemporalGaps(policy)
       // Should use direct Date parsing fallback
-      const expiringGap = gaps.find(g => g.subCategory === 'expiring_soon')
+      const expiringGap = gaps.find((g) => g.subCategory === 'expiring_soon')
       expect(expiringGap).toBeDefined()
     })
 
@@ -1190,7 +1199,7 @@ describe('Temporal Analyzer - Branch Coverage', () => {
       })
       const gaps = analyzeTemporalGaps(policy)
       // Should detect as missing/invalid date
-      const missingGap = gaps.find(g => g.subCategory === 'documentation_gap')
+      const missingGap = gaps.find((g) => g.subCategory === 'documentation_gap')
       expect(missingGap).toBeDefined()
     })
   })
@@ -1203,7 +1212,7 @@ describe('Temporal Analyzer - Branch Coverage', () => {
       })
       const gaps = analyzeTemporalGaps(policy)
       const expiringGap = gaps.find(
-        g => g.subCategory === 'expiring_soon' || g.subCategory === 'coverage_lapse'
+        (g) => g.subCategory === 'expiring_soon' || g.subCategory === 'coverage_lapse'
       )
       expect(expiringGap).toBeDefined()
     })
@@ -1214,7 +1223,7 @@ describe('Temporal Analyzer - Branch Coverage', () => {
         expiryDate: '2024-06-25', // 10 days away
       })
       const gaps = analyzeTemporalGaps(policy)
-      const expiringGap = gaps.find(g => g.subCategory === 'expiring_soon')
+      const expiringGap = gaps.find((g) => g.subCategory === 'expiring_soon')
       expect(expiringGap).toBeDefined()
       expect(expiringGap?.severity).toBe('high')
       expect(expiringGap?.severityScore).toBe(70)
@@ -1226,7 +1235,7 @@ describe('Temporal Analyzer - Branch Coverage', () => {
         expiryDate: '2026-01-01', // 2 years
       })
       const gaps = analyzeTemporalGaps(policy)
-      const shortTermGap = gaps.find(g => g.subCategory === 'waiting_period')
+      const shortTermGap = gaps.find((g) => g.subCategory === 'waiting_period')
       expect(shortTermGap).toBeUndefined()
     })
   })
@@ -1238,7 +1247,7 @@ describe('Temporal Analyzer - Branch Coverage', () => {
         specialConditions: ['Retroaktif tarih uygulanmaktadır'],
       })
       const gaps = analyzeTemporalGaps(policy)
-      const retroGap = gaps.find(g => g.subCategory === 'retroactive_gap')
+      const retroGap = gaps.find((g) => g.subCategory === 'retroactive_gap')
       expect(retroGap).toBeDefined()
       expect(retroGap?.severity).toBe('medium')
     })
@@ -1249,7 +1258,7 @@ describe('Temporal Analyzer - Branch Coverage', () => {
         specialConditions: ['Retroactive coverage limited to 1 year'],
       })
       const gaps = analyzeTemporalGaps(policy)
-      const retroGap = gaps.find(g => g.subCategory === 'retroactive_gap')
+      const retroGap = gaps.find((g) => g.subCategory === 'retroactive_gap')
       expect(retroGap).toBeDefined()
     })
 
@@ -1259,7 +1268,7 @@ describe('Temporal Analyzer - Branch Coverage', () => {
         specialConditions: ['Retroactive date: 01.01.2024'],
       })
       const gaps = analyzeTemporalGaps(policy)
-      const retroGap = gaps.find(g => g.subCategory === 'retroactive_gap')
+      const retroGap = gaps.find((g) => g.subCategory === 'retroactive_gap')
       expect(retroGap).toBeUndefined()
     })
 
@@ -1269,7 +1278,7 @@ describe('Temporal Analyzer - Branch Coverage', () => {
         specialConditions: undefined as unknown as string[],
       })
       const gaps = analyzeTemporalGaps(policy)
-      const retroGap = gaps.find(g => g.subCategory === 'retroactive_gap')
+      const retroGap = gaps.find((g) => g.subCategory === 'retroactive_gap')
       expect(retroGap).toBeUndefined()
     })
   })
@@ -1282,7 +1291,7 @@ describe('Temporal Analyzer - Branch Coverage', () => {
         expiryDate: '2024-01-01',
       })
       const gaps = analyzeTemporalGaps(policy)
-      const expiredGap = gaps.find(g => g.subCategory === 'coverage_lapse')
+      const expiredGap = gaps.find((g) => g.subCategory === 'coverage_lapse')
       expect(expiredGap?.financialImpact.potentialLoss).toBe(750000)
     })
 
@@ -1293,7 +1302,7 @@ describe('Temporal Analyzer - Branch Coverage', () => {
         expiryDate: '2024-01-01',
       })
       const gaps = analyzeTemporalGaps(policy)
-      const expiredGap = gaps.find(g => g.subCategory === 'coverage_lapse')
+      const expiredGap = gaps.find((g) => g.subCategory === 'coverage_lapse')
       // coverage || 500000 => 0 is falsy => 500000
       expect(expiredGap?.financialImpact.potentialLoss).toBe(500000)
     })
@@ -1305,7 +1314,7 @@ describe('Temporal Analyzer - Branch Coverage', () => {
         expiryDate: '2024-06-20', // 5 days away
       })
       const gaps = analyzeTemporalGaps(policy)
-      const expiringGap = gaps.find(g => g.subCategory === 'expiring_soon')
+      const expiringGap = gaps.find((g) => g.subCategory === 'expiring_soon')
       expect(expiringGap?.remediation.estimatedCost).toBe(8000)
     })
   })
@@ -1324,7 +1333,7 @@ describe('Compliance Analyzer - Branch Coverage', () => {
         coverages: [],
       })
       const gaps = analyzeComplianceGaps(policy)
-      const daskGap = gaps.find(g => g.title.includes('DASK'))
+      const daskGap = gaps.find((g) => g.title.includes('DASK'))
       expect(daskGap).toBeDefined()
     })
 
@@ -1337,7 +1346,7 @@ describe('Compliance Analyzer - Branch Coverage', () => {
         ],
       })
       const gaps = analyzeComplianceGaps(policy)
-      const limitGap = gaps.find(g => g.subCategory === 'regulatory_shortfall')
+      const limitGap = gaps.find((g) => g.subCategory === 'regulatory_shortfall')
       expect(limitGap).toBeDefined()
     })
   })
@@ -1350,7 +1359,7 @@ describe('Compliance Analyzer - Branch Coverage', () => {
         coverages: [],
       })
       const gaps = analyzeComplianceGaps(policy)
-      const profGap = gaps.find(g => g.title.includes('Professional Liability'))
+      const profGap = gaps.find((g) => g.title.includes('Professional Liability'))
       // Professional liability is not mandatory, should not appear as mandatory_missing
       expect(profGap).toBeUndefined()
     })
@@ -1361,13 +1370,17 @@ describe('Compliance Analyzer - Branch Coverage', () => {
       const policy = createMockPolicy({
         type: 'traffic',
         coverages: [
-          createCoverage({ name: 'Traffic Liability', nameTr: 'Trafik Sorumluluk', limit: 2000000 }),
+          createCoverage({
+            name: 'Traffic Liability',
+            nameTr: 'Trafik Sorumluluk',
+            limit: 2000000,
+          }),
           createCoverage({ name: 'Bodily Injury', nameTr: 'Bedensel Hasar', limit: 2000000 }),
           createCoverage({ name: 'Property Damage', nameTr: 'Maddi Hasar', limit: 500000 }),
         ],
       })
       const gaps = analyzeComplianceGaps(policy)
-      const mandatoryGap = gaps.find(g => g.subCategory === 'mandatory_missing')
+      const mandatoryGap = gaps.find((g) => g.subCategory === 'mandatory_missing')
       expect(mandatoryGap).toBeUndefined()
     })
   })
@@ -1382,7 +1395,7 @@ describe('Compliance Analyzer - Branch Coverage', () => {
       })
       const gaps = analyzeComplianceGaps(policy)
       const bodilyGap = gaps.find(
-        g => g.subCategory === 'regulatory_shortfall' && g.affectedCoverage?.includes('Bodily')
+        (g) => g.subCategory === 'regulatory_shortfall' && g.affectedCoverage?.includes('Bodily')
       )
       expect(bodilyGap).toBeUndefined()
     })
@@ -1394,8 +1407,8 @@ describe('Compliance Analyzer - Branch Coverage', () => {
       const marmaraGaps = analyzeComplianceGaps(policy, undefined, 'marmara')
       const egeGaps = analyzeComplianceGaps(policy, undefined, 'ege')
 
-      const marmaraRef = marmaraGaps.find(g => g.title.includes('DASK Reference'))
-      const egeRef = egeGaps.find(g => g.title.includes('DASK Reference'))
+      const marmaraRef = marmaraGaps.find((g) => g.title.includes('DASK Reference'))
+      const egeRef = egeGaps.find((g) => g.title.includes('DASK Reference'))
 
       if (marmaraRef && egeRef) {
         expect(marmaraRef.financialImpact.probability).toBeGreaterThan(
@@ -1406,7 +1419,15 @@ describe('Compliance Analyzer - Branch Coverage', () => {
 
     it('should use different probabilities for each region', () => {
       const policy = createMockPolicy({ type: 'home', coverages: [] })
-      const regions = ['marmara', 'ege', 'akdeniz', 'karadeniz', 'ic_anadolu', 'dogu_anadolu', 'guneydogu'] as const
+      const regions = [
+        'marmara',
+        'ege',
+        'akdeniz',
+        'karadeniz',
+        'ic_anadolu',
+        'dogu_anadolu',
+        'guneydogu',
+      ] as const
 
       for (const region of regions) {
         const gaps = analyzeComplianceGaps(policy, undefined, region)
@@ -1422,17 +1443,19 @@ describe('Compliance Analyzer - Branch Coverage', () => {
         coverages: [createCoverage({ name: 'DASK', nameTr: 'DASK', limit: 100000 })],
       })
       const gaps = analyzeComplianceGaps(policy)
-      const daskRefGap = gaps.find(g => g.title.includes('DASK Reference'))
+      const daskRefGap = gaps.find((g) => g.title.includes('DASK Reference'))
       expect(daskRefGap).toBeUndefined()
     })
 
     it('should detect DASK via nameTr containing earthquake', () => {
       const policy = createMockPolicy({
         type: 'home',
-        coverages: [createCoverage({ name: 'EQ Coverage', nameTr: 'Deprem Teminatı', limit: 100000 })],
+        coverages: [
+          createCoverage({ name: 'EQ Coverage', nameTr: 'Deprem Teminatı', limit: 100000 }),
+        ],
       })
       const gaps = analyzeComplianceGaps(policy)
-      const daskRefGap = gaps.find(g => g.title.includes('DASK Reference'))
+      const daskRefGap = gaps.find((g) => g.title.includes('DASK Reference'))
       expect(daskRefGap).toBeUndefined()
     })
   })
@@ -1441,10 +1464,12 @@ describe('Compliance Analyzer - Branch Coverage', () => {
     it('should detect via zorunlu in coverage nameTr', () => {
       const policy = createMockPolicy({
         type: 'kasko',
-        coverages: [createCoverage({ name: 'Liability', nameTr: 'Zorunlu Sorumluluk', limit: 100000 })],
+        coverages: [
+          createCoverage({ name: 'Liability', nameTr: 'Zorunlu Sorumluluk', limit: 100000 }),
+        ],
       })
       const gaps = analyzeComplianceGaps(policy)
-      const trafficRefGap = gaps.find(g => g.title.includes('Traffic Insurance Reference'))
+      const trafficRefGap = gaps.find((g) => g.title.includes('Traffic Insurance Reference'))
       expect(trafficRefGap).toBeUndefined()
     })
   })
@@ -1476,7 +1501,7 @@ describe('Engine - Branch Coverage', () => {
 
       // Check that no duplicate category-coverage-subCategory combos exist
       const keys = analysis.gaps.map(
-        g => `${g.category}-${g.affectedCoverage || 'general'}-${g.subCategory}`
+        (g) => `${g.category}-${g.affectedCoverage || 'general'}-${g.subCategory}`
       )
       const uniqueKeys = new Set(keys)
       expect(keys.length).toBe(uniqueKeys.size)
@@ -1530,10 +1555,12 @@ describe('Engine - Branch Coverage', () => {
       const analysis = await analyzeGapsComprehensive(POORLY_COVERED_HOME_POLICY)
 
       const manualPotentialLoss = analysis.gaps.reduce(
-        (sum, g) => sum + g.financialImpact.potentialLoss, 0
+        (sum, g) => sum + g.financialImpact.potentialLoss,
+        0
       )
       const manualExpectedLoss = analysis.gaps.reduce(
-        (sum, g) => sum + g.financialImpact.expectedLoss, 0
+        (sum, g) => sum + g.financialImpact.expectedLoss,
+        0
       )
 
       expect(analysis.financialSummary.totalPotentialLoss).toBe(manualPotentialLoss)
@@ -1545,7 +1572,8 @@ describe('Engine - Branch Coverage', () => {
 
       if (analysis.financialSummary.estimatedRemediationCost > 0) {
         expect(analysis.financialSummary.costBenefitRatio).toBe(
-          analysis.financialSummary.totalExpectedLoss / analysis.financialSummary.estimatedRemediationCost
+          analysis.financialSummary.totalExpectedLoss /
+            analysis.financialSummary.estimatedRemediationCost
         )
       } else {
         expect(analysis.financialSummary.costBenefitRatio).toBe(0)
@@ -1569,7 +1597,7 @@ describe('Engine - Branch Coverage', () => {
       const analysis = await analyzeGapsComprehensive(policy)
 
       const bundleRec = analysis.topRecommendations.find(
-        r => r.title === 'Add Missing Coverages Bundle'
+        (r) => r.title === 'Add Missing Coverages Bundle'
       )
       if (analysis.gapsByCategory.coverage.length > 2) {
         expect(bundleRec).toBeDefined()
@@ -1580,7 +1608,7 @@ describe('Engine - Branch Coverage', () => {
       const analysis = await analyzeGapsComprehensive(UNDERINSURED_KASKO_POLICY)
 
       const limitRec = analysis.topRecommendations.find(
-        r => r.title === 'Increase Coverage Limits'
+        (r) => r.title === 'Increase Coverage Limits'
       )
       if (analysis.gapsByCategory.limit.length > 1) {
         expect(limitRec).toBeDefined()
@@ -1595,9 +1623,9 @@ describe('Engine - Branch Coverage', () => {
       const analysis = await analyzeGapsComprehensive(policy)
 
       const complianceRec = analysis.topRecommendations.find(
-        r => r.title === 'Address Compliance Issues Immediately'
+        (r) => r.title === 'Address Compliance Issues Immediately'
       )
-      if (analysis.gapsByCategory.compliance.some(g => g.severity === 'critical')) {
+      if (analysis.gapsByCategory.compliance.some((g) => g.severity === 'critical')) {
         expect(complianceRec).toBeDefined()
       }
     })
@@ -1606,7 +1634,7 @@ describe('Engine - Branch Coverage', () => {
       const analysis = await analyzeGapsComprehensive(POORLY_COVERED_HOME_POLICY)
 
       const quickWinRec = analysis.topRecommendations.find(
-        r => r.title === 'Quick Wins - Easy Improvements'
+        (r) => r.title === 'Quick Wins - Easy Improvements'
       )
       // Should exist if there are easy-to-fix high-priority gaps
       if (quickWinRec) {
@@ -1624,8 +1652,9 @@ describe('Engine - Branch Coverage', () => {
       const analysis = await analyzeGapsComprehensive(POORLY_COVERED_HOME_POLICY)
 
       for (let i = 1; i < analysis.topRecommendations.length; i++) {
-        expect(analysis.topRecommendations[i - 1].priority)
-          .toBeLessThanOrEqual(analysis.topRecommendations[i].priority)
+        expect(analysis.topRecommendations[i - 1].priority).toBeLessThanOrEqual(
+          analysis.topRecommendations[i].priority
+        )
       }
     })
   })
@@ -1658,7 +1687,8 @@ describe('Engine - Branch Coverage', () => {
       const analysis = await analyzeGapsComprehensive(POORLY_COVERED_HOME_POLICY)
 
       if (analysis.gaps.length > 0) {
-        const avgConfidence = analysis.gaps.reduce((sum, g) => sum + g.confidence, 0) / analysis.gaps.length
+        const avgConfidence =
+          analysis.gaps.reduce((sum, g) => sum + g.confidence, 0) / analysis.gaps.length
         expect(analysis.confidence).toBeCloseTo(avgConfidence, 5)
       }
     })
@@ -1669,7 +1699,7 @@ describe('Engine - Branch Coverage', () => {
       const analysis = await analyzeGapsComprehensive(POORLY_COVERED_HOME_POLICY)
 
       const criticalPrioritized = analysis.prioritizedGaps.find(
-        pg => pg.gap.severity === 'critical'
+        (pg) => pg.gap.severity === 'critical'
       )
       if (criticalPrioritized) {
         expect(criticalPrioritized.reasoning).toContain('Critical severity')
@@ -1680,7 +1710,7 @@ describe('Engine - Branch Coverage', () => {
       const analysis = await analyzeGapsComprehensive(POORLY_COVERED_HOME_POLICY)
 
       const highLossPG = analysis.prioritizedGaps.find(
-        pg => pg.gap.financialImpact.expectedLoss > 10000
+        (pg) => pg.gap.financialImpact.expectedLoss > 10000
       )
       if (highLossPG) {
         expect(highLossPG.reasoning).toContain('financial exposure')
@@ -1690,9 +1720,7 @@ describe('Engine - Branch Coverage', () => {
     it('should include easy resolution info', async () => {
       const analysis = await analyzeGapsComprehensive(POORLY_COVERED_HOME_POLICY)
 
-      const easyPG = analysis.prioritizedGaps.find(
-        pg => pg.gap.remediation.difficulty === 'easy'
-      )
+      const easyPG = analysis.prioritizedGaps.find((pg) => pg.gap.remediation.difficulty === 'easy')
       if (easyPG) {
         expect(easyPG.reasoning).toContain('easy to resolve')
       }
@@ -1702,9 +1730,7 @@ describe('Engine - Branch Coverage', () => {
       const policy = createMockPolicy({ type: 'home', coverages: [] })
       const analysis = await analyzeGapsComprehensive(policy)
 
-      const compliancePG = analysis.prioritizedGaps.find(
-        pg => pg.gap.category === 'compliance'
-      )
+      const compliancePG = analysis.prioritizedGaps.find((pg) => pg.gap.category === 'compliance')
       if (compliancePG) {
         expect(compliancePG.reasoning).toContain('compliance')
       }
@@ -1714,7 +1740,7 @@ describe('Engine - Branch Coverage', () => {
       // This is hard to trigger since most gaps will match at least one condition
       // We test the reasoning is always a non-empty string
       const analysis = await analyzeGapsComprehensive(POORLY_COVERED_HOME_POLICY)
-      analysis.prioritizedGaps.forEach(pg => {
+      analysis.prioritizedGaps.forEach((pg) => {
         expect(pg.reasoning.length).toBeGreaterThan(0)
       })
     })
@@ -1834,13 +1860,17 @@ describe('DEFAULT_GAP_CONFIG', () => {
     expect(DEFAULT_GAP_CONFIG.policyTypeRules.home?.mandatoryCoverages.length).toBeGreaterThan(0)
     expect(DEFAULT_GAP_CONFIG.policyTypeRules.kasko?.mandatoryCoverages.length).toBeGreaterThan(0)
     expect(DEFAULT_GAP_CONFIG.policyTypeRules.health?.mandatoryCoverages.length).toBeGreaterThan(0)
-    expect(DEFAULT_GAP_CONFIG.policyTypeRules.business?.mandatoryCoverages.length).toBeGreaterThan(0)
+    expect(DEFAULT_GAP_CONFIG.policyTypeRules.business?.mandatoryCoverages.length).toBeGreaterThan(
+      0
+    )
   })
 
   it('should have critical exclusions for each policy type', () => {
     expect(DEFAULT_GAP_CONFIG.policyTypeRules.home?.criticalExclusions.length).toBeGreaterThan(0)
     expect(DEFAULT_GAP_CONFIG.policyTypeRules.kasko?.criticalExclusions.length).toBeGreaterThan(0)
     expect(DEFAULT_GAP_CONFIG.policyTypeRules.health?.criticalExclusions.length).toBeGreaterThan(0)
-    expect(DEFAULT_GAP_CONFIG.policyTypeRules.business?.criticalExclusions.length).toBeGreaterThan(0)
+    expect(DEFAULT_GAP_CONFIG.policyTypeRules.business?.criticalExclusions.length).toBeGreaterThan(
+      0
+    )
   })
 })

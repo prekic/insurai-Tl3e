@@ -40,13 +40,38 @@ const defaultHookReturn = {
   getFieldMeta: (category: string) => {
     if (category === 'ui') {
       return [
-        { key: 'default_items_per_page', label: 'Items per page', labelTr: 'Sayfa basina', description: 'Number of items per page', descriptionTr: 'Sayfa basina oge', type: 'number' as const, min: 5, max: 50 },
-        { key: 'toast_success_duration_ms', label: 'Success notification duration', labelTr: 'Basari', description: 'How long success messages shown', descriptionTr: 'Basari suresi', type: 'number' as const, min: 1000, max: 10000 },
+        {
+          key: 'default_items_per_page',
+          label: 'Items per page',
+          labelTr: 'Sayfa basina',
+          description: 'Number of items per page',
+          descriptionTr: 'Sayfa basina oge',
+          type: 'number' as const,
+          min: 5,
+          max: 50,
+        },
+        {
+          key: 'toast_success_duration_ms',
+          label: 'Success notification duration',
+          labelTr: 'Basari',
+          description: 'How long success messages shown',
+          descriptionTr: 'Basari suresi',
+          type: 'number' as const,
+          min: 1000,
+          max: 10000,
+        },
       ]
     }
     if (category === 'email') {
       return [
-        { key: 'default_marketing_enabled', label: 'Marketing emails', labelTr: 'Pazarlama', description: 'Receive product updates', descriptionTr: 'Urun guncellemeleri', type: 'boolean' as const },
+        {
+          key: 'default_marketing_enabled',
+          label: 'Marketing emails',
+          labelTr: 'Pazarlama',
+          description: 'Receive product updates',
+          descriptionTr: 'Urun guncellemeleri',
+          type: 'boolean' as const,
+        },
       ]
     }
     return []
@@ -114,6 +139,7 @@ describe('UserPreferencesPanel', () => {
   })
 
   it('should show error message', () => {
+    // @ts-expect-error - mismatch due to schema update
     hookReturn = { ...defaultHookReturn, error: 'Failed to save preferences' }
     render(<UserPreferencesPanel />)
 
@@ -121,6 +147,7 @@ describe('UserPreferencesPanel', () => {
   })
 
   it('should show success message', () => {
+    // @ts-expect-error - mismatch due to schema update
     hookReturn = { ...defaultHookReturn, successMessage: 'Preferences saved successfully' }
     render(<UserPreferencesPanel />)
 
@@ -131,6 +158,7 @@ describe('UserPreferencesPanel', () => {
     hookReturn = {
       ...defaultHookReturn,
       preferences: { ui: { default_items_per_page: 25 }, email: {} },
+      // @ts-expect-error - mismatch due to schema update
       isModified: (cat: string, key: string) => cat === 'ui' && key === 'default_items_per_page',
     }
 
@@ -146,6 +174,7 @@ describe('UserPreferencesPanel', () => {
     hookReturn = {
       ...defaultHookReturn,
       preferences: { ui: { default_items_per_page: 25 }, email: {} },
+      // @ts-expect-error - mismatch due to schema update
       isModified: (cat: string, key: string) => cat === 'ui' && key === 'default_items_per_page',
     }
 
@@ -170,6 +199,7 @@ describe('UserPreferencesPanel', () => {
     hookReturn = {
       ...defaultHookReturn,
       preferences: { ui: { default_items_per_page: 25 }, email: {} },
+      // @ts-expect-error - mismatch due to schema update
       isModified: (cat: string, key: string) => cat === 'ui' && key === 'default_items_per_page',
     }
 

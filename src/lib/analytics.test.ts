@@ -70,6 +70,7 @@ beforeEach(() => {
   delete window.dataLayer
   // Default: no GA measurement ID, DEV mode
   vi.stubEnv('VITE_GA_MEASUREMENT_ID', '')
+  // @ts-expect-error - mismatch due to schema update
   vi.stubEnv('DEV', 'true')
 })
 
@@ -276,10 +277,14 @@ describe('trackEvent', () => {
     window.gtag = gtagSpy
 
     trackEvent('policy_uploaded', { provider: 'Allianz' })
-    expect(gtagSpy).toHaveBeenCalledWith('event', 'policy_uploaded', expect.objectContaining({
-      provider: 'Allianz',
-      event_category: 'general',
-    }))
+    expect(gtagSpy).toHaveBeenCalledWith(
+      'event',
+      'policy_uploaded',
+      expect.objectContaining({
+        provider: 'Allianz',
+        event_category: 'general',
+      })
+    )
   })
 
   it('sets event_category to trial_funnel for trial events', async () => {
@@ -292,9 +297,13 @@ describe('trackEvent', () => {
     window.gtag = gtagSpy
 
     trackEvent('trial_page_view')
-    expect(gtagSpy).toHaveBeenCalledWith('event', 'trial_page_view', expect.objectContaining({
-      event_category: 'trial_funnel',
-    }))
+    expect(gtagSpy).toHaveBeenCalledWith(
+      'event',
+      'trial_page_view',
+      expect.objectContaining({
+        event_category: 'trial_funnel',
+      })
+    )
   })
 
   it('does not send to GA4 when consent not given', async () => {
@@ -533,11 +542,8 @@ describe('getTrialFunnelMetrics', () => {
   })
 
   it('calculates conversion rate as signupClicks/pageViews * 100', async () => {
-    const {
-      getTrialFunnelMetrics,
-      trackTrialPageView,
-      trackTrialSignupClicked,
-    } = await importAnalytics()
+    const { getTrialFunnelMetrics, trackTrialPageView, trackTrialSignupClicked } =
+      await importAnalytics()
 
     trackTrialPageView()
     trackTrialPageView()

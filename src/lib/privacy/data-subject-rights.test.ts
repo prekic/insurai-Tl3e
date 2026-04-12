@@ -11,26 +11,22 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 // Use vi.hoisted() to avoid TDZ errors since vi.mock is hoisted
 // =============================================================================
 
-const {
-  mockGetUserConsents,
-  mockGetUserConsentStatus,
-  mockRevokeConsent,
-  mockDeleteUserConsents,
-} = vi.hoisted(() => ({
-  mockGetUserConsents: vi.fn().mockResolvedValue([]),
-  mockGetUserConsentStatus: vi.fn().mockResolvedValue({
-    userId: 'test-user-123',
-    consents: {
-      terms_of_service: { granted: true, grantedAt: Date.now() },
-      cookie_essential: { granted: true, grantedAt: Date.now() },
-      cookie_analytics: { granted: true, grantedAt: Date.now() },
-      data_processing: { granted: true, grantedAt: Date.now() },
-    },
-    lastUpdated: Date.now(),
-  }),
-  mockRevokeConsent: vi.fn().mockResolvedValue(undefined),
-  mockDeleteUserConsents: vi.fn().mockResolvedValue(undefined),
-}))
+const { mockGetUserConsents, mockGetUserConsentStatus, mockRevokeConsent, mockDeleteUserConsents } =
+  vi.hoisted(() => ({
+    mockGetUserConsents: vi.fn().mockResolvedValue([]),
+    mockGetUserConsentStatus: vi.fn().mockResolvedValue({
+      userId: 'test-user-123',
+      consents: {
+        terms_of_service: { granted: true, grantedAt: Date.now() },
+        cookie_essential: { granted: true, grantedAt: Date.now() },
+        cookie_analytics: { granted: true, grantedAt: Date.now() },
+        data_processing: { granted: true, grantedAt: Date.now() },
+      },
+      lastUpdated: Date.now(),
+    }),
+    mockRevokeConsent: vi.fn().mockResolvedValue(undefined),
+    mockDeleteUserConsents: vi.fn().mockResolvedValue(undefined),
+  }))
 
 vi.mock('./consent-manager', () => ({
   consentManager: {
@@ -69,6 +65,7 @@ class MockIDBCursor {
   primaryKey: string
   value: unknown
 
+  // @ts-expect-error - TS6133 unused variable
   private store: MockIDBObjectStore
   private keys: string[]
   private index: number
@@ -129,9 +126,10 @@ class MockIDBIndex {
 
   openKeyCursor(range?: { lower?: unknown }): MockIDBRequest {
     const request = new MockIDBRequest()
-    const targetValue = range && 'lower' in (range as Record<string, unknown>)
-      ? (range as Record<string, unknown>).lower
-      : range
+    const targetValue =
+      range && 'lower' in (range as Record<string, unknown>)
+        ? (range as Record<string, unknown>).lower
+        : range
     setTimeout(() => {
       // Find keys matching the index value
       const matchingKeys: string[] = []
@@ -142,7 +140,11 @@ class MockIDBIndex {
         }
       }
       if (matchingKeys.length > 0) {
-        const cursor = new MockIDBCursor(null as unknown as MockIDBObjectStore, matchingKeys, request)
+        const cursor = new MockIDBCursor(
+          null as unknown as MockIDBObjectStore,
+          matchingKeys,
+          request
+        )
         request.succeed(cursor)
       } else {
         request.succeed(null)
@@ -155,6 +157,7 @@ class MockIDBIndex {
 class MockIDBObjectStore {
   name: string
   indexNames: DOMStringList
+  // @ts-expect-error - TS6133 unused variable
   private indexes: string[]
 
   constructor(name: string, indexes: string[] = ['userId', 'type', 'status', 'submittedAt']) {
@@ -164,7 +167,9 @@ class MockIDBObjectStore {
       contains: (n: string) => indexes.includes(n),
       length: indexes.length,
       item: (i: number) => indexes[i] ?? null,
-      [Symbol.iterator]: function* () { yield* indexes },
+      [Symbol.iterator]: function* () {
+        yield* indexes
+      },
     } as DOMStringList
   }
 
@@ -235,6 +240,7 @@ class MockIDBTransaction {
   oncomplete: (() => void) | null = null
   onerror: (() => void) | null = null
   private stores: Map<string, MockIDBObjectStore> = new Map()
+  // @ts-expect-error - TS6133 unused variable
   private storeNames: string[]
 
   constructor(storeNames: string[], _mode?: IDBTransactionMode) {
@@ -243,7 +249,9 @@ class MockIDBTransaction {
       contains: (name: string) => storeNames.includes(name),
       length: storeNames.length,
       item: (index: number) => storeNames[index] ?? null,
-      [Symbol.iterator]: function* () { yield* storeNames },
+      [Symbol.iterator]: function* () {
+        yield* storeNames
+      },
     } as DOMStringList
 
     for (const name of storeNames) {
@@ -262,6 +270,7 @@ class MockIDBTransaction {
 class MockIDBDatabase {
   name: string
   objectStoreNames: DOMStringList
+  // @ts-expect-error - TS6133 unused variable
   private storeNames: string[]
 
   constructor(name: string, storeNames: string[] = ['dsr_requests']) {
@@ -271,7 +280,9 @@ class MockIDBDatabase {
       contains: (name: string) => storeNames.includes(name),
       length: storeNames.length,
       item: (index: number) => storeNames[index] ?? null,
-      [Symbol.iterator]: function* () { yield* storeNames },
+      [Symbol.iterator]: function* () {
+        yield* storeNames
+      },
     } as DOMStringList
   }
 
@@ -422,7 +433,9 @@ describe('DataSubjectRightsManager', () => {
 
           setTimeout(() => {
             if (request.onupgradeneeded) {
-              request.onupgradeneeded({ target: request } as unknown as { target: MockIDBOpenDBRequest })
+              request.onupgradeneeded({ target: request } as unknown as {
+                target: MockIDBOpenDBRequest
+              })
             }
             request.result = db
             request.onsuccess?.()
@@ -444,7 +457,9 @@ describe('DataSubjectRightsManager', () => {
 
           setTimeout(() => {
             if (request.onupgradeneeded) {
-              request.onupgradeneeded({ target: request } as unknown as { target: MockIDBOpenDBRequest })
+              request.onupgradeneeded({ target: request } as unknown as {
+                target: MockIDBOpenDBRequest
+              })
             }
             request.result = db
             request.onsuccess?.()
@@ -511,10 +526,14 @@ describe('DataSubjectRightsManager', () => {
 
     it('should generate unique request IDs', async () => {
       const r1 = await dataSubjectRightsManager.submitRequest({
-        userId: 'u1', email: 'u1@test.com', type: 'access',
+        userId: 'u1',
+        email: 'u1@test.com',
+        type: 'access',
       })
       const r2 = await dataSubjectRightsManager.submitRequest({
-        userId: 'u2', email: 'u2@test.com', type: 'access',
+        userId: 'u2',
+        email: 'u2@test.com',
+        type: 'access',
       })
 
       expect(r1.id).not.toBe(r2.id)
@@ -527,9 +546,9 @@ describe('DataSubjectRightsManager', () => {
 
   describe('processRequest', () => {
     it('should throw "Request not found" for non-existent request', async () => {
-      await expect(
-        dataSubjectRightsManager.processRequest('non-existent-id')
-      ).rejects.toThrow('Request not found')
+      await expect(dataSubjectRightsManager.processRequest('non-existent-id')).rejects.toThrow(
+        'Request not found'
+      )
     })
 
     it('should process an ACCESS request and return completed response', async () => {
@@ -637,7 +656,11 @@ describe('DataSubjectRightsManager', () => {
         lastUpdated: Date.now(),
       })
 
-      const req = await createAndStoreRequest('withdraw_consent', 'withdraw-user', 'withdraw@test.com')
+      const req = await createAndStoreRequest(
+        'withdraw_consent',
+        'withdraw-user',
+        'withdraw@test.com'
+      )
 
       const response = await dataSubjectRightsManager.processRequest(req.id)
 
@@ -664,7 +687,11 @@ describe('DataSubjectRightsManager', () => {
         lastUpdated: Date.now(),
       })
 
-      const req = await createAndStoreRequest('withdraw_consent', 'no-revoke-user', 'norevoke@test.com')
+      const req = await createAndStoreRequest(
+        'withdraw_consent',
+        'no-revoke-user',
+        'norevoke@test.com'
+      )
 
       const response = await dataSubjectRightsManager.processRequest(req.id)
 
@@ -732,9 +759,9 @@ describe('DataSubjectRightsManager', () => {
 
       const req = await createAndStoreRequest('access', 'error-user', 'error@test.com')
 
-      await expect(
-        dataSubjectRightsManager.processRequest(req.id)
-      ).rejects.toThrow('Consent service unavailable')
+      await expect(dataSubjectRightsManager.processRequest(req.id)).rejects.toThrow(
+        'Consent service unavailable'
+      )
 
       // Request should be marked as rejected with reason
       const stored = await dataSubjectRightsManager.getRequest(req.id)
@@ -748,9 +775,9 @@ describe('DataSubjectRightsManager', () => {
 
       const req = await createAndStoreRequest('access', 'non-error-user', 'nonerr@test.com')
 
-      await expect(
-        dataSubjectRightsManager.processRequest(req.id)
-      ).rejects.toBe('string error message')
+      await expect(dataSubjectRightsManager.processRequest(req.id)).rejects.toBe(
+        'string error message'
+      )
 
       const stored = await dataSubjectRightsManager.getRequest(req.id)
       expect(stored?.status).toBe('rejected')
@@ -881,7 +908,11 @@ describe('Convenience functions', () => {
     })
 
     it('should create an erasure request with reason', async () => {
-      const request = await requestDataDeletion('user-delete-2', 'delete2@example.com', 'Account closure')
+      const request = await requestDataDeletion(
+        'user-delete-2',
+        'delete2@example.com',
+        'Account closure'
+      )
       expect(request.type).toBe('erasure')
       expect(request.reason).toBe('Account closure')
     })
@@ -942,14 +973,18 @@ describe('exportUserData', () => {
   it('should filter out technical category from personalDataFields', async () => {
     const data = await exportUserData('filter-user')
     const fields = data.personalDataFields as Array<{ category: string }>
-    const technicalFields = fields.filter(f => f.category === 'technical')
+    const technicalFields = fields.filter((f) => f.category === 'technical')
     expect(technicalFields.length).toBe(0)
   })
 
   it('should include field, category, purpose, purposeTr, retention in personalDataFields', async () => {
     const data = await exportUserData('fields-user')
     const fields = data.personalDataFields as Array<{
-      field: string; category: string; purpose: string; purposeTr: string; retention: string
+      field: string
+      category: string
+      purpose: string
+      purposeTr: string
+      retention: string
     }>
 
     expect(fields.length).toBeGreaterThan(0)
@@ -983,7 +1018,8 @@ describe('collectFromLocalStorage branches', () => {
     vi.stubGlobal('localStorage', {
       length: 2,
       key: (i: number) => ['user_match-user_data', 'unrelated_key'][i] ?? null,
-      getItem: (key: string) => key.includes('match-user') ? JSON.stringify({ found: true }) : null,
+      getItem: (key: string) =>
+        key.includes('match-user') ? JSON.stringify({ found: true }) : null,
       setItem: vi.fn(),
       removeItem: vi.fn(),
       clear: vi.fn(),
@@ -998,7 +1034,8 @@ describe('collectFromLocalStorage branches', () => {
     vi.stubGlobal('localStorage', {
       length: 2,
       key: (i: number) => ['insurai_settings', 'other_key'][i] ?? null,
-      getItem: (key: string) => key.startsWith('insurai_') ? JSON.stringify({ app: true }) : 'value',
+      getItem: (key: string) =>
+        key.startsWith('insurai_') ? JSON.stringify({ app: true }) : 'value',
       setItem: vi.fn(),
       removeItem: vi.fn(),
       clear: vi.fn(),
@@ -1012,7 +1049,7 @@ describe('collectFromLocalStorage branches', () => {
   it('should handle null key from localStorage.key()', async () => {
     vi.stubGlobal('localStorage', {
       length: 2,
-      key: (i: number) => i === 0 ? null : 'insurai_data',
+      key: (i: number) => (i === 0 ? null : 'insurai_data'),
       getItem: () => JSON.stringify({ data: true }),
       setItem: vi.fn(),
       removeItem: vi.fn(),
@@ -1059,7 +1096,9 @@ describe('collectFromLocalStorage branches', () => {
   it('should handle localStorage access error (outer catch)', async () => {
     vi.stubGlobal('localStorage', {
       length: 1,
-      key: () => { throw new Error('Access denied') },
+      key: () => {
+        throw new Error('Access denied')
+      },
       getItem: vi.fn(),
       setItem: vi.fn(),
       removeItem: vi.fn(),
@@ -1185,7 +1224,9 @@ describe('getRecordsForUser branches', () => {
             contains: (n: string) => n === 'policies',
             length: 1,
             item: () => 'policies',
-            [Symbol.iterator]: function* () { yield 'policies' },
+            [Symbol.iterator]: function* () {
+              yield 'policies'
+            },
           } as DOMStringList,
           transaction: (_storeNames: string | string[]) => ({
             objectStore: () => ({
@@ -1193,19 +1234,27 @@ describe('getRecordsForUser branches', () => {
                 contains: () => false, // No userId index!
                 length: 0,
                 item: () => null,
-                [Symbol.iterator]: function* () { /* empty */ },
+                [Symbol.iterator]: function* () {
+                  /* empty */
+                },
               } as DOMStringList,
               getAll: () => {
                 const req = new MockIDBRequest()
                 // Return records where some match userId
-                setTimeout(() => req.succeed([
-                  { userId: 'filter-user', data: 'matched' },
-                  { userId: 'other-user', data: 'not matched' },
-                  { id: 'no-userid', content: 'contains filter-user in stringify' },
-                ]), 0)
+                setTimeout(
+                  () =>
+                    req.succeed([
+                      { userId: 'filter-user', data: 'matched' },
+                      { userId: 'other-user', data: 'not matched' },
+                      { id: 'no-userid', content: 'contains filter-user in stringify' },
+                    ]),
+                  0
+                )
                 return req
               },
-              index: () => { throw new Error('Should not be called') },
+              index: () => {
+                throw new Error('Should not be called')
+              },
             }),
             oncomplete: null,
             onerror: null,
@@ -1240,7 +1289,9 @@ describe('getRecordsForUser branches', () => {
             contains: () => true,
             length: 1,
             item: () => 'policies',
-            [Symbol.iterator]: function* () { yield 'policies' },
+            [Symbol.iterator]: function* () {
+              yield 'policies'
+            },
           } as DOMStringList,
           transaction: () => {
             throw new Error('Transaction creation failed')
@@ -1269,7 +1320,9 @@ describe('getRecordsForUser branches', () => {
             contains: () => true,
             length: 1,
             item: () => 'policies',
-            [Symbol.iterator]: function* () { yield 'policies' },
+            [Symbol.iterator]: function* () {
+              yield 'policies'
+            },
           } as DOMStringList,
           transaction: () => ({
             objectStore: () => ({
@@ -1277,7 +1330,9 @@ describe('getRecordsForUser branches', () => {
                 contains: (n: string) => n === 'userId',
                 length: 1,
                 item: () => 'userId',
-                [Symbol.iterator]: function* () { yield 'userId' },
+                [Symbol.iterator]: function* () {
+                  yield 'userId'
+                },
               } as DOMStringList,
               index: () => ({
                 getAll: () => {
@@ -1314,7 +1369,9 @@ describe('getRecordsForUser branches', () => {
             contains: () => true,
             length: 1,
             item: () => 'events',
-            [Symbol.iterator]: function* () { yield 'events' },
+            [Symbol.iterator]: function* () {
+              yield 'events'
+            },
           } as DOMStringList,
           transaction: () => ({
             objectStore: () => ({
@@ -1322,7 +1379,9 @@ describe('getRecordsForUser branches', () => {
                 contains: () => false, // No userId index
                 length: 0,
                 item: () => null,
-                [Symbol.iterator]: function* () { /* empty */ },
+                [Symbol.iterator]: function* () {
+                  /* empty */
+                },
               } as DOMStringList,
               getAll: () => {
                 const req = new MockIDBRequest()
@@ -1357,7 +1416,9 @@ describe('getRecordsForUser branches', () => {
             contains: () => true,
             length: 1,
             item: () => 'policies',
-            [Symbol.iterator]: function* () { yield 'policies' },
+            [Symbol.iterator]: function* () {
+              yield 'policies'
+            },
           } as DOMStringList,
           transaction: () => ({
             objectStore: () => ({
@@ -1365,7 +1426,9 @@ describe('getRecordsForUser branches', () => {
                 contains: (n: string) => n === 'userId',
                 length: 1,
                 item: () => 'userId',
-                [Symbol.iterator]: function* () { yield 'userId' },
+                [Symbol.iterator]: function* () {
+                  yield 'userId'
+                },
               } as DOMStringList,
               index: () => ({
                 getAll: () => {
@@ -1405,7 +1468,9 @@ describe('getRecordsForUser branches', () => {
             contains: () => true,
             length: 1,
             item: () => 'events',
-            [Symbol.iterator]: function* () { yield 'events' },
+            [Symbol.iterator]: function* () {
+              yield 'events'
+            },
           } as DOMStringList,
           transaction: () => ({
             objectStore: () => ({
@@ -1413,7 +1478,9 @@ describe('getRecordsForUser branches', () => {
                 contains: () => false,
                 length: 0,
                 item: () => null,
-                [Symbol.iterator]: function* () { /* empty */ },
+                [Symbol.iterator]: function* () {
+                  /* empty */
+                },
               } as DOMStringList,
               getAll: () => {
                 const req = new MockIDBRequest()
@@ -1460,14 +1527,16 @@ describe('deleteAllUserData', () => {
 
     const result = await deleteAllUserData('consent-error-user')
 
-    expect(result.errors.some(e => e.includes('consents'))).toBe(true)
+    expect(result.errors.some((e) => e.includes('consents'))).toBe(true)
     expect(result.deleted).toBe(false) // errors.length > 0
   })
 
   it('should track localStorage deletion errors', async () => {
     vi.stubGlobal('localStorage', {
       length: 1,
-      key: () => { throw new Error('Access denied') },
+      key: () => {
+        throw new Error('Access denied')
+      },
       getItem: vi.fn(),
       setItem: vi.fn(),
       removeItem: vi.fn(),
@@ -1476,7 +1545,7 @@ describe('deleteAllUserData', () => {
 
     const result = await deleteAllUserData('ls-error-user')
 
-    expect(result.errors.some(e => e.includes('localStorage'))).toBe(true)
+    expect(result.errors.some((e) => e.includes('localStorage'))).toBe(true)
   })
 
   it('should accumulate errors from multiple IndexedDB databases', async () => {
@@ -1495,12 +1564,13 @@ describe('deleteAllUserData', () => {
     const result = await deleteAllUserData('all-fail-user')
 
     // All 5 IndexedDB databases should fail
-    const idbErrors = result.errors.filter(e =>
-      e.includes('insurai_policies') ||
-      e.includes('insurai_audit') ||
-      e.includes('insurai_ai_cache') ||
-      e.includes('insurai_cost_tracking') ||
-      e.includes('insurai_privacy')
+    const idbErrors = result.errors.filter(
+      (e) =>
+        e.includes('insurai_policies') ||
+        e.includes('insurai_audit') ||
+        e.includes('insurai_ai_cache') ||
+        e.includes('insurai_cost_tracking') ||
+        e.includes('insurai_privacy')
     )
     expect(idbErrors.length).toBe(5)
   })
@@ -1554,7 +1624,7 @@ describe('deleteFromLocalStorage branches', () => {
     const removeItemMock = vi.fn()
     vi.stubGlobal('localStorage', {
       length: 2,
-      key: (i: number) => i === 0 ? null : 'key_user-y_data',
+      key: (i: number) => (i === 0 ? null : 'key_user-y_data'),
       getItem: vi.fn(),
       setItem: vi.fn(),
       removeItem: removeItemMock,
@@ -1612,7 +1682,9 @@ describe('deleteFromStore branches', () => {
             contains: () => true,
             length: 1,
             item: () => 'store1',
-            [Symbol.iterator]: function* () { yield 'store1' },
+            [Symbol.iterator]: function* () {
+              yield 'store1'
+            },
           } as DOMStringList,
           transaction: () => ({
             objectStore: () => {
@@ -1628,7 +1700,9 @@ describe('deleteFromStore branches', () => {
                   contains: () => false, // No userId index!
                   length: 0,
                   item: () => null,
-                  [Symbol.iterator]: function* () { /* empty */ },
+                  [Symbol.iterator]: function* () {
+                    /* empty */
+                  },
                 } as DOMStringList,
                 openCursor: () => {
                   const req = new MockIDBRequest()
@@ -1682,7 +1756,9 @@ describe('deleteFromStore branches', () => {
             contains: () => true,
             length: 1,
             item: () => 'store1',
-            [Symbol.iterator]: function* () { yield 'store1' },
+            [Symbol.iterator]: function* () {
+              yield 'store1'
+            },
           } as DOMStringList,
           transaction: () => ({
             objectStore: () => ({
@@ -1690,7 +1766,9 @@ describe('deleteFromStore branches', () => {
                 contains: (n: string) => n === 'userId',
                 length: 1,
                 item: () => 'userId',
-                [Symbol.iterator]: function* () { yield 'userId' },
+                [Symbol.iterator]: function* () {
+                  yield 'userId'
+                },
               } as DOMStringList,
               index: () => ({
                 openKeyCursor: () => {
@@ -1727,7 +1805,9 @@ describe('deleteFromStore branches', () => {
             contains: () => true,
             length: 1,
             item: () => 'store1',
-            [Symbol.iterator]: function* () { yield 'store1' },
+            [Symbol.iterator]: function* () {
+              yield 'store1'
+            },
           } as DOMStringList,
           transaction: () => ({
             objectStore: () => ({
@@ -1735,7 +1815,9 @@ describe('deleteFromStore branches', () => {
                 contains: () => false,
                 length: 0,
                 item: () => null,
-                [Symbol.iterator]: function* () { /* empty */ },
+                [Symbol.iterator]: function* () {
+                  /* empty */
+                },
               } as DOMStringList,
               openCursor: () => {
                 const req = new MockIDBRequest()
@@ -1770,7 +1852,9 @@ describe('deleteFromStore branches', () => {
             contains: () => true,
             length: 1,
             item: () => 'store1',
-            [Symbol.iterator]: function* () { yield 'store1' },
+            [Symbol.iterator]: function* () {
+              yield 'store1'
+            },
           } as DOMStringList,
           transaction: () => {
             throw new Error('Transaction creation failed')
@@ -1806,7 +1890,9 @@ describe('deleteFromStore branches', () => {
             contains: () => true,
             length: 1,
             item: () => 'store1',
-            [Symbol.iterator]: function* () { yield 'store1' },
+            [Symbol.iterator]: function* () {
+              yield 'store1'
+            },
           } as DOMStringList,
           transaction: () => ({
             objectStore: () => ({
@@ -1814,7 +1900,9 @@ describe('deleteFromStore branches', () => {
                 contains: () => false,
                 length: 0,
                 item: () => null,
-                [Symbol.iterator]: function* () { /* empty */ },
+                [Symbol.iterator]: function* () {
+                  /* empty */
+                },
               } as DOMStringList,
               openCursor: () => {
                 const req = new MockIDBRequest()
@@ -1861,9 +1949,7 @@ describe('deleteFromStore branches', () => {
       open: vi.fn((name: string) => {
         const request = new MockIDBOpenDBRequest()
         let callIndex = 0
-        const records = [
-          { id: 'r1', note: 'Record for json-user inside text' },
-        ]
+        const records = [{ id: 'r1', note: 'Record for json-user inside text' }]
 
         const db = {
           name,
@@ -1871,7 +1957,9 @@ describe('deleteFromStore branches', () => {
             contains: () => true,
             length: 1,
             item: () => 'store1',
-            [Symbol.iterator]: function* () { yield 'store1' },
+            [Symbol.iterator]: function* () {
+              yield 'store1'
+            },
           } as DOMStringList,
           transaction: () => ({
             objectStore: () => ({
@@ -1879,7 +1967,9 @@ describe('deleteFromStore branches', () => {
                 contains: () => false,
                 length: 0,
                 item: () => null,
-                [Symbol.iterator]: function* () { /* empty */ },
+                [Symbol.iterator]: function* () {
+                  /* empty */
+                },
               } as DOMStringList,
               openCursor: () => {
                 const req = new MockIDBRequest()
@@ -1925,9 +2015,7 @@ describe('deleteFromStore branches', () => {
       open: vi.fn((name: string) => {
         const request = new MockIDBOpenDBRequest()
         let callIndex = 0
-        const records = [
-          { id: 'r1', userId: 'completely-different', data: 'unrelated' },
-        ]
+        const records = [{ id: 'r1', userId: 'completely-different', data: 'unrelated' }]
 
         const db = {
           name,
@@ -1935,7 +2023,9 @@ describe('deleteFromStore branches', () => {
             contains: () => true,
             length: 1,
             item: () => 'store1',
-            [Symbol.iterator]: function* () { yield 'store1' },
+            [Symbol.iterator]: function* () {
+              yield 'store1'
+            },
           } as DOMStringList,
           transaction: () => ({
             objectStore: () => ({
@@ -1943,7 +2033,9 @@ describe('deleteFromStore branches', () => {
                 contains: () => false,
                 length: 0,
                 item: () => null,
-                [Symbol.iterator]: function* () { /* empty */ },
+                [Symbol.iterator]: function* () {
+                  /* empty */
+                },
               } as DOMStringList,
               openCursor: () => {
                 const req = new MockIDBRequest()
@@ -2010,7 +2102,11 @@ describe('handleWithdrawConsentRequest detailed branches', () => {
       lastUpdated: Date.now(),
     })
 
-    const req = await createAndStoreRequest('withdraw_consent', 'full-revoke-user', 'fullrevoke@test.com')
+    const req = await createAndStoreRequest(
+      'withdraw_consent',
+      'full-revoke-user',
+      'fullrevoke@test.com'
+    )
     const response = await dataSubjectRightsManager.processRequest(req.id)
 
     expect(response.status).toBe('completed')
@@ -2097,6 +2193,7 @@ describe('storeRequest/updateRequest transaction error branches', () => {
   it('should resolve on transaction onerror in storeRequest', async () => {
     // The mock auto-completes transaction; test the onerror path by
     // overriding so the transaction fires onerror instead
+    // @ts-expect-error - TS6133 unused variable
     const _originalOpen = (globalThis.indexedDB as unknown as { open: typeof vi.fn }).open
     vi.stubGlobal('indexedDB', {
       open: vi.fn((name: string, _version?: number) => {
@@ -2107,7 +2204,9 @@ describe('storeRequest/updateRequest transaction error branches', () => {
             contains: () => true,
             length: 1,
             item: () => 'dsr_requests',
-            [Symbol.iterator]: function* () { yield 'dsr_requests' },
+            [Symbol.iterator]: function* () {
+              yield 'dsr_requests'
+            },
           } as DOMStringList,
           transaction: () => {
             const tx = {
@@ -2157,12 +2256,18 @@ describe('storeRequest/updateRequest transaction error branches', () => {
             contains: () => true,
             length: 1,
             item: () => 'dsr_requests',
-            [Symbol.iterator]: function* () { yield 'dsr_requests' },
+            [Symbol.iterator]: function* () {
+              yield 'dsr_requests'
+            },
           } as DOMStringList,
           transaction: () => ({
             objectStore: () => ({
-              add: () => { throw new Error('Quota exceeded') },
-              put: () => { throw new Error('Quota exceeded') },
+              add: () => {
+                throw new Error('Quota exceeded')
+              },
+              put: () => {
+                throw new Error('Quota exceeded')
+              },
               get: (key: string) => {
                 const req = new MockIDBRequest()
                 setTimeout(() => req.succeed(inMemoryStore.get(key) ?? null), 0)
@@ -2206,7 +2311,9 @@ describe('IDB query error paths', () => {
             contains: () => true,
             length: 1,
             item: () => 'dsr_requests',
-            [Symbol.iterator]: function* () { yield 'dsr_requests' },
+            [Symbol.iterator]: function* () {
+              yield 'dsr_requests'
+            },
           } as DOMStringList,
           transaction: () => ({
             objectStore: () => ({
@@ -2249,7 +2356,9 @@ describe('IDB query error paths', () => {
             contains: () => true,
             length: 1,
             item: () => 'dsr_requests',
-            [Symbol.iterator]: function* () { yield 'dsr_requests' },
+            [Symbol.iterator]: function* () {
+              yield 'dsr_requests'
+            },
           } as DOMStringList,
           transaction: () => ({
             objectStore: () => ({
@@ -2296,7 +2405,9 @@ describe('IDB query error paths', () => {
             contains: () => true,
             length: 1,
             item: () => 'dsr_requests',
-            [Symbol.iterator]: function* () { yield 'dsr_requests' },
+            [Symbol.iterator]: function* () {
+              yield 'dsr_requests'
+            },
           } as DOMStringList,
           transaction: () => ({
             objectStore: () => ({
@@ -2340,7 +2451,9 @@ describe('IDB query error paths', () => {
             contains: () => true,
             length: 1,
             item: () => 'dsr_requests',
-            [Symbol.iterator]: function* () { yield 'dsr_requests' },
+            [Symbol.iterator]: function* () {
+              yield 'dsr_requests'
+            },
           } as DOMStringList,
           transaction: () => ({
             objectStore: () => ({
@@ -2438,7 +2551,7 @@ describe('Edge cases', () => {
       requestDataAccess(`concurrent-user-${i}`, `concurrent${i}@example.com`)
     )
     const requests = await Promise.all(promises)
-    const ids = new Set(requests.map(r => r.id))
+    const ids = new Set(requests.map((r) => r.id))
     expect(ids.size).toBe(5)
   })
 
@@ -2475,7 +2588,7 @@ describe('Request ID generation', () => {
       requestDataAccess('r2', 'r2@test.com'),
       requestDataAccess('r3', 'r3@test.com'),
     ])
-    const randomParts = requests.map(r => r.id.split('_')[2])
+    const randomParts = requests.map((r) => r.id.split('_')[2])
     const uniqueParts = new Set(randomParts)
     expect(uniqueParts.size).toBe(3)
   })
@@ -2487,11 +2600,17 @@ describe('Request ID generation', () => {
 
 describe('All request types', () => {
   const allTypes = [
-    'access', 'erasure', 'portability', 'rectification',
-    'restriction', 'withdraw_consent', 'objection', 'complaint',
+    'access',
+    'erasure',
+    'portability',
+    'rectification',
+    'restriction',
+    'withdraw_consent',
+    'objection',
+    'complaint',
   ] as const
 
-  allTypes.forEach(type => {
+  allTypes.forEach((type) => {
     it(`should submit and store ${type} request`, async () => {
       const request = await dataSubjectRightsManager.submitRequest({
         userId: `type-${type}`,
@@ -2550,18 +2669,22 @@ describe('deleteFromIndexedDB with multiple stores', () => {
             contains: (n: string) => storeNames.includes(n),
             length: storeNames.length,
             item: (i: number) => storeNames[i] ?? null,
-            [Symbol.iterator]: function* () { yield* storeNames },
+            [Symbol.iterator]: function* () {
+              yield* storeNames
+            },
           } as DOMStringList,
           transaction: (names: string | string[]) => {
             const txStoreNames = Array.isArray(names) ? names : [names]
-            txStoreNames.forEach(n => storesAccessed.push(n))
+            txStoreNames.forEach((n) => storesAccessed.push(n))
             return {
               objectStore: () => ({
                 indexNames: {
                   contains: () => false,
                   length: 0,
                   item: () => null,
-                  [Symbol.iterator]: function* () { /* empty */ },
+                  [Symbol.iterator]: function* () {
+                    /* empty */
+                  },
                 } as DOMStringList,
                 openCursor: () => {
                   const req = new MockIDBRequest()

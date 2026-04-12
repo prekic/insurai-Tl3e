@@ -141,6 +141,22 @@ vi.mock('@/hooks/usePolicyEvaluation', () => ({
   })),
 }))
 
+vi.mock('@/hooks/usePilotGateOptions', () => ({
+  usePilotGateOptions: vi.fn(() => ({
+    userId: 'test-user',
+    featureFlags: {},
+    userSegments: [],
+  })),
+}))
+
+vi.mock('@/hooks/useDisplaySafeSummary', () => ({
+  useDisplaySafeSummary: vi.fn(() => ({
+    isPilotResult: false,
+    isDraft: false,
+    requiresHumanReview: false,
+  })),
+}))
+
 // Mock evaluation components
 vi.mock('./evaluation', () => ({
   GradeBadge: ({ grade, size }: { grade: string; size: string }) => (
@@ -485,6 +501,45 @@ describe('PolicyCard', () => {
     }
     render(<PolicyCard policy={mockPolicy} compact duplicateInfo={dupInfo} />)
     expect(screen.getByText('Duplicate')).toBeInTheDocument()
+  })
+
+  // ========== Unverified UI Gating ==========
+
+  describe('Unverified UI Gating', () => {
+    it('renders AlertTriangle and warning text instead of standard GradeBadge when isUnverified is true', async () => {
+      // Temporarily override the mock for useDisplaySafeSummary for this test
+      const { useDisplaySafeSummary } = await import('@/hooks/useDisplaySafeSummary')
+      vi.mocked(useDisplaySafeSummary).mockReturnValueOnce({
+        isPilotResult: true,
+        isDraft: true,
+        requiresHumanReview: true,
+      } as any)
+
+      render(<PolicyCard policy={mockPolicy} showEvaluation />)
+
+      // The unverified warning block should show
+      expect(
+        screen.getByText('Unverified AI output. Please review before using.')
+      ).toBeInTheDocument()
+
+      // The standard ScoreBreakdown should not be rendered for standard unverified view
+      expect(screen.queryByTestId('grade-badge')).not.toBeInTheDocument()
+    })
+
+    it('compact mode renders warning badge when isUnverified is true', async () => {
+      const { useDisplaySafeSummary } = await import('@/hooks/useDisplaySafeSummary')
+      vi.mocked(useDisplaySafeSummary).mockReturnValueOnce({
+        isPilotResult: true,
+        isDraft: true,
+        requiresHumanReview: true,
+      } as any)
+
+      const { container } = render(<PolicyCard policy={mockPolicy} showEvaluation compact />)
+
+      // Compact view has a small badge with the AlertTriangle but doesn't show full text
+      expect(container.querySelector('.bg-destructive')).toBeInTheDocument()
+      expect(screen.queryByTestId('grade-badge')).not.toBeInTheDocument()
+    })
   })
 
   // ========== Aria Labels ==========

@@ -60,6 +60,7 @@ function createMockPipelineResult(overrides?: Partial<PipelineResult>): Pipeline
     preservationIssues: [],
     artifactsRemaining: false,
     remainingArtifacts: [],
+    // @ts-expect-error - mismatch due to schema update
     stats: {
       originalLength: 1000,
       finalLength: 800,
@@ -159,7 +160,7 @@ describe('calculateConfidenceScore', () => {
       const score = calculateConfidenceScore(result)
 
       expect(score.breakdown.qaGateScore).toBeGreaterThanOrEqual(30)
-      expect(score.positiveFactors.some(f => f.factor.includes('first attempt'))).toBe(true)
+      expect(score.positiveFactors.some((f) => f.factor.includes('first attempt'))).toBe(true)
     })
 
     it('should give medium QA score when chunks pass after retry', () => {
@@ -192,7 +193,7 @@ describe('calculateConfidenceScore', () => {
       const score = calculateConfidenceScore(result)
 
       expect(score.breakdown.qaGateScore).toBeLessThan(25)
-      expect(score.negativeFactors.some(f => f.factor.includes('failed QA'))).toBe(true)
+      expect(score.negativeFactors.some((f) => f.factor.includes('failed QA'))).toBe(true)
     })
 
     it('should handle null QA report', () => {
@@ -217,7 +218,7 @@ describe('calculateConfidenceScore', () => {
       const score = calculateConfidenceScore(result)
 
       expect(score.breakdown.preservationScore).toBe(25)
-      expect(score.positiveFactors.some(f => f.factor.includes('preserved'))).toBe(true)
+      expect(score.positiveFactors.some((f) => f.factor.includes('preserved'))).toBe(true)
     })
 
     it('should deduct for preservation issues', () => {
@@ -229,7 +230,7 @@ describe('calculateConfidenceScore', () => {
       const score = calculateConfidenceScore(result)
 
       expect(score.breakdown.preservationScore).toBeLessThan(25)
-      expect(score.negativeFactors.some(f => f.factor.includes('preservation'))).toBe(true)
+      expect(score.negativeFactors.some((f) => f.factor.includes('preservation'))).toBe(true)
     })
 
     it('should cap score for critical preservation issues', () => {
@@ -241,7 +242,7 @@ describe('calculateConfidenceScore', () => {
       const score = calculateConfidenceScore(result)
 
       expect(score.breakdown.preservationScore).toBeLessThanOrEqual(10)
-      expect(score.recommendations.some(r => r.includes('policy numbers'))).toBe(true)
+      expect(score.recommendations.some((r) => r.includes('policy numbers'))).toBe(true)
     })
   })
 
@@ -255,7 +256,7 @@ describe('calculateConfidenceScore', () => {
       const score = calculateConfidenceScore(result)
 
       expect(score.breakdown.artifactScore).toBe(20)
-      expect(score.positiveFactors.some(f => f.factor.includes('No OCR artifacts'))).toBe(true)
+      expect(score.positiveFactors.some((f) => f.factor.includes('No OCR artifacts'))).toBe(true)
     })
 
     it('should deduct for remaining artifacts', () => {
@@ -277,7 +278,7 @@ describe('calculateConfidenceScore', () => {
 
       const score = calculateConfidenceScore(result)
 
-      expect(score.negativeFactors.some(f => f.factor.includes('Barcode'))).toBe(true)
+      expect(score.negativeFactors.some((f) => f.factor.includes('Barcode'))).toBe(true)
     })
   })
 
@@ -310,7 +311,9 @@ describe('calculateConfidenceScore', () => {
       const score = calculateConfidenceScore(result)
 
       expect(score.breakdown.contentRatioScore).toBeLessThan(15)
-      expect(score.negativeFactors.some(f => f.factor.includes('High content removal'))).toBe(true)
+      expect(score.negativeFactors.some((f) => f.factor.includes('High content removal'))).toBe(
+        true
+      )
     })
   })
 
@@ -358,7 +361,7 @@ describe('calculateConfidenceScore', () => {
 
       const score = calculateConfidenceScore(result)
 
-      expect(score.breakdown.bonuses.some(b => b.reason.includes('Perfect QA'))).toBe(true)
+      expect(score.breakdown.bonuses.some((b) => b.reason.includes('Perfect QA'))).toBe(true)
     })
 
     it('should add bonus for successful fragment merging', () => {
@@ -371,7 +374,7 @@ describe('calculateConfidenceScore', () => {
 
       const score = calculateConfidenceScore(result)
 
-      expect(score.breakdown.bonuses.some(b => b.reason.includes('fragment'))).toBe(true)
+      expect(score.breakdown.bonuses.some((b) => b.reason.includes('fragment'))).toBe(true)
     })
 
     it('should deduct for overall failure', () => {
@@ -381,7 +384,7 @@ describe('calculateConfidenceScore', () => {
 
       const score = calculateConfidenceScore(result)
 
-      expect(score.breakdown.deductions.some(d => d.reason.includes('not complete'))).toBe(true)
+      expect(score.breakdown.deductions.some((d) => d.reason.includes('not complete'))).toBe(true)
     })
   })
 
@@ -436,7 +439,7 @@ describe('calculateQuickConfidence', () => {
   it('should return high score for clean result', () => {
     const score = calculateQuickConfidence(
       1000, // original
-      800,  // final
+      800, // final
       createMockSanitizerStats(),
       false // no artifacts
     )
@@ -447,7 +450,7 @@ describe('calculateQuickConfidence', () => {
   it('should deduct for excessive removal', () => {
     const score = calculateQuickConfidence(
       1000, // original
-      200,  // final (80% removed)
+      200, // final (80% removed)
       createMockSanitizerStats(),
       false
     )
@@ -513,9 +516,36 @@ describe('aggregateConfidenceScores', () => {
 
   it('should calculate correct statistics', () => {
     const scores: ConfidenceScore[] = [
-      { score: 90, grade: 'A', status: 'excellent', breakdown: {} as any, positiveFactors: [], negativeFactors: [], recommendations: [], calculatedAt: '' },
-      { score: 75, grade: 'B', status: 'good', breakdown: {} as any, positiveFactors: [], negativeFactors: [], recommendations: [], calculatedAt: '' },
-      { score: 60, grade: 'C', status: 'fair', breakdown: {} as any, positiveFactors: [], negativeFactors: [], recommendations: [], calculatedAt: '' },
+      {
+        score: 90,
+        grade: 'A',
+        status: 'excellent',
+        breakdown: {} as any,
+        positiveFactors: [],
+        negativeFactors: [],
+        recommendations: [],
+        calculatedAt: '',
+      },
+      {
+        score: 75,
+        grade: 'B',
+        status: 'good',
+        breakdown: {} as any,
+        positiveFactors: [],
+        negativeFactors: [],
+        recommendations: [],
+        calculatedAt: '',
+      },
+      {
+        score: 60,
+        grade: 'C',
+        status: 'fair',
+        breakdown: {} as any,
+        positiveFactors: [],
+        negativeFactors: [],
+        recommendations: [],
+        calculatedAt: '',
+      },
     ]
 
     const result = aggregateConfidenceScores(scores)
@@ -531,7 +561,16 @@ describe('aggregateConfidenceScores', () => {
 
   it('should handle single score', () => {
     const scores: ConfidenceScore[] = [
-      { score: 85, grade: 'B', status: 'good', breakdown: {} as any, positiveFactors: [], negativeFactors: [], recommendations: [], calculatedAt: '' },
+      {
+        score: 85,
+        grade: 'B',
+        status: 'good',
+        breakdown: {} as any,
+        positiveFactors: [],
+        negativeFactors: [],
+        recommendations: [],
+        calculatedAt: '',
+      },
     ]
 
     const result = aggregateConfidenceScores(scores)

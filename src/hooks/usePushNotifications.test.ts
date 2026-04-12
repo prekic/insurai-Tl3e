@@ -24,15 +24,13 @@ vi.mock('@/lib/supabase/auth-context', () => ({
   useAuth: () => ({ user: mockAuthState.user, session: mockAuthState.session }),
 }))
 
-const {
-  mockGetPushSubscription,
-  mockSubscribeToPush,
-  mockUnsubscribeFromPush,
-} = vi.hoisted(() => ({
-  mockGetPushSubscription: vi.fn(),
-  mockSubscribeToPush: vi.fn(),
-  mockUnsubscribeFromPush: vi.fn(),
-}))
+const { mockGetPushSubscription, mockSubscribeToPush, mockUnsubscribeFromPush } = vi.hoisted(
+  () => ({
+    mockGetPushSubscription: vi.fn(),
+    mockSubscribeToPush: vi.fn(),
+    mockUnsubscribeFromPush: vi.fn(),
+  })
+)
 
 vi.mock('@/lib/pwa', () => ({
   subscribeToPush: mockSubscribeToPush,
@@ -65,16 +63,14 @@ function setPushSupported(supported: boolean): void {
       writable: true,
       configurable: true,
     })
-     
     ;(globalThis as any).Notification = {
       permission: 'default',
       requestPermission: vi.fn().mockResolvedValue('granted'),
     }
   } else {
-     
     delete (window as any).PushManager
     // Use delete so `'Notification' in window` returns false (assigning undefined still returns true)
-     
+
     delete (globalThis as any).Notification
   }
 }
@@ -100,7 +96,6 @@ describe('usePushNotifications', () => {
   })
 
   afterEach(() => {
-     
     ;(globalThis as any).Notification = originalNotification
   })
 
@@ -120,7 +115,6 @@ describe('usePushNotifications', () => {
     })
 
     it('is false when PushManager is missing', async () => {
-       
       delete (window as any).PushManager
       const { result } = await renderHookWithImport()
       expect(result.current.isSupported).toBe(false)
@@ -128,7 +122,7 @@ describe('usePushNotifications', () => {
 
     it('is false when Notification is missing', async () => {
       // Must delete (not assign undefined) so `'Notification' in window` returns false
-       
+
       delete (globalThis as any).Notification
       const { result } = await renderHookWithImport()
       expect(result.current.isSupported).toBe(false)
@@ -140,8 +134,11 @@ describe('usePushNotifications', () => {
   // -------------------------------------------------------------------------
   describe('permission', () => {
     it('reflects Notification.permission on mount', async () => {
-       
-      ;(globalThis as any).Notification = { ...originalNotification, permission: 'granted', requestPermission: vi.fn() }
+      ;(globalThis as any).Notification = {
+        ...originalNotification,
+        permission: 'granted',
+        requestPermission: vi.fn(),
+      }
       const { result } = await renderHookWithImport()
       expect(result.current.permission).toBe('granted')
     })
@@ -206,7 +203,6 @@ describe('usePushNotifications', () => {
   // -------------------------------------------------------------------------
   describe('subscribe', () => {
     it('returns false when push is not supported', async () => {
-       
       delete (window as any).PushManager
       const { result } = await renderHookWithImport()
 
@@ -218,7 +214,6 @@ describe('usePushNotifications', () => {
     })
 
     it('requests notification permission', async () => {
-       
       const mockRequest = vi.fn().mockResolvedValue('denied')
       ;(globalThis as any).Notification = { permission: 'default', requestPermission: mockRequest }
 
@@ -232,8 +227,10 @@ describe('usePushNotifications', () => {
     })
 
     it('returns false when permission is denied', async () => {
-       
-      ;(globalThis as any).Notification = { permission: 'default', requestPermission: vi.fn().mockResolvedValue('denied') }
+      ;(globalThis as any).Notification = {
+        permission: 'default',
+        requestPermission: vi.fn().mockResolvedValue('denied'),
+      }
 
       const { result } = await renderHookWithImport()
 
@@ -246,8 +243,10 @@ describe('usePushNotifications', () => {
     })
 
     it('fetches VAPID public key from server', async () => {
-       
-      ;(globalThis as any).Notification = { permission: 'default', requestPermission: vi.fn().mockResolvedValue('granted') }
+      ;(globalThis as any).Notification = {
+        permission: 'default',
+        requestPermission: vi.fn().mockResolvedValue('granted'),
+      }
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
@@ -274,8 +273,10 @@ describe('usePushNotifications', () => {
     })
 
     it('returns false when VAPID key fetch fails', async () => {
-       
-      ;(globalThis as any).Notification = { permission: 'default', requestPermission: vi.fn().mockResolvedValue('granted') }
+      ;(globalThis as any).Notification = {
+        permission: 'default',
+        requestPermission: vi.fn().mockResolvedValue('granted'),
+      }
       mockFetch.mockResolvedValueOnce({ ok: false })
 
       const { result } = await renderHookWithImport()
@@ -289,8 +290,10 @@ describe('usePushNotifications', () => {
     })
 
     it('calls subscribeToPush with the VAPID key', async () => {
-       
-      ;(globalThis as any).Notification = { permission: 'default', requestPermission: vi.fn().mockResolvedValue('granted') }
+      ;(globalThis as any).Notification = {
+        permission: 'default',
+        requestPermission: vi.fn().mockResolvedValue('granted'),
+      }
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
@@ -315,8 +318,10 @@ describe('usePushNotifications', () => {
     })
 
     it('returns false when subscribeToPush returns null', async () => {
-       
-      ;(globalThis as any).Notification = { permission: 'default', requestPermission: vi.fn().mockResolvedValue('granted') }
+      ;(globalThis as any).Notification = {
+        permission: 'default',
+        requestPermission: vi.fn().mockResolvedValue('granted'),
+      }
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({ publicKey: 'vapid-key' }),
@@ -334,8 +339,10 @@ describe('usePushNotifications', () => {
     })
 
     it('posts subscription to server', async () => {
-       
-      ;(globalThis as any).Notification = { permission: 'default', requestPermission: vi.fn().mockResolvedValue('granted') }
+      ;(globalThis as any).Notification = {
+        permission: 'default',
+        requestPermission: vi.fn().mockResolvedValue('granted'),
+      }
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
@@ -364,8 +371,10 @@ describe('usePushNotifications', () => {
     })
 
     it('returns true on successful subscription', async () => {
-       
-      ;(globalThis as any).Notification = { permission: 'default', requestPermission: vi.fn().mockResolvedValue('granted') }
+      ;(globalThis as any).Notification = {
+        permission: 'default',
+        requestPermission: vi.fn().mockResolvedValue('granted'),
+      }
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
@@ -392,8 +401,10 @@ describe('usePushNotifications', () => {
     })
 
     it('returns false and unsubscribes from SW when server registration fails', async () => {
-       
-      ;(globalThis as any).Notification = { permission: 'default', requestPermission: vi.fn().mockResolvedValue('granted') }
+      ;(globalThis as any).Notification = {
+        permission: 'default',
+        requestPermission: vi.fn().mockResolvedValue('granted'),
+      }
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
@@ -418,12 +429,16 @@ describe('usePushNotifications', () => {
     })
 
     it('sets isLoading during the operation', async () => {
-      ;(globalThis as any).Notification = { permission: 'default', requestPermission: vi.fn().mockResolvedValue('denied') }
+      ;(globalThis as any).Notification = {
+        permission: 'default',
+        requestPermission: vi.fn().mockResolvedValue('denied'),
+      }
 
       const { result } = await renderHookWithImport()
 
       expect(result.current.isLoading).toBe(false)
       // isLoading becomes true during subscribe and false after
+      // @ts-expect-error - TS6133 unused variable
       let _loadingDuring = false
       ;(globalThis as any).Notification.requestPermission = vi.fn().mockImplementation(async () => {
         _loadingDuring = result.current.isLoading
@@ -443,7 +458,6 @@ describe('usePushNotifications', () => {
   // -------------------------------------------------------------------------
   describe('unsubscribe', () => {
     it('returns false when push is not supported', async () => {
-       
       delete (window as any).PushManager
       const { result } = await renderHookWithImport()
 

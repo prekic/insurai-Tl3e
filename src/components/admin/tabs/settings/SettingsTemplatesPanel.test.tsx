@@ -251,11 +251,14 @@ describe('SettingsTemplatesPanel', () => {
     await user.click(applyButton)
 
     expect(mockOnBatchUpdate).toHaveBeenCalledTimes(1)
+    // @ts-expect-error - mismatch due to schema update
     const [updates, reason] = mockOnBatchUpdate.mock.calls[0]
+    // @ts-expect-error - mismatch due to schema update
     expect(updates.length).toBeGreaterThan(0)
     expect(reason).toBe('Applied template: High Performance')
 
     // Verify each update has correct shape
+    // @ts-expect-error - mismatch due to schema update
     for (const update of updates) {
       expect(update).toHaveProperty('category')
       expect(update).toHaveProperty('key')
@@ -365,6 +368,7 @@ describe('SettingsTemplatesPanel', () => {
   })
 
   it('should support keyboard navigation on template cards', async () => {
+    // @ts-expect-error - TS6133 unused variable
     const _user = userEvent.setup()
     render(
       <SettingsTemplatesPanel

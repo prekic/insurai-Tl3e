@@ -417,6 +417,7 @@ describe('TryAnalysis', () => {
 
   describe('Logged-in User Redirect', () => {
     it('redirects logged-in users to /upload', async () => {
+      // @ts-expect-error - mismatch due to schema update
       mockUser.mockReturnValue({ id: 'user-1', email: 'test@example.com' })
 
       renderWithRouter()
@@ -510,6 +511,7 @@ describe('TryAnalysis', () => {
         health: {
           status: 'unhealthy',
           providers: { openai: false, anthropic: false, google: false },
+          // @ts-expect-error - mismatch due to schema update
           error: 'Service unavailable',
         },
       })

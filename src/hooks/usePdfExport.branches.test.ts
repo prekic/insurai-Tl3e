@@ -52,7 +52,13 @@ vi.mock('@/lib/pdf-export/generator', () => ({
   getAvailableReportTypes: (...args: unknown[]) => mockGetAvailableReportTypes(...args),
 }))
 
-import { useBranding, usePdfExport, useQuickExport, useReportPreview, useReportTypes } from './usePdfExport'
+import {
+  useBranding,
+  usePdfExport,
+  useQuickExport,
+  useReportPreview,
+  useReportTypes,
+} from './usePdfExport'
 
 // ============================================================================
 // Helpers
@@ -80,6 +86,7 @@ function makePolicy(overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPolicy {
 }
 
 function makeGapAnalysis(): ComprehensiveGapAnalysis {
+  // @ts-expect-error - mismatch due to schema update
   return {
     gaps: [],
     gapCount: { total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 },
@@ -183,10 +190,26 @@ describe('useBranding', () => {
 // ============================================================================
 describe('usePdfExport', () => {
   beforeEach(() => {
-    mockGeneratePolicyDetailReport.mockReturnValue({ success: true, html: '<html>test</html>', filename: 'test.html' })
-    mockGenerateGapAnalysisReport.mockReturnValue({ success: true, html: '<html>gap</html>', filename: 'gap.html' })
-    mockGeneratePortfolioReport.mockReturnValue({ success: true, html: '<html>portfolio</html>', filename: 'portfolio.html' })
-    mockGeneratePolicySummaryReport.mockReturnValue({ success: true, html: '<html>summary</html>', filename: 'summary.html' })
+    mockGeneratePolicyDetailReport.mockReturnValue({
+      success: true,
+      html: '<html>test</html>',
+      filename: 'test.html',
+    })
+    mockGenerateGapAnalysisReport.mockReturnValue({
+      success: true,
+      html: '<html>gap</html>',
+      filename: 'gap.html',
+    })
+    mockGeneratePortfolioReport.mockReturnValue({
+      success: true,
+      html: '<html>portfolio</html>',
+      filename: 'portfolio.html',
+    })
+    mockGeneratePolicySummaryReport.mockReturnValue({
+      success: true,
+      html: '<html>summary</html>',
+      filename: 'summary.html',
+    })
     mockOpenPrintWindow.mockReturnValue({ document: { write: vi.fn(), close: vi.fn() } })
     mockGetAvailableReportTypes.mockReturnValue(['policy_detail', 'portfolio'])
   })
@@ -236,7 +259,9 @@ describe('usePdfExport', () => {
   })
 
   it('exportPolicy handles exception with Error object', async () => {
-    mockGeneratePolicyDetailReport.mockImplementation(() => { throw new Error('Boom') })
+    mockGeneratePolicyDetailReport.mockImplementation(() => {
+      throw new Error('Boom')
+    })
     const { result } = renderHook(() => usePdfExport())
     let success: boolean | undefined
     await act(async () => {
@@ -247,7 +272,9 @@ describe('usePdfExport', () => {
   })
 
   it('exportPolicy handles exception with non-Error', async () => {
-    mockGeneratePolicyDetailReport.mockImplementation(() => { throw 'string error' })
+    mockGeneratePolicyDetailReport.mockImplementation(() => {
+      throw 'string error'
+    })
     const { result } = renderHook(() => usePdfExport())
     let success: boolean | undefined
     await act(async () => {
@@ -288,7 +315,9 @@ describe('usePdfExport', () => {
   })
 
   it('exportGapAnalysis handles exception', async () => {
-    mockGenerateGapAnalysisReport.mockImplementation(() => { throw new Error('Gap boom') })
+    mockGenerateGapAnalysisReport.mockImplementation(() => {
+      throw new Error('Gap boom')
+    })
     const { result } = renderHook(() => usePdfExport())
     let success: boolean | undefined
     await act(async () => {
@@ -319,7 +348,9 @@ describe('usePdfExport', () => {
   })
 
   it('exportPortfolio handles exception with non-Error', async () => {
-    mockGeneratePortfolioReport.mockImplementation(() => { throw 42 })
+    mockGeneratePortfolioReport.mockImplementation(() => {
+      throw 42
+    })
     const { result } = renderHook(() => usePdfExport())
     let success: boolean | undefined
     await act(async () => {
@@ -431,8 +462,16 @@ describe('usePdfExport', () => {
 // ============================================================================
 describe('useQuickExport', () => {
   beforeEach(() => {
-    mockGeneratePolicyDetailReport.mockReturnValue({ success: true, html: '<html>test</html>', filename: 'test.html' })
-    mockGeneratePortfolioReport.mockReturnValue({ success: true, html: '<html>portfolio</html>', filename: 'portfolio.html' })
+    mockGeneratePolicyDetailReport.mockReturnValue({
+      success: true,
+      html: '<html>test</html>',
+      filename: 'test.html',
+    })
+    mockGeneratePortfolioReport.mockReturnValue({
+      success: true,
+      html: '<html>portfolio</html>',
+      filename: 'portfolio.html',
+    })
     mockOpenPrintWindow.mockReturnValue({ document: { write: vi.fn(), close: vi.fn() } })
   })
 
@@ -465,7 +504,9 @@ describe('useQuickExport', () => {
   })
 
   it('exports portfolio for multiple policies', async () => {
-    const { result } = renderHook(() => useQuickExport([makePolicy(), makePolicy({ id: 'test-2' })]))
+    const { result } = renderHook(() =>
+      useQuickExport([makePolicy(), makePolicy({ id: 'test-2' })])
+    )
     let success: boolean | undefined
     await act(async () => {
       success = await result.current.exportToPDF()
@@ -510,7 +551,9 @@ describe('useReportPreview', () => {
   })
 
   it('generates gap_analysis preview', () => {
-    const { result } = renderHook(() => useReportPreview('gap_analysis', makePolicy(), undefined, makeGapAnalysis()))
+    const { result } = renderHook(() =>
+      useReportPreview('gap_analysis', makePolicy(), undefined, makeGapAnalysis())
+    )
     act(() => {
       result.current.generatePreview()
     })
@@ -542,7 +585,9 @@ describe('useReportPreview', () => {
   })
 
   it('generates policy_summary preview', () => {
-    const { result } = renderHook(() => useReportPreview('policy_summary', undefined, [makePolicy()]))
+    const { result } = renderHook(() =>
+      useReportPreview('policy_summary', undefined, [makePolicy()])
+    )
     act(() => {
       result.current.generatePreview()
     })

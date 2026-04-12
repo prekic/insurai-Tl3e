@@ -9,7 +9,9 @@ import { LanguageDetector } from './language-detector'
 import type { ConfigurationManager } from './configuration-manager'
 import type { OCRSettings, LocaleConfig, UniversalConfig } from './types'
 
-function createMockOCRSettings(overrides: Partial<OCRSettings['language_detection']> = {}): OCRSettings {
+function createMockOCRSettings(
+  overrides: Partial<OCRSettings['language_detection']> = {}
+): OCRSettings {
   return {
     version: '1.0.0',
     last_updated: '2026-01-01',
@@ -21,8 +23,14 @@ function createMockOCRSettings(overrides: Partial<OCRSettings['language_detectio
       min_chars_for_valid_page: 50,
     },
     confidence_calculation: {
-      weights: { char_density: 0.25, text_quality: 0.30, page_variance: 0.15, encoding_check: 0.15, field_extraction: 0.15 },
-      thresholds: { skip_ocr: 0.70, selective_ocr: 0.40, full_ocr: 0.0 },
+      weights: {
+        char_density: 0.25,
+        text_quality: 0.3,
+        page_variance: 0.15,
+        encoding_check: 0.15,
+        field_extraction: 0.15,
+      },
+      thresholds: { skip_ocr: 0.7, selective_ocr: 0.4, full_ocr: 0.0 },
     },
     ocr_providers: {
       primary: 'google_document_ai',
@@ -147,7 +155,7 @@ function createMockConfigManager(
   locales: Record<string, LocaleConfig | UniversalConfig>,
   ocrSettings?: OCRSettings
 ): ConfigurationManager {
-  const availableLocales = Object.keys(locales).filter(k => k !== '_universal')
+  const availableLocales = Object.keys(locales).filter((k) => k !== '_universal')
 
   return {
     getOCRSettings: () => ocrSettings || createMockOCRSettings(),
@@ -172,7 +180,8 @@ describe('LanguageDetector coverage', () => {
 
   describe('detect', () => {
     it('detects Turkish from insurance terms', () => {
-      const text = 'Bu sigorta poliçesi teminat ve prim bilgileri içerir. Hasar durumunda kasko geçerlidir.'
+      const text =
+        'Bu sigorta poliçesi teminat ve prim bilgileri içerir. Hasar durumunda kasko geçerlidir.'
       const result = detector.detect(text)
       expect(result.locale_code).toBe('tr')
       expect(result.confidence).toBeGreaterThan(0.3)
@@ -182,7 +191,8 @@ describe('LanguageDetector coverage', () => {
     })
 
     it('detects English from insurance terms', () => {
-      const text = 'This insurance policy provides coverage details. The premium and deductible are listed. Please file a claim.'
+      const text =
+        'This insurance policy provides coverage details. The premium and deductible are listed. Please file a claim.'
       const result = detector.detect(text)
       expect(result.locale_code).toBe('en')
       expect(result.confidence).toBeGreaterThan(0.3)
@@ -226,10 +236,13 @@ describe('LanguageDetector coverage', () => {
 
     it('uses sample_size setting for text sampling', () => {
       const settings = createMockOCRSettings({ sample_size: 50 })
-      const configManager = createMockConfigManager({
-        tr: createTurkishLocaleConfig(),
-        en: createEnglishLocaleConfig(),
-      }, settings)
+      const configManager = createMockConfigManager(
+        {
+          tr: createTurkishLocaleConfig(),
+          en: createEnglishLocaleConfig(),
+        },
+        settings
+      )
       const det = new LanguageDetector(configManager)
 
       // Terms after 50 chars should not be detected in sample
@@ -286,10 +299,13 @@ describe('LanguageDetector coverage', () => {
     it('uses default sample_size when not specified', () => {
       const settings = createMockOCRSettings()
       delete (settings.language_detection as Record<string, unknown>).sample_size
-      const configManager = createMockConfigManager({
-        tr: createTurkishLocaleConfig(),
-        en: createEnglishLocaleConfig(),
-      }, settings)
+      const configManager = createMockConfigManager(
+        {
+          tr: createTurkishLocaleConfig(),
+          en: createEnglishLocaleConfig(),
+        },
+        settings
+      )
       const det = new LanguageDetector(configManager)
       const result = det.detect('sigorta poliçe')
       expect(result).toBeDefined()
@@ -317,9 +333,13 @@ describe('LanguageDetector coverage', () => {
       const settings = createMockOCRSettings({ fallback_locale: '' })
       const universal = createUniversalConfig()
       // Only universal config (skipped in scoring)
-      const _configManager = createMockConfigManager({
-        _universal: universal,
-      }, settings)
+      // @ts-expect-error - TS6133 unused variable
+      const _configManager = createMockConfigManager(
+        {
+          _universal: universal,
+        },
+        settings
+      )
       // This will fail at verifyConfiguration but shouldn't crash detect
       // We need at least one locale for the detector
       const configManager2 = createMockConfigManager({}, settings)

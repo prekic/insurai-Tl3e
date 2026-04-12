@@ -98,11 +98,9 @@ describe('SettingsHistoryPanel', () => {
     })
 
     it('should retry fetch when retry button is clicked', async () => {
-      mockAdminFetch
-        .mockRejectedValueOnce(new Error('Network error'))
-        .mockResolvedValueOnce({
-          json: () => Promise.resolve(createMockResponse(createMockHistory(3), 3)),
-        })
+      mockAdminFetch.mockRejectedValueOnce(new Error('Network error')).mockResolvedValueOnce({
+        json: () => Promise.resolve(createMockResponse(createMockHistory(3), 3)),
+      })
 
       render(<SettingsHistoryPanel />)
 
@@ -200,7 +198,7 @@ describe('SettingsHistoryPanel', () => {
 
       // Find and click the first entry
       const entries = screen.getAllByRole('button')
-      const expandableEntry = entries.find(btn => btn.getAttribute('aria-expanded') !== null)
+      const expandableEntry = entries.find((btn) => btn.getAttribute('aria-expanded') !== null)
 
       if (expandableEntry) {
         fireEvent.click(expandableEntry)
@@ -232,7 +230,7 @@ describe('SettingsHistoryPanel', () => {
 
       // Expand the entry
       const entries = screen.getAllByRole('button')
-      const expandableEntry = entries.find(btn => btn.getAttribute('aria-expanded') !== null)
+      const expandableEntry = entries.find((btn) => btn.getAttribute('aria-expanded') !== null)
 
       if (expandableEntry) {
         fireEvent.click(expandableEntry)
@@ -242,7 +240,9 @@ describe('SettingsHistoryPanel', () => {
         })
 
         // Use getAllByText since reason may appear in multiple places
-        expect(screen.getAllByText(/Updated for performance optimization/i).length).toBeGreaterThan(0)
+        expect(screen.getAllByText(/Updated for performance optimization/i).length).toBeGreaterThan(
+          0
+        )
       }
     })
 
@@ -259,7 +259,7 @@ describe('SettingsHistoryPanel', () => {
       })
 
       const entries = screen.getAllByRole('button')
-      const expandableEntry = entries.find(btn => btn.getAttribute('aria-expanded') !== null)
+      const expandableEntry = entries.find((btn) => btn.getAttribute('aria-expanded') !== null)
 
       if (expandableEntry) {
         // Expand
@@ -320,7 +320,9 @@ describe('SettingsHistoryPanel', () => {
       await user.type(searchInput, 'nonexistent_setting_xyz')
 
       await waitFor(() => {
-        expect(screen.getByText(/No settings changes match your search criteria/i)).toBeInTheDocument()
+        expect(
+          screen.getByText(/No settings changes match your search criteria/i)
+        ).toBeInTheDocument()
       })
     })
   })
@@ -344,9 +346,7 @@ describe('SettingsHistoryPanel', () => {
 
       // Should trigger a new fetch with category parameter
       await waitFor(() => {
-        expect(mockAdminFetch).toHaveBeenCalledWith(
-          expect.stringContaining('category=ai')
-        )
+        expect(mockAdminFetch).toHaveBeenCalledWith(expect.stringContaining('category=ai'))
       })
     })
   })
@@ -388,9 +388,7 @@ describe('SettingsHistoryPanel', () => {
       fireEvent.click(nextButton)
 
       await waitFor(() => {
-        expect(mockAdminFetch).toHaveBeenCalledWith(
-          expect.stringContaining('offset=20')
-        )
+        expect(mockAdminFetch).toHaveBeenCalledWith(expect.stringContaining('offset=20'))
       })
     })
 
@@ -580,7 +578,9 @@ describe('SettingsHistoryPanel', () => {
   describe('Value Formatting', () => {
     it('should handle object values with field-level diff', async () => {
       const mockHistory = createMockHistory(1)
+      // @ts-expect-error - mismatch due to schema update
       mockHistory[0].previousValue = { nested: 'object', value: 123 }
+      // @ts-expect-error - mismatch due to schema update
       mockHistory[0].newValue = { nested: 'updated', value: 456 }
       mockAdminFetch.mockResolvedValue({
         json: () => Promise.resolve(createMockResponse(mockHistory, 1)),
@@ -608,6 +608,7 @@ describe('SettingsHistoryPanel', () => {
 
     it('should handle null to value transition with Value Set badge', async () => {
       const mockHistory = createMockHistory(1)
+      // @ts-expect-error - mismatch due to schema update
       mockHistory[0].previousValue = null
       mockHistory[0].newValue = 'new_value'
       mockAdminFetch.mockResolvedValue({

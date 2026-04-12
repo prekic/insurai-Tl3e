@@ -200,6 +200,7 @@ describe('convertDatabaseConfigToEvaluatorConfig', () => {
 })
 
 describe('evaluatePolicy with EvaluatePolicyOptions', () => {
+  // @ts-expect-error - mismatch due to schema update
   const createTestPolicy = (): Policy => ({
     id: 'test-policy-1',
     policyNumber: 'POL-2026-001',

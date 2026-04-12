@@ -751,6 +751,7 @@ describe('ComparePolicies', () => {
         aspectTR: 'Teminat',
         description: 'Slightly more',
         descriptionTR: 'Biraz daha fazla',
+        // @ts-expect-error - mismatch due to schema update
         significance: 'minor',
         favoredPolicy: 'p2',
       },

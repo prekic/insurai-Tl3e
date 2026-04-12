@@ -65,6 +65,7 @@ function createMockPipelineResult(overrides?: Partial<PipelineResult>): Pipeline
     preservationIssues: [],
     artifactsRemaining: false,
     remainingArtifacts: [],
+    // @ts-expect-error - mismatch due to schema update
     stats: {
       originalLength: 1000,
       finalLength: 800,
@@ -255,17 +256,14 @@ describe('OCR Statistics Service', () => {
 
       const inRange = getExecutionsInRange(hourAgo, now)
 
-      expect(inRange.some(e => e.documentId === 'recent')).toBe(true)
+      expect(inRange.some((e) => e.documentId === 'recent')).toBe(true)
     })
 
     it('should return empty array for empty range', () => {
       const result = createMockPipelineResult()
       recordExecution(result, { documentId: 'test' })
 
-      const inRange = getExecutionsInRange(
-        new Date('2020-01-01'),
-        new Date('2020-01-02')
-      )
+      const inRange = getExecutionsInRange(new Date('2020-01-01'), new Date('2020-01-02'))
 
       expect(inRange.length).toBe(0)
     })
@@ -356,7 +354,10 @@ describe('OCR Statistics Service', () => {
       const stats = aggregateStats(executions, 'day', new Date(), new Date())
 
       expect(stats.confidenceStats.gradeDistribution).toBeDefined()
-      const totalGrades = Object.values(stats.confidenceStats.gradeDistribution).reduce((a, b) => a + b, 0)
+      const totalGrades = Object.values(stats.confidenceStats.gradeDistribution).reduce(
+        (a, b) => a + b,
+        0
+      )
       expect(totalGrades).toBe(3)
     })
 

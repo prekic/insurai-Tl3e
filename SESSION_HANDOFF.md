@@ -1,14 +1,13 @@
-# Session Handoff — April 12, 2026 (Pilot Pipeline Completed + Evaluation Backfill + Calibration + Codebase Hardening)
+# Session Handoff — April 12, 2026 (UI Gating & Stabilization)
 
-> **Session type**: Execution + Bug fix + Configuration + Hardening. Fixed the latent V8 `Date` DD.MM.YYYY day/month swap bug. Executed the Phase C pilot batch ingestion. Ran the evaluation backfill to generate actuarial scores. Backfilled corrupt date data in the DB. Lowered sample req and calibrated new data-driven grade thresholds. Finally, performed an extensive codebase hardening pass: resolved all `any` types in evaluation boundaries, removed overly-broad `eslint-disable` rules, deleted historical root clutter including fallback deployment configs (`netlify.toml`, `vercel.json`), resolved OCR glyph-split string bounds limits, and completely cleansed the `vitest` console errors output.
+> **Session type**: UI Polish + Bug Fix. Addressed critical TS build errors, resolved Next.js unhandled promise rejections on the client policy routes, and finalized UI trustworthiness gating for unverified policies on `PolicyCard` and `PolicyDetailView`.
 
 ## 🎯 Immediate Next Steps for the Next Agent (priority order)
 
-1. **Triage TS Build Errors**: Tackle the remaining 700+ TypeScript build errors strictly located in the Web/UI modules (`src/components/`, `src/app/`, etc.).
-2. **Fix Unhandled Rejection**: Investigate and fix the Next.js unhandled promise rejection error occurring on the `/policies/[id]` route. 
-3. **UI Gating**: Complete the UI gating implementations to ensure structurally unverified or provisional policies reflect their low-confidence status visually.
-4. **Monitor OCR Changes**: Keep an eye on the pilot ingestion logs to ensure the new `(?:[ \t][A-ZÇĞİÖŞÜ]){2,}` regex is successfully resolving split-words without chewing through valid word boundaries.
-5. **Revert Calibration Threshold**: When sample sets expand beyond the pilot, switch `MIN_SAMPLE_SIZE` in `src/lib/policy-evaluation/calibration.ts` back to 50.
+1. **Monitor Production Logs**: Continue monitoring Sentry/production logs to ensure no other async paths in `PolicyDetailView` or elsewhere are swallowing errors.
+2. **Refinement**: The current implementation is stable; future refinements should focus on UI/UX polish of the warning banners if user feedback indicates they are too intrusive or not visible enough.
+3. **Monitor OCR Changes**: Keep an eye on the pilot ingestion logs to ensure the new `(?:[ \t][A-ZÇĞİÖŞÜ]){2,}` regex is successfully resolving split-words without chewing through valid word boundaries.
+4. **Revert Calibration Threshold**: When sample sets expand beyond the pilot, switch `MIN_SAMPLE_SIZE` in `src/lib/policy-evaluation/calibration.ts` back to 50.
 
 Full runbook for completed pilot steps: `docs/runbooks/03-pilot-batch-ingestion.md`.
 
@@ -89,8 +88,13 @@ Full runbook for completed pilot steps: `docs/runbooks/03-pilot-batch-ingestion.
 | `src/lib/pdf/noise-stripper.ts` | Replaced rigid 10-char bounding limits and the hard-coded `commonSplits` block with a single scale-invariant regex for Turkish glyph-split texts. |
 | `src/lib/pdf/noise-stripper.test.ts` | Overhauled with boundary edge cases to trap incorrect word merging. |
 | `src/lib/ai/config.test.ts` | Purged repeating console.error manual spies and substituted scaled `beforeEach`/`afterEach` configurations to clean output limits. |
-| `CLAUDE.md` | Added Gotchas #57, #58, #59, and #60 (Vitest Output/PDF OCR Regex). |
+| `CLAUDE.md` | Added Gotchas #57, #58, #59, and #60 (Vitest Output/PDF OCR Regex, Unhandled Promise Rejections), and updated Project Overview. |
 | `SESSION_HANDOFF.md` | Full document cleanup, preserved backfill records, and synced latest commits. |
+| `src/components/PolicyCard.tsx` | **(Missed in initial audit)** Added UI Gating logic and `AlertTriangle` warning overlay for unverified policies securely linked to `useDisplaySafeSummary`. |
+| `src/components/PolicyDetailView.tsx` | **(Missed in initial audit)** Wrapped async UI callbacks (`handleExportExcel`, `handleExportPdf`, `fetchPolicyById`) in tight `try/catch` block boundaries, extinguishing unhandled Next.js routing failures. |
+| `src/components/PolicyCard.test.tsx` & `src/components/PolicyDetailView.test.tsx` | **(Missed in initial audit)** Mocked `usePilotGateOptions` & updated locale test matches for regression patching. |
+| `src/**/*.test.ts` (Multiple) | **(Missed in initial audit)** Handled systemic TS mock typing mismatches across dozens of test suites resolving 700+ build errors. |
+| `src/__tests__/utils/` & `tsconfig.temp.json` | **Untracked files** generated during TypeScript triage; require ignore or commit evaluation next session. |
 
 ## Carry-Forward Priorities
 

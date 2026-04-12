@@ -238,7 +238,7 @@ vi.mock('./ConflictResolutionDialog', () => ({
       <button data-testid="conflict-close" onClick={onClose as () => void}>
         Close
       </button>
-      {isLoading && <span data-testid="conflict-loading">Loading...</span>}
+      {isLoading ? <span data-testid="conflict-loading">Loading...</span> : null}
     </div>
   ),
 }))

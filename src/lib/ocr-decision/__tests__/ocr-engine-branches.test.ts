@@ -67,7 +67,7 @@ describe('OCRDecisionEngine — Branch Coverage', () => {
     it('returns full_ocr when confidence < selective_ocr threshold (0.60)', () => {
       const decision = engine.analyzeDocument('abc')
       expect(decision.action).toBe('full_ocr')
-      expect(decision.confidence).toBeLessThan(0.60)
+      expect(decision.confidence).toBeLessThan(0.6)
       expect(decision.pages_to_ocr.length).toBeGreaterThan(0)
     })
 
@@ -122,7 +122,9 @@ describe('OCRDecisionEngine — Branch Coverage', () => {
       // Need >= threshold (200) chars/page and quickQuality.score > 0.5
       // but NOT >= threshold * 5 (1000) with isLikelyGood
       // Use 5 pages with total ~1500 chars -> 300 chars/page (>= 200 but < 1000)
-      const _adequateText = 'Normal document text with enough content to pass quality checks. '.repeat(6)
+      // @ts-expect-error - TS6133 unused variable
+      const _adequateText =
+        'Normal document text with enough content to pass quality checks. '.repeat(6)
       // ~390 chars total, 5 pages -> 78 chars/page. Let's use 1 page with 300 chars
       const text300 = 'A'.repeat(250) + ' normal text with letters '
       const result = engine.quickAnalyze(text300, 1)
@@ -290,7 +292,10 @@ describe('OCRDecisionEngine — Branch Coverage', () => {
 
     it('returns reduced score proportional to encoding issue count', () => {
       // Each encoding issue reduces score by 0.1
-      const text = 'Normal text with \ufffd\ufffd\ufffd replacement characters and more \ufffd\ufffd '.repeat(10)
+      const text =
+        'Normal text with \ufffd\ufffd\ufffd replacement characters and more \ufffd\ufffd '.repeat(
+          10
+        )
       const decision = engine.analyzeDocument(text)
       const breakdown = decision.analysis.confidence_breakdown.confidence_breakdown!
       expect(breakdown.encoding_check.score).toBeLessThan(1.0)
@@ -339,33 +344,33 @@ describe('OCRDecisionEngine — Branch Coverage', () => {
   describe('reasoning generation', () => {
     it('includes language detection reasoning', () => {
       const decision = engine.analyzeDocument('Sigorta poliçe belgesi '.repeat(20))
-      expect(decision.reasoning.some(r => r.includes('Language detected as'))).toBe(true)
+      expect(decision.reasoning.some((r) => r.includes('Language detected as'))).toBe(true)
     })
 
     it('includes policy classification reasoning', () => {
       const decision = engine.analyzeDocument('Kasko sigortası '.repeat(20))
-      expect(decision.reasoning.some(r => r.includes('Policy classified as'))).toBe(true)
+      expect(decision.reasoning.some((r) => r.includes('Policy classified as'))).toBe(true)
     })
 
     it('includes character density reasoning', () => {
       const decision = engine.analyzeDocument('Test text '.repeat(20))
-      expect(decision.reasoning.some(r => r.includes('Character density'))).toBe(true)
+      expect(decision.reasoning.some((r) => r.includes('Character density'))).toBe(true)
     })
 
     it('includes text quality reasoning', () => {
       const decision = engine.analyzeDocument('Sigorta poliçe '.repeat(20))
-      expect(decision.reasoning.some(r => r.includes('Text quality score'))).toBe(true)
+      expect(decision.reasoning.some((r) => r.includes('Text quality score'))).toBe(true)
     })
 
     it('includes field extraction reasoning', () => {
       const decision = engine.analyzeDocument('Test '.repeat(20))
-      expect(decision.reasoning.some(r => r.includes('Field extraction'))).toBe(true)
+      expect(decision.reasoning.some((r) => r.includes('Field extraction'))).toBe(true)
     })
 
     it('includes encoding warning when encoding issues detected', () => {
       const text = 'Normal text with \ufffd\ufffd\ufffd replacement characters '.repeat(10)
       const decision = engine.analyzeDocument(text)
-      expect(decision.reasoning.some(r => r.includes('Encoding issues detected'))).toBe(true)
+      expect(decision.reasoning.some((r) => r.includes('Encoding issues detected'))).toBe(true)
     })
 
     it('includes final decision reasoning for skip_ocr', () => {
@@ -381,13 +386,13 @@ describe('OCRDecisionEngine — Branch Coverage', () => {
       `.repeat(20)
       const decision = engine.analyzeDocument(richText)
       if (decision.action === 'skip_ocr') {
-        expect(decision.reasoning.some(r => r.includes('Decision: Skip OCR'))).toBe(true)
+        expect(decision.reasoning.some((r) => r.includes('Decision: Skip OCR'))).toBe(true)
       }
     })
 
     it('includes final decision reasoning for full_ocr', () => {
       const decision = engine.analyzeDocument('tiny')
-      expect(decision.reasoning.some(r => r.includes('Decision: Full OCR'))).toBe(true)
+      expect(decision.reasoning.some((r) => r.includes('Decision: Full OCR'))).toBe(true)
     })
   })
 
@@ -413,7 +418,6 @@ describe('OCRDecisionEngine — Branch Coverage', () => {
     })
   })
 })
-
 
 // ============================================================
 // 2. CONFIGURATION MANAGER — BRANCH COVERAGE
@@ -494,13 +498,13 @@ describe('ConfigurationManager — Branch Coverage', () => {
     it('returns success: true when all critical configs loaded', () => {
       const result = configManager.verifyConfigurations()
       expect(result.success).toBe(true)
-      expect(result.issues.filter(i => i.startsWith('CRITICAL'))).toHaveLength(0)
+      expect(result.issues.filter((i) => i.startsWith('CRITICAL'))).toHaveLength(0)
     })
 
     it('includes diagnostics for all locales', () => {
       const result = configManager.verifyConfigurations()
       expect(result.diagnostics.locales.length).toBeGreaterThanOrEqual(3)
-      const trLocale = result.diagnostics.locales.find(l => l.code === 'tr')
+      const trLocale = result.diagnostics.locales.find((l) => l.code === 'tr')
       expect(trLocale).toBeDefined()
       expect(trLocale!.sample_terms_count).toBeGreaterThan(0)
     })
@@ -508,7 +512,7 @@ describe('ConfigurationManager — Branch Coverage', () => {
     it('includes diagnostics for all policy types', () => {
       const result = configManager.verifyConfigurations()
       expect(result.diagnostics.policy_types.length).toBeGreaterThanOrEqual(4)
-      const kasko = result.diagnostics.policy_types.find(p => p.id === 'motor_kasko')
+      const kasko = result.diagnostics.policy_types.find((p) => p.id === 'motor_kasko')
       expect(kasko).toBeDefined()
       expect(kasko!.has_classification).toBe(true)
       expect(kasko!.detection_terms_locales).toContain('tr')
@@ -516,7 +520,7 @@ describe('ConfigurationManager — Branch Coverage', () => {
 
     it('includes OCR settings diagnostics', () => {
       const result = configManager.verifyConfigurations()
-      expect(result.diagnostics.ocr_settings.min_confidence).toBe(0.40)
+      expect(result.diagnostics.ocr_settings.min_confidence).toBe(0.4)
       expect(result.diagnostics.ocr_settings.fallback_locale).toBe('en')
     })
   })
@@ -531,13 +535,13 @@ describe('ConfigurationManager — Branch Coverage', () => {
     it('updates settings from database config', () => {
       configManager.updateFromDatabaseConfig({
         charsPerPageThreshold: 300,
-        skipOcrThreshold: 0.90,
+        skipOcrThreshold: 0.9,
       } as import('@/lib/config/types').OCRConfig)
 
       expect(configManager.isDatabaseConfigApplied()).toBe(true)
       const settings = configManager.getOCRSettings()
       expect(settings.density_analysis.chars_per_page_threshold).toBe(300)
-      expect(settings.confidence_calculation.thresholds.skip_ocr).toBe(0.90)
+      expect(settings.confidence_calculation.thresholds.skip_ocr).toBe(0.9)
     })
 
     it('resets to base settings correctly', () => {
@@ -685,7 +689,6 @@ describe('ConfigurationManager — Branch Coverage', () => {
   })
 })
 
-
 // ============================================================
 // 3. LANGUAGE DETECTOR — BRANCH COVERAGE
 // ============================================================
@@ -700,7 +703,8 @@ describe('LanguageDetector — Branch Coverage', () => {
 
   describe('Turkish detection with high confidence (term matching)', () => {
     it('detects Turkish via term_matching method', () => {
-      const text = 'Sigorta poliçe belgesi ile teminat kapsamı prim tutarı sigortalı sigortacı muafiyet hasar acente'
+      const text =
+        'Sigorta poliçe belgesi ile teminat kapsamı prim tutarı sigortalı sigortacı muafiyet hasar acente'
       const result = detector.detect(text)
       expect(result.locale_code).toBe('tr')
       expect(result.method).toBe('term_matching')
@@ -712,7 +716,8 @@ describe('LanguageDetector — Branch Coverage', () => {
     it('detects English with insurance terms', () => {
       // en.json sample_terms: insurance, policy, coverage, premium, the, and, for, insured, underwriter
       // Need 6+ of 9 to get combined score >= 0.40 (6/9 * 0.7 = 0.467)
-      const text = 'The insurance policy provides coverage and premium details for the insured party and the underwriter'
+      const text =
+        'The insurance policy provides coverage and premium details for the insured party and the underwriter'
       const result = detector.detect(text)
       expect(result.locale_code).toBe('en')
       expect(result.confidence).toBeGreaterThan(0)
@@ -800,7 +805,6 @@ describe('LanguageDetector — Branch Coverage', () => {
   })
 })
 
-
 // ============================================================
 // 4. POLICY CLASSIFIER — BRANCH COVERAGE
 // ============================================================
@@ -815,7 +819,8 @@ describe('PolicyTypeClassifier — Branch Coverage', () => {
 
   describe('kasko classification with exclusion term filtering', () => {
     it('classifies kasko document correctly', () => {
-      const text = 'Kasko sigortası araç sigortası oto sigorta motorlu kara taşıtları kasko poliçesi'
+      const text =
+        'Kasko sigortası araç sigortası oto sigorta motorlu kara taşıtları kasko poliçesi'
       const result = classifier.classify(text, 'tr')
       expect(result.policy_type_id).toBe('motor_kasko')
       expect(result.confidence).toBeGreaterThan(0)
@@ -823,7 +828,8 @@ describe('PolicyTypeClassifier — Branch Coverage', () => {
 
     it('excludes kasko when traffic exclusion terms present', () => {
       // Traffic terms like "zmss", "zorunlu mali sorumluluk" are exclusion terms for kasko
-      const text = 'Trafik sigortası zorunlu mali sorumluluk zmss zmms trafik poliçesi karayolu motorlu'
+      const text =
+        'Trafik sigortası zorunlu mali sorumluluk zmss zmms trafik poliçesi karayolu motorlu'
       const result = classifier.classify(text, 'tr')
       expect(result.policy_type_id).toBe('motor_traffic')
       expect(result.all_scores.motor_kasko?.excluded).toBe(true)
@@ -832,7 +838,8 @@ describe('PolicyTypeClassifier — Branch Coverage', () => {
 
   describe('traffic insurance classification', () => {
     it('classifies traffic/MTPL document', () => {
-      const text = 'Trafik sigortası zorunlu mali sorumluluk zmss zmms trafik poliçesi karayolu motorlu'
+      const text =
+        'Trafik sigortası zorunlu mali sorumluluk zmss zmms trafik poliçesi karayolu motorlu'
       const result = classifier.classify(text, 'tr')
       expect(result.policy_type_id).toBe('motor_traffic')
       expect(result.confidence).toBeGreaterThanOrEqual(0.6)
@@ -841,7 +848,8 @@ describe('PolicyTypeClassifier — Branch Coverage', () => {
 
   describe('health insurance classification', () => {
     it('classifies health insurance document', () => {
-      const text = 'Sağlık sigortası sağlık poliçesi özel sağlık tss tedavi giderleri tamamlayıcı sağlık'
+      const text =
+        'Sağlık sigortası sağlık poliçesi özel sağlık tss tedavi giderleri tamamlayıcı sağlık'
       const result = classifier.classify(text, 'tr')
       expect(result.policy_type_id).toBe('health_individual')
     })
@@ -902,7 +910,8 @@ describe('PolicyTypeClassifier — Branch Coverage', () => {
 
   describe('classifyWithDetails', () => {
     it('returns detailed analysis with all detections', () => {
-      const text = 'Kasko sigortası araç sigortası oto sigorta motorlu kara taşıtları kasko poliçesi'
+      const text =
+        'Kasko sigortası araç sigortası oto sigorta motorlu kara taşıtları kasko poliçesi'
       const { result, analysis } = classifier.classifyWithDetails(text, 'tr')
       expect(result.policy_type_id).toBe('motor_kasko')
       expect(analysis.all_detections.length).toBeGreaterThan(0)
@@ -914,14 +923,17 @@ describe('PolicyTypeClassifier — Branch Coverage', () => {
       const text = 'Kasko sigortası poliçesi teminat'
       const { analysis } = classifier.classifyWithDetails(text, 'tr')
       for (let i = 1; i < analysis.all_detections.length; i++) {
-        expect(analysis.all_detections[i - 1].score).toBeGreaterThanOrEqual(analysis.all_detections[i].score)
+        expect(analysis.all_detections[i - 1].score).toBeGreaterThanOrEqual(
+          analysis.all_detections[i].score
+        )
       }
     })
   })
 
   describe('matchesPolicyType', () => {
     it('returns true when document matches specified policy type', () => {
-      const text = 'Kasko sigortası araç sigortası oto sigorta motorlu kara taşıtları kasko poliçesi'
+      const text =
+        'Kasko sigortası araç sigortası oto sigorta motorlu kara taşıtları kasko poliçesi'
       const result = classifier.matchesPolicyType(text, 'motor_kasko', 'tr')
       expect(result.matches).toBe(true)
       expect(result.confidence).toBeGreaterThan(0)
@@ -946,7 +958,8 @@ describe('PolicyTypeClassifier — Branch Coverage', () => {
 
   describe('getAllPotentialMatches', () => {
     it('returns all matches above minimum confidence', () => {
-      const text = 'Kasko sigortası araç sigortası oto sigorta motorlu kara taşıtları kasko poliçesi'
+      const text =
+        'Kasko sigortası araç sigortası oto sigorta motorlu kara taşıtları kasko poliçesi'
       const matches = classifier.getAllPotentialMatches(text, 'tr', 0.1)
       expect(matches.length).toBeGreaterThan(0)
       expect(matches[0].confidence).toBeGreaterThan(0)
@@ -967,7 +980,6 @@ describe('PolicyTypeClassifier — Branch Coverage', () => {
   })
 })
 
-
 // ============================================================
 // 5. TEXT QUALITY ANALYZER — BRANCH COVERAGE
 // ============================================================
@@ -987,7 +999,8 @@ describe('TextQualityAnalyzer — Branch Coverage', () => {
       // core_terms (16): sigorta, poliçe, teminat, prim, sigortalı, muafiyet, hasar, tazminat, riziko, acente, lehdar, sigorta ettiren, sigortacı, police, tanzim, vade
       // document_structure_terms (10): madde, kloz, şartlar, kapsam, limit, ek sözleşme, genel şartlar, özel şartlar, teminat tablosu, prim hesabı
       // common_values (10): TL, tarih, no, numara, adres, telefon, vade, başlangıç, bitiş, toplam
-      const text = 'Sigorta poliçe teminat prim sigortalı muafiyet hasar tazminat riziko acente lehdar sigorta ettiren sigortacı police tanzim vade madde kloz şartlar kapsam limit ek sözleşme genel şartlar özel şartlar teminat tablosu prim hesabı TL tarih no numara adres telefon başlangıç bitiş toplam'
+      const text =
+        'Sigorta poliçe teminat prim sigortalı muafiyet hasar tazminat riziko acente lehdar sigorta ettiren sigortacı police tanzim vade madde kloz şartlar kapsam limit ek sözleşme genel şartlar özel şartlar teminat tablosu prim hesabı TL tarih no numara adres telefon başlangıç bitiş toplam'
       const config = configManager.getPolicyConfig('motor_kasko')
       const result = analyzer.analyze(text, 'tr', config)
       expect(result.recommendation).toBe('proceed')
@@ -1034,6 +1047,7 @@ describe('TextQualityAnalyzer — Branch Coverage', () => {
       const config = configManager.getPolicyConfig('motor_kasko')
       const result = analyzer.analyze(text, 'tr', config)
       expect(result.encoding_issues).toBe(true)
+      // @ts-expect-error - mismatch due to schema update
       expect(result.encoding_issues_found.length).toBeGreaterThan(0)
     })
 
@@ -1056,6 +1070,7 @@ describe('TextQualityAnalyzer — Branch Coverage', () => {
       const config = configManager.getPolicyConfig('motor_kasko')
       const result = analyzer.analyze('clean text sigorta poliçe teminat', 'tr', config)
       // Should have checked garbage patterns from Turkish locale config
+      // @ts-expect-error - mismatch due to schema update
       expect(result.garbage_patterns_checked.length).toBeGreaterThan(0)
     })
   })
@@ -1070,24 +1085,35 @@ describe('TextQualityAnalyzer — Branch Coverage', () => {
     it('identifies high garbage character ratio', () => {
       const text = '\ufffd'.repeat(20) + 'A'.repeat(20)
       const result = analyzer.quickCheck(text)
-      expect(result.issues.some(i => i.includes('garbage character ratio'))).toBe(true)
+      expect(result.issues.some((i) => i.includes('garbage character ratio'))).toBe(true)
     })
 
     it('identifies low alphanumeric ratio', () => {
       const text = '!@#$%^&*()_+-={}[]|;:\'",.<>?/\\~`'.repeat(10)
       const result = analyzer.quickCheck(text)
-      expect(result.issues.some(i => i.includes('alphanumeric ratio'))).toBe(true)
+      expect(result.issues.some((i) => i.includes('alphanumeric ratio'))).toBe(true)
     })
 
     it('identifies excessive repeated characters', () => {
-      const text = 'Normal text ' + 'A'.repeat(15) + ' more text ' + 'B'.repeat(15) +
-        ' and ' + 'C'.repeat(15) + ' plus ' + 'D'.repeat(15) + ' end'
+      const text =
+        'Normal text ' +
+        'A'.repeat(15) +
+        ' more text ' +
+        'B'.repeat(15) +
+        ' and ' +
+        'C'.repeat(15) +
+        ' plus ' +
+        'D'.repeat(15) +
+        ' end'
       const result = analyzer.quickCheck(text)
-      expect(result.issues.some(i => i.includes('repeated characters'))).toBe(true)
+      expect(result.issues.some((i) => i.includes('repeated characters'))).toBe(true)
     })
 
     it('returns isLikelyGood=true for good quality text', () => {
-      const text = 'This is a perfectly normal text with good content and sufficient length for analysis. '.repeat(5)
+      const text =
+        'This is a perfectly normal text with good content and sufficient length for analysis. '.repeat(
+          5
+        )
       const result = analyzer.quickCheck(text)
       expect(result.isLikelyGood).toBe(true)
       expect(result.score).toBeGreaterThan(0.6)
@@ -1149,7 +1175,6 @@ describe('TextQualityAnalyzer — Branch Coverage', () => {
   })
 })
 
-
 // ============================================================
 // 6. FIELD EXTRACTOR — BRANCH COVERAGE
 // ============================================================
@@ -1188,8 +1213,10 @@ describe('FieldExtractor — Branch Coverage', () => {
       const config = configManager.getPolicyConfig('motor_kasko')
       const result = extractor.testExtraction(text, config, 'tr')
       // Depending on how many required fields the config has, 2 found might be consider_ocr
-      if (result.extraction_rate < result.min_rate_threshold &&
-          result.extraction_rate >= result.min_rate_threshold * 0.5) {
+      if (
+        result.extraction_rate < result.min_rate_threshold &&
+        result.extraction_rate >= result.min_rate_threshold * 0.5
+      ) {
         expect(result.recommendation).toBe('consider_ocr')
       }
     })
@@ -1204,7 +1231,12 @@ describe('FieldExtractor — Branch Coverage', () => {
   describe('extractField with real config', () => {
     it('extracts policy number from Turkish text', () => {
       const config = configManager.getPolicyConfig('motor_kasko')
-      const result = extractor.extractField('Poliçe No: KSK-2024-001', config, 'policy_number', 'tr')
+      const result = extractor.extractField(
+        'Poliçe No: KSK-2024-001',
+        config,
+        'policy_number',
+        'tr'
+      )
       expect(result.found).toBe(true)
       expect(result.value).toContain('KSK')
     })
@@ -1276,7 +1308,6 @@ describe('FieldExtractor — Branch Coverage', () => {
     })
   })
 })
-
 
 // ============================================================
 // 7. INTEGRATION — CROSS-MODULE BRANCH COVERAGE

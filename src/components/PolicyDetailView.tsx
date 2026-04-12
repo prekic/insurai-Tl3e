@@ -924,7 +924,8 @@ export function PolicyDetailView() {
         setPolicy(fetchedPolicy ?? undefined)
         setIsLoadingPolicy(false)
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error('Failed to load policy within PolicyDetailView:', error)
         if (cancelled) return
         setIsLoadingPolicy(false)
       })
@@ -1020,11 +1021,16 @@ export function PolicyDetailView() {
   const handleExportPdf = useCallback(async () => {
     if (!policy || draftExportBlocked()) return
     setExportMenuOpen(false)
-    const success = await exportPolicy(policy)
-    if (success) {
-      toast.success(t.exportMenu.pdfSuccess)
-    } else {
-      toast.error(t.exportMenu.popupBlocked)
+    try {
+      const success = await exportPolicy(policy)
+      if (success) {
+        toast.success(t.exportMenu.pdfSuccess)
+      } else {
+        toast.error(t.exportMenu.popupBlocked)
+      }
+    } catch (err) {
+      console.error('Failed to export PDF:', err)
+      toast.error(t.exportMenu.pdfSuccess ? 'PDF export failed' : 'PDF export failed')
     }
   }, [policy, exportPolicy, t.exportMenu.pdfSuccess, t.exportMenu.popupBlocked, draftExportBlocked])
 
@@ -1038,8 +1044,13 @@ export function PolicyDetailView() {
   const handleExportExcel = useCallback(async () => {
     if (!policy || draftExportBlocked()) return
     setExportMenuOpen(false)
-    await exportSinglePolicyToExcel(policy, locale as 'tr' | 'en')
-    toast.success(t.exportMenu.excelSuccess)
+    try {
+      await exportSinglePolicyToExcel(policy, locale as 'tr' | 'en')
+      toast.success(t.exportMenu.excelSuccess)
+    } catch (err) {
+      toast.error(locale === 'tr' ? 'Excel dışa aktarımı başarısız oldu' : 'Excel export failed')
+      console.error(err)
+    }
   }, [policy, locale, t.exportMenu.excelSuccess, draftExportBlocked])
 
   const handleExportText = useCallback(() => {

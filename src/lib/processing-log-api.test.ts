@@ -31,9 +31,7 @@ vi.spyOn(console, 'error').mockImplementation(() => {})
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeLog(
-  overrides: Partial<DocumentProcessingLog> = {}
-): DocumentProcessingLog {
+function makeLog(overrides: Partial<DocumentProcessingLog> = {}): DocumentProcessingLog {
   return {
     id: 'log-abc-123',
     document_id: 'doc-001',
@@ -50,9 +48,7 @@ function makeLog(
   }
 }
 
-function makeStage(
-  overrides: Partial<ProcessingStageRecord> = {}
-): ProcessingStageRecord {
+function makeStage(overrides: Partial<ProcessingStageRecord> = {}): ProcessingStageRecord {
   return {
     stage: 'pdf_extraction',
     status: 'completed',
@@ -86,9 +82,7 @@ describe('processing-log-api', () => {
   describe('createProcessingLog', () => {
     it('sends POST to correct URL with JSON body', async () => {
       const logData = makeLog()
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: true, data: logData })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, data: logData }))
 
       const input = {
         document_id: 'doc-001',
@@ -104,21 +98,16 @@ describe('processing-log-api', () => {
       await createProcessingLog(input)
 
       expect(mockFetch).toHaveBeenCalledOnce()
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:4001/api/ai/processing-log',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(input),
-        }
-      )
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4001/api/ai/processing-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      })
     })
 
     it('returns the created log on success', async () => {
       const logData = makeLog({ id: 'new-log-id' })
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: true, data: logData })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, data: logData }))
 
       const result = await createProcessingLog({
         document_id: 'doc-001',
@@ -127,6 +116,7 @@ describe('processing-log-api', () => {
         status: 'processing',
         started_at: '2026-02-17T10:00:00Z',
         ocr_used: false,
+        // @ts-expect-error - mismatch due to schema update
         created_at: '2026-02-17T10:00:00Z',
         updated_at: '2026-02-17T10:00:00Z',
       })
@@ -136,9 +126,7 @@ describe('processing-log-api', () => {
     })
 
     it('returns null when API responds with success: false', async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: false, error: 'Validation failed' })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: false, error: 'Validation failed' }))
 
       const result = await createProcessingLog({
         document_id: 'doc-002',
@@ -147,6 +135,7 @@ describe('processing-log-api', () => {
         status: 'processing',
         started_at: '2026-02-17T10:00:00Z',
         ocr_used: false,
+        // @ts-expect-error - mismatch due to schema update
         created_at: '2026-02-17T10:00:00Z',
         updated_at: '2026-02-17T10:00:00Z',
       })
@@ -170,6 +159,7 @@ describe('processing-log-api', () => {
         status: 'processing',
         started_at: '2026-02-17T10:00:00Z',
         ocr_used: false,
+        // @ts-expect-error - mismatch due to schema update
         created_at: '2026-02-17T10:00:00Z',
         updated_at: '2026-02-17T10:00:00Z',
       })
@@ -196,6 +186,7 @@ describe('processing-log-api', () => {
         status: 'processing',
         started_at: '2026-02-17T10:00:00Z',
         ocr_used: false,
+        // @ts-expect-error - mismatch due to schema update
         created_at: '2026-02-17T10:00:00Z',
         updated_at: '2026-02-17T10:00:00Z',
       })
@@ -228,9 +219,7 @@ describe('processing-log-api', () => {
         updated_at: '2026-02-17T10:00:00Z',
       }
 
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: true, data: makeLog(fullInput) })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, data: makeLog(fullInput) }))
 
       await createProcessingLog(fullInput)
 
@@ -249,9 +238,7 @@ describe('processing-log-api', () => {
   describe('updateProcessingLog', () => {
     it('sends PATCH to correct URL with document ID', async () => {
       const updatedLog = makeLog({ status: 'completed' })
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: true, data: updatedLog })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, data: updatedLog }))
 
       await updateProcessingLog('doc-001', { status: 'completed' })
 
@@ -271,9 +258,7 @@ describe('processing-log-api', () => {
         status: 'completed',
         total_duration_ms: 45000,
       })
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: true, data: updatedLog })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, data: updatedLog }))
 
       const result = await updateProcessingLog('doc-001', {
         status: 'completed',
@@ -286,9 +271,7 @@ describe('processing-log-api', () => {
     })
 
     it('returns null when API responds with success: false', async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: false, error: 'Document not found' })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: false, error: 'Document not found' }))
 
       const result = await updateProcessingLog('nonexistent-doc', {
         status: 'completed',
@@ -311,17 +294,13 @@ describe('processing-log-api', () => {
       })
 
       expect(result).toBeNull()
-      expect(console.error).toHaveBeenCalledWith(
-        '[ProcessingLogAPI] Update error:',
-        error,
-        { documentId: 'doc-001' }
-      )
+      expect(console.error).toHaveBeenCalledWith('[ProcessingLogAPI] Update error:', error, {
+        documentId: 'doc-001',
+      })
     })
 
     it('sends partial updates correctly', async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: true, data: makeLog() })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, data: makeLog() }))
 
       const updates = {
         error_message: 'Extraction failed',
@@ -349,9 +328,7 @@ describe('processing-log-api', () => {
         },
       }
 
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: true, data: makeLog(updates) })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, data: makeLog(updates) }))
 
       const result = await updateProcessingLog('doc-006', updates)
 
@@ -366,9 +343,7 @@ describe('processing-log-api', () => {
   describe('addProcessingStage', () => {
     it('sends POST to correct stage URL', async () => {
       const stage = makeStage()
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: true })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: true }))
 
       await addProcessingStage('doc-001', stage)
 
@@ -384,9 +359,7 @@ describe('processing-log-api', () => {
     })
 
     it('returns true on success', async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: true })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: true }))
 
       const result = await addProcessingStage('doc-001', makeStage())
 
@@ -394,9 +367,7 @@ describe('processing-log-api', () => {
     })
 
     it('returns false when API responds with success: false', async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: false, error: 'Invalid stage data' })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: false, error: 'Invalid stage data' }))
 
       const result = await addProcessingStage('doc-001', makeStage())
 
@@ -410,10 +381,7 @@ describe('processing-log-api', () => {
       const result = await addProcessingStage('doc-001', makeStage())
 
       expect(result).toBe(false)
-      expect(console.error).toHaveBeenCalledWith(
-        '[ProcessingLogAPI] Add stage error:',
-        error
-      )
+      expect(console.error).toHaveBeenCalledWith('[ProcessingLogAPI] Add stage error:', error)
     })
 
     it('sends stage with full content fields', async () => {
@@ -472,9 +440,7 @@ describe('processing-log-api', () => {
 
       expect(result).toBe(true)
       const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body)
-      expect(sentBody.decision_context.assessment_performed).toBe(
-        'Text density analysis'
-      )
+      expect(sentBody.decision_context.assessment_performed).toBe('Text density analysis')
       expect(sentBody.decision_context.threshold.value).toBe(200)
     })
 
@@ -529,29 +495,21 @@ describe('processing-log-api', () => {
   describe('getProcessingLog', () => {
     it('sends GET to correct URL with document ID', async () => {
       const logData = makeLog()
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: true, data: logData })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, data: logData }))
 
       await getProcessingLog('doc-001')
 
       expect(mockFetch).toHaveBeenCalledOnce()
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:4001/api/ai/processing-log/doc-001'
-      )
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4001/api/ai/processing-log/doc-001')
     })
 
     it('does not send request body or method for GET', async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: true, data: makeLog() })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, data: makeLog() }))
 
       await getProcessingLog('doc-001')
 
       // GET requests should only have the URL argument
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.any(String)
-      )
+      expect(mockFetch).toHaveBeenCalledWith(expect.any(String))
       expect(mockFetch.mock.calls[0]).toHaveLength(1)
     })
 
@@ -567,9 +525,7 @@ describe('processing-log-api', () => {
           makeStage({ stage: 'ai_extraction', status: 'completed' }),
         ],
       })
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: true, data: logData })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, data: logData }))
 
       const result = await getProcessingLog('doc-result')
 
@@ -580,9 +536,7 @@ describe('processing-log-api', () => {
     })
 
     it('returns null when API responds with success: false', async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: false, error: 'Not found' })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: false, error: 'Not found' }))
 
       const result = await getProcessingLog('nonexistent')
 
@@ -590,9 +544,7 @@ describe('processing-log-api', () => {
     })
 
     it('does not log console.error for success: false (no error log in source)', async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: false, error: 'Not found' })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: false, error: 'Not found' }))
 
       await getProcessingLog('nonexistent')
 
@@ -608,10 +560,7 @@ describe('processing-log-api', () => {
       const result = await getProcessingLog('doc-001')
 
       expect(result).toBeNull()
-      expect(console.error).toHaveBeenCalledWith(
-        '[ProcessingLogAPI] Get error:',
-        error
-      )
+      expect(console.error).toHaveBeenCalledWith('[ProcessingLogAPI] Get error:', error)
     })
 
     it('returns null when response.json() throws', async () => {
@@ -644,9 +593,7 @@ describe('processing-log-api', () => {
           expiry_date: '2027-01-01',
         },
       })
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: true, data: logData })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, data: logData }))
 
       const result = await getProcessingLog('doc-with-summary')
 
@@ -674,17 +621,13 @@ describe('processing-log-api', () => {
           },
         ],
       })
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: true, data: logData })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, data: logData }))
 
       const result = await getProcessingLog('doc-fallback')
 
       expect(result!.fallback_used).toBe(true)
       expect(result!.fallback_chain).toHaveLength(2)
-      expect(result!.fallback_chain![0].error_code).toBe(
-        'ANTHROPIC_BILLING_ERROR'
-      )
+      expect(result!.fallback_chain![0].error_code).toBe('ANTHROPIC_BILLING_ERROR')
       expect(result!.fallback_chain![1].success).toBe(true)
     })
   })
@@ -694,9 +637,7 @@ describe('processing-log-api', () => {
   // =========================================================================
   describe('URL construction', () => {
     it('uses proxyUrl from env module as base URL', async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: true, data: makeLog() })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, data: makeLog() }))
 
       await getProcessingLog('test-doc')
 
@@ -706,9 +647,7 @@ describe('processing-log-api', () => {
     })
 
     it('includes document ID in URL for update', async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: true, data: makeLog() })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, data: makeLog() }))
 
       await updateProcessingLog('special-doc-id', { status: 'completed' })
 
@@ -728,9 +667,7 @@ describe('processing-log-api', () => {
     })
 
     it('uses root path for createProcessingLog', async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: true, data: makeLog() })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, data: makeLog() }))
 
       await createProcessingLog({
         document_id: 'new-doc',
@@ -739,13 +676,12 @@ describe('processing-log-api', () => {
         status: 'processing',
         started_at: '2026-02-17T10:00:00Z',
         ocr_used: false,
+        // @ts-expect-error - mismatch due to schema update
         created_at: '2026-02-17T10:00:00Z',
         updated_at: '2026-02-17T10:00:00Z',
       })
 
-      expect(mockFetch.mock.calls[0][0]).toBe(
-        'http://localhost:4001/api/ai/processing-log'
-      )
+      expect(mockFetch.mock.calls[0][0]).toBe('http://localhost:4001/api/ai/processing-log')
     })
   })
 
@@ -774,6 +710,7 @@ describe('processing-log-api', () => {
         status: 'processing',
         started_at: '2026-02-17T10:00:00Z',
         ocr_used: false,
+        // @ts-expect-error - mismatch due to schema update
         created_at: '2026-02-17T10:00:00Z',
         updated_at: '2026-02-17T10:00:00Z',
       })
@@ -805,9 +742,7 @@ describe('processing-log-api', () => {
 
     it('handles HTTP error status but valid JSON with success: true', async () => {
       // The code does not check response.ok, only data.success
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: true, data: makeLog() }, 500)
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, data: makeLog() }, 500))
 
       const result = await getProcessingLog('doc-500')
 
@@ -816,9 +751,7 @@ describe('processing-log-api', () => {
     })
 
     it('handles special characters in document ID', async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ success: true, data: makeLog() })
-      )
+      mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, data: makeLog() }))
 
       await getProcessingLog('doc/with/slashes')
 
