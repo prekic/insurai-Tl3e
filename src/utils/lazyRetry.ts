@@ -30,12 +30,36 @@ export const lazyRetry = <T extends ComponentType<unknown>>(
         const hasRetried = sessionStorage.getItem(sessionKey)
         if (!hasRetried) {
           sessionStorage.setItem(sessionKey, 'true')
-          // Force a hard reload from the server to get the latest index.html and chunk mappings
-          window.location.reload()
+
+          // Attempt to clear PWA Service Workers and caches before reloading
+          // This prevents the browser from reloading the same stale index.html
+          const clearCachesAndReload = async () => {
+            try {
+              if ('caches' in window) {
+                const names = await caches.keys()
+                await Promise.all(names.map((n) => caches.delete(n)))
+              }
+              if ('serviceWorker' in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations()
+                await Promise.all(regs.map((r) => r.unregister()))
+              }
+            } catch (e) {
+              console.error('Failed to clear caches/SW on chunk load error:', e)
+            }
+          }
+
+          clearCachesAndReload().finally(() => {
+            window.location.reload()
+          })
 
           // Return a never-resolving promise so React doesn't try to render the
           // error boundary/fallback before the page fully reloads
           return new Promise<{ default: T }>(() => {})
+        } else {
+          // If we already retried and it STILL failed, we're going to crash out.
+          // We must clear the session flag now so that if the user clicks "Try Again"
+          // in the ErrorBoundary, we can attempt the recovery cycle again.
+          sessionStorage.removeItem(sessionKey)
         }
       }
 
