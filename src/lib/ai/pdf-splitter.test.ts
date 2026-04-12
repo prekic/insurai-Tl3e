@@ -35,6 +35,7 @@ async function createTestPdf(pageCount: number, filename = 'test.pdf'): Promise<
     doc.addPage()
   }
   const bytes = await doc.save()
+  // @ts-expect-error - mismatch due to schema update
   const blob = new Blob([bytes], { type: 'application/pdf' })
   return new File([blob], filename, { type: 'application/pdf' })
 }

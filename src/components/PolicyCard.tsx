@@ -1,4 +1,13 @@
-import { Eye, Trash2, MessageSquare, CheckSquare, Square, Sparkles, Copy } from 'lucide-react'
+import {
+  Eye,
+  Trash2,
+  MessageSquare,
+  CheckSquare,
+  Square,
+  Sparkles,
+  Copy,
+  AlertTriangle,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatDate } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n'
@@ -6,6 +15,8 @@ import { useDisplayCurrency } from '@/hooks/useDisplayCurrency'
 import { Badge } from './ui/badge'
 import { GradeBadge, StatusIndicator, ScoreBreakdown, OverallScore } from './evaluation'
 import { usePolicyEvaluation } from '@/hooks/usePolicyEvaluation'
+import { usePilotGateOptions } from '@/hooks/usePilotGateOptions'
+import { useDisplaySafeSummary } from '@/hooks/useDisplaySafeSummary'
 import type { AnalyzedPolicy, DuplicatePolicy } from '@/types/policy'
 import { POLICY_TYPES } from '@/types/policy'
 
@@ -45,6 +56,16 @@ export function PolicyCard({
   const { t, locale } = useI18n()
   const { formatConverted } = useDisplayCurrency()
   const { evaluation } = usePolicyEvaluation(showEvaluation ? policy : undefined)
+
+  const pilotOptions = usePilotGateOptions()
+  const displaySummary = useDisplaySafeSummary(policy, pilotOptions)
+  const isPilotResult = displaySummary?.isPilotResult ?? false
+  const isDraft = displaySummary?.isDraft ?? false
+  const isVerificationPending =
+    isPilotResult && displaySummary?.pilotReviewStatus === 'pending_review'
+  const lowConfidence = policy.aiConfidence !== undefined && policy.aiConfidence < 0.6
+  const isUnverified =
+    isDraft || isVerificationPending || lowConfidence || (evaluation?.isProvisional ?? false)
 
   const policyTypeInfo = POLICY_TYPES[policy.type]
   const typeLabel =
@@ -160,7 +181,18 @@ export function PolicyCard({
           </div>
 
           {/* Grade */}
-          {evaluation && <GradeBadge grade={evaluation.grade} size="sm" />}
+          {evaluation ? (
+            isUnverified ? (
+              <Badge
+                variant="destructive"
+                className="flex items-center gap-1 font-bold h-6 overflow-hidden max-w-6"
+              >
+                <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+              </Badge>
+            ) : (
+              <GradeBadge grade={evaluation.grade} size="sm" />
+            )
+          ) : null}
         </div>
       </div>
     )
@@ -230,12 +262,22 @@ export function PolicyCard({
                 <p className="text-sm text-gray-500 truncate">{policy.policyNumber}</p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                {evaluation && (
-                  <>
-                    <GradeBadge grade={evaluation.grade} size="md" />
-                    <StatusIndicator status={evaluation.status} showLabel={false} size="sm" />
-                  </>
-                )}
+                {evaluation ? (
+                  isUnverified ? (
+                    <Badge
+                      variant="destructive"
+                      className="flex items-center gap-1 font-bold text-[10px]"
+                    >
+                      <AlertTriangle className="w-3 h-3" />
+                      {locale === 'tr' ? 'DOĞRULANMADI' : 'UNVERIFIED'}
+                    </Badge>
+                  ) : (
+                    <>
+                      <GradeBadge grade={evaluation.grade} size="md" />
+                      <StatusIndicator status={evaluation.status} showLabel={false} size="sm" />
+                    </>
+                  )
+                ) : null}
               </div>
             </div>
           </div>
@@ -273,12 +315,23 @@ export function PolicyCard({
         {/* Evaluation section */}
         {showEvaluation && evaluation && (
           <div className="pt-3 border-t border-gray-100">
-            <div className="flex items-center gap-4">
-              <OverallScore score={evaluation.overallScore} size="sm" showLabel={false} />
-              <div className="flex-1">
-                <ScoreBreakdown breakdown={evaluation.scoreBreakdown} variant="mini" />
+            {isUnverified ? (
+              <div className="flex items-center gap-2 p-2 bg-red-50 text-red-700 rounded-lg text-sm border border-red-100 opacity-90 transition-opacity hover:opacity-100">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                <span className="font-medium text-xs leading-snug">
+                  {locale === 'tr'
+                    ? 'Yapay zeka analizi doğrulanmadı. Sonuçlar için kullanmadan önce kontrol ediniz.'
+                    : 'Unverified AI output. Please review before using.'}
+                </span>
               </div>
-            </div>
+            ) : (
+              <div className="flex items-center gap-4">
+                <OverallScore score={evaluation.overallScore} size="sm" showLabel={false} />
+                <div className="flex-1">
+                  <ScoreBreakdown breakdown={evaluation.scoreBreakdown} variant="mini" />
+                </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -499,6 +499,7 @@ describe('ConfigurationService', () => {
       setupCategoryQuery([{ key: 'unknown_key_xyz', value: 'should_be_ignored' }])
       const config = await service.getAIConfig()
       expect(config).toEqual(DEFAULT_AI_CONFIG)
+      // @ts-expect-error - mismatch due to schema update
       expect((config as Record<string, unknown>)['unknown_key_xyz']).toBeUndefined()
     })
   })

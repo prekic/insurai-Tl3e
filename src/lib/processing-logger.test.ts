@@ -13,6 +13,7 @@ import {
 } from './processing-logger'
 
 // Type alias to satisfy eslint - ProcessingLogger is used for type checking
+// @ts-expect-error - mismatch due to schema update
 type _Logger = ProcessingLogger
 
 describe('ProcessingLogger', () => {

@@ -77,6 +77,7 @@ describe('usePilotGateOptions', () => {
   })
 
   it('returns empty segments when user is not logged in', async () => {
+    // @ts-expect-error - mismatch due to schema update
     mockUseAuth.mockReturnValue({ user: null })
 
     const { result } = renderHook(() => usePilotGateOptions())

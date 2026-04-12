@@ -64,11 +64,56 @@ function makeEvaluation(overrides: Partial<PolicyEvaluation> = {}): PolicyEvalua
     grade: 'B',
     status: 'good',
     scoreBreakdown: {
-      premium: { category: 'premium', categoryTR: 'Prim', score: 70, weight: 20, details: '', detailsTR: '', issues: [], issuesTR: [] },
-      coverage: { category: 'coverage', categoryTR: 'Teminat', score: 80, weight: 30, details: '', detailsTR: '', issues: [], issuesTR: [] },
-      deductible: { category: 'deductible', categoryTR: 'Muafiyet', score: 60, weight: 15, details: '', detailsTR: '', issues: [], issuesTR: [] },
-      compliance: { category: 'compliance', categoryTR: 'Uyumluluk', score: 90, weight: 20, details: '', detailsTR: '', issues: [], issuesTR: [] },
-      value: { category: 'value', categoryTR: 'Fiyat/Performans', score: 65, weight: 15, details: '', detailsTR: '', issues: [], issuesTR: [] },
+      premium: {
+        category: 'premium',
+        categoryTR: 'Prim',
+        score: 70,
+        weight: 20,
+        details: '',
+        detailsTR: '',
+        issues: [],
+        issuesTR: [],
+      },
+      coverage: {
+        category: 'coverage',
+        categoryTR: 'Teminat',
+        score: 80,
+        weight: 30,
+        details: '',
+        detailsTR: '',
+        issues: [],
+        issuesTR: [],
+      },
+      deductible: {
+        category: 'deductible',
+        categoryTR: 'Muafiyet',
+        score: 60,
+        weight: 15,
+        details: '',
+        detailsTR: '',
+        issues: [],
+        issuesTR: [],
+      },
+      compliance: {
+        category: 'compliance',
+        categoryTR: 'Uyumluluk',
+        score: 90,
+        weight: 20,
+        details: '',
+        detailsTR: '',
+        issues: [],
+        issuesTR: [],
+      },
+      value: {
+        category: 'value',
+        categoryTR: 'Fiyat/Performans',
+        score: 65,
+        weight: 15,
+        details: '',
+        detailsTR: '',
+        issues: [],
+        issuesTR: [],
+      },
     },
     marketComparison: {
       premiumPercentile: 50,
@@ -96,6 +141,7 @@ function makeEvaluation(overrides: Partial<PolicyEvaluation> = {}): PolicyEvalua
 }
 
 function makeDbConfig(overrides: Partial<DatabaseEvaluationConfig> = {}): DatabaseEvaluationConfig {
+  // @ts-expect-error - mismatch due to schema update
   return {
     weightPremium: 20,
     weightCoverage: 30,
@@ -152,9 +198,7 @@ describe('usePolicyEvaluation', () => {
   describe('when policy is null or undefined', () => {
     it('returns null evaluation for null policy', async () => {
       const usePolicyEvaluation = await importHook()
-      const { result } = renderHook(() =>
-        usePolicyEvaluation(null, { skipDatabaseConfig: true })
-      )
+      const { result } = renderHook(() => usePolicyEvaluation(null, { skipDatabaseConfig: true }))
 
       expect(result.current.evaluation).toBeNull()
       expect(result.current.isLoading).toBe(false)
@@ -194,9 +238,12 @@ describe('usePolicyEvaluation', () => {
 
       expect(result.current.evaluation).toBe(evaluation)
       expect(result.current.error).toBeNull()
-      expect(mockEvaluatePolicy).toHaveBeenCalledWith(policy, expect.objectContaining({
-        config: expect.any(Object),
-      }))
+      expect(mockEvaluatePolicy).toHaveBeenCalledWith(
+        policy,
+        expect.objectContaining({
+          config: expect.any(Object),
+        })
+      )
     })
 
     it('returns evaluation immediately with skipDatabaseConfig', async () => {
@@ -205,9 +252,7 @@ describe('usePolicyEvaluation', () => {
       const evaluation = makeEvaluation()
       mockEvaluatePolicy.mockReturnValue(evaluation)
 
-      const { result } = renderHook(() =>
-        usePolicyEvaluation(policy, { skipDatabaseConfig: true })
-      )
+      const { result } = renderHook(() => usePolicyEvaluation(policy, { skipDatabaseConfig: true }))
 
       // Should not be loading since we skip db config
       expect(result.current.isLoading).toBe(false)
@@ -219,14 +264,9 @@ describe('usePolicyEvaluation', () => {
       const usePolicyEvaluation = await importHook()
       const policy = makePolicy({ id: 'custom-id', premium: 99999 })
 
-      renderHook(() =>
-        usePolicyEvaluation(policy, { skipDatabaseConfig: true })
-      )
+      renderHook(() => usePolicyEvaluation(policy, { skipDatabaseConfig: true }))
 
-      expect(mockEvaluatePolicy).toHaveBeenCalledWith(
-        policy,
-        expect.any(Object)
-      )
+      expect(mockEvaluatePolicy).toHaveBeenCalledWith(policy, expect.any(Object))
       const passedPolicy = mockEvaluatePolicy.mock.calls[0][0]
       expect(passedPolicy.id).toBe('custom-id')
       expect(passedPolicy.premium).toBe(99999)
@@ -262,9 +302,7 @@ describe('usePolicyEvaluation', () => {
       const usePolicyEvaluation = await importHook()
       const policy = makePolicy()
 
-      renderHook(() =>
-        usePolicyEvaluation(policy, { skipDatabaseConfig: true })
-      )
+      renderHook(() => usePolicyEvaluation(policy, { skipDatabaseConfig: true }))
 
       expect(mockGetEvaluationConfig).not.toHaveBeenCalled()
     })
@@ -273,9 +311,7 @@ describe('usePolicyEvaluation', () => {
       const usePolicyEvaluation = await importHook()
       const policy = makePolicy()
 
-      renderHook(() =>
-        usePolicyEvaluation(policy, { skipDatabaseConfig: true })
-      )
+      renderHook(() => usePolicyEvaluation(policy, { skipDatabaseConfig: true }))
 
       expect(mockConvertDatabaseConfigToEvaluatorConfig).not.toHaveBeenCalled()
     })
@@ -292,9 +328,12 @@ describe('usePolicyEvaluation', () => {
         usePolicyEvaluation(policy, { skipDatabaseConfig: true, config: customConfig })
       )
 
-      expect(mockEvaluatePolicy).toHaveBeenCalledWith(policy, expect.objectContaining({
-        config: customConfig,
-      }))
+      expect(mockEvaluatePolicy).toHaveBeenCalledWith(
+        policy,
+        expect.objectContaining({
+          config: customConfig,
+        })
+      )
     })
   })
 
@@ -334,9 +373,7 @@ describe('usePolicyEvaluation', () => {
         region: 'marmara',
       }
 
-      const { result } = renderHook(() =>
-        usePolicyEvaluation(policy, { config: customConfig })
-      )
+      const { result } = renderHook(() => usePolicyEvaluation(policy, { config: customConfig }))
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false)
@@ -361,11 +398,11 @@ describe('usePolicyEvaluation', () => {
       const usePolicyEvaluation = await importHook()
       const policy = makePolicy()
       const error = new Error('Evaluation failed')
-      mockEvaluatePolicy.mockImplementation(() => { throw error })
+      mockEvaluatePolicy.mockImplementation(() => {
+        throw error
+      })
 
-      const { result } = renderHook(() =>
-        usePolicyEvaluation(policy, { skipDatabaseConfig: true })
-      )
+      const { result } = renderHook(() => usePolicyEvaluation(policy, { skipDatabaseConfig: true }))
 
       expect(result.current.evaluation).toBeNull()
       expect(result.current.isLoading).toBe(false)
@@ -375,11 +412,11 @@ describe('usePolicyEvaluation', () => {
     it('wraps non-Error throws in a generic Error', async () => {
       const usePolicyEvaluation = await importHook()
       const policy = makePolicy()
-      mockEvaluatePolicy.mockImplementation(() => { throw 'string error' })  
+      mockEvaluatePolicy.mockImplementation(() => {
+        throw 'string error'
+      })
 
-      const { result } = renderHook(() =>
-        usePolicyEvaluation(policy, { skipDatabaseConfig: true })
-      )
+      const { result } = renderHook(() => usePolicyEvaluation(policy, { skipDatabaseConfig: true }))
 
       expect(result.current.evaluation).toBeNull()
       expect(result.current.error).toBeInstanceOf(Error)
@@ -446,9 +483,7 @@ describe('usePolicyEvaluation', () => {
       const usePolicyEvaluation = await importHook()
       const policy = makePolicy()
 
-      const { result } = renderHook(() =>
-        usePolicyEvaluation(policy, { skipDatabaseConfig: true })
-      )
+      const { result } = renderHook(() => usePolicyEvaluation(policy, { skipDatabaseConfig: true }))
 
       expect(result.current.isLoading).toBe(false)
     })
@@ -563,9 +598,7 @@ describe('usePolicyEvaluation', () => {
 
       const eval1 = makeEvaluation({ overallScore: 80 })
       const eval2 = makeEvaluation({ overallScore: 60 })
-      mockEvaluatePolicy
-        .mockReturnValueOnce(eval1)
-        .mockReturnValueOnce(eval2)
+      mockEvaluatePolicy.mockReturnValueOnce(eval1).mockReturnValueOnce(eval2)
 
       const { result, rerender } = renderHook(
         ({ policy }) => usePolicyEvaluation(policy, { skipDatabaseConfig: true }),
@@ -616,9 +649,7 @@ describe('usePolicyEvaluations', () => {
     it('returns empty map', async () => {
       const usePolicyEvaluations = await importHook()
 
-      const { result } = renderHook(() =>
-        usePolicyEvaluations([], { skipDatabaseConfig: true })
-      )
+      const { result } = renderHook(() => usePolicyEvaluations([], { skipDatabaseConfig: true }))
 
       expect(result.current.evaluations.size).toBe(0)
       expect(result.current.isLoading).toBe(false)
@@ -661,14 +692,9 @@ describe('usePolicyEvaluations', () => {
 
     it('calls evaluatePolicy for each policy', async () => {
       const usePolicyEvaluations = await importHook()
-      const policies = [
-        makePolicy({ id: 'a' }),
-        makePolicy({ id: 'b' }),
-      ]
+      const policies = [makePolicy({ id: 'a' }), makePolicy({ id: 'b' })]
 
-      renderHook(() =>
-        usePolicyEvaluations(policies, { skipDatabaseConfig: true })
-      )
+      renderHook(() => usePolicyEvaluations(policies, { skipDatabaseConfig: true }))
 
       expect(mockEvaluatePolicy).toHaveBeenCalledTimes(2)
       expect(mockEvaluatePolicy.mock.calls[0][0].id).toBe('a')
@@ -713,7 +739,9 @@ describe('usePolicyEvaluations', () => {
 
       mockEvaluatePolicy
         .mockReturnValueOnce(evalGood1)
-        .mockImplementationOnce(() => { throw new Error('Bad policy data') })
+        .mockImplementationOnce(() => {
+          throw new Error('Bad policy data')
+        })
         .mockReturnValueOnce(evalGood2)
 
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -738,7 +766,9 @@ describe('usePolicyEvaluations', () => {
         makePolicy({ id: 'bad2', premium: 20000 }),
       ]
 
-      mockEvaluatePolicy.mockImplementation(() => { throw new Error('fail') })
+      mockEvaluatePolicy.mockImplementation(() => {
+        throw new Error('fail')
+      })
 
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
@@ -822,9 +852,7 @@ describe('usePolicyEvaluations', () => {
       const usePolicyEvaluations = await importHook()
       const policies = [makePolicy()]
 
-      renderHook(() =>
-        usePolicyEvaluations(policies, { skipDatabaseConfig: true })
-      )
+      renderHook(() => usePolicyEvaluations(policies, { skipDatabaseConfig: true }))
 
       expect(mockGetEvaluationConfig).not.toHaveBeenCalled()
     })
@@ -833,9 +861,7 @@ describe('usePolicyEvaluations', () => {
       const usePolicyEvaluations = await importHook()
       const policies = [makePolicy()]
 
-      renderHook(() =>
-        usePolicyEvaluations(policies, { skipDatabaseConfig: true })
-      )
+      renderHook(() => usePolicyEvaluations(policies, { skipDatabaseConfig: true }))
 
       expect(mockConvertDatabaseConfigToEvaluatorConfig).not.toHaveBeenCalled()
     })
@@ -912,9 +938,7 @@ describe('usePolicyEvaluations', () => {
 
       const customConfig = { strictCompliance: false }
 
-      const { result } = renderHook(() =>
-        usePolicyEvaluations(policies, { config: customConfig })
-      )
+      const { result } = renderHook(() => usePolicyEvaluations(policies, { config: customConfig }))
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false)

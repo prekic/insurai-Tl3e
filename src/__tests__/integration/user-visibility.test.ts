@@ -18,6 +18,7 @@ import { describe, it, expect } from 'vitest'
  */
 describe('API Error Response Visibility', () => {
   describe('End User View (Production)', () => {
+    // @ts-expect-error - TS6133 unused variable
     const _NODE_ENV = 'production' // Documenting environment context
 
     it('should see user-friendly error message only', () => {
@@ -36,8 +37,8 @@ describe('API Error Response Visibility', () => {
       expect(errorResponse).not.toHaveProperty('details') // ✅ Hidden in production
 
       // The error message is user-friendly, no technical details
-      expect(errorResponse.error).not.toContain('sk-')  // No API key fragments
-      expect(errorResponse.error).not.toContain('401')  // No HTTP status codes
+      expect(errorResponse.error).not.toContain('sk-') // No API key fragments
+      expect(errorResponse.error).not.toContain('401') // No HTTP status codes
       expect(errorResponse.error).not.toContain('stack') // No stack traces
     })
 
@@ -54,6 +55,7 @@ describe('API Error Response Visibility', () => {
 
     it('should NOT see raw API error messages', () => {
       // These should be transformed to user-friendly messages
+      // @ts-expect-error - TS6133 unused variable
       const _rawErrors = [
         '401 Unauthorized - Incorrect API key provided: sk-proj-xxx',
         'Error: insufficient_quota - You exceeded your current quota',
@@ -67,7 +69,7 @@ describe('API Error Response Visibility', () => {
         'OpenAI extraction failed',
       ]
 
-      userFriendlyMessages.forEach(msg => {
+      userFriendlyMessages.forEach((msg) => {
         expect(msg).not.toContain('sk-')
         expect(msg).not.toContain('127.0.0.1')
         expect(msg).not.toContain('APIError')
@@ -76,6 +78,7 @@ describe('API Error Response Visibility', () => {
   })
 
   describe('Admin/Developer View (Development)', () => {
+    // @ts-expect-error - TS6133 unused variable
     const _NODE_ENV = 'development' // Documenting environment context
 
     it('should see full error details for debugging', () => {
@@ -168,10 +171,10 @@ describe('Diagnostic Response Visibility', () => {
         'Cloud Vision API not enabled - enable it in Google Cloud Console',
       ]
 
-      sanitizedErrors.forEach(error => {
-        expect(error).not.toMatch(/sk-[a-zA-Z0-9]+/)  // No API keys
-        expect(error).not.toContain('Bearer')         // No auth headers
-        expect(error).not.toContain('Authorization')  // No auth info
+      sanitizedErrors.forEach((error) => {
+        expect(error).not.toMatch(/sk-[a-zA-Z0-9]+/) // No API keys
+        expect(error).not.toContain('Bearer') // No auth headers
+        expect(error).not.toContain('Authorization') // No auth info
       })
     })
   })
@@ -207,7 +210,7 @@ describe('UI Error Message Visibility', () => {
       ]
 
       // These are appropriate for developers self-hosting
-      troubleshootingSteps.forEach(step => {
+      troubleshootingSteps.forEach((step) => {
         expect(step).not.toContain('password')
         expect(step).not.toContain('secret')
       })
@@ -224,7 +227,7 @@ describe('UI Error Message Visibility', () => {
       ]
 
       // All messages are user-appropriate
-      uiMessages.forEach(msg => {
+      uiMessages.forEach((msg) => {
         expect(msg).not.toMatch(/sk-[a-zA-Z0-9]+/)
       })
     })
@@ -237,16 +240,18 @@ describe('UI Error Message Visibility', () => {
         },
         error: {
           title: 'AI Not Configured',
-          description: 'The AI service is not available. Ensure the backend server is running with OPENAI_API_KEY or ANTHROPIC_API_KEY in .env',
+          description:
+            'The AI service is not available. Ensure the backend server is running with OPENAI_API_KEY or ANTHROPIC_API_KEY in .env',
         },
         rateLimit: {
           title: 'Rate Limit Exceeded',
-          description: 'Too many requests to the AI service. Please wait a few minutes before trying again.',
+          description:
+            'Too many requests to the AI service. Please wait a few minutes before trying again.',
         },
       }
 
       // All toast messages are user-friendly
-      Object.values(toastMessages).forEach(toast => {
+      Object.values(toastMessages).forEach((toast) => {
         expect(toast.title).not.toContain('Error:')
         expect(toast.description).not.toContain('stack')
         expect(toast.description).not.toContain('at ')
@@ -272,7 +277,7 @@ describe('UI Error Message Visibility', () => {
       // - For self-hosted: ACCEPTABLE (users need to configure)
       // - For SaaS: SHOULD BE HIDDEN (users shouldn't configure server)
 
-      uiMessages.forEach(msg => {
+      uiMessages.forEach((msg) => {
         expect(msg).toMatch(/\.env|API_KEY|localhost/)
       })
     })
@@ -291,7 +296,7 @@ describe('UI Error Message Visibility', () => {
       // - API performance characteristics
 
       // RISK LEVEL: Very Low - generally acceptable
-      Object.values(diagnosticUI).forEach(msg => {
+      Object.values(diagnosticUI).forEach((msg) => {
         expect(msg).toMatch(/\d+ms/)
       })
     })
@@ -362,7 +367,7 @@ describe('Health Check Endpoint Visibility', () => {
         status: 'ok',
         timestamp: '2026-01-06T12:30:00.000Z',
         providers: {
-          openai: true,    // Boolean only - key exists
+          openai: true, // Boolean only - key exists
           anthropic: false,
           google: true,
         },
@@ -436,7 +441,7 @@ describe('SaaS Production Visibility Controls (IMPLEMENTED)', () => {
       }
 
       // Verify no technical details leak
-      Object.values(productionErrors).forEach(msg => {
+      Object.values(productionErrors).forEach((msg) => {
         expect(msg).not.toContain('sk-')
         expect(msg).not.toContain('.env')
         expect(msg).not.toContain('API key')
@@ -487,7 +492,11 @@ describe('SaaS Production Visibility Controls (IMPLEMENTED)', () => {
 
     it('should include environment field in development for debugging', () => {
       const developmentDiagnostics = {
-        openai: { configured: true, valid: false, error: 'Invalid API key - check OPENAI_API_KEY in .env' },
+        openai: {
+          configured: true,
+          valid: false,
+          error: 'Invalid API key - check OPENAI_API_KEY in .env',
+        },
         anthropic: { configured: false, valid: false },
         google: { configured: false, valid: false },
         timestamp: '2026-01-06T12:30:00.000Z',
@@ -515,7 +524,7 @@ describe('SaaS Production Visibility Controls (IMPLEMENTED)', () => {
       }
 
       // Verify no technical details
-      Object.values(productionTroubleshooting).forEach(msg => {
+      Object.values(productionTroubleshooting).forEach((msg) => {
         expect(msg).not.toContain('.env')
         expect(msg).not.toContain('npm')
         expect(msg).not.toContain('API_KEY')
@@ -525,9 +534,11 @@ describe('SaaS Production Visibility Controls (IMPLEMENTED)', () => {
 
     it('should show technical details in development UI for self-hosted users', () => {
       const developmentTroubleshooting = {
-        AI_NOT_CONFIGURED: 'Ensure the backend server is running with OPENAI_API_KEY or ANTHROPIC_API_KEY in .env',
+        AI_NOT_CONFIGURED:
+          'Ensure the backend server is running with OPENAI_API_KEY or ANTHROPIC_API_KEY in .env',
         NETWORK_ERROR: 'Check that the backend is running on port 4001 (npm run dev:server)',
-        PROVIDER_NOT_READY: 'Add OPENAI_API_KEY or ANTHROPIC_API_KEY to the server .env file and restart.',
+        PROVIDER_NOT_READY:
+          'Add OPENAI_API_KEY or ANTHROPIC_API_KEY to the server .env file and restart.',
       }
 
       // These contain setup instructions for self-hosted deployments
@@ -575,7 +586,8 @@ describe('SaaS Production Visibility Controls (IMPLEMENTED)', () => {
           anthropic: false,
           google: true,
         },
-        rateLimits: { // ✅ Included in development
+        rateLimits: {
+          // ✅ Included in development
           general: { windowMs: 900000, max: 100 },
           ai: { windowMs: 3600000, max: 20 },
           ocr: { windowMs: 3600000, max: 30 },

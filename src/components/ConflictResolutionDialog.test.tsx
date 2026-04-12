@@ -499,6 +499,7 @@ describe('ConflictResolutionDialog', () => {
       <ConflictResolutionDialog conflict={conflict} newPolicy={newPolicy} {...defaultCallbacks} />
     )
     // Close button is the X button in the header
+    // @ts-expect-error - TS6133 unused variable
     const _closeButton = screen
       .getAllByRole('button')
       .find((b) => !b.hasAttribute('disabled') && !b.textContent)

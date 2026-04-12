@@ -485,7 +485,9 @@ describe('PolicyDetailView', () => {
       renderPolicyDetailView()
 
       // Below average indicator - may appear in different formats
-      expect(screen.getAllByText(/below average|altında|cheaper/i).length).toBeGreaterThan(0)
+      expect(
+        screen.getAllByText(/below average|altında|cheaper|below market/i).length
+      ).toBeGreaterThan(0)
     })
 
     it('should not render Market Comparison when data is not available', () => {

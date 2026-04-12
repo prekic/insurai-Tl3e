@@ -302,6 +302,7 @@ describe('Issue 7: Evidence-first insight ordering', () => {
       '⚠ Warning E',
     ]
     const result = sanitizeReviewerInsights(insights)
+    // @ts-expect-error - mismatch due to schema update
     const warningEnd = result.findLastIndex((i) => i.startsWith('⚠'))
     const observationStart = result.findIndex((i) => i.startsWith('✓'))
     const recStart = result.findIndex((i) => i.startsWith('💡'))

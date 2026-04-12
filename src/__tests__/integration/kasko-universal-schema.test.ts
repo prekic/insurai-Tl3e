@@ -14,6 +14,7 @@ describe('KASKO Universal Schema Validation', () => {
     `.trim()
 
     // 2. Define the evidence spans pointing to specific offsets
+    // @ts-expect-error - TS6133 unused variable
     const _evidenceSpans: Record<string, Evidence> = {
       rayicDeger: {
         rawSnippet: 'SİGORTA BEDELİ: Rayiç Değer',

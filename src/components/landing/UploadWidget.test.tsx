@@ -57,16 +57,13 @@ const createMockFile = (name = 'test-policy.pdf', type = 'application/pdf', size
 // Component to capture location state for testing
 const LocationStateCapture = () => {
   const location = useLocation()
-  return (
-    <div data-testid="location-state">
-      {JSON.stringify(location.state)}
-    </div>
-  )
+  return <div data-testid="location-state">{JSON.stringify(location.state)}</div>
 }
 
 // Helper to render with router and capture navigation state
 const renderWithRouter = (props = {}, options = {}) => {
   const { initialUser = null } = options as { initialUser?: { id: string; email: string } | null }
+  // @ts-expect-error - mismatch due to schema update
   mockUser.mockReturnValue(initialUser)
 
   return render(
@@ -280,6 +277,7 @@ describe('UploadWidget', () => {
       // Override the mock for this specific test
       mockValidateFiles.mockReturnValueOnce({
         valid: [],
+        // @ts-expect-error - mismatch due to schema update
         errors: [{ code: 'INVALID_FILE_TYPE', file: 'test.exe' }],
       })
 

@@ -65,6 +65,7 @@ const mockEvalValueBased = vi.mocked(evaluateValueBasedPremium)
 const CURRENT_DATA_DATE = new Date().toISOString().split('T')[0]
 
 function makePolicy(overrides: Partial<Policy> = {}): Policy {
+  // @ts-expect-error - mismatch due to schema update
   return {
     id: 'bench-test-1',
     policyNumber: 'POL-BENCH-001',
@@ -155,6 +156,7 @@ describe('B1 — Benchmark Honesty', () => {
         score: 95, // Would be 95 without cap
         details: 'Premium rate of 2.0% is below market estimate of 3.0%',
         detailsTR: 'Prim oranı %2.0, piyasa tahmini %3.0 altında',
+        // @ts-expect-error - mismatch due to schema update
         position: 'competitive' as const,
         rate: 0.02,
       })

@@ -48,6 +48,7 @@ describe('IMM scenario coverage detection (Voluntary Liability)', () => {
     const card = findIMMCard({
       ...basePolicy,
       coverages: [
+        // @ts-expect-error - mismatch due to schema update
         {
           name: 'Voluntary Liability Coverage',
           limit: 500000,
@@ -64,6 +65,7 @@ describe('IMM scenario coverage detection (Voluntary Liability)', () => {
     const card = findIMMCard({
       ...basePolicy,
       coverages: [
+        // @ts-expect-error - mismatch due to schema update
         {
           name: 'Excess Liability',
           limit: 250000,

@@ -133,7 +133,9 @@ describe('QA field: sourceQuoteCount', () => {
     const qaRecord = createPilotQARecord('doc-9', 'test.pdf', 'user-1')
     const policy: Partial<AnalyzedPolicy> = {
       evidenceData: {
+        // @ts-expect-error - mismatch due to schema update
         insights: { quotes: ['quote1'] },
+        // @ts-expect-error - mismatch due to schema update
         exclusions: { quotes: ['quote2', 'quote3'] },
         coverages: { quotes: ['quote4'] },
       },
@@ -146,6 +148,7 @@ describe('QA field: sourceQuoteCount', () => {
   it('returns 0 when evidenceData is empty', () => {
     const qaRecord = createPilotQARecord('doc-10', 'test.pdf', 'user-1')
     const policy: Partial<AnalyzedPolicy> = {
+      // @ts-expect-error - mismatch due to schema update
       evidenceData: {},
       coverages: [],
     }

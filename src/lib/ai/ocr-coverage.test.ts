@@ -49,7 +49,7 @@ function createMockFile(name = 'test.pdf', type = 'application/pdf', content = '
   const file = new File([blob], name, { type })
   // Ensure arrayBuffer is available (jsdom may not have it)
   if (!file.arrayBuffer) {
-    (file as unknown as Record<string, unknown>).arrayBuffer = () =>
+    ;(file as unknown as Record<string, unknown>).arrayBuffer = () =>
       new Promise<ArrayBuffer>((resolve) => {
         const reader = new FileReader()
         reader.onload = () => resolve(reader.result as ArrayBuffer)
@@ -63,7 +63,7 @@ function createMockFile(name = 'test.pdf', type = 'application/pdf', content = '
 function createMockBlob(content = 'mock'): Blob {
   const blob = new Blob([content], { type: 'image/png' })
   if (!blob.arrayBuffer) {
-    (blob as unknown as Record<string, unknown>).arrayBuffer = () =>
+    ;(blob as unknown as Record<string, unknown>).arrayBuffer = () =>
       new Promise<ArrayBuffer>((resolve) => {
         const reader = new FileReader()
         reader.onload = () => resolve(reader.result as ArrayBuffer)
@@ -150,6 +150,7 @@ describe('ocr coverage', () => {
         isScanned: true,
         backend: 'document-ai' as const,
       }
+      // @ts-expect-error - mismatch due to schema update
       mockGetOCR.mockResolvedValue(cachedData)
 
       const file = createMockFile()
@@ -167,6 +168,7 @@ describe('ocr coverage', () => {
         pageCount: 1,
         isScanned: true,
       }
+      // @ts-expect-error - mismatch due to schema update
       mockGetOCR.mockResolvedValue(cachedData)
       vi.mocked(isOCRConfigured).mockReturnValue(true)
       vi.mocked(getProxyUrl).mockReturnValue(null)
@@ -175,9 +177,10 @@ describe('ocr coverage', () => {
       // Mock global fetch for Vision API
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          responses: [{ fullTextAnnotation: { text: 'fresh text', pages: [] } }],
-        }),
+        json: () =>
+          Promise.resolve({
+            responses: [{ fullTextAnnotation: { text: 'fresh text', pages: [] } }],
+          }),
       })
       vi.stubGlobal('fetch', mockFetch)
 
@@ -195,16 +198,17 @@ describe('ocr coverage', () => {
 
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          success: true,
-          data: {
-            text: 'Document AI text',
-            confidence: 0.95,
-            pageCount: 2,
-            formFields: [],
-            tables: [],
-          },
-        }),
+        json: () =>
+          Promise.resolve({
+            success: true,
+            data: {
+              text: 'Document AI text',
+              confidence: 0.95,
+              pageCount: 2,
+              formFields: [],
+              tables: [],
+            },
+          }),
       })
       vi.stubGlobal('fetch', mockFetch)
 
@@ -235,9 +239,10 @@ describe('ocr coverage', () => {
         // Vision API proxy call
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({
-            data: { text: 'Vision fallback text', confidence: 0.8, pageCount: 1 },
-          }),
+          json: () =>
+            Promise.resolve({
+              data: { text: 'Vision fallback text', confidence: 0.8, pageCount: 1 },
+            }),
         })
       })
       vi.stubGlobal('fetch', mockFetch)
@@ -278,9 +283,10 @@ describe('ocr coverage', () => {
 
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          data: { text: 'Vision text', confidence: 0.85, pageCount: 1 },
-        }),
+        json: () =>
+          Promise.resolve({
+            data: { text: 'Vision text', confidence: 0.85, pageCount: 1 },
+          }),
       })
       vi.stubGlobal('fetch', mockFetch)
 
@@ -300,9 +306,10 @@ describe('ocr coverage', () => {
 
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          data: { text: 'cached text', confidence: 0.85, pageCount: 1 },
-        }),
+        json: () =>
+          Promise.resolve({
+            data: { text: 'cached text', confidence: 0.85, pageCount: 1 },
+          }),
       })
       vi.stubGlobal('fetch', mockFetch)
 
@@ -319,9 +326,10 @@ describe('ocr coverage', () => {
 
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          data: { text: 'text', confidence: 0.85, pageCount: 1 },
-        }),
+        json: () =>
+          Promise.resolve({
+            data: { text: 'text', confidence: 0.85, pageCount: 1 },
+          }),
       })
       vi.stubGlobal('fetch', mockFetch)
 
@@ -446,10 +454,11 @@ describe('ocr coverage', () => {
 
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          success: true,
-          data: { text: 'text', confidence: 0.9, pageCount: 1 },
-        }),
+        json: () =>
+          Promise.resolve({
+            success: true,
+            data: { text: 'text', confidence: 0.9, pageCount: 1 },
+          }),
       })
       vi.stubGlobal('fetch', mockFetch)
 
@@ -467,10 +476,11 @@ describe('ocr coverage', () => {
 
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          success: true,
-          data: { text: 'text', confidence: 0.9, pageCount: 1 },
-        }),
+        json: () =>
+          Promise.resolve({
+            success: true,
+            data: { text: 'text', confidence: 0.9, pageCount: 1 },
+          }),
       })
       vi.stubGlobal('fetch', mockFetch)
 
@@ -489,10 +499,11 @@ describe('ocr coverage', () => {
 
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          success: true,
-          data: { text: 'text', confidence: 0.9, pageCount: 1 },
-        }),
+        json: () =>
+          Promise.resolve({
+            success: true,
+            data: { text: 'text', confidence: 0.9, pageCount: 1 },
+          }),
       })
       vi.stubGlobal('fetch', mockFetch)
 
@@ -510,10 +521,11 @@ describe('ocr coverage', () => {
 
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          success: true,
-          data: { text: 'text', confidence: 0.9, pageCount: 1 },
-        }),
+        json: () =>
+          Promise.resolve({
+            success: true,
+            data: { text: 'text', confidence: 0.9, pageCount: 1 },
+          }),
       })
       vi.stubGlobal('fetch', mockFetch)
 
@@ -531,10 +543,11 @@ describe('ocr coverage', () => {
 
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          success: true,
-          data: { text: 'text', confidence: 0.9, pageCount: 1 },
-        }),
+        json: () =>
+          Promise.resolve({
+            success: true,
+            data: { text: 'text', confidence: 0.9, pageCount: 1 },
+          }),
       })
       vi.stubGlobal('fetch', mockFetch)
 
@@ -552,10 +565,11 @@ describe('ocr coverage', () => {
 
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          success: true,
-          data: {}, // Missing text, confidence, pageCount
-        }),
+        json: () =>
+          Promise.resolve({
+            success: true,
+            data: {}, // Missing text, confidence, pageCount
+          }),
       })
       vi.stubGlobal('fetch', mockFetch)
 
@@ -579,9 +593,10 @@ describe('ocr coverage', () => {
 
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          data: { text: 'Vision proxy text', confidence: 0.9, pageCount: 1 },
-        }),
+        json: () =>
+          Promise.resolve({
+            data: { text: 'Vision proxy text', confidence: 0.9, pageCount: 1 },
+          }),
       })
       vi.stubGlobal('fetch', mockFetch)
 
@@ -592,10 +607,7 @@ describe('ocr coverage', () => {
         expect(result.data.text).toBe('Vision proxy text')
         expect(result.data.backend).toBe('vision-api')
       }
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:4001/api/ai/ocr',
-        expect.any(Object)
-      )
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4001/api/ai/ocr', expect.any(Object))
 
       vi.unstubAllGlobals()
     })
@@ -647,19 +659,21 @@ describe('ocr coverage', () => {
 
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          responses: [{
-            fullTextAnnotation: {
-              text: 'Direct Vision text',
-              pages: [{
-                blocks: [
-                  { confidence: 0.9 },
-                  { confidence: 0.8 },
-                ],
-              }],
-            },
-          }],
-        }),
+        json: () =>
+          Promise.resolve({
+            responses: [
+              {
+                fullTextAnnotation: {
+                  text: 'Direct Vision text',
+                  pages: [
+                    {
+                      blocks: [{ confidence: 0.9 }, { confidence: 0.8 }],
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
       })
       vi.stubGlobal('fetch', mockFetch)
 
@@ -784,16 +798,21 @@ describe('ocr coverage', () => {
 
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          responses: [{
-            fullTextAnnotation: {
-              text: 'text',
-              pages: [{
-                blocks: [{}, {}], // blocks without confidence
-              }],
-            },
-          }],
-        }),
+        json: () =>
+          Promise.resolve({
+            responses: [
+              {
+                fullTextAnnotation: {
+                  text: 'text',
+                  pages: [
+                    {
+                      blocks: [{}, {}], // blocks without confidence
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
       })
       vi.stubGlobal('fetch', mockFetch)
 
@@ -880,9 +899,10 @@ describe('ocr coverage', () => {
 
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          data: { text: 'page text', confidence: 0.9 },
-        }),
+        json: () =>
+          Promise.resolve({
+            data: { text: 'page text', confidence: 0.9 },
+          }),
       })
       vi.stubGlobal('fetch', mockFetch)
 
@@ -925,14 +945,17 @@ describe('ocr coverage', () => {
 
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          responses: [{
-            fullTextAnnotation: {
-              text: 'Direct page text',
-              pages: [{ blocks: [{ confidence: 0.95 }] }],
-            },
-          }],
-        }),
+        json: () =>
+          Promise.resolve({
+            responses: [
+              {
+                fullTextAnnotation: {
+                  text: 'Direct page text',
+                  pages: [{ blocks: [{ confidence: 0.95 }] }],
+                },
+              },
+            ],
+          }),
       })
       vi.stubGlobal('fetch', mockFetch)
 
@@ -1013,9 +1036,10 @@ describe('ocr coverage', () => {
         const text = `page ${++callIndex} text`
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({
-            data: { text, confidence: 0.85 },
-          }),
+          json: () =>
+            Promise.resolve({
+              data: { text, confidence: 0.85 },
+            }),
         })
       })
       vi.stubGlobal('fetch', mockFetch)
@@ -1070,9 +1094,10 @@ describe('ocr coverage', () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          data: { text: 'text', confidence: 0.9 },
-        }),
+        json: () =>
+          Promise.resolve({
+            data: { text: 'text', confidence: 0.9 },
+          }),
       })
       vi.stubGlobal('fetch', mockFetch)
 
@@ -1099,25 +1124,19 @@ describe('ocr coverage', () => {
     })
 
     it('should skip low confidence fields', () => {
-      const fields: FormField[] = [
-        { name: 'Field', value: 'value', confidence: 0.3 },
-      ]
+      const fields: FormField[] = [{ name: 'Field', value: 'value', confidence: 0.3 }]
       const map = extractFormFieldMap(fields)
       expect(Object.keys(map)).toHaveLength(0)
     })
 
     it('should skip fields with boundary confidence (0.5)', () => {
-      const fields: FormField[] = [
-        { name: 'Field', value: 'value', confidence: 0.5 },
-      ]
+      const fields: FormField[] = [{ name: 'Field', value: 'value', confidence: 0.5 }]
       const map = extractFormFieldMap(fields)
       expect(Object.keys(map)).toHaveLength(0)
     })
 
     it('should include fields just above 0.5 confidence', () => {
-      const fields: FormField[] = [
-        { name: 'Field', value: 'value', confidence: 0.51 },
-      ]
+      const fields: FormField[] = [{ name: 'Field', value: 'value', confidence: 0.51 }]
       const map = extractFormFieldMap(fields)
       expect(map['field']).toBe('value')
     })
@@ -1132,9 +1151,7 @@ describe('ocr coverage', () => {
     })
 
     it('should normalize and trim field names', () => {
-      const fields: FormField[] = [
-        { name: '  Poliçe No  ', value: '  POL-123  ', confidence: 0.9 },
-      ]
+      const fields: FormField[] = [{ name: '  Poliçe No  ', value: '  POL-123  ', confidence: 0.9 }]
       const map = extractFormFieldMap(fields)
       expect(map['poliçe no']).toBe('POL-123')
     })
@@ -1206,9 +1223,7 @@ describe('ocr coverage', () => {
     })
 
     it('should match policy number patterns', () => {
-      const fields: FormField[] = [
-        { name: 'Poliçe Numarası', value: 'POL-123', confidence: 0.9 },
-      ]
+      const fields: FormField[] = [{ name: 'Poliçe Numarası', value: 'POL-123', confidence: 0.9 }]
       const found = findFormField(fields, TURKISH_FORM_FIELD_PATTERNS.policyNumber)
       expect(found).toBeTruthy()
     })
@@ -1222,9 +1237,7 @@ describe('ocr coverage', () => {
     })
 
     it('should match insured name patterns', () => {
-      const fields: FormField[] = [
-        { name: 'Sigortalı', value: 'Ahmet', confidence: 0.9 },
-      ]
+      const fields: FormField[] = [{ name: 'Sigortalı', value: 'Ahmet', confidence: 0.9 }]
       const found = findFormField(fields, TURKISH_FORM_FIELD_PATTERNS.insuredName)
       expect(found).toBeTruthy()
     })
@@ -1238,33 +1251,25 @@ describe('ocr coverage', () => {
     })
 
     it('should match end date patterns', () => {
-      const fields: FormField[] = [
-        { name: 'Bitiş Tarihi', value: '2027-01-01', confidence: 0.9 },
-      ]
+      const fields: FormField[] = [{ name: 'Bitiş Tarihi', value: '2027-01-01', confidence: 0.9 }]
       const found = findFormField(fields, TURKISH_FORM_FIELD_PATTERNS.endDate)
       expect(found).toBeTruthy()
     })
 
     it('should match premium patterns', () => {
-      const fields: FormField[] = [
-        { name: 'Toplam Prim', value: '15000', confidence: 0.9 },
-      ]
+      const fields: FormField[] = [{ name: 'Toplam Prim', value: '15000', confidence: 0.9 }]
       const found = findFormField(fields, TURKISH_FORM_FIELD_PATTERNS.premium)
       expect(found).toBeTruthy()
     })
 
     it('should match vehicle plate patterns', () => {
-      const fields: FormField[] = [
-        { name: 'Araç Plaka', value: '34 ABC 1234', confidence: 0.9 },
-      ]
+      const fields: FormField[] = [{ name: 'Araç Plaka', value: '34 ABC 1234', confidence: 0.9 }]
       const found = findFormField(fields, TURKISH_FORM_FIELD_PATTERNS.vehiclePlate)
       expect(found).toBeTruthy()
     })
 
     it('should match VIN/chassis patterns', () => {
-      const fields: FormField[] = [
-        { name: 'Şasi Numarası', value: 'VIN123', confidence: 0.9 },
-      ]
+      const fields: FormField[] = [{ name: 'Şasi Numarası', value: 'VIN123', confidence: 0.9 }]
       const found = findFormField(fields, TURKISH_FORM_FIELD_PATTERNS.vin)
       expect(found).toBeTruthy()
     })

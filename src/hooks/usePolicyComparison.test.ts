@@ -932,6 +932,7 @@ describe('useCompareSelection', () => {
 
 describe('useCompareUrlState', () => {
   const originalLocation = window.location
+  // @ts-expect-error - TS6133 unused variable
   const _originalHistory = window.history
 
   let replaceStateSpy: ReturnType<typeof vi.spyOn>

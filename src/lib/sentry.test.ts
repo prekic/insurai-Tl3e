@@ -49,9 +49,7 @@ describe('Sentry Client', () => {
     })
 
     it('should accept user object', () => {
-      expect(() =>
-        setSentryUser({ id: 'user-123', email: 'test@example.com' })
-      ).not.toThrow()
+      expect(() => setSentryUser({ id: 'user-123', email: 'test@example.com' })).not.toThrow()
     })
 
     it('should accept null to clear user', () => {
@@ -69,9 +67,7 @@ describe('Sentry Client', () => {
     })
 
     it('should accept context name and object', () => {
-      expect(() =>
-        setSentryContext('policy', { type: 'auto', coverage: '100k' })
-      ).not.toThrow()
+      expect(() => setSentryContext('policy', { type: 'auto', coverage: '100k' })).not.toThrow()
     })
 
     it('should accept empty context', () => {
@@ -146,9 +142,7 @@ describe('Sentry Client', () => {
     })
 
     it('should accept message, category, and data', () => {
-      expect(() =>
-        addBreadcrumb('Button click', 'ui', { button: 'submit' })
-      ).not.toThrow()
+      expect(() => addBreadcrumb('Button click', 'ui', { button: 'submit' })).not.toThrow()
     })
 
     it('should handle various categories', () => {
@@ -329,8 +323,7 @@ describe('Sentry Client', () => {
 
   describe('environment detection', () => {
     it('should detect production environment', () => {
-      const getEnv = (isProd: boolean) =>
-        isProd ? 'production' : 'development'
+      const getEnv = (isProd: boolean) => (isProd ? 'production' : 'development')
       expect(getEnv(true)).toBe('production')
       expect(getEnv(false)).toBe('development')
     })
@@ -380,11 +373,7 @@ describe('Sentry Client', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       const error = new Error('Test error')
       captureError(error)
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Error captured (Sentry disabled):',
-        error,
-        undefined
-      )
+      expect(consoleSpy).toHaveBeenCalledWith('Error captured (Sentry disabled):', error, undefined)
       consoleSpy.mockRestore()
     })
 
@@ -393,11 +382,7 @@ describe('Sentry Client', () => {
       const error = new Error('Test')
       const context = { userId: 'user-123' }
       captureError(error, context)
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Error captured (Sentry disabled):',
-        error,
-        context
-      )
+      expect(consoleSpy).toHaveBeenCalledWith('Error captured (Sentry disabled):', error, context)
       consoleSpy.mockRestore()
     })
 
@@ -457,7 +442,7 @@ describe('Sentry Client', () => {
         { message: 'Navigation to dashboard' },
       ]
 
-      const sanitized = breadcrumbs.map(b => {
+      const sanitized = breadcrumbs.map((b) => {
         if (b.message) {
           let msg = b.message
           msg = msg.replace(/\b\d{2}-\d{8}\b/g, '[POLICY_NUMBER]')
@@ -473,11 +458,9 @@ describe('Sentry Client', () => {
     })
 
     it('should handle breadcrumbs without message', () => {
-      const breadcrumbs = [
-        { category: 'http', data: { url: '/api/test' } },
-      ]
+      const breadcrumbs = [{ category: 'http', data: { url: '/api/test' } }]
 
-      const sanitized = breadcrumbs.map(b => {
+      const sanitized = breadcrumbs.map((b) => {
         if ('message' in b && b.message) {
           return b
         }
@@ -497,6 +480,7 @@ describe('Sentry Client', () => {
         },
       }
 
+      // @ts-expect-error - mismatch due to schema update
       delete event.request.headers.Authorization
       expect(event.request.headers.Authorization).toBeUndefined()
       expect(event.request.headers['Content-Type']).toBe('application/json')

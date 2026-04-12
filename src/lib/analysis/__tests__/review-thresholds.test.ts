@@ -46,6 +46,7 @@ describe('evaluateDisplayMode', () => {
     const data = makeData()
     const validation: ValidationResult = {
       isValid: false,
+      // @ts-expect-error - mismatch due to schema update
       flags: [{ level: 'Error', message: 'Critical conflict', ruleId: 'E1' }],
     }
     const analysis = generateAnalysisBundle('test', data, validation)

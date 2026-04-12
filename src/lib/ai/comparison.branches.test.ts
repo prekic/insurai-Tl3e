@@ -104,6 +104,7 @@ function makePolicy(overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPolicy {
 
 describe('comparePolicies', () => {
   let comparePolicies: typeof import('./comparison').comparePolicies
+  // @ts-expect-error - TS6133 unused variable
   let _generateComparisonReport: typeof import('./comparison').generateComparisonReport
 
   beforeEach(async () => {
@@ -118,8 +119,20 @@ describe('comparePolicies', () => {
   })
 
   it('compares 2 policies and returns complete result', () => {
-    const p1 = makePolicy({ id: 'p1', provider: 'Allianz', premium: 5000, coverage: 500000, deductible: 2000 })
-    const p2 = makePolicy({ id: 'p2', provider: 'AXA', premium: 7000, coverage: 600000, deductible: 3000 })
+    const p1 = makePolicy({
+      id: 'p1',
+      provider: 'Allianz',
+      premium: 5000,
+      coverage: 500000,
+      deductible: 2000,
+    })
+    const p2 = makePolicy({
+      id: 'p2',
+      provider: 'AXA',
+      premium: 7000,
+      coverage: 600000,
+      deductible: 3000,
+    })
 
     const result = comparePolicies([p1, p2])
     expect(result.policies).toHaveLength(2)
@@ -212,8 +225,8 @@ describe('generateRecommendations branches', () => {
     const p2 = makePolicy({ id: 'p2', provider: 'AXA', premium: 6000 })
 
     const result = comparePolicies([p1, p2], { includeMarketBenchmarks: false })
-    expect(result.recommendations.some(r => r.includes('Prim farkı'))).toBe(true)
-    expect(result.recommendations.some(r => r.includes('Allianz'))).toBe(true)
+    expect(result.recommendations.some((r) => r.includes('Prim farkı'))).toBe(true)
+    expect(result.recommendations.some((r) => r.includes('Allianz'))).toBe(true)
   })
 
   it('does NOT generate premium recommendation when diff <= 20%', () => {
@@ -221,7 +234,7 @@ describe('generateRecommendations branches', () => {
     const p2 = makePolicy({ id: 'p2', provider: 'AXA', premium: 5500 })
 
     const result = comparePolicies([p1, p2], { includeMarketBenchmarks: false })
-    expect(result.recommendations.some(r => r.includes('Prim farkı'))).toBe(false)
+    expect(result.recommendations.some((r) => r.includes('Prim farkı'))).toBe(false)
   })
 
   it('generates coverage recommendation when diff > 15%', () => {
@@ -229,7 +242,7 @@ describe('generateRecommendations branches', () => {
     const p2 = makePolicy({ id: 'p2', provider: 'AXA', coverage: 600000 })
 
     const result = comparePolicies([p1, p2], { includeMarketBenchmarks: false })
-    expect(result.recommendations.some(r => r.includes('en yüksek teminat'))).toBe(true)
+    expect(result.recommendations.some((r) => r.includes('en yüksek teminat'))).toBe(true)
   })
 
   it('generates deductible recommendation when diff > 1000', () => {
@@ -237,7 +250,7 @@ describe('generateRecommendations branches', () => {
     const p2 = makePolicy({ id: 'p2', provider: 'AXA', deductible: 3000 })
 
     const result = comparePolicies([p1, p2], { includeMarketBenchmarks: false })
-    expect(result.recommendations.some(r => r.includes('en düşük muafiyet'))).toBe(true)
+    expect(result.recommendations.some((r) => r.includes('en düşük muafiyet'))).toBe(true)
   })
 
   it('does NOT generate deductible recommendation when diff <= 1000', () => {
@@ -245,7 +258,7 @@ describe('generateRecommendations branches', () => {
     const p2 = makePolicy({ id: 'p2', provider: 'AXA', deductible: 1500 })
 
     const result = comparePolicies([p1, p2], { includeMarketBenchmarks: false })
-    expect(result.recommendations.some(r => r.includes('en düşük muafiyet'))).toBe(false)
+    expect(result.recommendations.some((r) => r.includes('en düşük muafiyet'))).toBe(false)
   })
 
   it('generates best value recommendation', () => {
@@ -253,7 +266,7 @@ describe('generateRecommendations branches', () => {
     const p2 = makePolicy({ id: 'p2', provider: 'AXA', premium: 3000, coverage: 400000 })
 
     const result = comparePolicies([p1, p2], { includeMarketBenchmarks: false })
-    expect(result.recommendations.some(r => r.includes('Değer analizi'))).toBe(true)
+    expect(result.recommendations.some((r) => r.includes('Değer analizi'))).toBe(true)
   })
 
   it('generates unique coverage recommendations', () => {
@@ -273,7 +286,7 @@ describe('generateRecommendations branches', () => {
     })
 
     const result = comparePolicies([p1, p2], { includeMarketBenchmarks: false })
-    expect(result.recommendations.some(r => r.includes('ekstra sunuyor'))).toBe(true)
+    expect(result.recommendations.some((r) => r.includes('ekstra sunuyor'))).toBe(true)
   })
 
   it('generates expiring warning for expiring policies', () => {
@@ -281,7 +294,9 @@ describe('generateRecommendations branches', () => {
     const p2 = makePolicy({ id: 'p2', provider: 'AXA', status: 'active' })
 
     const result = comparePolicies([p1, p2], { includeMarketBenchmarks: false })
-    expect(result.recommendations.some(r => r.includes('⚠️') && r.includes('sona eriyor'))).toBe(true)
+    expect(result.recommendations.some((r) => r.includes('⚠️') && r.includes('sona eriyor'))).toBe(
+      true
+    )
   })
 
   it('handles multiple expiring policies (plural suffix)', () => {
@@ -289,7 +304,7 @@ describe('generateRecommendations branches', () => {
     const p2 = makePolicy({ id: 'p2', provider: 'AXA', status: 'expiring' })
 
     const result = comparePolicies([p1, p2], { includeMarketBenchmarks: false })
-    const expRec = result.recommendations.find(r => r.includes('sona eriyor'))
+    const expRec = result.recommendations.find((r) => r.includes('sona eriyor'))
     expect(expRec).toBeDefined()
     expect(expRec).toContain('leri') // plural suffix
   })
@@ -311,7 +326,7 @@ describe('generateRecommendations branches', () => {
     })
 
     const result = comparePolicies([p1, p2], { includeMarketBenchmarks: false })
-    const rec = result.recommendations.find(r => r.includes('ekstra sunuyor'))
+    const rec = result.recommendations.find((r) => r.includes('ekstra sunuyor'))
     expect(rec).toBeDefined()
     expect(rec).toContain('...')
   })
@@ -327,11 +342,23 @@ describe('getFieldRecommendation branches', () => {
   })
 
   it('generates premium field recommendation', () => {
-    const p1 = makePolicy({ id: 'p1', provider: 'Allianz', premium: 3000, coverage: 500000, deductible: 2000 })
-    const p2 = makePolicy({ id: 'p2', provider: 'AXA', premium: 8000, coverage: 500000, deductible: 2000 })
+    const p1 = makePolicy({
+      id: 'p1',
+      provider: 'Allianz',
+      premium: 3000,
+      coverage: 500000,
+      deductible: 2000,
+    })
+    const p2 = makePolicy({
+      id: 'p2',
+      provider: 'AXA',
+      premium: 8000,
+      coverage: 500000,
+      deductible: 2000,
+    })
 
     const result = comparePolicies([p1, p2], { includeMarketBenchmarks: false })
-    const premDiff = result.differences.find(d => d.field === 'premium')
+    const premDiff = result.differences.find((d) => d.field === 'premium')
     expect(premDiff?.recommendation).toContain('en düşük primi')
   })
 
@@ -340,7 +367,7 @@ describe('getFieldRecommendation branches', () => {
     const p2 = makePolicy({ id: 'p2', provider: 'AXA', status: 'active' })
 
     const result = comparePolicies([p1, p2], { includeMarketBenchmarks: false })
-    const statusDiff = result.differences.find(d => d.field === 'status')
+    const statusDiff = result.differences.find((d) => d.field === 'status')
     expect(statusDiff?.recommendation).toContain('süresi dolmuş')
   })
 
@@ -349,7 +376,7 @@ describe('getFieldRecommendation branches', () => {
     const p2 = makePolicy({ id: 'p2', provider: 'AXA', status: 'expiring' })
 
     const result = comparePolicies([p1, p2], { includeMarketBenchmarks: false })
-    const statusDiff = result.differences.find(d => d.field === 'status')
+    const statusDiff = result.differences.find((d) => d.field === 'status')
     if (statusDiff) {
       expect(statusDiff.recommendation).toBeUndefined()
     }
@@ -370,20 +397,24 @@ describe('formatFieldValue branches', () => {
     const p2 = makePolicy({ id: 'p2', provider: 'AXA', expiryDate: '2027-06-01' })
 
     const result = comparePolicies([p1, p2], { includeMarketBenchmarks: false })
-    const expiryDiff = result.differences.find(d => d.field === 'expiryDate')
+    const expiryDiff = result.differences.find((d) => d.field === 'expiryDate')
     if (expiryDiff) {
-      expect(expiryDiff.values.some(v => v.value === 'N/A')).toBe(true)
+      expect(expiryDiff.values.some((v) => v.value === 'N/A')).toBe(true)
     }
   })
 })
 
 describe('generateBenchmarkRecommendations branches', () => {
   let comparePolicies: typeof import('./comparison').comparePolicies
-  let MarketDataService: { getMarketComparison: ReturnType<typeof vi.fn>; analyzePolicyBenchmark: ReturnType<typeof vi.fn> }
+  let MarketDataService: {
+    getMarketComparison: ReturnType<typeof vi.fn>
+    analyzePolicyBenchmark: ReturnType<typeof vi.fn>
+  }
 
   beforeEach(async () => {
     vi.clearAllMocks()
     const marketMod = await import('@/lib/market-data/service')
+    // @ts-expect-error - mismatch due to schema update
     MarketDataService = marketMod.MarketDataService as typeof MarketDataService
     const mod = await import('./comparison')
     comparePolicies = mod.comparePolicies
@@ -401,7 +432,11 @@ describe('generateBenchmarkRecommendations branches', () => {
     const p2 = makePolicy({ id: 'p2', provider: 'AXA', premium: 6000 })
 
     const result = comparePolicies([p1, p2])
-    expect(result.recommendations.some(r => r.includes('📊') && r.includes('piyasa ortalamasının altında'))).toBe(true)
+    expect(
+      result.recommendations.some(
+        (r) => r.includes('📊') && r.includes('piyasa ortalamasının altında')
+      )
+    ).toBe(true)
   })
 
   it('does NOT add premium benchmark rec when percentile >= 40', () => {
@@ -416,7 +451,11 @@ describe('generateBenchmarkRecommendations branches', () => {
     const p2 = makePolicy({ id: 'p2', provider: 'AXA', premium: 6000 })
 
     const result = comparePolicies([p1, p2])
-    expect(result.recommendations.some(r => r.includes('📊') && r.includes('piyasa ortalamasının altında'))).toBe(false)
+    expect(
+      result.recommendations.some(
+        (r) => r.includes('📊') && r.includes('piyasa ortalamasının altında')
+      )
+    ).toBe(false)
   })
 
   it('adds value recommendation for excellent rating', () => {
@@ -431,16 +470,26 @@ describe('generateBenchmarkRecommendations branches', () => {
     const p2 = makePolicy({ id: 'p2', provider: 'AXA', premium: 6000 })
 
     const result = comparePolicies([p1, p2])
-    expect(result.recommendations.some(r => r.includes('💎') && r.includes('mükemmel'))).toBe(true)
+    expect(result.recommendations.some((r) => r.includes('💎') && r.includes('mükemmel'))).toBe(
+      true
+    )
   })
 
   it('adds trend recommendation for high YoY change (>30%)', () => {
     // traffic has premiumChangeYoY: 35 in our mock
     const p1 = makePolicy({ id: 'p1', type: 'traffic', typeTr: 'Trafik' })
-    const p2 = makePolicy({ id: 'p2', type: 'traffic', typeTr: 'Trafik', provider: 'AXA', premium: 6000 })
+    const p2 = makePolicy({
+      id: 'p2',
+      type: 'traffic',
+      typeTr: 'Trafik',
+      provider: 'AXA',
+      premium: 6000,
+    })
 
     const result = comparePolicies([p1, p2])
-    expect(result.recommendations.some(r => r.includes('📈') && r.includes('erken yenileme'))).toBe(true)
+    expect(
+      result.recommendations.some((r) => r.includes('📈') && r.includes('erken yenileme'))
+    ).toBe(true)
   })
 
   it('does NOT add trend recommendation for low YoY change', () => {
@@ -449,7 +498,7 @@ describe('generateBenchmarkRecommendations branches', () => {
     const p2 = makePolicy({ id: 'p2', type: 'kasko', provider: 'AXA', premium: 6000 })
 
     const result = comparePolicies([p1, p2])
-    expect(result.recommendations.some(r => r.includes('📈'))).toBe(false)
+    expect(result.recommendations.some((r) => r.includes('📈'))).toBe(false)
   })
 })
 
@@ -490,7 +539,13 @@ describe('generateComparisonReport branches', () => {
 
   it('handles report with no recommendations', () => {
     const p1 = makePolicy({ id: 'p1', premium: 5000, coverage: 500000, deductible: 2000 })
-    const p2 = makePolicy({ id: 'p2', provider: 'AXA', premium: 5000, coverage: 500000, deductible: 2000 })
+    const p2 = makePolicy({
+      id: 'p2',
+      provider: 'AXA',
+      premium: 5000,
+      coverage: 500000,
+      deductible: 2000,
+    })
 
     const result = comparePolicies([p1, p2], { includeMarketBenchmarks: false })
     // Filter to make empty

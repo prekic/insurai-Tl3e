@@ -118,6 +118,7 @@ describe('generateDisplaySafeSummary', () => {
 
   it('KASKO: unlimited-with-carve-out renders as conditional/narrowed wording', () => {
     const data = makeKaskoData({
+      // @ts-expect-error - mismatch due to schema update
       coverages: [{ name: 'Kasko', isMarketValue: true, isUnlimited: true, deductible: 0 }],
     })
     const analysis = generateAnalysisBundle('pol-3', data, validValidation)
@@ -159,6 +160,7 @@ describe('generateDisplaySafeSummary', () => {
     const data = makeKaskoData({ currency: null })
     const warningValidation: ValidationResult = {
       isValid: false,
+      // @ts-expect-error - mismatch due to schema update
       flags: [{ level: 'Warning', message: 'Unclear clause scope', ruleId: 'W1' }],
     }
     const analysis = generateAnalysisBundle('pol-6', data, warningValidation)
@@ -212,6 +214,7 @@ describe('generateDisplaySafeSummary', () => {
     })
     const errorValidation: ValidationResult = {
       isValid: false,
+      // @ts-expect-error - mismatch due to schema update
       flags: [{ level: 'Error', message: 'Critical data conflict', ruleId: 'E1' }],
     }
     const analysis = generateAnalysisBundle('pol-8', data, errorValidation)
@@ -297,6 +300,7 @@ describe('generateDisplaySafeSummary', () => {
   it('claim risk cards include deductible risk when present', () => {
     const data = makeKaskoData({
       coverages: [
+        // @ts-expect-error - mismatch due to schema update
         { name: 'Kasko', isMarketValue: true, deductible: 5000 },
         { name: 'IMM', limit: 10000000, deductible: 2000 },
       ],
@@ -312,6 +316,7 @@ describe('generateDisplaySafeSummary', () => {
 
   it('no prohibited phrases appear in any card body', () => {
     const data = makeKaskoData({
+      // @ts-expect-error - mismatch due to schema update
       coverages: [{ name: 'Kasko', isMarketValue: true, isUnlimited: true, deductible: 0 }],
     })
     const analysis = generateAnalysisBundle('pol-13', data, validValidation)

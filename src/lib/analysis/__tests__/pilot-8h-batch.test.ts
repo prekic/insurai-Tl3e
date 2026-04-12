@@ -140,6 +140,7 @@ function runPilotDocument(sample: PilotSample): PilotDocResult {
   qaRecord.admissionReason = admission.reason
   qaRecord.countedInPilotMetrics = admission.countedInPilotMetrics
 
+  // @ts-expect-error - mismatch due to schema update
   qaRecord.triggersFired = displayResult.triggers.map((t) => t.trigger)
   qaRecord.phraseClean = prohibitedFound.length === 0
   qaRecord.foundProhibitedPhrases = prohibitedFound

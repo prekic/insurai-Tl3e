@@ -161,27 +161,27 @@ describe('pattern-store coverage', () => {
   describe('recordPatternsFromText', () => {
     it('detects barcode patterns', () => {
       const patterns = store.recordPatternsFromText('B^^^B some text B^^^^B', 'doc1')
-      expect(patterns.some(p => p.type === 'barcode')).toBe(true)
+      expect(patterns.some((p) => p.type === 'barcode')).toBe(true)
     })
 
     it('detects a!!!a patterns', () => {
       const patterns = store.recordPatternsFromText('a!!!!aA text', 'doc1')
-      expect(patterns.some(p => p.type === 'barcode')).toBe(true)
+      expect(patterns.some((p) => p.type === 'barcode')).toBe(true)
     })
 
     it('detects spaced fragments', () => {
       const patterns = store.recordPatternsFromText('G E N İ Ş L E T İ L M İ Ş', 'doc1')
-      expect(patterns.some(p => p.type === 'spaced_fragment')).toBe(true)
+      expect(patterns.some((p) => p.type === 'spaced_fragment')).toBe(true)
     })
 
     it('detects high ASCII sequences', () => {
       const patterns = store.recordPatternsFromText('\x80\x81\x82\x83 text', 'doc1')
-      expect(patterns.some(p => p.type === 'high_ascii')).toBe(true)
+      expect(patterns.some((p) => p.type === 'high_ascii')).toBe(true)
     })
 
     it('detects repetitive patterns', () => {
       const patterns = store.recordPatternsFromText('aaaaaaaaaa text', 'doc1')
-      expect(patterns.some(p => p.type === 'repetitive')).toBe(true)
+      expect(patterns.some((p) => p.type === 'repetitive')).toBe(true)
     })
 
     it('handles text with no patterns', () => {
@@ -242,7 +242,10 @@ describe('pattern-store coverage', () => {
     })
 
     it('getPatternsForPromotion filters eligible patterns', () => {
-      const s = new PatternStore({ minOccurrencesForSignificance: 2, minConfidenceForPromotion: 0.5 })
+      const s = new PatternStore({
+        minOccurrencesForSignificance: 2,
+        minConfidenceForPromotion: 0.5,
+      })
       for (let i = 0; i < 5; i++) {
         s.recordPattern('promo', { causedFailure: true, retriedSuccessfully: true })
       }
@@ -256,7 +259,7 @@ describe('pattern-store coverage', () => {
       }
       const p = store.getAllPatterns()[0]
       store.markAsPromoted(p.id)
-      expect(store.getPatternsForPromotion().some(x => x.id === p.id)).toBe(false)
+      expect(store.getPatternsForPromotion().some((x) => x.id === p.id)).toBe(false)
     })
 
     it('getTopPatterns returns sorted by occurrence', () => {
@@ -282,7 +285,7 @@ describe('pattern-store coverage', () => {
     it('getTopFailingPatterns filters patterns with < 2 occurrences', () => {
       store.recordPattern('single', { causedFailure: true })
       const top = store.getTopFailingPatterns(10)
-      expect(top.some(p => p.occurrenceCount < 2)).toBe(false)
+      expect(top.some((p) => p.occurrenceCount < 2)).toBe(false)
     })
   })
 
@@ -308,6 +311,7 @@ describe('pattern-store coverage', () => {
 
     it('falls back to literal match on regex error', () => {
       // Force a pattern that might fail as regex
+      // @ts-expect-error - TS6133 unused variable
       const _p = store.recordPattern('test(pattern')
       // The escapeRegex should handle this, but if not, literal match catches it
       const results = store.findKnownPatterns('has test(pattern in it')
@@ -373,7 +377,7 @@ describe('pattern-store coverage', () => {
       const p = store.recordPattern('dup-tags', { tags: ['tag1'] })
       store.addTags(p.id, ['tag1', 'tag2'])
       const tags = store.getPattern(p.id)!.tags
-      expect(tags.filter(t => t === 'tag1').length).toBe(1)
+      expect(tags.filter((t) => t === 'tag1').length).toBe(1)
     })
 
     it('addTags returns false for unknown pattern', () => {
@@ -462,13 +466,18 @@ describe('pattern-store coverage', () => {
     })
 
     it('import skips patterns without id or pattern field', () => {
-      const json = JSON.stringify({ patterns: [{ id: 'p1' }, { pattern: 'text' }, { id: 'p3', pattern: 'valid' }] })
+      const json = JSON.stringify({
+        patterns: [{ id: 'p1' }, { pattern: 'text' }, { id: 'p3', pattern: 'valid' }],
+      })
       const count = store.import(json)
       expect(count).toBe(1) // Only the one with both id and pattern
     })
 
     it('exportAsRegexRules returns escaped patterns', () => {
-      const s = new PatternStore({ minOccurrencesForSignificance: 1, minConfidenceForPromotion: 0.0 })
+      const s = new PatternStore({
+        minOccurrencesForSignificance: 1,
+        minConfidenceForPromotion: 0.0,
+      })
       for (let i = 0; i < 5; i++) {
         s.recordPattern('B^^^B', { causedFailure: true, retriedSuccessfully: true })
       }

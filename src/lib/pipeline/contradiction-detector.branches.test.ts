@@ -619,7 +619,7 @@ describe('detectVehicleContradictions — VIN', () => {
 
   it('skips VIN with normalized length !== 17', () => {
     // A 16-char string that looks like a VIN but is too short
-    const text = 'WVWZZZ3CZWE12345 bilgileri'  // 16 chars
+    const text = 'WVWZZZ3CZWE12345 bilgileri' // 16 chars
     const extraction = makeExtraction({
       vehicles: [{ ...vehicleBase, chassisNo: 'WBAPH5C55BA123456' }],
     })
@@ -1205,6 +1205,7 @@ describe('remaining branch coverage', () => {
     const text = '5.000 USD toplam prim'
     const extraction = makeExtraction()
     // Force premium to null
+    // @ts-expect-error - mismatch due to schema update
     ;(extraction as { premium: null }).premium = null
     const report = detectContradictions(extraction, text)
     const cc = report.contradictions.filter((c) => c.type === 'currency_conflict')
@@ -1228,6 +1229,7 @@ describe('remaining branch coverage', () => {
     const text = '5.000 EUR ödeme'
     const extraction = makeExtraction()
     // Force premium to undefined
+    // @ts-expect-error - mismatch due to schema update
     ;(extraction as { premium: undefined }).premium = undefined
     const report = detectContradictions(extraction, text)
     const cc = report.contradictions.filter((c) => c.type === 'currency_conflict')

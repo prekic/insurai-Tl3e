@@ -165,7 +165,8 @@ describe('LanguageDetector', () => {
 
     it('detects English text', () => {
       // Include many English sample terms: insurance, policy, coverage, premium, deductible
-      const text = 'Insurance policy document with coverage and premium details deductible information'
+      const text =
+        'Insurance policy document with coverage and premium details deductible information'
       const result = detector.detect(text)
       expect(result.locale_code).toBe('en')
     })
@@ -280,7 +281,9 @@ describe('TextQualityAnalyzer', () => {
 
   describe('quickCheck', () => {
     it('identifies good quality text', () => {
-      const text = 'This is a normal text with sufficient length and alphanumeric content. '.repeat(5)
+      const text = 'This is a normal text with sufficient length and alphanumeric content. '.repeat(
+        5
+      )
       const result = analyzer.quickCheck(text)
       expect(result.isLikelyGood).toBe(true)
     })
@@ -464,7 +467,7 @@ describe('Language Detection Verification', () => {
     expect(result.matched_terms!.length).toBeGreaterThan(3)
 
     // Should have matched key Turkish insurance terms
-    const matchedTermsLower = result.matched_terms!.map(t => t.toLowerCase())
+    const matchedTermsLower = result.matched_terms!.map((t) => t.toLowerCase())
     expect(matchedTermsLower).toContain('sigorta')
     expect(matchedTermsLower).toContain('poliçe')
     expect(matchedTermsLower).toContain('prim')
@@ -499,7 +502,7 @@ describe('Language Detection Verification', () => {
 
     // Should detect Turkish chars: ö, ğ, ü, ş, ç, İ
     const matchedChars = result.all_scores.tr.matched_chars || []
-    const hasSpecialChars = matchedChars.some(c => ['ö', 'ğ', 'ü', 'ş', 'ç', 'İ'].includes(c))
+    const hasSpecialChars = matchedChars.some((c) => ['ö', 'ğ', 'ü', 'ş', 'ç', 'İ'].includes(c))
     expect(hasSpecialChars).toBe(true)
   })
 })
@@ -541,7 +544,7 @@ describe('Policy Classification Verification', () => {
     expect(result.category).toBe('motor')
 
     // Should have matched key kasko terms
-    const matchedLower = result.matched_terms.map(t => t.toLowerCase())
+    const matchedLower = result.matched_terms.map((t) => t.toLowerCase())
     expect(matchedLower).toContain('kasko')
   })
 
@@ -647,7 +650,9 @@ describe('Integration', () => {
     expect(decision.document_classification.detected_language.locale_code).toBe('tr')
 
     // Should detect Kasko policy type
-    expect(decision.document_classification.detected_policy_type?.policy_type_id).toBe('motor_kasko')
+    expect(decision.document_classification.detected_policy_type?.policy_type_id).toBe(
+      'motor_kasko'
+    )
 
     // Should have reasonable confidence
     expect(decision.confidence).toBeGreaterThan(0.3)
@@ -749,7 +754,7 @@ describe('Confidence Calculation Verification', () => {
 
       Sigortacı: XYZ Sigorta A.Ş.
       Adres: İstanbul, Türkiye
-    `.repeat(6)  // Repeat to simulate 4000+ chars/page
+    `.repeat(6) // Repeat to simulate 4000+ chars/page
 
     const decision = engine.analyzeDocument(cleanDigitalKaskoDocument)
 
@@ -768,7 +773,7 @@ describe('Confidence Calculation Verification', () => {
 
     expect(breakdown.text_quality).toBeDefined()
     expect(breakdown.text_quality.score).toBeGreaterThanOrEqual(0)
-    expect(breakdown.text_quality.weight).toBe(0.30)
+    expect(breakdown.text_quality.weight).toBe(0.3)
 
     expect(breakdown.page_variance).toBeDefined()
     expect(breakdown.page_variance.weight).toBe(0.15)
@@ -857,6 +862,7 @@ describe('Confidence Calculation Verification', () => {
 
   it('correctly calculates density score using linear formula', () => {
     const settings = configManager.getOCRSettings()
+    // @ts-expect-error - TS6133 unused variable
     const _threshold = settings.density_analysis.chars_per_page_threshold // 200
 
     // Create document that would give ~500 chars per page (estimated)
@@ -897,7 +903,7 @@ describe('Confidence Calculation Verification', () => {
 
     // Encoding score should be gradual, not binary 0 or 1
     // With just a few issues, should be between 0.7 and 1.0
-    if (breakdown.encoding_check.raw_value as number > 0) {
+    if ((breakdown.encoding_check.raw_value as number) > 0) {
       expect(breakdown.encoding_check.score).toBeLessThan(1.0)
       expect(breakdown.encoding_check.score).toBeGreaterThan(0)
     }
@@ -911,20 +917,40 @@ describe('Confidence Calculation Verification', () => {
     // Verify contribution = score * weight for each component
     const tolerance = 0.0001
 
-    expect(Math.abs(breakdown.char_density.contribution -
-      breakdown.char_density.score * breakdown.char_density.weight)).toBeLessThan(tolerance)
+    expect(
+      Math.abs(
+        breakdown.char_density.contribution -
+          breakdown.char_density.score * breakdown.char_density.weight
+      )
+    ).toBeLessThan(tolerance)
 
-    expect(Math.abs(breakdown.text_quality.contribution -
-      breakdown.text_quality.score * breakdown.text_quality.weight)).toBeLessThan(tolerance)
+    expect(
+      Math.abs(
+        breakdown.text_quality.contribution -
+          breakdown.text_quality.score * breakdown.text_quality.weight
+      )
+    ).toBeLessThan(tolerance)
 
-    expect(Math.abs(breakdown.page_variance.contribution -
-      breakdown.page_variance.score * breakdown.page_variance.weight)).toBeLessThan(tolerance)
+    expect(
+      Math.abs(
+        breakdown.page_variance.contribution -
+          breakdown.page_variance.score * breakdown.page_variance.weight
+      )
+    ).toBeLessThan(tolerance)
 
-    expect(Math.abs(breakdown.encoding_check.contribution -
-      breakdown.encoding_check.score * breakdown.encoding_check.weight)).toBeLessThan(tolerance)
+    expect(
+      Math.abs(
+        breakdown.encoding_check.contribution -
+          breakdown.encoding_check.score * breakdown.encoding_check.weight
+      )
+    ).toBeLessThan(tolerance)
 
-    expect(Math.abs(breakdown.field_extraction.contribution -
-      breakdown.field_extraction.score * breakdown.field_extraction.weight)).toBeLessThan(tolerance)
+    expect(
+      Math.abs(
+        breakdown.field_extraction.contribution -
+          breakdown.field_extraction.score * breakdown.field_extraction.weight
+      )
+    ).toBeLessThan(tolerance)
   })
 })
 
@@ -1110,7 +1136,9 @@ describe('Document Journey Metadata', () => {
       for (const [_fieldName, fieldResult] of Object.entries(fields)) {
         expect(typeof fieldResult.found).toBe('boolean')
         expect(fieldResult.value === null || typeof fieldResult.value === 'string').toBe(true)
-        expect(fieldResult.pattern_used === null || typeof fieldResult.pattern_used === 'string').toBe(true)
+        expect(
+          fieldResult.pattern_used === null || typeof fieldResult.pattern_used === 'string'
+        ).toBe(true)
         expect(typeof fieldResult.required).toBe('boolean')
       }
     })

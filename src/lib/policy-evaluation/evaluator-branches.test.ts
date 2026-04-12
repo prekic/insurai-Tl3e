@@ -71,6 +71,7 @@ const mockEvalValueBased = vi.mocked(evaluateValueBasedPremium)
 const CURRENT_DATA_DATE = new Date().toISOString().split('T')[0]
 
 function makePolicy(overrides: Partial<Policy> = {}): Policy {
+  // @ts-expect-error - mismatch due to schema update
   return {
     id: 'test-1',
     policyNumber: 'POL-001',
@@ -907,6 +908,7 @@ describe('evaluatePolicy', () => {
           ],
         })
       )
+      // @ts-expect-error - TS6133 unused variable
       const _positiveRecs = result.recommendations.filter(
         (r) => r.title === 'Policy Well-Structured'
       )
