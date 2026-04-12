@@ -104,7 +104,7 @@ Normal again
       const result = stripControlCharacters(text)
 
       expect(result).toBe('HelloWorld')
-       
+
       expect(result).not.toMatch(/[\x7F-\x9F]/)
     })
 
@@ -184,6 +184,23 @@ Normal again
       const result = fixGlyphSplitTurkish(text)
 
       expect(result).toBe(text)
+    })
+
+    it('fixes long split words (>10 chars)', () => {
+      const text = 'G E N İ Ş L E T İ L M İ Ş   K A S K O'
+      const result = fixGlyphSplitTurkish(text)
+
+      expect(result).toContain('GENİŞLETİLMİŞ')
+      expect(result).toContain('KASKO')
+      // Shouldn't merge into one
+      expect(result.includes('GENİŞLETİLMİŞKASKO')).toBe(false)
+    })
+
+    it('preserves multiple spaces between distinct words', () => {
+      const text = 'S İ G O R T A   P O L İ Ç E S İ'
+      const result = fixGlyphSplitTurkish(text)
+
+      expect(result).toBe('SİGORTA   POLİÇESİ')
     })
   })
 

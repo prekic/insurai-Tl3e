@@ -566,6 +566,18 @@ describe('AI Config (config.ts)', () => {
   // extractViaProxy
   // =========================================================================
   describe('extractViaProxy', () => {
+    let warnSpy: any
+    let errorSpy: any
+
+    beforeEach(() => {
+      warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    })
+
+    afterEach(() => {
+      warnSpy.mockRestore()
+      errorSpy.mockRestore()
+    })
     it('should return error when proxy is not configured', async () => {
       mockEnv.proxyUrl = null
       const result = await extractViaProxy('openai', 'doc text', 'prompt')
@@ -591,9 +603,7 @@ describe('AI Config (config.ts)', () => {
         json: async () => serverResponse,
       })
 
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const result = await extractViaProxy('anthropic', 'document text', 'system prompt')
-      warnSpy.mockRestore()
 
       expect(result.success).toBe(true)
       expect(result.data).toEqual({ policyNumber: 'POL-001', provider: 'Allianz' })
@@ -630,9 +640,7 @@ describe('AI Config (config.ts)', () => {
         }),
       })
 
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const result = await extractViaProxy('anthropic', 'doc', 'prompt')
-      warnSpy.mockRestore()
 
       expect(result.success).toBe(true)
       expect(result.fallbackReason).toBe('Anthropic billing error')
@@ -653,9 +661,7 @@ describe('AI Config (config.ts)', () => {
         }),
       })
 
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const result = await extractViaProxy('anthropic', 'doc', 'prompt')
-      warnSpy.mockRestore()
 
       expect(result.success).toBe(true)
       expect(result).not.toHaveProperty('fallbackReason')
@@ -674,11 +680,7 @@ describe('AI Config (config.ts)', () => {
         }),
       })
 
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       const result = await extractViaProxy('openai', 'doc', 'prompt')
-      warnSpy.mockRestore()
-      errorSpy.mockRestore()
 
       expect(result.success).toBe(false)
       expect(result.error).toBe('Extraction failed: Provider returned invalid JSON')
@@ -693,11 +695,7 @@ describe('AI Config (config.ts)', () => {
         json: async () => ({ error: 'Rate limit exceeded' }),
       })
 
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       const result = await extractViaProxy('openai', 'doc', 'prompt')
-      warnSpy.mockRestore()
-      errorSpy.mockRestore()
 
       expect(result.success).toBe(false)
       expect(result.error).toBe('Rate limit exceeded')
@@ -712,11 +710,7 @@ describe('AI Config (config.ts)', () => {
         json: async () => ({}),
       })
 
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       const result = await extractViaProxy('openai', 'doc', 'prompt')
-      warnSpy.mockRestore()
-      errorSpy.mockRestore()
 
       expect(result.success).toBe(false)
       expect(result.error).toBe('HTTP 400')
@@ -731,11 +725,7 @@ describe('AI Config (config.ts)', () => {
         json: async () => ({ details: 'some details' }),
       })
 
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       const result = await extractViaProxy('openai', 'doc', 'prompt')
-      warnSpy.mockRestore()
-      errorSpy.mockRestore()
 
       expect(result.success).toBe(false)
       expect(result.error).toBe('Server error: some details')
@@ -750,11 +740,7 @@ describe('AI Config (config.ts)', () => {
         json: async () => ({ success: true }),
       })
 
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       const result = await extractViaProxy('openai', 'doc', 'prompt')
-      warnSpy.mockRestore()
-      errorSpy.mockRestore()
 
       expect(result.success).toBe(false)
       expect(result.error).toBe('Server returned success but no data')
@@ -764,11 +750,7 @@ describe('AI Config (config.ts)', () => {
       mockEnv.proxyUrl = 'http://localhost:4001'
       globalThis.fetch = vi.fn().mockRejectedValue(new Error('Failed to fetch'))
 
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       const result = await extractViaProxy('openai', 'doc', 'prompt')
-      warnSpy.mockRestore()
-      errorSpy.mockRestore()
 
       expect(result.success).toBe(false)
       expect(result.error).toContain('Failed to fetch')
@@ -779,11 +761,7 @@ describe('AI Config (config.ts)', () => {
       mockEnv.proxyUrl = 'http://localhost:4001'
       globalThis.fetch = vi.fn().mockRejectedValue('string error')
 
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       const result = await extractViaProxy('openai', 'doc', 'prompt')
-      warnSpy.mockRestore()
-      errorSpy.mockRestore()
 
       expect(result.success).toBe(false)
       expect(result.error).toBe('Network error')
@@ -794,6 +772,18 @@ describe('AI Config (config.ts)', () => {
   // extractWithFallback
   // =========================================================================
   describe('extractWithFallback', () => {
+    let warnSpy: any
+    let errorSpy: any
+
+    beforeEach(() => {
+      warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    })
+
+    afterEach(() => {
+      warnSpy.mockRestore()
+      errorSpy.mockRestore()
+    })
     it('should return error when proxy is not configured', async () => {
       mockEnv.proxyUrl = null
       const result = await extractWithFallback('doc text')
@@ -906,6 +896,18 @@ describe('AI Config (config.ts)', () => {
   // ocrViaProxy
   // =========================================================================
   describe('ocrViaProxy', () => {
+    let warnSpy: any
+    let errorSpy: any
+
+    beforeEach(() => {
+      warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    })
+
+    afterEach(() => {
+      warnSpy.mockRestore()
+      errorSpy.mockRestore()
+    })
     it('should return error when proxy is not configured', async () => {
       mockEnv.proxyUrl = null
       const result = await ocrViaProxy('base64data')
@@ -1004,6 +1006,18 @@ describe('AI Config (config.ts)', () => {
   // extractViaProxy response logging (dataKeys branch)
   // =========================================================================
   describe('extractViaProxy logging branches', () => {
+    let warnSpy: any
+    let errorSpy: any
+
+    beforeEach(() => {
+      warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    })
+
+    afterEach(() => {
+      warnSpy.mockRestore()
+      errorSpy.mockRestore()
+    })
     it('should handle data being a non-object type in logging', async () => {
       mockEnv.proxyUrl = 'http://localhost:4001'
       // data is a string, not an object — the logging branch `typeof result.data === 'object'` should be false
@@ -1018,9 +1032,7 @@ describe('AI Config (config.ts)', () => {
         }),
       })
 
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const result = await extractViaProxy('openai', 'doc', 'prompt')
-      warnSpy.mockRestore()
 
       // Should still return success because data is truthy
       expect(result.success).toBe(true)
@@ -1040,11 +1052,7 @@ describe('AI Config (config.ts)', () => {
         }),
       })
 
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       const result = await extractViaProxy('openai', 'doc', 'prompt')
-      warnSpy.mockRestore()
-      errorSpy.mockRestore()
 
       expect(result.success).toBe(false)
       expect(result.error).toBe('Server returned success but no data')

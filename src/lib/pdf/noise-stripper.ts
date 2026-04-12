@@ -138,55 +138,14 @@ export function stripControlCharacters(text: string): string {
  */
 export function fixGlyphSplitTurkish(text: string): string {
   // Common Turkish words that get split
-  const commonSplits: [RegExp, string][] = [
-    // Insurance terms
-    [/S\s*İ\s*G\s*O\s*R\s*T\s*A/gi, 'SİGORTA'],
-    [/P\s*O\s*L\s*İ\s*Ç\s*E/gi, 'POLİÇE'],
-    [/K\s*A\s*S\s*K\s*O/gi, 'KASKO'],
-    [/T\s*R\s*A\s*F\s*İ\s*K/gi, 'TRAFİK'],
-    [/T\s*E\s*M\s*İ\s*N\s*A\s*T/gi, 'TEMİNAT'],
-    [/P\s*R\s*İ\s*M/gi, 'PRİM'],
-    [/M\s*U\s*A\s*F\s*İ\s*Y\s*E\s*T/gi, 'MUAFİYET'],
-    [/H\s*A\s*S\s*A\s*R/gi, 'HASAR'],
-    [/T\s*A\s*Z\s*M\s*İ\s*N\s*A\s*T/gi, 'TAZMİNAT'],
-
-    // Common document words
-    [/B\s*İ\s*R\s*L\s*E\s*Ş\s*İ\s*K/gi, 'BİRLEŞİK'],
-    [/G\s*E\s*N\s*İ\s*Ş\s*L\s*E\s*T\s*İ\s*L\s*M\s*İ\s*Ş/gi, 'GENİŞLETİLMİŞ'],
-    [/T\s*A\s*R\s*İ\s*H/gi, 'TARİH'],
-    [/N\s*U\s*M\s*A\s*R\s*A/gi, 'NUMARA'],
-    [/A\s*D\s*R\s*E\s*S/gi, 'ADRES'],
-    [/T\s*E\s*L\s*E\s*F\s*O\s*N/gi, 'TELEFON'],
-    [/T\s*O\s*P\s*L\s*A\s*M/gi, 'TOPLAM'],
-    [/T\s*U\s*T\s*A\s*R/gi, 'TUTAR'],
-    [/B\s*A\s*Ş\s*L\s*A\s*N\s*G\s*I\s*Ç/gi, 'BAŞLANGIÇ'],
-    [/B\s*İ\s*T\s*İ\s*Ş/gi, 'BİTİŞ'],
-
-    // Company names
-    [/A\s*N\s*A\s*D\s*O\s*L\s*U/gi, 'ANADOLU'],
-    [/A\s*L\s*L\s*I\s*A\s*N\s*Z/gi, 'ALLIANZ'],
-    [/A\s*K\s*S\s*İ\s*G\s*O\s*R\s*T\s*A/gi, 'AKSİGORTA'],
-    [/M\s*A\s*P\s*F\s*R\s*E/gi, 'MAPFRE'],
-  ]
-
   let result = text
-  for (const [pattern, replacement] of commonSplits) {
-    result = result.replace(pattern, replacement)
-  }
 
-  // Generic fix: collapse sequences of single letters separated by spaces
-  // Only when it looks like it should be a word (3+ consecutive single chars)
-  // This is more aggressive and may have false positives
+  // Generic fix: collapse sequences of single letters separated by exactly one space or tab
+  // This correctly merges glyph-split words of any length (>10 characters)
+  // while preserving multiple spaces that delimit distinct words.
   result = result.replace(
-    /\b([A-ZÇĞİÖŞÜ])\s+([A-ZÇĞİÖŞÜ])\s+([A-ZÇĞİÖŞÜ])(?:\s+([A-ZÇĞİÖŞÜ]))?(?:\s+([A-ZÇĞİÖŞÜ]))?(?:\s+([A-ZÇĞİÖŞÜ]))?(?:\s+([A-ZÇĞİÖŞÜ]))?(?:\s+([A-ZÇĞİÖŞÜ]))?(?:\s+([A-ZÇĞİÖŞÜ]))?(?:\s+([A-ZÇĞİÖŞÜ]))?\b/g,
-    (match, ...letters) => {
-      const validLetters = letters.slice(0, 10).filter((l) => l != null)
-      // Only collapse if we have 3+ consecutive letters
-      if (validLetters.length >= 3) {
-        return validLetters.join('')
-      }
-      return match
-    }
+    /(?<=[^A-ZÇĞİÖŞÜa-zçğıöşü]|^)[A-ZÇĞİÖŞÜ](?:[ \t][A-ZÇĞİÖŞÜ]){2,}(?=[^A-ZÇĞİÖŞÜa-zçğıöşü]|$)/g,
+    (match) => match.replace(/[ \t]/g, '')
   )
 
   return result
