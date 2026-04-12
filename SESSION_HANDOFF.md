@@ -31,7 +31,7 @@ Full runbook for steps 3-4: `docs/runbooks/03-pilot-batch-ingestion.md`.
 
 ## Current State
 
-**Branch**: `claude/load-project-context-mQ22F` — clean, pushed. 1 commit ahead of `origin/main`.
+**Branch**: `claude/load-project-context-mQ22F` — clean, pushed. 2 commits ahead of `origin/main`.
 **Working tree**: clean.
 **`.env`**: Created at `/home/user/insurai/.env` with all keys EXCEPT `PILOT_REVIEWER_USER_ID`. In `.gitignore`.
 
@@ -39,7 +39,8 @@ Full runbook for steps 3-4: `docs/runbooks/03-pilot-batch-ingestion.md`.
 
 | # | SHA | Message | Scope |
 |---|-----|---------|-------|
-| 1 | `ed487ef` | `fix: use parseTurkishDate() to prevent V8 DD.MM.YYYY day/month swap` | 6 files, +597/−280 |
+| 1 | `ed487ef` | `fix: use parseTurkishDate() to prevent V8 DD.MM.YYYY day/month swap` | 6 files, +597/−280 (includes Prettier auto-formatting by lint-staged; semantic changes ~60 lines) |
+| 2 | `9b350ef` | `chore(docs): session handoff — DD.MM.YYYY fix complete, Phase B .env created` | 2 files, +95/−243 |
 
 ### Fix Details (commit `ed487ef`)
 
@@ -75,6 +76,8 @@ Full runbook for steps 3-4: `docs/runbooks/03-pilot-batch-ingestion.md`.
 - `GCP_SERVICE_ACCOUNT_BASE64` ✅
 - `PILOT_REVIEWER_USER_ID` ❌ (missing — needs a valid `auth.users` UUID)
 - Plus: `ADMIN_JWT_SECRET`, `GOOGLE_CLOUD_API_KEY`, `VAPID_*`, `EXCHANGERATE_API_KEY`, `CRON_SECRET`, `VITE_SUPABASE_*`
+
+**`.env` note**: The `.env` was created from the user's Railway production env dump, so it includes `NODE_ENV="production"`. This is fine for the batch scripts (they use `process.env` directly, not Vite). If running `dev:server` or `dev:all` locally, change it to `NODE_ENV="development"`.
 
 **Why Phase C didn't execute**: The Claude Code sandbox has no outbound HTTPS to external services. Connection to `exykhfulkbwzatpesruv.supabase.co:443` timed out. Phase C requires network access to Supabase, OpenAI, and Google Cloud.
 
@@ -139,6 +142,12 @@ Full runbook for steps 3-4: `docs/runbooks/03-pilot-batch-ingestion.md`.
 | `.env` | Created with all keys except `PILOT_REVIEWER_USER_ID` |
 | `CLAUDE.md` | Updated gotcha #52, Next Session Instructions |
 | `SESSION_HANDOFF.md` | Complete rewrite (this file) |
+
+## Noteworthy Side Effects
+
+1. **New runtime import in `policy-utils.ts`**: Added `import { parseTurkishDate } from './ai/turkish-utils'`. Previously this file only had a type import (`@/types/policy`). The new import is a pure function (regex + string manipulation, no side effects, no external deps), so it doesn't affect test isolation — `policy-utils.branches.test.ts` does NOT mock `turkish-utils` and all 154 tests pass. However, if someone mocks `turkish-utils` in a future test of `policy-utils`, they should be aware of this dependency.
+
+2. **Prettier auto-formatting inflated diffstat**: lint-staged ran Prettier on all staged files during commit `ed487ef`. This reformatted unrelated lines in `policy-utils.ts` (~260 lines of formatting changes beyond our ~15 semantic lines), `extraction-validator.ts` (~20 lines formatting), and `policy-extractor-conversion.test.ts` (~200 lines formatting). The actual semantic diff is ~60 lines across all 6 files. The +597/−280 stat in the commit is correct but misleading.
 
 ## Anti-Patterns Not Repeated
 
