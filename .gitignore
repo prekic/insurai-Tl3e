@@ -238,3 +238,8 @@ supabase/.temp/
 # Pilot PDF ingest staging — contains real PII (KVKK). NEVER commit to main.
 # Use `git add -f upload/` on a throwaway branch only.
 upload/
+
+# Test data which may contain PII, and scratch files
+test-data/
+scratch.ts
+axa_text.txt

@@ -518,9 +518,7 @@ describe('PolicyCard', () => {
       render(<PolicyCard policy={mockPolicy} showEvaluation />)
 
       // The unverified warning block should show
-      expect(
-        screen.getByText('Unverified AI output. Please review before using.')
-      ).toBeInTheDocument()
+      expect(screen.getByText('Unverified AI output. Please review carefully.')).toBeInTheDocument()
 
       // The standard ScoreBreakdown should not be rendered for standard unverified view
       expect(screen.queryByTestId('grade-badge')).not.toBeInTheDocument()
@@ -537,7 +535,7 @@ describe('PolicyCard', () => {
       const { container } = render(<PolicyCard policy={mockPolicy} showEvaluation compact />)
 
       // Compact view has a small badge with the AlertTriangle but doesn't show full text
-      expect(container.querySelector('.bg-destructive')).toBeInTheDocument()
+      expect(container.querySelector('.bg-amber-100')).toBeInTheDocument()
       expect(screen.queryByTestId('grade-badge')).not.toBeInTheDocument()
     })
   })
