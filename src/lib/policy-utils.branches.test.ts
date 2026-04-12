@@ -247,6 +247,22 @@ describe('policy-utils branch coverage', () => {
       const result = normalizeDate('abc.def.ghi')
       expect(result).toBeNull()
     })
+
+    it('correctly parses DD.MM.YYYY when day ≤ 12 (V8 Date swap regression, gotcha #52)', () => {
+      // "01.12.2024" means Dec 1 — V8's new Date('01.12.2024') returns Jan 12
+      const result = normalizeDate('01.12.2024')
+      expect(result).not.toBeNull()
+      const parsed = new Date(result!)
+      expect(parsed.getUTCMonth()).toBe(11) // December = 11
+      expect(parsed.getUTCDate()).toBe(1)
+
+      // "05.03.2024" means Mar 5 — V8 would return May 3
+      const result2 = normalizeDate('05.03.2024')
+      expect(result2).not.toBeNull()
+      const parsed2 = new Date(result2!)
+      expect(parsed2.getUTCMonth()).toBe(2) // March = 2
+      expect(parsed2.getUTCDate()).toBe(5)
+    })
   })
 
   // ==========================================================================
@@ -572,9 +588,7 @@ describe('policy-utils branch coverage', () => {
     it('should use keyword overlap when length ratio <= 0.5', () => {
       // Branch 97[0] line 701: lengthRatio <= 0.5 → check keywords
       // 1 item vs 3 items: ratio = 1/3 = 0.33 < 0.5
-      const a = [
-        'Flood damage earthquake damage and war terrorism exclusion apply to this policy',
-      ]
+      const a = ['Flood damage earthquake damage and war terrorism exclusion apply to this policy']
       const b = [
         'Flood damage exclusion applies to this insurance',
         'Earthquake damage exclusion also applies here',
@@ -606,9 +620,7 @@ describe('policy-utils branch coverage', () => {
 
     it('should return false when keyword overlap < 80% for different content', () => {
       // Different content with very different array lengths
-      const a = [
-        'This policy specifically excludes all natural disaster damage',
-      ]
+      const a = ['This policy specifically excludes all natural disaster damage']
       const b = [
         'Coverage applies to automobile collision events only',
         'Medical expenses are covered separately by another policy',
@@ -640,9 +652,7 @@ describe('policy-utils branch coverage', () => {
       // Branch 101[1] line 724: totalUniqueKeywords > 0 → false (use 1)
       // This is extremely hard to trigger because we need strings >10 chars
       // that split into words all <= 4 chars AND length ratio <= 0.5
-      const a = [
-        'it is so an at to be or no ok go',
-      ]
+      const a = ['it is so an at to be or no ok go']
       const b = [
         'we do go on in up as by if no at',
         'so or be to is it an ok we do go',
@@ -847,7 +857,7 @@ describe('policy-utils branch coverage', () => {
 
       const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: true })
       // These are SEDDK equivalent, so coverage should NOT be flagged
-      expect(diff.find(d => d.field === 'coverage')).toBeUndefined()
+      expect(diff.find((d) => d.field === 'coverage')).toBeUndefined()
     })
 
     it('should check SEDDK equivalents via typeTr field', () => {
@@ -864,7 +874,7 @@ describe('policy-utils branch coverage', () => {
       })
 
       const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: true })
-      expect(diff.find(d => d.field === 'coverage')).toBeUndefined()
+      expect(diff.find((d) => d.field === 'coverage')).toBeUndefined()
     })
 
     it('should not check SEDDK equivalents for non-traffic policies', () => {
@@ -881,7 +891,7 @@ describe('policy-utils branch coverage', () => {
 
       const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: true })
       // Non-traffic → no SEDDK check → large difference flagged
-      expect(diff.find(d => d.field === 'coverage')).toBeDefined()
+      expect(diff.find((d) => d.field === 'coverage')).toBeDefined()
     })
 
     it('should handle null date normalization (both null = same)', () => {
@@ -890,8 +900,8 @@ describe('policy-utils branch coverage', () => {
       const policy2 = createMockPolicy({ startDate: 'invalid-date', expiryDate: 'invalid-date' })
 
       const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: false })
-      expect(diff.find(d => d.field === 'startDate')).toBeUndefined()
-      expect(diff.find(d => d.field === 'expiryDate')).toBeUndefined()
+      expect(diff.find((d) => d.field === 'startDate')).toBeUndefined()
+      expect(diff.find((d) => d.field === 'expiryDate')).toBeUndefined()
     })
 
     it('should handle date comparison where one is null', () => {
@@ -900,16 +910,26 @@ describe('policy-utils branch coverage', () => {
       const policy2 = createMockPolicy({ startDate: 'invalid-date' })
 
       const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: false })
-      expect(diff.find(d => d.field === 'startDate')).toBeDefined()
+      expect(diff.find((d) => d.field === 'startDate')).toBeDefined()
     })
 
     it('should use strict number comparison in non-tolerant mode', () => {
       // Branch at line 930: tolerantMode is false → use oldNorm === newNorm
-      const policy1 = createMockPolicy({ coverage: 5153000, premium: 10000, deductible: 500, monthlyPremium: 400 })
-      const policy2 = createMockPolicy({ coverage: 5153000, premium: 10000, deductible: 500, monthlyPremium: 400 })
+      const policy1 = createMockPolicy({
+        coverage: 5153000,
+        premium: 10000,
+        deductible: 500,
+        monthlyPremium: 400,
+      })
+      const policy2 = createMockPolicy({
+        coverage: 5153000,
+        premium: 10000,
+        deductible: 500,
+        monthlyPremium: 400,
+      })
 
       const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: false })
-      expect(diff.find(d => d.field === 'coverage')).toBeUndefined()
+      expect(diff.find((d) => d.field === 'coverage')).toBeUndefined()
     })
 
     it('should flag number differences in non-tolerant mode without SEDDK', () => {
@@ -917,7 +937,7 @@ describe('policy-utils branch coverage', () => {
       const policy2 = createMockPolicy({ coverage: 100001 })
 
       const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: false })
-      expect(diff.find(d => d.field === 'coverage')).toBeDefined()
+      expect(diff.find((d) => d.field === 'coverage')).toBeDefined()
     })
 
     it('should handle non-tolerant null number comparison', () => {
@@ -926,7 +946,7 @@ describe('policy-utils branch coverage', () => {
       const policy2 = createMockPolicy({ monthlyPremium: undefined as unknown as number })
 
       const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: false })
-      expect(diff.find(d => d.field === 'monthlyPremium')).toBeUndefined()
+      expect(diff.find((d) => d.field === 'monthlyPremium')).toBeUndefined()
     })
 
     it('should detect specialConditions differences', () => {
@@ -939,7 +959,7 @@ describe('policy-utils branch coverage', () => {
       })
 
       const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: true })
-      expect(diff.find(d => d.field === 'specialConditions')).toBeDefined()
+      expect(diff.find((d) => d.field === 'specialConditions')).toBeDefined()
     })
 
     it('should not flag specialConditions when they match', () => {
@@ -951,7 +971,7 @@ describe('policy-utils branch coverage', () => {
       })
 
       const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: true })
-      expect(diff.find(d => d.field === 'specialConditions')).toBeUndefined()
+      expect(diff.find((d) => d.field === 'specialConditions')).toBeUndefined()
     })
 
     it('should handle empty string fields both empty', () => {
@@ -960,7 +980,7 @@ describe('policy-utils branch coverage', () => {
       const policy2 = createMockPolicy({ insuredPerson: undefined })
 
       const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: true })
-      expect(diff.find(d => d.field === 'insuredPerson')).toBeUndefined()
+      expect(diff.find((d) => d.field === 'insuredPerson')).toBeUndefined()
     })
 
     it('should use non-fuzzy string comparison for non-fuzzy fields', () => {
@@ -969,7 +989,7 @@ describe('policy-utils branch coverage', () => {
       const policy2 = createMockPolicy({ type: 'kasko' })
 
       const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: true })
-      expect(diff.find(d => d.field === 'type')).toBeUndefined()
+      expect(diff.find((d) => d.field === 'type')).toBeUndefined()
     })
 
     it('should detect string field changes for non-fuzzy fields', () => {
@@ -977,7 +997,7 @@ describe('policy-utils branch coverage', () => {
       const policy2 = createMockPolicy({ type: 'traffic' })
 
       const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: true })
-      expect(diff.find(d => d.field === 'type')).toBeDefined()
+      expect(diff.find((d) => d.field === 'type')).toBeDefined()
     })
 
     it('should use arraysEqualTolerant for exclusions in strict mode', () => {
@@ -989,7 +1009,7 @@ describe('policy-utils branch coverage', () => {
       })
 
       const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: false })
-      expect(diff.find(d => d.field === 'exclusions')).toBeUndefined()
+      expect(diff.find((d) => d.field === 'exclusions')).toBeUndefined()
     })
 
     it('should use arraysEqualTolerant for specialConditions in strict mode', () => {
@@ -1001,19 +1021,23 @@ describe('policy-utils branch coverage', () => {
       })
 
       const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: false })
-      expect(diff.find(d => d.field === 'specialConditions')).toBeDefined()
+      expect(diff.find((d) => d.field === 'specialConditions')).toBeDefined()
     })
 
     it('should use arraysEqualTolerant for coverages in strict mode', () => {
       const policy1 = createMockPolicy({
-        coverages: [{ name: 'Collision', nameTr: 'Carpma', limit: 100000, deductible: 0, included: true }],
+        coverages: [
+          { name: 'Collision', nameTr: 'Carpma', limit: 100000, deductible: 0, included: true },
+        ],
       })
       const policy2 = createMockPolicy({
-        coverages: [{ name: 'Collision', nameTr: 'Carpma', limit: 100000, deductible: 0, included: true }],
+        coverages: [
+          { name: 'Collision', nameTr: 'Carpma', limit: 100000, deductible: 0, included: true },
+        ],
       })
 
       const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: false })
-      expect(diff.find(d => d.field === 'coverages')).toBeUndefined()
+      expect(diff.find((d) => d.field === 'coverages')).toBeUndefined()
     })
   })
 
@@ -1095,7 +1119,7 @@ describe('policy-utils branch coverage', () => {
       if (result.type === 'extractionVariance') {
         // Only status changed (minor, non-OCR-sensitive)
         expect(result.changes.length).toBeGreaterThan(0)
-        expect(result.changes.some(c => c.field === 'status')).toBe(true)
+        expect(result.changes.some((c) => c.field === 'status')).toBe(true)
       }
     })
   })
@@ -1120,10 +1144,10 @@ describe('policy-utils branch coverage', () => {
       const policy2 = createMockPolicy({
         id: 'p2',
         policyNumber: 'POL-999', // Different policy number
-        provider: 'Allianz',   // Same provider
-        type: 'kasko',         // Same type
-        coverage: 100000,      // Same coverage
-        premium: 5000,         // Same premium
+        provider: 'Allianz', // Same provider
+        type: 'kasko', // Same type
+        coverage: 100000, // Same coverage
+        premium: 5000, // Same premium
         startDate: '2024-06-01', // Different dates
         expiryDate: '2025-06-01',
       })
@@ -1256,8 +1280,8 @@ describe('policy-utils branch coverage', () => {
         policyNumber: 'POL-999',
         provider: 'Allianz',
         type: 'kasko',
-        coverage: 200000,  // Different
-        premium: 20000,    // Different
+        coverage: 200000, // Different
+        premium: 20000, // Different
         startDate: '2024-06-01',
         expiryDate: '2025-06-01',
       })
@@ -1286,16 +1310,12 @@ describe('policy-utils branch coverage', () => {
       const dup1 = createMockPolicy({ id: 'dup1' })
       const dup2 = createMockPolicy({ id: 'dup2' })
 
-      const { uniquePolicies, duplicateGroups } = groupDuplicatePolicies([
-        original,
-        dup1,
-        dup2,
-      ])
+      const { uniquePolicies, duplicateGroups } = groupDuplicatePolicies([original, dup1, dup2])
 
       // original should be unique, dup1 and dup2 are duplicates
-      expect(uniquePolicies.map(p => p.id)).toContain('original')
-      expect(uniquePolicies.map(p => p.id)).not.toContain('dup1')
-      expect(uniquePolicies.map(p => p.id)).not.toContain('dup2')
+      expect(uniquePolicies.map((p) => p.id)).toContain('original')
+      expect(uniquePolicies.map((p) => p.id)).not.toContain('dup1')
+      expect(uniquePolicies.map((p) => p.id)).not.toContain('dup2')
 
       // Group should have original + 2 duplicates
       const group = duplicateGroups.get('original')
@@ -1316,7 +1336,11 @@ describe('policy-utils branch coverage', () => {
     })
 
     it('should check all policies in order and return first match', () => {
-      const existing1 = createMockPolicy({ id: 'e1', policyNumber: 'POL-999', provider: 'Different' })
+      const existing1 = createMockPolicy({
+        id: 'e1',
+        policyNumber: 'POL-999',
+        provider: 'Different',
+      })
       const existing2 = createMockPolicy({ id: 'e2', policyNumber: 'POL-001' })
       const newPolicy = createMockPolicy({ id: 'new-1', policyNumber: 'POL-001' })
 
@@ -1577,7 +1601,7 @@ describe('policy-utils branch coverage', () => {
         provider: 'Allianz',
         insuredPerson: 'Ahmet Yilmaz',
         coverage: 300000, // Different coverage for non-exact
-        premium: 8000,    // Different premium
+        premium: 8000, // Different premium
         startDate: '2024-06-01',
         expiryDate: '2025-06-01',
       })
@@ -1647,7 +1671,7 @@ describe('policy-utils branch coverage', () => {
 
       const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: false })
       // Both NaN → both null → same
-      expect(diff.find(d => d.field === 'coverage')).toBeUndefined()
+      expect(diff.find((d) => d.field === 'coverage')).toBeUndefined()
     })
 
     it('should treat both null date values as same in date comparison', () => {
@@ -1662,8 +1686,8 @@ describe('policy-utils branch coverage', () => {
       })
 
       const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: false })
-      expect(diff.find(d => d.field === 'startDate')).toBeUndefined()
-      expect(diff.find(d => d.field === 'expiryDate')).toBeUndefined()
+      expect(diff.find((d) => d.field === 'startDate')).toBeUndefined()
+      expect(diff.find((d) => d.field === 'expiryDate')).toBeUndefined()
     })
   })
 
@@ -1698,11 +1722,7 @@ describe('policy-utils branch coverage', () => {
       const a = [
         'aa bb cc dd ee ff gg', // 20 chars, all words <= 2 chars
       ]
-      const b = [
-        'hh ii jj kk ll mm nn',
-        'oo pp qq rr ss tt uu',
-        'vv ww xx yy zz ab cd',
-      ]
+      const b = ['hh ii jj kk ll mm nn', 'oo pp qq rr ss tt uu', 'vv ww xx yy zz ab cd']
       // matchRatio = 0/1 < 70%
       // lengthRatio = 1/3 = 0.33 <= 0.5 → keyword fallback
       // All words <= 4 chars → keywordsA and keywordsB are both empty
@@ -1731,7 +1751,7 @@ describe('policy-utils branch coverage', () => {
       // oldPolicy is traffic → SEDDK check still happens
       const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: true })
       // type difference is flagged
-      expect(diff.find(d => d.field === 'type')).toBeDefined()
+      expect(diff.find((d) => d.field === 'type')).toBeDefined()
       // But coverage may or may not be flagged depending on which branch triggers
     })
 
@@ -1751,7 +1771,7 @@ describe('policy-utils branch coverage', () => {
       const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: true })
       // typeTr diff is string comparison
       // Coverage: old typeTr includes 'trafik' → SEDDK check → equivalent
-      expect(diff.find(d => d.field === 'coverage')).toBeUndefined()
+      expect(diff.find((d) => d.field === 'coverage')).toBeUndefined()
     })
   })
 })

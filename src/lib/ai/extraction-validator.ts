@@ -7,11 +7,7 @@
 
 import type { PolicyType } from '@/types/policy'
 import type { ExtendedExtractedPolicyData } from './extraction-schema-extended'
-import {
-  parseTurkishDate,
-  parseTurkishPlate,
-  normalizeCoverageName,
-} from './turkish-utils'
+import { parseTurkishDate, parseTurkishPlate, normalizeCoverageName } from './turkish-utils'
 
 // =============================================================================
 // VALIDATION RESULT TYPES
@@ -130,9 +126,12 @@ function validateBaseFields(data: ExtendedExtractedPolicyData): ValidationIssue[
   }
 
   // Validate date logic
+  // Use parseTurkishDate first to avoid V8 DD.MM.YYYY day/month swap (gotcha #52)
   if (data.startDate && data.endDate) {
-    const start = new Date(data.startDate)
-    const end = new Date(data.endDate)
+    const startStr = parseTurkishDate(data.startDate) ?? data.startDate
+    const endStr = parseTurkishDate(data.endDate) ?? data.endDate
+    const start = new Date(startStr)
+    const end = new Date(endStr)
 
     if (end <= start) {
       issues.push({
@@ -407,10 +406,7 @@ function validateHome(data: ExtendedExtractedPolicyData): ValidationIssue[] {
     // Construction year
     if (data.property.constructionYear) {
       const currentYear = new Date().getFullYear()
-      if (
-        data.property.constructionYear < 1900 ||
-        data.property.constructionYear > currentYear
-      ) {
+      if (data.property.constructionYear < 1900 || data.property.constructionYear > currentYear) {
         issues.push({
           severity: 'warning',
           field: 'property.constructionYear',
@@ -421,7 +417,10 @@ function validateHome(data: ExtendedExtractedPolicyData): ValidationIssue[] {
     }
 
     // Area
-    if (data.property.totalArea && (data.property.totalArea < 20 || data.property.totalArea > 2000)) {
+    if (
+      data.property.totalArea &&
+      (data.property.totalArea < 20 || data.property.totalArea > 2000)
+    ) {
       issues.push({
         severity: 'info',
         field: 'property.totalArea',
@@ -544,10 +543,7 @@ function validateLife(data: ExtendedExtractedPolicyData): ValidationIssue[] {
     })
   } else {
     // Check beneficiary percentages sum to 100
-    const totalPercentage = data.lifeBeneficiaries.reduce(
-      (sum, b) => sum + (b.percentage || 0),
-      0
-    )
+    const totalPercentage = data.lifeBeneficiaries.reduce((sum, b) => sum + (b.percentage || 0), 0)
     if (totalPercentage > 0 && Math.abs(totalPercentage - 100) > 1) {
       issues.push({
         severity: 'warning',
@@ -815,11 +811,9 @@ export function formatValidationIssues(
   locale: 'en' | 'tr' = 'en'
 ): string[] {
   return issues.map((issue) => {
-    const prefix =
-      issue.severity === 'error' ? '❌' : issue.severity === 'warning' ? '⚠️' : 'ℹ️'
+    const prefix = issue.severity === 'error' ? '❌' : issue.severity === 'warning' ? '⚠️' : 'ℹ️'
     const message = locale === 'tr' ? issue.messageTr : issue.message
-    const suggestion =
-      locale === 'tr' ? issue.suggestionTr : issue.suggestion
+    const suggestion = locale === 'tr' ? issue.suggestionTr : issue.suggestion
 
     return suggestion ? `${prefix} ${message} (${suggestion})` : `${prefix} ${message}`
   })

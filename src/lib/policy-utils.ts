@@ -1,4 +1,5 @@
 import type { Policy, DuplicatePolicy } from '@/types/policy'
+import { parseTurkishDate } from './ai/turkish-utils'
 
 /**
  * Time threshold for considering a policy as "new" (in milliseconds)
@@ -38,9 +39,7 @@ const SEDDK_LIMIT_PAIRS: Array<{ perUnit: number; perAccident: number; name: str
  * Per-accident sum: 600K + 13.5M + 13.5M = 27.6M
  * These represent the SAME policy
  */
-const SEDDK_TOTAL_COVERAGE_EQUIVALENTS = [
-  { perUnitTotal: 5700000, perAccidentTotal: 27600000 },
-]
+const SEDDK_TOTAL_COVERAGE_EQUIVALENTS = [{ perUnitTotal: 5700000, perAccidentTotal: 27600000 }]
 
 /**
  * Check if two limit values are SEDDK equivalent (per-unit ↔ per-accident)
@@ -75,8 +74,8 @@ export function areTotalCoveragesSDKEquivalent(coverageA: number, coverageB: num
   const [smaller, larger] = coverageA < coverageB ? [coverageA, coverageB] : [coverageB, coverageA]
 
   for (const pair of SEDDK_TOTAL_COVERAGE_EQUIVALENTS) {
-    const perUnitMatch = numbersEqualWithTolerance(smaller, pair.perUnitTotal, 0.10)
-    const perAccidentMatch = numbersEqualWithTolerance(larger, pair.perAccidentTotal, 0.10)
+    const perUnitMatch = numbersEqualWithTolerance(smaller, pair.perUnitTotal, 0.1)
+    const perAccidentMatch = numbersEqualWithTolerance(larger, pair.perAccidentTotal, 0.1)
     if (perUnitMatch && perAccidentMatch) {
       return true
     }
@@ -141,23 +140,15 @@ export function normalizeDate(value: string | Date | undefined | null): number |
     return isNaN(value.getTime()) ? null : value.getTime()
   }
 
-  // Try ISO format first (YYYY-MM-DD)
-  let date = new Date(value)
-  if (!isNaN(date.getTime())) {
-    return date.getTime()
+  // Use parseTurkishDate first to avoid V8 DD.MM.YYYY day/month swap (gotcha #52)
+  const parsed = parseTurkishDate(value)
+  if (parsed) {
+    return new Date(parsed + 'T00:00:00Z').getTime()
   }
 
-  // Try Turkish/European format (DD.MM.YYYY or DD/MM/YYYY)
-  const parts = value.split(/[./]/)
-  if (parts.length === 3) {
-    const [day, month, year] = parts
-    date = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`)
-    if (!isNaN(date.getTime())) {
-      return date.getTime()
-    }
-  }
-
-  return null
+  // Fallback to Date constructor for other formats (ISO datetimes, etc.)
+  const date = new Date(value)
+  return isNaN(date.getTime()) ? null : date.getTime()
 }
 
 /**
@@ -176,21 +167,23 @@ export function normalizeString(value: string | undefined | null): string {
  */
 export function normalizeStringTolerant(value: string | undefined | null): string {
   if (!value) return ''
-  return value
-    .trim()
-    .toLowerCase()
-    // Collapse multiple spaces to single space
-    .replace(/\s+/g, ' ')
-    // Normalize colon spacing (": " or " :" or " : " all become ": ")
-    .replace(/\s*:\s*/g, ':')
-    // Normalize slash spacing ("/ " or " /" or " / " all become "/")
-    .replace(/\s*\/\s*/g, '/')
-    // Normalize comma spacing
-    .replace(/\s*,\s*/g, ',')
-    // Normalize period spacing in addresses
-    .replace(/\s*\.\s*/g, '.')
-    // Final trim
-    .trim()
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      // Collapse multiple spaces to single space
+      .replace(/\s+/g, ' ')
+      // Normalize colon spacing (": " or " :" or " : " all become ": ")
+      .replace(/\s*:\s*/g, ':')
+      // Normalize slash spacing ("/ " or " /" or " / " all become "/")
+      .replace(/\s*\/\s*/g, '/')
+      // Normalize comma spacing
+      .replace(/\s*,\s*/g, ',')
+      // Normalize period spacing in addresses
+      .replace(/\s*\.\s*/g, '.')
+      // Final trim
+      .trim()
+  )
 }
 
 /**
@@ -211,33 +204,33 @@ export function normalizePolicyNumber(value: string | undefined | null): string 
  */
 const OCR_SUBSTITUTIONS: Record<string, string> = {
   '0': 'o',
-  'o': 'o',
-  'О': 'o', // Cyrillic O
+  o: 'o',
+  О: 'o', // Cyrillic O
   '1': 'i',
-  'l': 'i',
-  'I': 'i',
-  'ı': 'i', // Turkish dotless i
-  'İ': 'i', // Turkish capital I with dot
+  l: 'i',
+  I: 'i',
+  ı: 'i', // Turkish dotless i
+  İ: 'i', // Turkish capital I with dot
   '5': 's',
-  's': 's',
-  'ş': 's', // Turkish ş
-  'Ş': 's',
+  s: 's',
+  ş: 's', // Turkish ş
+  Ş: 's',
   '8': 'b',
-  'b': 'b',
-  'ğ': 'g', // Turkish ğ
-  'Ğ': 'g',
-  'ö': 'o', // Turkish ö
-  'Ö': 'o',
-  'ü': 'u', // Turkish ü
-  'Ü': 'u',
-  'ç': 'c', // Turkish ç
-  'Ç': 'c',
-  'а': 'a', // Cyrillic а
-  'е': 'e', // Cyrillic е
-  'р': 'p', // Cyrillic р
-  'с': 'c', // Cyrillic с
-  'у': 'y', // Cyrillic у
-  'х': 'x', // Cyrillic х
+  b: 'b',
+  ğ: 'g', // Turkish ğ
+  Ğ: 'g',
+  ö: 'o', // Turkish ö
+  Ö: 'o',
+  ü: 'u', // Turkish ü
+  Ü: 'u',
+  ç: 'c', // Turkish ç
+  Ç: 'c',
+  а: 'a', // Cyrillic а
+  е: 'e', // Cyrillic е
+  р: 'p', // Cyrillic р
+  с: 'c', // Cyrillic с
+  у: 'y', // Cyrillic у
+  х: 'x', // Cyrillic х
 }
 
 /**
@@ -289,18 +282,12 @@ export function normalizeOCRTextForExtraction(text: string): string {
 
   // Normalize Turkish currency amounts (ensure consistent format)
   // "1.234.567,89 TL" or "1,234,567.89 TL" -> consistent format
-  normalized = normalized.replace(
-    /(\d{1,3})\.(\d{3})\.(\d{3}),(\d{2})/g,
-    '$1$2$3.$4'
-  )
+  normalized = normalized.replace(/(\d{1,3})\.(\d{3})\.(\d{3}),(\d{2})/g, '$1$2$3.$4')
 
   // Normalize dates to ISO-like format for consistency
   // "15.01.2026" -> "15.01.2026" (keep as-is, just ensure consistency)
   // "15/01/2026" -> "15.01.2026"
-  normalized = normalized.replace(
-    /(\d{2})\/(\d{2})\/(\d{4})/g,
-    '$1.$2.$3'
-  )
+  normalized = normalized.replace(/(\d{2})\/(\d{2})\/(\d{4})/g, '$1.$2.$3')
 
   return normalized.trim()
 }
@@ -321,7 +308,7 @@ export function generateOCRTextHash(text: string): string {
   let hash = 0
   for (let i = 0; i < normalized.length; i++) {
     const char = normalized.charCodeAt(i)
-    hash = ((hash << 5) - hash) + char
+    hash = (hash << 5) - hash + char
     hash = hash & hash
   }
 
@@ -338,7 +325,7 @@ export function normalizeForOCR(value: string): string {
   return value
     .toLowerCase()
     .split('')
-    .map(char => OCR_SUBSTITUTIONS[char] || char)
+    .map((char) => OCR_SUBSTITUTIONS[char] || char)
     .join('')
     .replace(/\s+/g, '')
     .replace(/[^a-z0-9]/g, '') // Remove special chars for comparison
@@ -372,8 +359,8 @@ export function levenshteinDistance(a: string, b: string): number {
       } else {
         matrix[i][j] = Math.min(
           matrix[i - 1][j - 1] + 1, // substitution
-          matrix[i][j - 1] + 1,     // insertion
-          matrix[i - 1][j] + 1      // deletion
+          matrix[i][j - 1] + 1, // insertion
+          matrix[i - 1][j] + 1 // deletion
         )
       }
     }
@@ -426,11 +413,7 @@ export function fuzzyMatchOCR(a: string, b: string, threshold: number = 0.85): b
 /**
  * Compare two values with tolerance based on type
  */
-function compareTolerant(
-  a: unknown,
-  b: unknown,
-  type: 'number' | 'date' | 'string'
-): boolean {
+function compareTolerant(a: unknown, b: unknown, type: 'number' | 'date' | 'string'): boolean {
   if (type === 'number') {
     return normalizeNumber(a as number) === normalizeNumber(b as number)
   }
@@ -483,7 +466,7 @@ export function arraysEqualTolerant(
   // Compare normalized arrays
   for (let i = 0; i < normalizedA.length; i++) {
     // Use fuzzy matching for each item (allows for OCR errors)
-    if (!fuzzyMatchOCR(normalizedA[i], normalizedB[i], 0.90)) {
+    if (!fuzzyMatchOCR(normalizedA[i], normalizedB[i], 0.9)) {
       return false
     }
   }
@@ -501,16 +484,13 @@ export function arraysEqualTolerant(
  */
 export function generateDocumentHash(text: string): string {
   // Normalize text: remove extra whitespace, lowercase
-  const normalized = text
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .trim()
+  const normalized = text.toLowerCase().replace(/\s+/g, ' ').trim()
 
   // Simple hash using string reduction (not cryptographic, but fast)
   let hash = 0
   for (let i = 0; i < normalized.length; i++) {
     const char = normalized.charCodeAt(i)
-    hash = ((hash << 5) - hash) + char
+    hash = (hash << 5) - hash + char
     hash = hash & hash // Convert to 32-bit integer
   }
 
@@ -574,8 +554,8 @@ export function coveragesEqualSmart(
   if (!a?.length || !b?.length) return false
 
   // Extract names from both arrays
-  const namesA = a.map(extractCoverageName).filter(n => n.length > 0)
-  const namesB = b.map(extractCoverageName).filter(n => n.length > 0)
+  const namesA = a.map(extractCoverageName).filter((n) => n.length > 0)
+  const namesB = b.map(extractCoverageName).filter((n) => n.length > 0)
 
   // In tolerant mode, we care about:
   // 1. Whether the same coverage NAMES exist (fuzzy match)
@@ -602,8 +582,9 @@ export function coveragesEqualSmart(
           // If limit differs, check if it's a SEDDK per-unit vs per-accident difference
           // For traffic insurance, 300K vs 600K and 2.7M vs 13.5M are equivalent limits
           if (itemA?.limit !== undefined && itemB?.limit !== undefined) {
-            const limitsMatch = numbersEqualWithTolerance(itemA.limit, itemB.limit, 0.10) ||
-                                areLimitsSDKEquivalent(itemA.limit, itemB.limit)
+            const limitsMatch =
+              numbersEqualWithTolerance(itemA.limit, itemB.limit, 0.1) ||
+              areLimitsSDKEquivalent(itemA.limit, itemB.limit)
             if (!limitsMatch) {
               return false
             }
@@ -611,7 +592,7 @@ export function coveragesEqualSmart(
 
           // If deductible differs significantly, flag
           if (itemA?.deductible !== undefined && itemB?.deductible !== undefined) {
-            if (!numbersEqualWithTolerance(itemA.deductible, itemB.deductible, 0.20)) {
+            if (!numbersEqualWithTolerance(itemA.deductible, itemB.deductible, 0.2)) {
               return false
             }
           }
@@ -664,8 +645,8 @@ export function stringsArrayEqualSmart(
 
   if (tolerantMode) {
     // Normalize all strings
-    const normalizedA = a.map(normalizeStringTolerant).filter(s => s.length > 10)
-    const normalizedB = b.map(normalizeStringTolerant).filter(s => s.length > 10)
+    const normalizedA = a.map(normalizeStringTolerant).filter((s) => s.length > 10)
+    const normalizedB = b.map(normalizeStringTolerant).filter((s) => s.length > 10)
 
     if (normalizedA.length === 0 && normalizedB.length === 0) return true
 
@@ -688,13 +669,14 @@ export function stringsArrayEqualSmart(
     const totalItems = Math.max(normalizedA.length, normalizedB.length)
     const matchRatio = matchCount / totalItems
 
-    if (matchRatio >= 0.70) return true
+    if (matchRatio >= 0.7) return true
 
     // FALLBACK: Check if arrays are semantically equivalent (split/merged differently)
     // Only use this fallback when arrays have significantly different lengths
     // (suggesting the same content was split differently)
-    const lengthRatio = Math.min(normalizedA.length, normalizedB.length) /
-                        Math.max(normalizedA.length, normalizedB.length)
+    const lengthRatio =
+      Math.min(normalizedA.length, normalizedB.length) /
+      Math.max(normalizedA.length, normalizedB.length)
 
     // If one array has WAY more items (e.g., 1 vs 3), it might be split/merged content
     // But if lengths are similar (e.g., 1 vs 2), it's likely a real addition
@@ -709,8 +691,8 @@ export function stringsArrayEqualSmart(
     const combinedB = normalizedB.join(' ')
 
     // Extract key terms (words >4 chars) and compare
-    const keywordsA = new Set(combinedA.split(/\s+/).filter(w => w.length > 4))
-    const keywordsB = new Set(combinedB.split(/\s+/).filter(w => w.length > 4))
+    const keywordsA = new Set(combinedA.split(/\s+/).filter((w) => w.length > 4))
+    const keywordsB = new Set(combinedB.split(/\s+/).filter((w) => w.length > 4))
 
     if (keywordsA.size === 0 && keywordsB.size === 0) return true
 
@@ -725,7 +707,7 @@ export function stringsArrayEqualSmart(
 
     // Need high keyword overlap (80%+) for significantly different array lengths
     // This catches cases where one long exclusion is split into multiple shorter ones
-    return keywordOverlapRatio >= 0.80
+    return keywordOverlapRatio >= 0.8
   }
 
   return arraysEqualTolerant(a, b)
@@ -763,7 +745,7 @@ export function isPolicyIdentifierMatch(
   // Check provider match (more lenient - just needs to contain similar text)
   let sameProvider: boolean
   if (useFuzzyMatch) {
-    sameProvider = fuzzyMatchOCR(a.provider || '', b.provider || '', 0.80)
+    sameProvider = fuzzyMatchOCR(a.provider || '', b.provider || '', 0.8)
   } else {
     sameProvider = normalizeString(a.provider) === normalizeString(b.provider)
   }
@@ -780,7 +762,7 @@ export function isPolicyIdentifierMatch(
   // If neither has it, consider it a match (legacy data)
   if (aInsured && bInsured) {
     if (useFuzzyMatch) {
-      return fuzzyMatchOCR(aInsured, bInsured, 0.80)
+      return fuzzyMatchOCR(aInsured, bInsured, 0.8)
     } else {
       return normalizeString(aInsured) === normalizeString(bInsured)
     }
@@ -805,9 +787,10 @@ export function getPolicyIdentifierSimilarity(a: Policy, b: Policy): number {
 
   const aInsured = a.insuredPerson || a.location || ''
   const bInsured = b.insuredPerson || b.location || ''
-  const insuredSimilarity = aInsured && bInsured
-    ? stringSimilarity(normalizeForOCR(aInsured), normalizeForOCR(bInsured))
-    : 1 // If no insured info, don't penalize
+  const insuredSimilarity =
+    aInsured && bInsured
+      ? stringSimilarity(normalizeForOCR(aInsured), normalizeForOCR(bInsured))
+      : 1 // If no insured info, don't penalize
 
   // Weighted average: policy number is most important
   return numberSimilarity * 0.5 + providerSimilarity * 0.3 + insuredSimilarity * 0.2
@@ -838,23 +821,83 @@ const DIFF_FIELD_CONFIG: Array<{
   significance: 'critical' | 'major' | 'moderate' | 'minor'
 }> = [
   // Critical - core policy terms
-  { field: 'coverage', label: 'Coverage', labelTr: 'Teminat', type: 'number', significance: 'critical' },
+  {
+    field: 'coverage',
+    label: 'Coverage',
+    labelTr: 'Teminat',
+    type: 'number',
+    significance: 'critical',
+  },
   { field: 'premium', label: 'Premium', labelTr: 'Prim', type: 'number', significance: 'critical' },
-  { field: 'startDate', label: 'Start Date', labelTr: 'Başlangıç Tarihi', type: 'date', significance: 'critical' },
-  { field: 'expiryDate', label: 'Expiry Date', labelTr: 'Bitiş Tarihi', type: 'date', significance: 'critical' },
+  {
+    field: 'startDate',
+    label: 'Start Date',
+    labelTr: 'Başlangıç Tarihi',
+    type: 'date',
+    significance: 'critical',
+  },
+  {
+    field: 'expiryDate',
+    label: 'Expiry Date',
+    labelTr: 'Bitiş Tarihi',
+    type: 'date',
+    significance: 'critical',
+  },
 
   // Major - important financial/coverage terms
-  { field: 'deductible', label: 'Deductible', labelTr: 'Muafiyet', type: 'number', significance: 'major' },
-  { field: 'type', label: 'Policy Type', labelTr: 'Poliçe Türü', type: 'string', significance: 'major' },
-  { field: 'monthlyPremium', label: 'Monthly Premium', labelTr: 'Aylık Prim', type: 'number', significance: 'major' },
+  {
+    field: 'deductible',
+    label: 'Deductible',
+    labelTr: 'Muafiyet',
+    type: 'number',
+    significance: 'major',
+  },
+  {
+    field: 'type',
+    label: 'Policy Type',
+    labelTr: 'Poliçe Türü',
+    type: 'string',
+    significance: 'major',
+  },
+  {
+    field: 'monthlyPremium',
+    label: 'Monthly Premium',
+    labelTr: 'Aylık Prim',
+    type: 'number',
+    significance: 'major',
+  },
 
   // Moderate - policyholder details
-  { field: 'insuredPerson', label: 'Insured Person', labelTr: 'Sigortalı', type: 'string', significance: 'moderate' },
-  { field: 'beneficiary', label: 'Beneficiary', labelTr: 'Lehdar', type: 'string', significance: 'moderate' },
-  { field: 'location', label: 'Risk Address', labelTr: 'Riziko Adresi', type: 'string', significance: 'moderate' },
+  {
+    field: 'insuredPerson',
+    label: 'Insured Person',
+    labelTr: 'Sigortalı',
+    type: 'string',
+    significance: 'moderate',
+  },
+  {
+    field: 'beneficiary',
+    label: 'Beneficiary',
+    labelTr: 'Lehdar',
+    type: 'string',
+    significance: 'moderate',
+  },
+  {
+    field: 'location',
+    label: 'Risk Address',
+    labelTr: 'Riziko Adresi',
+    type: 'string',
+    significance: 'moderate',
+  },
 
   // Minor - administrative
-  { field: 'paymentFrequency', label: 'Payment Frequency', labelTr: 'Ödeme Sıklığı', type: 'string', significance: 'minor' },
+  {
+    field: 'paymentFrequency',
+    label: 'Payment Frequency',
+    labelTr: 'Ödeme Sıklığı',
+    type: 'string',
+    significance: 'minor',
+  },
   { field: 'agentName', label: 'Agent', labelTr: 'Acente', type: 'string', significance: 'minor' },
   { field: 'status', label: 'Status', labelTr: 'Durum', type: 'string', significance: 'minor' },
 ]
@@ -946,7 +989,7 @@ export function calculatePolicyDiff(
         // First check with tolerant string normalization
         const oldNorm = normalizeStringTolerant(oldStr)
         const newNorm = normalizeStringTolerant(newStr)
-        areSame = oldNorm === newNorm || fuzzyMatchOCR(oldStr, newStr, 0.90)
+        areSame = oldNorm === newNorm || fuzzyMatchOCR(oldStr, newStr, 0.9)
       } else {
         // Use tolerant string normalization for other string fields
         areSame = normalizeStringTolerant(oldStr) === normalizeStringTolerant(newStr)
@@ -1002,7 +1045,9 @@ export function calculatePolicyDiff(
 
   // Check special conditions array with smart comparison (70% match threshold)
   const conditionsEqual = tolerantMode
-    ? stringsArrayEqualSmart(oldPolicy.specialConditions, newPolicy.specialConditions, { tolerantMode })
+    ? stringsArrayEqualSmart(oldPolicy.specialConditions, newPolicy.specialConditions, {
+        tolerantMode,
+      })
     : arraysEqualTolerant(oldPolicy.specialConditions, newPolicy.specialConditions)
 
   if (!conditionsEqual) {
@@ -1028,7 +1073,12 @@ export type PreUploadCheckResult =
   | { type: 'noConflict' }
   | { type: 'exactDuplicate'; existingPolicy: Policy }
   | { type: 'extractionVariance'; existingPolicy: Policy; changes: PolicyFieldDiff[] }
-  | { type: 'amendment'; existingPolicy: Policy; changes: PolicyFieldDiff[]; isVerifiedAmendment: boolean }
+  | {
+      type: 'amendment'
+      existingPolicy: Policy
+      changes: PolicyFieldDiff[]
+      isVerifiedAmendment: boolean
+    }
 
 /**
  * Check if a policy has valid amendment markers (Zeyilname indicators)
@@ -1102,16 +1152,22 @@ export function comparePoliciesAdvanced(
 
   // STEP 4: There are differences - determine if OCR variance or real change
   // OCR-sensitive fields: text arrays and addresses often have OCR/formatting variance
-  const ocrSensitiveFields = ['coverages', 'exclusions', 'specialConditions', 'location', 'insuredPerson']
-  const coreFieldChanges = changes.filter(c => !ocrSensitiveFields.includes(c.field))
-  const ocrFieldChanges = changes.filter(c => ocrSensitiveFields.includes(c.field))
+  const ocrSensitiveFields = [
+    'coverages',
+    'exclusions',
+    'specialConditions',
+    'location',
+    'insuredPerson',
+  ]
+  const coreFieldChanges = changes.filter((c) => !ocrSensitiveFields.includes(c.field))
+  const ocrFieldChanges = changes.filter((c) => ocrSensitiveFields.includes(c.field))
 
   // If there are changes to core fields (coverage amount, premium, dates, etc.)
   // these are likely REAL changes, not OCR variance
   if (coreFieldChanges.length > 0) {
     // Check if changes are significant enough to be a real amendment
-    const hasSignificantChange = coreFieldChanges.some(c =>
-      c.significance === 'critical' || c.significance === 'major'
+    const hasSignificantChange = coreFieldChanges.some(
+      (c) => c.significance === 'critical' || c.significance === 'major'
     )
 
     if (hasSignificantChange) {
@@ -1141,11 +1197,17 @@ export function comparePoliciesAdvanced(
 /**
  * Compare two policies to determine their similarity level (TOLERANT)
  */
-function comparePolicies(a: Policy, b: Policy): { similarity: 'exact' | 'high' | 'medium' | null; matchedFields: string[] } {
+function comparePolicies(
+  a: Policy,
+  b: Policy
+): { similarity: 'exact' | 'high' | 'medium' | null; matchedFields: string[] } {
   const matchedFields: string[] = []
 
   // Primary identifiers (tolerant)
-  if (normalizePolicyNumber(a.policyNumber) === normalizePolicyNumber(b.policyNumber) && a.policyNumber) {
+  if (
+    normalizePolicyNumber(a.policyNumber) === normalizePolicyNumber(b.policyNumber) &&
+    a.policyNumber
+  ) {
     matchedFields.push('policyNumber')
   }
   if (normalizeString(a.provider) === normalizeString(b.provider)) {
@@ -1175,8 +1237,11 @@ function comparePolicies(a: Policy, b: Policy): { similarity: 'exact' | 'high' |
   if (normalizeString(a.type) === normalizeString(b.type)) {
     matchedFields.push('type')
   }
-  if (a.insuredPerson && b.insuredPerson &&
-      normalizeString(a.insuredPerson) === normalizeString(b.insuredPerson)) {
+  if (
+    a.insuredPerson &&
+    b.insuredPerson &&
+    normalizeString(a.insuredPerson) === normalizeString(b.insuredPerson)
+  ) {
     matchedFields.push('insuredPerson')
   }
 
@@ -1224,7 +1289,10 @@ function comparePolicies(a: Policy, b: Policy): { similarity: 'exact' | 'high' |
 /**
  * Check if a policy is considered "new" based on its createdAt timestamp
  */
-export function isNewPolicy(policy: Policy, thresholdMs: number = NEW_POLICY_THRESHOLD_MS): boolean {
+export function isNewPolicy(
+  policy: Policy,
+  thresholdMs: number = NEW_POLICY_THRESHOLD_MS
+): boolean {
   if (!policy.createdAt) {
     return false
   }
@@ -1232,7 +1300,7 @@ export function isNewPolicy(policy: Policy, thresholdMs: number = NEW_POLICY_THR
   const createdTime = new Date(policy.createdAt).getTime()
   const now = Date.now()
 
-  return (now - createdTime) < thresholdMs
+  return now - createdTime < thresholdMs
 }
 
 /**
@@ -1330,7 +1398,7 @@ export function groupDuplicatePolicies(policies: Policy[]): {
   }
 
   // Get unique policies (not part of any duplicate group as secondary)
-  const uniquePolicies = policies.filter(p => !duplicateIds.has(p.id))
+  const uniquePolicies = policies.filter((p) => !duplicateIds.has(p.id))
 
   return { uniquePolicies, duplicateGroups }
 }
@@ -1360,7 +1428,7 @@ export function createPolicyTimestamp(): string {
 
 export function ensurePolicyTimestamps<T extends Policy>(policies: T[]): T[] {
   const now = createPolicyTimestamp()
-  return policies.map(p => ({
+  return policies.map((p) => ({
     ...p,
     createdAt: p.createdAt || now,
   }))
