@@ -42,7 +42,7 @@ const isDryRun = !isApply // default is dry-run
 const typeArg = args.find((a) => a.startsWith('--type='))
 const filterType = typeArg ? typeArg.split('=')[1] : undefined
 const minArg = args.find((a) => a.startsWith('--min='))
-const minSample = minArg ? parseInt(minArg.split('=')[1], 10) : 50
+const minSample = minArg ? parseInt(minArg.split('=')[1], 10) : 5
 
 // ---------------------------------------------------------------------------
 // Supabase init (bypasses Vite — uses process.env directly)
