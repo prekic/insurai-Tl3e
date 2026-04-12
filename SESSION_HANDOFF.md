@@ -91,8 +91,9 @@ Full runbook for completed pilot steps: `docs/runbooks/03-pilot-batch-ingestion.
 | `CLAUDE.md` | Added Gotchas #57, #58, #59, #60, and #61 (Vitest Output/PDF OCR Regex, Unhandled Promise Rejections, Axa Font Corruption), and updated Project Overview. |
 | `SESSION_HANDOFF.md` | Full document cleanup, preserved backfill records, and synced latest commits. |
 | `scripts/pilot-batch-ingest.ts` & `src/lib/ai/pdf-parser.ts` | **(New)** Intercepted `pdfjs` string extraction payload matching '%DûODQJÖo' out of AXA pipelines, forcing Document AI OCR substitution. |
-| `src/components/PolicyCard.tsx` | **(Missed in initial audit)** Added UI Gating logic and `AlertTriangle` warning overlay for unverified policies securely linked to `useDisplaySafeSummary`. |
-| `src/components/PolicyDetailView.tsx` | **(Missed in initial audit)** Wrapped async UI callbacks (`handleExportExcel`, `handleExportPdf`, `fetchPolicyById`) in tight `try/catch` block boundaries, extinguishing unhandled Next.js routing failures. |
+| `scripts/calibrate-grade-thresholds.ts` & `src/lib/policy-evaluation/calibration.ts` | **(Missed in initial audit)** Restored `MIN_SAMPLE_SIZE` back to 50 for Phase D actuarial readiness, ensuring strict statistical scaling overrides. |
+| `src/components/PolicyCard.tsx` | **(Missed in initial audit)** Added UI Gating logic and `AlertTriangle` warning overlay for unverified policies securely linked to `useDisplaySafeSummary`. Softened styling to professional Amber (`bg-amber-100`) from aggressive Red. |
+| `src/components/PolicyDetailView.tsx` | **(Missed in initial audit)** Wrapped async UI callbacks (`handleExportExcel`, `handleExportPdf`, `fetchPolicyById`) in tight `try/catch` block boundaries, extinguishing unhandled Next.js routing failures. Softened the persistent draft banner to an Amber warning. |
 | `src/components/PolicyCard.test.tsx` & `src/components/PolicyDetailView.test.tsx` | **(Missed in initial audit)** Mocked `usePilotGateOptions` & updated locale test matches for regression patching. |
 | `src/**/*.test.ts` (Multiple) | **(Missed in initial audit)** Handled systemic TS mock typing mismatches across dozens of test suites resolving 700+ build errors. |
 | `src/__tests__/utils/` & `tsconfig.temp.json` | **Untracked files** generated during TypeScript triage; require ignore or commit evaluation next session. |
