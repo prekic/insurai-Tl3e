@@ -17,7 +17,7 @@ import {
   type Table,
 } from './document-ocr'
 import { extractFormFieldMap, findFormField, TURKISH_FORM_FIELD_PATTERNS } from './ocr'
-import { parseTurkishCurrency, extractVehicleInfoFromText } from './turkish-utils'
+import { parseTurkishCurrency, extractVehicleInfoFromText, parseTurkishDate } from './turkish-utils'
 import { parseTablesForCoverages, mergeCoveragesWithTableData } from './table-parser'
 import { extractWithConsensus, type ConsensusResult } from './providers/consensus'
 import { extractWithOpenAI } from './providers/openai'
@@ -1607,24 +1607,26 @@ async function convertToAnalyzedPolicy(
     .split('T')[0]
 
   if (rawEndDate) {
-    let endDate = new Date(rawEndDate)
-    if (isNaN(endDate.getTime())) {
-      const parts = rawEndDate.split(/[./-]/)
-      if (parts.length === 3) {
-        if (parts[2].length === 4) {
-          endDate = new Date(
-            `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}T00:00:00Z`
-          )
-        } else if (parts[0].length === 4) {
-          endDate = new Date(
-            `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}T00:00:00Z`
-          )
-        }
+    // Use parseTurkishDate first to avoid V8 Date constructor silently swapping
+    // day/month on Turkish DD.MM.YYYY strings when day ≤ 12 (see gotcha #52)
+    const parsedEnd = parseTurkishDate(rawEndDate)
+    let endDate: Date | null = null
+
+    if (parsedEnd) {
+      expiryDateStr = parsedEnd
+      endDate = new Date(parsedEnd + 'T00:00:00Z')
+    } else {
+      // Fallback for ISO datetimes (e.g. "2024-12-15T00:00:00Z") that parseTurkishDate doesn't cover
+      const d = new Date(rawEndDate)
+      if (!isNaN(d.getTime())) {
+        expiryDateStr = d.toISOString().split('T')[0]
+        endDate = d
+      } else {
+        expiryDateStr = rawEndDate // totally unparseable — keep raw string
       }
     }
 
-    if (!isNaN(endDate.getTime())) {
-      expiryDateStr = endDate.toISOString().split('T')[0]
+    if (endDate && !isNaN(endDate.getTime())) {
       const daysUntilExpiry = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
       if (daysUntilExpiry < 0) {
@@ -1632,8 +1634,6 @@ async function convertToAnalyzedPolicy(
       } else if (daysUntilExpiry <= 30) {
         status = 'expiring'
       }
-    } else {
-      expiryDateStr = rawEndDate // fallback to raw string if totally unparseable
     }
   }
 
@@ -1811,20 +1811,11 @@ async function convertToAnalyzedPolicy(
     startDate: (() => {
       const rawStartDate = data.startDate ?? (rawData.start_date as string)
       if (!rawStartDate) return now.toISOString().split('T')[0]
-      let sd = new Date(rawStartDate)
-      if (isNaN(sd.getTime())) {
-        const parts = rawStartDate.split(/[./-]/)
-        if (parts.length === 3) {
-          if (parts[2].length === 4)
-            sd = new Date(
-              `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}T00:00:00Z`
-            )
-          else if (parts[0].length === 4)
-            sd = new Date(
-              `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}T00:00:00Z`
-            )
-        }
-      }
+      // Use parseTurkishDate first to avoid V8 DD.MM.YYYY day/month swap (gotcha #52)
+      const parsed = parseTurkishDate(rawStartDate)
+      if (parsed) return parsed
+      // Fallback for ISO datetimes
+      const sd = new Date(rawStartDate)
       return !isNaN(sd.getTime()) ? sd.toISOString().split('T')[0] : rawStartDate
     })(),
     expiryDate: expiryDateStr,
@@ -3260,14 +3251,18 @@ export function comprehensiveToAnalyzedPolicy(
   const now = new Date()
 
   // Determine status based on dates
+  // Use parseTurkishDate first to avoid V8 DD.MM.YYYY day/month swap (gotcha #52)
   let status: 'active' | 'expiring' | 'expired' | 'pending' = 'active'
   if (data.policy.endDate) {
-    const endDate = new Date(data.policy.endDate)
-    const daysUntilExpiry = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-    if (daysUntilExpiry < 0) {
-      status = 'expired'
-    } else if (daysUntilExpiry <= 30) {
-      status = 'expiring'
+    const parsedEnd = parseTurkishDate(data.policy.endDate)
+    const endDate = parsedEnd ? new Date(parsedEnd + 'T00:00:00Z') : new Date(data.policy.endDate)
+    if (!isNaN(endDate.getTime())) {
+      const daysUntilExpiry = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      if (daysUntilExpiry < 0) {
+        status = 'expired'
+      } else if (daysUntilExpiry <= 30) {
+        status = 'expiring'
+      }
     }
   }
 

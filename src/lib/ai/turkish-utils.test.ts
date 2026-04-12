@@ -100,6 +100,15 @@ describe('Date Parsing', () => {
       expect(parseTurkishDate('29.02.2024')).toBe('2024-02-29') // Leap year
       expect(parseTurkishDate('29.02.2023')).toBe(null) // Not a leap year
     })
+
+    it('correctly parses DD.MM.YYYY when day ≤ 12 (V8 Date swap regression, gotcha #52)', () => {
+      // These are the exact cases where new Date() silently swaps day/month
+      expect(parseTurkishDate('01.12.2024')).toBe('2024-12-01') // Dec 1, not Jan 12
+      expect(parseTurkishDate('05.03.2024')).toBe('2024-03-05') // Mar 5, not May 3
+      expect(parseTurkishDate('10.11.2025')).toBe('2025-11-10') // Nov 10, not Oct 11
+      expect(parseTurkishDate('12.01.2024')).toBe('2024-01-12') // Jan 12
+      expect(parseTurkishDate('03.07.2025')).toBe('2025-07-03') // Jul 3, not Mar 7
+    })
   })
 
   describe('extractDatesFromText', () => {

@@ -85,7 +85,14 @@ vi.mock('@/types/policy', () => ({
 }))
 
 vi.mock('@/data/market-data/benchmarks', () => ({
-  MARKET_BENCHMARKS: { kasko: { premiumRange: { percentile75: 10000 }, coverageRange: { average: 800000, median: 700000 }, commonCoverages: [], trends: { premiumChangeYoY: 20 } } },
+  MARKET_BENCHMARKS: {
+    kasko: {
+      premiumRange: { percentile75: 10000 },
+      coverageRange: { average: 800000, median: 700000 },
+      commonCoverages: [],
+      trends: { premiumChangeYoY: 20 },
+    },
+  },
 }))
 
 vi.mock('@/lib/ml', () => ({
@@ -97,14 +104,28 @@ vi.mock('@/lib/ml', () => ({
 
 vi.mock('@/lib/gap-detection', () => ({
   GapDetectionService: {
-    analyzePolicy: vi.fn(() => Promise.resolve({ overallScore: 30, gapCount: { critical: 0, high: 0, medium: 0, low: 0, total: 0 }, prioritizedGaps: [], financialSummary: { totalExpectedLoss: 0, estimatedRemediationCost: 0 } })),
+    analyzePolicy: vi.fn(() =>
+      Promise.resolve({
+        overallScore: 30,
+        gapCount: { critical: 0, high: 0, medium: 0, low: 0, total: 0 },
+        prioritizedGaps: [],
+        financialSummary: { totalExpectedLoss: 0, estimatedRemediationCost: 0 },
+      })
+    ),
     getActionItems: vi.fn(() => Promise.resolve([])),
   },
 }))
 
 vi.mock('@/lib/market-data/market-data-provider', () => ({
   marketDataProvider: {
-    getBenchmark: vi.fn(() => Promise.resolve({ commonCoverages: [], premiumRange: { min: 1000, max: 10000, average: 5000, median: 4500, percentile75: 7500 }, coverageRange: { min: 50000, max: 1000000, average: 500000, median: 450000 }, trends: { premiumChangeYoY: 10 } })),
+    getBenchmark: vi.fn(() =>
+      Promise.resolve({
+        commonCoverages: [],
+        premiumRange: { min: 1000, max: 10000, average: 5000, median: 4500, percentile75: 7500 },
+        coverageRange: { min: 50000, max: 1000000, average: 500000, median: 450000 },
+        trends: { premiumChangeYoY: 10 },
+      })
+    ),
     getRegionalFactor: vi.fn(() => Promise.resolve(1.0)),
     calculatePremiumPercentile: vi.fn(() => Promise.resolve(50)),
     calculateCoveragePercentile: vi.fn(() => Promise.resolve(50)),
@@ -121,13 +142,39 @@ vi.mock('./text-processor', () => ({
   applyBasicOCRCorrections: vi.fn((text: string) => ({ text, corrections: [] })),
   textNeedsProcessing: vi.fn(() => false),
   processTextEnhanced: vi.fn(),
-  applyComprehensivePreprocessing: vi.fn((text: string) => ({ text, stats: { garbageBlocksRemoved: 0, qrBlocksRemoved: 0, spacedCharsFixed: 0, totalCharactersRemoved: 0 } })),
+  applyComprehensivePreprocessing: vi.fn((text: string) => ({
+    text,
+    stats: {
+      garbageBlocksRemoved: 0,
+      qrBlocksRemoved: 0,
+      spacedCharsFixed: 0,
+      totalCharactersRemoved: 0,
+    },
+  })),
   addSectionMarkers: vi.fn((text: string) => ({ text, sectionsFound: [] })),
 }))
 
 vi.mock('@/lib/ocr-decision/ocr-decision-engine', () => ({
   getOCRDecisionEngine: vi.fn(() => ({
-    analyzeDocument: vi.fn(() => ({ action: 'skip_ocr', confidence: 0.85, document_classification: { detected_language: { locale_code: 'tr', confidence: 0.9 }, detected_policy_type: { policy_type_id: 'motor_kasko', policy_type_name: 'Kasko', confidence: 0.85 } }, analysis: { text_quality: { quality_score: 0.8, is_good_quality: true }, field_extraction: { extraction_rate: 0.6 }, confidence_breakdown: { component_scores: {} } }, pages_to_ocr: [], reasoning: [] })),
+    analyzeDocument: vi.fn(() => ({
+      action: 'skip_ocr',
+      confidence: 0.85,
+      document_classification: {
+        detected_language: { locale_code: 'tr', confidence: 0.9 },
+        detected_policy_type: {
+          policy_type_id: 'motor_kasko',
+          policy_type_name: 'Kasko',
+          confidence: 0.85,
+        },
+      },
+      analysis: {
+        text_quality: { quality_score: 0.8, is_good_quality: true },
+        field_extraction: { extraction_rate: 0.6 },
+        confidence_breakdown: { component_scores: {} },
+      },
+      pages_to_ocr: [],
+      reasoning: [],
+    })),
     buildDocumentJourneyMetadata: vi.fn(() => ({ ocr_decision: {} })),
   })),
 }))
@@ -146,13 +193,15 @@ vi.mock('@/lib/utils', () => ({
 }))
 
 vi.mock('@/lib/config', () => ({
-  getAIConfig: vi.fn(() => Promise.resolve({
-    confidenceWeightPolicyNumber: 0.20,
-    confidenceWeightProvider: 0.15,
-    confidenceWeightDates: 0.20,
-    confidenceWeightPremium: 0.20,
-    confidenceWeightCoverages: 0.25,
-  })),
+  getAIConfig: vi.fn(() =>
+    Promise.resolve({
+      confidenceWeightPolicyNumber: 0.2,
+      confidenceWeightProvider: 0.15,
+      confidenceWeightDates: 0.2,
+      confidenceWeightPremium: 0.2,
+      confidenceWeightCoverages: 0.25,
+    })
+  ),
   configService: {
     getAIConfig: vi.fn(() => Promise.resolve({})),
   },
@@ -239,7 +288,9 @@ function makeStructuredData(overrides: Partial<StructuredPolicyData> = {}): Stru
   }
 }
 
-function makeResult(overrides: Partial<ComprehensiveExtractionResult> = {}): ComprehensiveExtractionResult {
+function makeResult(
+  overrides: Partial<ComprehensiveExtractionResult> = {}
+): ComprehensiveExtractionResult {
   return {
     success: true,
     policyBrief: null,
@@ -257,7 +308,9 @@ function makeResult(overrides: Partial<ComprehensiveExtractionResult> = {}): Com
   }
 }
 
-function makeCoverage(overrides: Partial<StructuredPolicyData['coverages'][0]> = {}): StructuredPolicyData['coverages'][0] {
+function makeCoverage(
+  overrides: Partial<StructuredPolicyData['coverages'][0]> = {}
+): StructuredPolicyData['coverages'][0] {
   return {
     name: 'Collision',
     nameTr: 'Çarpma/Çarpışma',
@@ -321,7 +374,17 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
 
   describe('status calculation', () => {
     it('defaults to "active" when no endDate is provided', () => {
-      const _data = makeStructuredData({ policy: { policyNumber: 'P1', sbmPolicyNumber: null, provider: 'Allianz', productName: null, startDate: '2026-01-01', endDate: '', issueDate: null } })
+      const _data = makeStructuredData({
+        policy: {
+          policyNumber: 'P1',
+          sbmPolicyNumber: null,
+          provider: 'Allianz',
+          productName: null,
+          startDate: '2026-01-01',
+          endDate: '',
+          issueDate: null,
+        },
+      })
       // Empty string endDate: new Date('') is Invalid — the implementation checks falsy after new Date() parse
       // We verify by passing null-like value via structuredData override
       const result = makeResult({
@@ -333,7 +396,7 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
             provider: 'Allianz',
             productName: null,
             startDate: '2026-01-01',
-            endDate: '',  // empty string → falsy after Date parse NaN check, but code checks `if (data.policy.endDate)` so falsy empty string → skip
+            endDate: '', // empty string → falsy after Date parse NaN check, but code checks `if (data.policy.endDate)` so falsy empty string → skip
             issueDate: null,
           },
         },
@@ -352,7 +415,7 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
             provider: 'Allianz',
             productName: null,
             startDate: '2020-01-01',
-            endDate: '2021-01-01',   // definitely in the past
+            endDate: '2021-01-01', // definitely in the past
             issueDate: null,
           },
         }),
@@ -403,6 +466,51 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
       })
       const policy = comprehensiveToAnalyzedPolicy(result, makeFile(), 'raw', 'processed')
       expect(policy?.status).toBe('active')
+    })
+
+    it('correctly parses DD.MM.YYYY endDate with day ≤ 12 (V8 Date swap regression, gotcha #52)', () => {
+      // "01.12.2021" means December 1, 2021 (in the past → expired)
+      // V8's new Date('01.12.2021') would return Jan 12, 2021 — same status but wrong date
+      // Use a date that changes status when day/month are swapped:
+      // "05.01.2021" = January 5, 2021 (past → expired)
+      // If V8 swapped: May 1, 2021 — still past, but wrong month
+      const result = makeResult({
+        structuredData: makeStructuredData({
+          policy: {
+            policyNumber: 'P-DATE-SWAP',
+            sbmPolicyNumber: null,
+            provider: 'TestCo',
+            productName: null,
+            startDate: '01.06.2020',
+            endDate: '01.12.2021', // Dec 1 2021 — in the past → expired
+            issueDate: null,
+          },
+        }),
+      })
+      const policy = comprehensiveToAnalyzedPolicy(result, makeFile(), 'raw', 'processed')
+      expect(policy?.status).toBe('expired')
+      // The critical assertion: expiryDate must be Dec 1, not Jan 12
+      expect(policy?.expiryDate).toBe('01.12.2021') // comprehensiveToAnalyzedPolicy passes through raw
+    })
+
+    it('correctly parses DD.MM.YYYY endDate for status when day > 12', () => {
+      // "15.01.2021" = January 15, 2021 — V8 would reject this (NaN), so manual parse fires
+      // This case already worked before the fix but validates the full path
+      const result = makeResult({
+        structuredData: makeStructuredData({
+          policy: {
+            policyNumber: 'P-DATE-SAFE',
+            sbmPolicyNumber: null,
+            provider: 'TestCo',
+            productName: null,
+            startDate: '2020-01-01',
+            endDate: '15.01.2021', // Jan 15, 2021 — in the past → expired
+            issueDate: null,
+          },
+        }),
+      })
+      const policy = comprehensiveToAnalyzedPolicy(result, makeFile(), 'raw', 'processed')
+      expect(policy?.status).toBe('expired')
     })
   })
 
@@ -474,7 +582,14 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
     it('returns 0 when coverage has isMarketValue=true', () => {
       const result = makeResult({
         structuredData: makeStructuredData({
-          coverages: [makeCoverage({ name: 'Vehicle', nameTr: 'Araç Değeri', isMarketValue: true, limit: 750000 })],
+          coverages: [
+            makeCoverage({
+              name: 'Vehicle',
+              nameTr: 'Araç Değeri',
+              isMarketValue: true,
+              limit: 750000,
+            }),
+          ],
         }),
       })
       const policy = comprehensiveToAnalyzedPolicy(result, makeFile(), 'raw', 'processed')
@@ -485,7 +600,13 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
       const result = makeResult({
         structuredData: makeStructuredData({
           coverages: [
-            makeCoverage({ name: 'Main Coverage', nameTr: 'Ana Teminat', category: 'main', limit: 600000, isMarketValue: false }),
+            makeCoverage({
+              name: 'Main Coverage',
+              nameTr: 'Ana Teminat',
+              category: 'main',
+              limit: 600000,
+              isMarketValue: false,
+            }),
           ],
         }),
       })
@@ -497,7 +618,13 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
       const result = makeResult({
         structuredData: makeStructuredData({
           coverages: [
-            makeCoverage({ name: 'Araç Bedeli', nameTr: 'Araç Bedeli', category: 'supplementary', limit: 450000, isMarketValue: false }),
+            makeCoverage({
+              name: 'Araç Bedeli',
+              nameTr: 'Araç Bedeli',
+              category: 'supplementary',
+              limit: 450000,
+              isMarketValue: false,
+            }),
           ],
         }),
       })
@@ -509,7 +636,13 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
       const result = makeResult({
         structuredData: makeStructuredData({
           coverages: [
-            makeCoverage({ name: 'Kasko Teminatı', nameTr: 'Kasko Teminatı', category: 'supplementary', limit: 520000, isMarketValue: false }),
+            makeCoverage({
+              name: 'Kasko Teminatı',
+              nameTr: 'Kasko Teminatı',
+              category: 'supplementary',
+              limit: 520000,
+              isMarketValue: false,
+            }),
           ],
         }),
       })
@@ -526,7 +659,13 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
       const result = makeResult({
         structuredData: makeStructuredData({
           coverages: [
-            makeCoverage({ name: 'Mali Sorumluluk Kasko', nameTr: 'MSK', category: 'supplementary', limit: 200000, isMarketValue: false }),
+            makeCoverage({
+              name: 'Mali Sorumluluk Kasko',
+              nameTr: 'MSK',
+              category: 'supplementary',
+              limit: 200000,
+              isMarketValue: false,
+            }),
           ],
         }),
       })
@@ -539,8 +678,20 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
       const result = makeResult({
         structuredData: makeStructuredData({
           coverages: [
-            makeCoverage({ name: 'Glass Coverage', nameTr: 'Cam Teminatı', category: 'supplementary', limit: 30000, isMarketValue: false }),
-            makeCoverage({ name: 'Personal Accident', nameTr: 'Kişisel Kaza', category: 'supplementary', limit: 80000, isMarketValue: false }),
+            makeCoverage({
+              name: 'Glass Coverage',
+              nameTr: 'Cam Teminatı',
+              category: 'supplementary',
+              limit: 30000,
+              isMarketValue: false,
+            }),
+            makeCoverage({
+              name: 'Personal Accident',
+              nameTr: 'Kişisel Kaza',
+              category: 'supplementary',
+              limit: 80000,
+              isMarketValue: false,
+            }),
           ],
         }),
       })
@@ -555,7 +706,13 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
       const result = makeResult({
         structuredData: makeStructuredData({
           coverages: [
-            makeCoverage({ name: 'Third Party Liability', nameTr: 'Üçüncü Şahıs', category: 'liability', limit: 100000, isMarketValue: false }),
+            makeCoverage({
+              name: 'Third Party Liability',
+              nameTr: 'Üçüncü Şahıs',
+              category: 'liability',
+              limit: 100000,
+              isMarketValue: false,
+            }),
           ],
         }),
       })
@@ -577,7 +734,13 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
       const result = makeResult({
         structuredData: makeStructuredData({
           coverages: [
-            makeCoverage({ name: 'Vehicle Value', nameTr: 'Araç Değeri', isMarketValue: true, category: 'main', limit: 900000 }),
+            makeCoverage({
+              name: 'Vehicle Value',
+              nameTr: 'Araç Değeri',
+              isMarketValue: true,
+              category: 'main',
+              limit: 900000,
+            }),
           ],
         }),
       })
@@ -620,7 +783,9 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
 
     it('sets vehicleInfo to undefined when vehicle is absent', () => {
       const result = makeResult({
-        structuredData: makeStructuredData({ vehicle: undefined as unknown as StructuredPolicyData['vehicle'] }),
+        structuredData: makeStructuredData({
+          vehicle: undefined as unknown as StructuredPolicyData['vehicle'],
+        }),
       })
       const policy = comprehensiveToAnalyzedPolicy(result, makeFile(), 'raw', 'processed')
       expect(policy?.vehicleInfo).toBeUndefined()
@@ -664,8 +829,8 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
       expect(policy?.aiInsights[0]).toBe('⚠ W1')
       expect(policy?.aiInsights[4]).toBe('⚠ W5')
       // W6 and W7 should be absent
-      expect(policy?.aiInsights.some(i => i.includes('W6'))).toBe(false)
-      expect(policy?.aiInsights.some(i => i.includes('W7'))).toBe(false)
+      expect(policy?.aiInsights.some((i) => i.includes('W6'))).toBe(false)
+      expect(policy?.aiInsights.some((i) => i.includes('W7'))).toBe(false)
     })
 
     it('always places the quality score line last', () => {
@@ -707,7 +872,12 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
           exclusions: [
             { trigger: 'Racing events', effect: 'excluded', details: null, source: 'policy' },
             { trigger: 'Drunk driving', effect: 'excluded', details: null, source: 'policy' },
-            { trigger: 'Unpermitted use', effect: 'limited', details: 'reduced coverage', source: 'policy' },
+            {
+              trigger: 'Unpermitted use',
+              effect: 'limited',
+              details: 'reduced coverage',
+              source: 'policy',
+            },
           ],
         }),
       })
@@ -744,7 +914,15 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
     it('generates a fallback policyNumber when policyNumber is null', () => {
       const result = makeResult({
         structuredData: makeStructuredData({
-          policy: { policyNumber: null, sbmPolicyNumber: null, provider: 'Allianz', productName: null, startDate: '2026-01-01', endDate: '2027-01-01', issueDate: null },
+          policy: {
+            policyNumber: null,
+            sbmPolicyNumber: null,
+            provider: 'Allianz',
+            productName: null,
+            startDate: '2026-01-01',
+            endDate: '2027-01-01',
+            issueDate: null,
+          },
         }),
       })
       const policy = comprehensiveToAnalyzedPolicy(result, makeFile(), 'raw', 'processed')
@@ -760,7 +938,15 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
     it('sets provider from structuredData.policy.provider', () => {
       const result = makeResult({
         structuredData: makeStructuredData({
-          policy: { policyNumber: 'P1', sbmPolicyNumber: null, provider: 'AXA', productName: null, startDate: '2026-01-01', endDate: '2027-01-01', issueDate: null },
+          policy: {
+            policyNumber: 'P1',
+            sbmPolicyNumber: null,
+            provider: 'AXA',
+            productName: null,
+            startDate: '2026-01-01',
+            endDate: '2027-01-01',
+            issueDate: null,
+          },
         }),
       })
       const policy = comprehensiveToAnalyzedPolicy(result, makeFile(), 'raw', 'processed')
@@ -770,7 +956,14 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
     it('sets premium and monthlyPremium from structuredData.premium', () => {
       const result = makeResult({
         structuredData: makeStructuredData({
-          premium: { netPremium: 8000, tax: 2000, totalPremium: 10000, currency: 'TRY', paymentPlan: null, installments: null },
+          premium: {
+            netPremium: 8000,
+            tax: 2000,
+            totalPremium: 10000,
+            currency: 'TRY',
+            paymentPlan: null,
+            installments: null,
+          },
         }),
       })
       const policy = comprehensiveToAnalyzedPolicy(result, makeFile(), 'raw', 'processed')
@@ -781,7 +974,14 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
     it('maps insuredPerson from structuredData.insured.name', () => {
       const result = makeResult({
         structuredData: makeStructuredData({
-          insured: { name: 'Jane Smith', tcKimlik: null, vkn: null, address: 'Ankara', phone: null, email: null },
+          insured: {
+            name: 'Jane Smith',
+            tcKimlik: null,
+            vkn: null,
+            address: 'Ankara',
+            phone: null,
+            email: null,
+          },
         }),
       })
       const policy = comprehensiveToAnalyzedPolicy(result, makeFile(), 'raw', 'processed')
@@ -791,7 +991,14 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
     it('maps location from insured.address', () => {
       const result = makeResult({
         structuredData: makeStructuredData({
-          insured: { name: 'John', tcKimlik: null, vkn: null, address: 'Izmir', phone: null, email: null },
+          insured: {
+            name: 'John',
+            tcKimlik: null,
+            vkn: null,
+            address: 'Izmir',
+            phone: null,
+            email: null,
+          },
         }),
       })
       const policy = comprehensiveToAnalyzedPolicy(result, makeFile(), 'raw', 'processed')
@@ -801,7 +1008,14 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
     it('sets location to undefined when address is null', () => {
       const result = makeResult({
         structuredData: makeStructuredData({
-          insured: { name: 'John', tcKimlik: null, vkn: null, address: null, phone: null, email: null },
+          insured: {
+            name: 'John',
+            tcKimlik: null,
+            vkn: null,
+            address: null,
+            phone: null,
+            email: null,
+          },
         }),
       })
       const policy = comprehensiveToAnalyzedPolicy(result, makeFile(), 'raw', 'processed')
@@ -810,7 +1024,12 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
 
     it('sets fileName from the provided File object', () => {
       const result = makeResult()
-      const policy = comprehensiveToAnalyzedPolicy(result, makeFile('allianz-kasko.pdf'), 'raw', 'processed')
+      const policy = comprehensiveToAnalyzedPolicy(
+        result,
+        makeFile('allianz-kasko.pdf'),
+        'raw',
+        'processed'
+      )
       expect(policy?.fileName).toBe('allianz-kasko.pdf')
     })
 
@@ -823,7 +1042,12 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
 
     it('sets extractedText and processedText from function arguments', () => {
       const result = makeResult()
-      const policy = comprehensiveToAnalyzedPolicy(result, makeFile(), 'raw text here', 'processed text here')
+      const policy = comprehensiveToAnalyzedPolicy(
+        result,
+        makeFile(),
+        'raw text here',
+        'processed text here'
+      )
       expect(policy?.extractedText).toBe('raw text here')
       expect(policy?.processedText).toBe('processed text here')
     })
@@ -831,7 +1055,14 @@ describe('comprehensiveToAnalyzedPolicy()', () => {
     it('sets currency from premium.currency', () => {
       const result = makeResult({
         structuredData: makeStructuredData({
-          premium: { netPremium: 4000, tax: 1000, totalPremium: 5000, currency: 'EUR', paymentPlan: null, installments: null },
+          premium: {
+            netPremium: 4000,
+            tax: 1000,
+            totalPremium: 5000,
+            currency: 'EUR',
+            paymentPlan: null,
+            installments: null,
+          },
         }),
       })
       const policy = comprehensiveToAnalyzedPolicy(result, makeFile(), 'raw', 'processed')
