@@ -283,12 +283,18 @@ describe('Issue 5: Benchmark / market insight provenance gate', () => {
     expect(hasBenchmarkProvenance).toBe(false)
   })
 
-  it('static benchmarks have no provenance (gate closed by default)', async () => {
+  it('static benchmarks have provenance for the pilot', async () => {
     const { MARKET_BENCHMARKS } = await import('@/data/market-data/benchmarks')
     const kasko = MARKET_BENCHMARKS.kasko
-    const p = kasko.provenance
-    const hasBenchmarkProvenance = !!(p?.source && p?.date && p?.cohort)
-    expect(hasBenchmarkProvenance).toBe(false)
+
+    const hasKaskoProvenance = !!(
+      kasko.provenance?.source &&
+      kasko.provenance?.date &&
+      kasko.provenance?.cohort
+    )
+
+    // Kasko benchmark has provenance for the pilot
+    expect(hasKaskoProvenance).toBe(true)
   })
 })
 
