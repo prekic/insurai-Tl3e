@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import * as dotenv from 'dotenv'
 import { parseArgs } from 'util'
 import { evaluatePolicy } from '../src/lib/policy-evaluation'
+import { initializeBenchmarks } from '../src/lib/policy-evaluation/benchmark-service'
 import type { Policy } from '../src/types/policy'
 import type { Database } from '../src/lib/supabase/types'
 
@@ -93,6 +94,10 @@ async function main() {
   }
 
   const supabase = createClient<Database>(supabaseUrl, supabaseKey)
+
+  // 0. Initialize benchmarks so synchronous evaluation can accurately access market data
+  console.log('Fetching market benchmarks...')
+  await initializeBenchmarks()
 
   // 1. Fetch rows
   let query = supabase.from('policies').select('*')

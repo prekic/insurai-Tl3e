@@ -4,12 +4,28 @@
  * during initial app boot, when only checking if credentials exist.
  */
 
+// Helper to safely get environment variables across both Vite (browser/tests) and Node (CLI scripts)
+function getEnvVar(key: string): string | undefined {
+  // 1. Try Vite's import.meta.env first
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key] !== undefined) {
+    return import.meta.env[key] as string
+  }
+  // 2. Fall back to Node's process.env
+  if (typeof process !== 'undefined' && process.env && process.env[key] !== undefined) {
+    return process.env[key]
+  }
+  return undefined
+}
+
 // Supabase configuration from environment variables
-export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
-export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
+export const supabaseUrl = getEnvVar('VITE_SUPABASE_URL') || getEnvVar('SUPABASE_URL')
+export const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY')
 
 // Check if we're in a browser environment and in production
-export const isProduction = import.meta.env.PROD
+export const isProduction =
+  typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.PROD !== undefined
+    ? import.meta.env.PROD
+    : typeof process !== 'undefined' && process.env.NODE_ENV === 'production'
 export const isBrowser = typeof window !== 'undefined'
 
 /**
@@ -21,43 +37,44 @@ export const isBrowser = typeof window !== 'undefined'
  * 3. Data could leak to unintended destinations
  */
 export function validateCredentials(): { url: string; key: string } | null {
-    if (!supabaseUrl || !supabaseAnonKey) {
-        return null
-    }
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return null
+  }
 
-    // Basic URL validation - must be a valid Supabase URL
-    try {
-        const url = new URL(supabaseUrl)
-        if (!url.hostname.includes('supabase')) {
-            console.warn('[Supabase] URL does not appear to be a Supabase endpoint:', url.hostname)
-        }
-    } catch {
-        console.error('[Supabase] Invalid VITE_SUPABASE_URL - not a valid URL')
-        return null
+  // Basic URL validation - must be a valid Supabase URL
+  try {
+    const url = new URL(supabaseUrl)
+    if (!url.hostname.includes('supabase')) {
+      console.warn('[Supabase] URL does not appear to be a Supabase endpoint:', url.hostname)
     }
+  } catch {
+    console.error('[Supabase] Invalid VITE_SUPABASE_URL - not a valid URL')
+    return null
+  }
 
-    // Key should be a JWT (starts with eyJ)
-    if (!supabaseAnonKey.startsWith('eyJ')) {
-        console.warn('[Supabase] VITE_SUPABASE_ANON_KEY does not appear to be a valid JWT')
-    }
+  // Key should be a JWT (starts with eyJ)
+  if (!supabaseAnonKey.startsWith('eyJ')) {
+    console.warn('[Supabase] VITE_SUPABASE_ANON_KEY does not appear to be a valid JWT')
+  }
 
-    return { url: supabaseUrl, key: supabaseAnonKey }
+  return { url: supabaseUrl, key: supabaseAnonKey }
 }
 
 export const credentials = validateCredentials()
 
 // Log configuration status (but not the actual values)
 if (!credentials) {
-    const message = 'Supabase not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env'
-    if (isProduction && isBrowser) {
-        // In production browser, log error but don't crash - app can work in local-only mode
-        console.error(`[Supabase] ${message}`)
-    } else {
-        console.warn(`[Supabase] ${message}`)
-    }
+  const message =
+    'Supabase not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env'
+  if (isProduction && isBrowser) {
+    // In production browser, log error but don't crash - app can work in local-only mode
+    console.error(`[Supabase] ${message}`)
+  } else {
+    console.warn(`[Supabase] ${message}`)
+  }
 }
 
 // Check if Supabase is properly configured
 export const isSupabaseConfigured = (): boolean => {
-    return Boolean(supabaseUrl && supabaseAnonKey)
+  return Boolean(supabaseUrl && supabaseAnonKey)
 }

@@ -78,7 +78,8 @@ function isCacheValid(): boolean {
  */
 export async function refreshBenchmarks(): Promise<PremiumBenchmark[]> {
   try {
-    const { data, error } = await (await getSupabase())
+    const supabase = await getSupabase()
+    const { data, error } = await supabase
       .from('premium_benchmarks')
       .select('*')
       .eq('is_active', true)
@@ -86,9 +87,11 @@ export async function refreshBenchmarks(): Promise<PremiumBenchmark[]> {
       .order('sub_type', { ascending: true })
 
     if (error) {
-      console.error('Failed to fetch premium benchmarks:', error)
+      console.error('Failed to fetch premium benchmarks (Supabase error):', error)
       return benchmarkCache // Return stale cache on error
     }
+
+    console.log(`Successfully fetched ${data?.length || 0} benchmarks from DB`)
 
     // Transform database rows to our interface
     benchmarkCache = (data || []).map((row) => ({
@@ -172,9 +175,15 @@ export function getPremiumBenchmark(
   })
 
   // If no exact match found, try to find a general one for the insurance type
-  const fallback = !benchmark
-    ? benchmarkCache.find((b) => b.insuranceType === insuranceType && !b.subType)
-    : undefined
+  let fallback: (typeof benchmarkCache)[0] | undefined
+  if (!benchmark) {
+    // Try to find one without subType (generic)
+    fallback = benchmarkCache.find((b) => b.insuranceType === insuranceType && !b.subType)
+    if (!fallback) {
+      // Still no fallback? Just use the first available benchmark for this insurance type
+      fallback = benchmarkCache.find((b) => b.insuranceType === insuranceType)
+    }
+  }
 
   const match = benchmark || fallback
 
