@@ -477,17 +477,74 @@ async function extractWithLLM(
         // per CLAUDE.md. Production extraction uses DB-managed config; we
         // hardcode here to avoid the alias breakage.
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 4096,
+        max_tokens: 16384,
         system: systemPrompt,
-        messages: [{ role: 'user', content: userMessage }],
+        messages: [
+          {
+            role: 'user',
+            content:
+              userMessage +
+              '\n\nRespond with ONLY the JSON object. No markdown, no commentary, no code fences.',
+          },
+        ],
       })
       const text = resp.content
         .filter((b: any) => b.type === 'text')
         .map((b: any) => b.text)
         .join('')
-      const jsonMatch = text.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) return { success: false, error: 'No JSON in response' }
-      return { success: true, data: JSON.parse(jsonMatch[0]), model: 'claude-haiku-4-5-20251001' }
+
+      // Debug: log first 200 chars of response when it looks problematic
+      if (!text.includes('{')) {
+        console.log(`    [DEBUG] Anthropic response (first 300 chars): ${text.substring(0, 300)}`)
+      }
+
+      // Robust brace-balanced JSON extraction: Claude often appends commentary
+      // after the JSON object which breaks greedy regex + JSON.parse. Walk
+      // forward from the first '{', counting braces while respecting strings.
+      let parsed = null
+      const cleaned = text
+        .replace(/```json/gi, '')
+        .replace(/```/gi, '')
+        .trim()
+      const startIdx = cleaned.indexOf('{')
+      if (startIdx === -1) return { success: false, error: 'No JSON in response' }
+
+      let depth = 0
+      let inString = false
+      let escape = false
+      let endIdx = -1
+      for (let ci = startIdx; ci < cleaned.length; ci++) {
+        const ch = cleaned[ci]
+        if (escape) {
+          escape = false
+          continue
+        }
+        if (ch === '\\' && inString) {
+          escape = true
+          continue
+        }
+        if (ch === '"') {
+          inString = !inString
+          continue
+        }
+        if (inString) continue
+        if (ch === '{') depth++
+        else if (ch === '}') {
+          depth--
+          if (depth === 0) {
+            endIdx = ci
+            break
+          }
+        }
+      }
+
+      if (endIdx === -1) return { success: false, error: 'Unbalanced JSON braces' }
+      try {
+        parsed = JSON.parse(cleaned.substring(startIdx, endIdx + 1))
+      } catch (e: any) {
+        return { success: false, error: e.message || 'JSON parse error' }
+      }
+      return { success: true, data: parsed, model: 'claude-haiku-4-5-20251001' }
     }
   } catch (err: any) {
     return { success: false, error: err.message || 'Unknown error' }
