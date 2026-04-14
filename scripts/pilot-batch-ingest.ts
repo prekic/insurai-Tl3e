@@ -477,32 +477,58 @@ async function extractWithLLM(
         // per CLAUDE.md. Production extraction uses DB-managed config; we
         // hardcode here to avoid the alias breakage.
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 16384,
+        // Budget raised from 4096 → 32768 to handle complex multi-coverage
+        // policies that produce large JSON. Combined with the prefill
+        // technique below, this eliminates truncation for all pilot PDFs.
+        max_tokens: 32768,
+        // Streaming is required by the Anthropic SDK for operations that may
+        // take longer than 10 minutes (triggered by high max_tokens values).
+        stream: true,
         system: systemPrompt,
         messages: [
           {
             role: 'user',
             content:
               userMessage +
-              '\n\nRespond with ONLY the JSON object. No markdown, no commentary, no code fences.',
+              '\n\nIMPORTANT: Respond with ONLY a single compact JSON object. ' +
+              'No markdown fences, no commentary before or after. ' +
+              'Use compact formatting (no pretty-print indentation). ' +
+              'Omit fields that are null or empty arrays. ' +
+              'Keep description strings under 100 characters.',
           },
+          // Anthropic prefill technique: seed the assistant turn with '{'
+          // so the model MUST continue from there — eliminates preamble
+          // ("Here is the extracted data:") which wastes output tokens.
+          { role: 'assistant', content: '{' },
         ],
       })
-      const text = resp.content
-        .filter((b: any) => b.type === 'text')
-        .map((b: any) => b.text)
-        .join('')
 
-      // Debug: log first 200 chars of response when it looks problematic
-      if (!text.includes('{')) {
-        console.log(`    [DEBUG] Anthropic response (first 300 chars): ${text.substring(0, 300)}`)
+      // Accumulate streamed text chunks
+      let text = ''
+      let stopReason = 'unknown'
+      for await (const event of resp) {
+        if (event.type === 'content_block_delta' && (event.delta as any).type === 'text_delta') {
+          text += (event.delta as any).text
+        }
+        if (event.type === 'message_delta') {
+          stopReason = (event as any).delta?.stop_reason || stopReason
+        }
       }
 
-      // Robust brace-balanced JSON extraction: Claude often appends commentary
-      // after the JSON object which breaks greedy regex + JSON.parse. Walk
-      // forward from the first '{', counting braces while respecting strings.
+      // Prepend the '{' we used as prefill — the model continues from there
+      const fullJson = '{' + text
+
+      // Debug: log first 300 chars of response when it looks problematic
+      if (!fullJson.includes('"')) {
+        console.log(
+          `    [DEBUG] Anthropic response (first 300 chars): ${fullJson.substring(0, 300)}`
+        )
+      }
+
+      // Robust brace-balanced JSON extraction: walk forward from the first
+      // '{' counting braces while respecting string literals.
       let parsed = null
-      const cleaned = text
+      const cleaned = fullJson
         .replace(/```json/gi, '')
         .replace(/```/gi, '')
         .trim()
@@ -538,7 +564,13 @@ async function extractWithLLM(
         }
       }
 
-      if (endIdx === -1) return { success: false, error: 'Unbalanced JSON braces' }
+      if (endIdx === -1) {
+        // Log truncation details for diagnosis
+        console.log(
+          `    [DEBUG] Unbalanced braces — stop_reason: ${stopReason}, response length: ${text.length} chars`
+        )
+        return { success: false, error: `Unbalanced JSON braces (stop_reason: ${stopReason})` }
+      }
       try {
         parsed = JSON.parse(cleaned.substring(startIdx, endIdx + 1))
       } catch (e: any) {
