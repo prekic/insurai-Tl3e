@@ -1057,7 +1057,9 @@ function evaluateCompliance(policy: Policy, config: EvaluationConfig): Complianc
   // Check for Sanctions clause
   const hasSanctions =
     policy.exclusions.some(
-      (e) => e.toLowerCase().includes('yaptırım') || e.toLowerCase().includes('sanction')
+      (e) =>
+        typeof e === 'string' &&
+        (e.toLowerCase().includes('yaptırım') || e.toLowerCase().includes('sanction'))
     ) ||
     (policy as { specialConditions?: unknown[] }).specialConditions?.some(
       (c) =>
@@ -1627,6 +1629,7 @@ function generateScenarioCards(
   // 2. Network Repair Scenario (Kasko specific)
   const hasNetworkRestriction = policy.exclusions.some(
     (e) =>
+      typeof e === 'string' &&
       e.toLowerCase().includes('servis') &&
       (e.toLowerCase().includes('anlaşmalı') || e.toLowerCase().includes('yetkili'))
   )
