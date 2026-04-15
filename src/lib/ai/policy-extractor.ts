@@ -1684,7 +1684,7 @@ async function convertToAnalyzedPolicy(
   // tables (e.g., "sigorta bedeli ... (16750 -TL) sigortalanır").
   if ((policyType === 'kasko' || policyType === 'nakliyat') && totalCoverage < 1000 && rawText) {
     const bedelPatterns = [
-      /sigorta\s+bedeli[\s:.]*([\d.,]+)\s*[-–]?\s*(?:TL|TRY|₺)/i,
+      /s[iİ]gorta\s+bedel[iİ][\s:.]*([\d.,]+)\s*[-–]?\s*(?:TL|TRY|₺)/i,
       /\((\d[\d.,]*)\s*[-–]?\s*TL\)/i, // Parenthesized amount: (16750 -TL)
     ]
     for (const pat of bedelPatterns) {

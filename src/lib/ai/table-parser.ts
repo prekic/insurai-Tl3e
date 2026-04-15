@@ -99,8 +99,10 @@ const MARKET_VALUE_PATTERNS = [/rayi[çc]/i, /piyasa\s*de[gğ]er/i, /g[üu]ncel\
 
 /**
  * Patterns indicating coverage is included
+ * Note: /x/i removed — too broad (matches "text", "next", etc.)
+ * Note: dahi̇l variant added for Turkish İ→i̇ lowercasing (U+0130 → U+0069+U+0307)
  */
-const INCLUDED_PATTERNS = [/dahil/i, /var/i, /evet/i, /✓/i, /✔/i, /x/i]
+const INCLUDED_PATTERNS = [/dahil/i, /dahi̇l/i, /\bvar\b/i, /evet/i, /✓/, /✔/, /^x$/i]
 
 // ============================================================================
 // PARSING FUNCTIONS
