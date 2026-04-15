@@ -192,7 +192,7 @@ function identifyColumns(headerRow: TableRow): TableColumnMapping {
     const cellText = headerRow.cells[i].text.toLowerCase()
 
     for (const [type, patterns] of Object.entries(TURKISH_HEADER_PATTERNS)) {
-      if (patterns.some(p => p.test(cellText))) {
+      if (patterns.some((p) => p.test(cellText))) {
         mapping[type as keyof TableColumnMapping] = i
         break
       }
@@ -246,11 +246,13 @@ function extractCoverageFromRow(
     }
   }
 
-  // Check if included (skip excluded coverages)
+  // Check if included — keep excluded coverages with included=false instead of
+  // dropping them, so downstream gap analysis can see what was explicitly excluded.
+  let isIncluded = true
   if (columnMapping.included !== undefined) {
     const includedCell = row.cells[columnMapping.included]
-    if (includedCell && !isIncludedValue(includedCell.text)) {
-      return null // Skip excluded coverages
+    if (includedCell) {
+      isIncluded = isIncludedValue(includedCell.text)
     }
   }
 
@@ -265,6 +267,7 @@ function extractCoverageFromRow(
     isUnlimited,
     isMarketValue,
     category,
+    included: isIncluded,
     // Internal properties (will be stripped)
     _nameTr: name,
     _rowConfidence: rowConfidence,
@@ -280,11 +283,11 @@ function extractWithPatternMatching(table: Table): InternalParsedTableData {
 
   for (const row of table.rows) {
     // Concatenate all cells to find patterns
-    const rowText = row.cells.map(c => c.text).join(' ')
+    const rowText = row.cells.map((c) => c.text).join(' ')
 
     // Check if row contains a coverage pattern
     for (const [coverageType, patterns] of Object.entries(TURKISH_COVERAGE_PATTERNS)) {
-      if (patterns.some(p => p.test(rowText))) {
+      if (patterns.some((p) => p.test(rowText))) {
         // Found a coverage - extract limit from the row
         const limitResult = extractLimitFromText(rowText)
 
@@ -327,12 +330,12 @@ function parseLimitValue(text: string): {
   const cleanText = text.trim()
 
   // Check for unlimited
-  if (UNLIMITED_PATTERNS.some(p => p.test(cleanText))) {
+  if (UNLIMITED_PATTERNS.some((p) => p.test(cleanText))) {
     return { limit: 0, isUnlimited: true, isMarketValue: false }
   }
 
   // Check for market value
-  if (MARKET_VALUE_PATTERNS.some(p => p.test(cleanText))) {
+  if (MARKET_VALUE_PATTERNS.some((p) => p.test(cleanText))) {
     return { limit: 0, isUnlimited: false, isMarketValue: true }
   }
 
@@ -365,12 +368,12 @@ function extractLimitFromText(text: string): {
   isMarketValue: boolean
 } {
   // Check for unlimited
-  if (UNLIMITED_PATTERNS.some(p => p.test(text))) {
+  if (UNLIMITED_PATTERNS.some((p) => p.test(text))) {
     return { limit: 0, isUnlimited: true, isMarketValue: false }
   }
 
   // Check for market value
-  if (MARKET_VALUE_PATTERNS.some(p => p.test(text))) {
+  if (MARKET_VALUE_PATTERNS.some((p) => p.test(text))) {
     return { limit: 0, isUnlimited: false, isMarketValue: true }
   }
 
@@ -394,17 +397,19 @@ function isIncludedValue(text: string): boolean {
   const cleanText = text.trim().toLowerCase()
 
   // Check for explicit inclusion
-  if (INCLUDED_PATTERNS.some(p => p.test(cleanText))) {
+  if (INCLUDED_PATTERNS.some((p) => p.test(cleanText))) {
     return true
   }
 
-  // Check for explicit exclusion
-  if (/hayır|yok|hariç|excluded/i.test(cleanText)) {
+  // Check for explicit exclusion — handle OCR variants of HARİÇ
+  if (/hay[ıi]r|yok|hari[çc]|excluded|HARİÇ|HARIC/i.test(cleanText)) {
     return false
   }
 
-  // Default to included if there's any content
-  return cleanText.length > 0
+  // Default to excluded (safe) when DAHİL/HARİÇ column can't be confidently parsed.
+  // Previously defaulted to true, which caused HARİÇ coverages to be incorrectly
+  // marked as included when OCR corrupted the text.
+  return false
 }
 
 /**
@@ -436,7 +441,15 @@ function determineCoverageCategory(name: string): ExtractedCoverage['category'] 
  * Determine category from coverage type key
  */
 function determineCategoryFromType(type: string): ExtractedCoverage['category'] {
-  const mainTypes = ['collision', 'theft', 'fire', 'naturalDisaster', 'building', 'contents', 'earthquake']
+  const mainTypes = [
+    'collision',
+    'theft',
+    'fire',
+    'naturalDisaster',
+    'building',
+    'contents',
+    'earthquake',
+  ]
   const liabilityTypes = ['liability', 'bodilyInjury', 'propertyDamage']
   const assistanceTypes = ['assistance', 'towing', 'replacementVehicle']
   const supplementaryTypes = ['glass', 'personalAccident', 'keyLoss']
@@ -501,18 +514,18 @@ function extractTurkishName(text: string, patterns: RegExp[]): string {
 function translateCoverageName(turkishName: string): string {
   const translations: Record<string, string> = {
     'çarpma/çarpışma': 'Collision Damage',
-    'hırsızlık': 'Theft',
-    'yangın': 'Fire',
+    hırsızlık: 'Theft',
+    yangın: 'Fire',
     'doğal afetler': 'Natural Disaster',
-    'deprem': 'Earthquake',
-    'sel': 'Flood',
+    deprem: 'Earthquake',
+    sel: 'Flood',
     'cam kırılması': 'Glass Breakage',
     'ferdi kaza': 'Personal Accident',
     'mali sorumluluk': 'Liability',
     'hukuki koruma': 'Legal Protection',
     'yol yardım': 'Roadside Assistance',
     'ikame araç': 'Replacement Vehicle',
-    'çekici': 'Towing',
+    çekici: 'Towing',
     'anahtar kaybı': 'Key Loss',
     'kısmi hasar': 'Partial Damage',
     'tam hasar': 'Total Loss',

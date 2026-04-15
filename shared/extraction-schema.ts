@@ -99,6 +99,11 @@ export const EXTRACTION_JSON_SCHEMA = {
               description:
                 'Coverage category: main (Ana Teminat, vehicle/property value), liability (Mali Sorumluluk), supplementary (Ek Teminat), assistance (Asistans, İkame), legal (Hukuki Koruma), other',
             },
+            included: {
+              type: 'boolean',
+              description:
+                'Set to true if coverage is DAHİL (included/active). Set to false if coverage is HARİÇ (excluded/not purchased). Turkish policies often have a DAHİL/HARİÇ column — use it. Include BOTH DAHİL and HARİÇ coverages in this array. Default to true if status is ambiguous.',
+            },
           },
           // STRICT MODE: ALL properties must be in required (Issue #331).
           // limit, deductible, description, category are nullable types so the
@@ -112,6 +117,7 @@ export const EXTRACTION_JSON_SCHEMA = {
             'isUnlimited',
             'isMarketValue',
             'category',
+            'included',
           ],
           additionalProperties: false,
         },
