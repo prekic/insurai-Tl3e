@@ -1652,7 +1652,7 @@ async function convertToAnalyzedPolicy(
       nameTr: aiNameTr ?? mappedNameTr ?? coverageName,
       limit: c.limit ?? 0,
       deductible: c.deductible ?? 0,
-      included: true,
+      included: c.included ?? true,
       description: c.description ?? undefined,
       isUnlimited: c.isUnlimited ?? false,
       isMarketValue: c.isMarketValue ?? false,
@@ -1677,7 +1677,27 @@ async function convertToAnalyzedPolicy(
   // Calculate total coverage based on policy type
   // For kasko: use vehicle value (main coverage or market value), NOT sum of all limits
   // For other types: use the main coverage or sum of main coverages
-  const totalCoverage = calculateMainCoverage(policyType, coverages)
+  let totalCoverage = calculateMainCoverage(policyType, coverages)
+
+  // Sigorta Bedeli raw text fallback for kasko/nakliyat — the AI may miss the
+  // sum insured when it appears in free-text paragraphs rather than structured
+  // tables (e.g., "sigorta bedeli ... (16750 -TL) sigortalanır").
+  if ((policyType === 'kasko' || policyType === 'nakliyat') && totalCoverage < 1000 && rawText) {
+    const bedelPatterns = [
+      /s[iİ]gorta\s+bedel[iİ][\s:.]*([\d.,]+)\s*[-–]?\s*(?:TL|TRY|₺)/i,
+      /\((\d[\d.,]*)\s*[-–]?\s*TL\)/i, // Parenthesized amount: (16750 -TL)
+    ]
+    for (const pat of bedelPatterns) {
+      const m = rawText.match(pat)
+      if (m?.[1]) {
+        const parsed = parseTurkishCurrency(m[1])
+        if (parsed && parsed > totalCoverage && parsed < 50_000_000) {
+          totalCoverage = parsed
+          break
+        }
+      }
+    }
+  }
 
   // Handle premium - AI might return a number or an object with 'amount' field
   let premiumValue = 0
@@ -1700,10 +1720,14 @@ async function convertToAnalyzedPolicy(
   // strings in the raw text and re-parse with the locale-aware utility.
   if (premiumValue > 0 && rawText) {
     try {
-      // Match "Brüt Prim ... 1.659,72 TL" or "Net Prim ... 1.580,67"
+      // Match premium labels in raw text. Turkish İ (U+0130) is NOT case-folded
+      // by JS /i flag, so we match both ASCII i and İ explicitly with [iİ].
+      // "TOPLAM NET PRİM" has an intervening word — allow optional "NET".
       const premiumPatterns = [
-        /(?:brüt\s*prim|brut\s*prim)[\s:.]*([\d.,]+)\s*(?:TL|TRY|₺)?/i,
-        /(?:toplam\s*prim|ödenecek\s*prim)[\s:.]*([\d.,]+)\s*(?:TL|TRY|₺)?/i,
+        /(?:br[uü]t\s*pr[iİ]m)[\s:.]*([\d.,]+)\s*(?:TL|TRY|₺)?/i,
+        /(?:toplam\s+(?:net\s+)?pr[iİ]m)[\s:.]*([\d.,]+)\s*(?:TL|TRY|₺)?/i,
+        /(?:[oö]denecek\s*pr[iİ]m)[\s:.]*([\d.,]+)\s*(?:TL|TRY|₺)?/i,
+        /(?:net\s*pr[iİ]m)[\s:.]*([\d.,]+)\s*(?:TL|TRY|₺)?/i,
       ]
       for (const pat of premiumPatterns) {
         const m = rawText.match(pat)
@@ -1807,7 +1831,7 @@ async function convertToAnalyzedPolicy(
     coverage: totalCoverage,
     premium: premiumValue,
     monthlyPremium: premiumValue / 12,
-    deductible: coverages[0]?.deductible ?? 0,
+    deductible: coverages.length > 0 ? Math.max(0, ...coverages.map((c) => c.deductible ?? 0)) : 0,
     startDate: (() => {
       const rawStartDate = data.startDate ?? (rawData.start_date as string)
       if (!rawStartDate) return now.toISOString().split('T')[0]
@@ -3275,7 +3299,7 @@ export function comprehensiveToAnalyzedPolicy(
       nameTr: aiNameTr ?? mappedNameTr ?? c.name,
       limit: c.limit ?? 0,
       deductible: c.deductible ?? 0,
-      included: true,
+      included: c.included ?? true,
       isUnlimited: c.isUnlimited,
       isMarketValue: c.isMarketValue,
       category: c.category,
@@ -3297,7 +3321,7 @@ export function comprehensiveToAnalyzedPolicy(
     coverage: totalCoverage,
     premium: data.premium.totalPremium,
     monthlyPremium: data.premium.totalPremium / 12,
-    deductible: coverages[0]?.deductible ?? 0,
+    deductible: coverages.length > 0 ? Math.max(0, ...coverages.map((c) => c.deductible ?? 0)) : 0,
     startDate: data.policy.startDate,
     expiryDate: data.policy.endDate,
     status,

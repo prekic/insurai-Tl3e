@@ -838,15 +838,29 @@ describe('evaluatePolicy', () => {
   })
 
   describe('generateRecommendations branches', () => {
-    it('critical compliance recommendations for expired policy', () => {
+    it('critical compliance recommendations for recently expired policy', () => {
+      // Use a date within the last 2 years so it triggers "Renew" not "Historical"
+      const recentExpiry = new Date()
+      recentExpiry.setMonth(recentExpiry.getMonth() - 6) // 6 months ago
       const result = evaluatePolicy(
         makePolicy({
-          expiryDate: '2024-01-01',
+          expiryDate: recentExpiry.toISOString().split('T')[0],
         })
       )
       const critRecs = result.recommendations.filter((r) => r.priority === 'critical')
       expect(critRecs.length).toBeGreaterThan(0)
       expect(critRecs[0].title).toContain('Renew Expired Policy')
+    })
+
+    it('historical policy recommendation for policies expired >2 years', () => {
+      const result = evaluatePolicy(
+        makePolicy({
+          expiryDate: '2020-01-01', // 6+ years ago
+        })
+      )
+      const critRecs = result.recommendations.filter((r) => r.priority === 'critical')
+      expect(critRecs.length).toBeGreaterThan(0)
+      expect(critRecs[0].title).toContain('Historical Policy')
     })
 
     it('coverage improvement recommendation when score < 70', () => {

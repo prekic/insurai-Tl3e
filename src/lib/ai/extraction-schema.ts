@@ -121,6 +121,8 @@ export interface ExtractedCoverage {
   isMarketValue?: boolean
   /** Coverage category: main, liability, supplementary, assistance, legal, other */
   category?: 'main' | 'liability' | 'supplementary' | 'assistance' | 'legal' | 'other'
+  /** True if DAHİL (included), false if HARİÇ (excluded). Defaults to true if ambiguous. */
+  included?: boolean
 }
 
 // Re-export the canonical schema from the shared single source of truth.
@@ -225,6 +227,18 @@ Your task is to extract structured information from insurance policy documents.
    - assistance: Asistans, İkame Araç, roadside assistance
    - legal: Hukuki Koruma, legal protection
    - other: Everything else
+
+   **CRITICAL - Coverage Inclusion Status (DAHİL/HARİÇ)**:
+   - Turkish policies often have a DAHİL (included) / HARİÇ (excluded) column in the teminat table
+   - For EACH coverage: set included=true if DAHİL, included=false if HARİÇ
+   - Include BOTH DAHİL and HARİÇ coverages in the coverages array — HARİÇ coverages are valuable for gap analysis
+   - If no explicit DAHİL/HARİÇ column exists, set included=true for all coverages
+
+   **CRITICAL - Commercial Vehicle Exclusions**:
+   - Turkish kasko policies differentiate alcohol thresholds by vehicle type:
+     - Hususi (private): 0.50 promil
+     - Ticari (commercial): 0.00 promil (ANY detectable alcohol voids coverage, no causation required)
+   - If you find an alcohol exclusion clause referencing "ticari" or "hususi", extract it as an exclusion with the specific promil threshold and vehicle type.
 
 8. **CRITICAL - Amendment/Zeyilname Detection**:
    IMPORTANT: Determine if this document is an ORIGINAL POLICY or an AMENDMENT (Zeyilname).

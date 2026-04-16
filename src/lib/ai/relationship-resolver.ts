@@ -44,12 +44,12 @@ export function resolveClauseRelationships(
 
   for (const edge of sortedEdges) {
     if (edge.isCandidate || !edge.targetId) {
-      // Add a warning insight for candidate relationships
-      if (!updatedPolicy.aiInsights) updatedPolicy.aiInsights = []
-      updatedPolicy.aiInsights.push(
-        `⚠️ Unresolved relationship: ${edge.sourceId} affects ${
+      // Log internally for debugging — do NOT surface to end user UI.
+      // These are graph-construction ambiguities, not actionable user insights.
+      console.warn(
+        `[ClauseResolver] Unresolved relationship: ${edge.sourceId} affects ${
           edge.targetId ?? 'unknown'
-        } (${edge.relationshipType}). Please review.`
+        } (${edge.relationshipType})`
       )
       continue
     }

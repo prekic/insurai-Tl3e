@@ -48,10 +48,10 @@ describe('shared/extraction-schema', () => {
     expect(props.coverages.items.required).toContain('nameTr')
   })
 
-  it('has all 8 coverage item properties in required', () => {
+  it('has all 9 coverage item properties in required', () => {
     const coverageItems = props.coverages.items
     const coverageKeys = Object.keys(coverageItems.properties)
-    expect(coverageKeys).toHaveLength(8)
+    expect(coverageKeys).toHaveLength(9)
     for (const key of coverageKeys) {
       expect(coverageItems.required).toContain(key)
     }

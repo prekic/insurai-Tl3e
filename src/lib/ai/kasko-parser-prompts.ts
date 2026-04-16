@@ -443,6 +443,8 @@ export interface StructuredPolicyData {
     deductibleType: 'fixed' | 'percentage'
     conditions: string | null
     source: string
+    /** True if DAHİL (included), false if HARİÇ (excluded). Defaults to true. */
+    included?: boolean
   }>
   deductiblesPenalties: Array<{
     trigger: string
