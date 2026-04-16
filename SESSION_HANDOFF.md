@@ -90,6 +90,15 @@ From the original QA report, these remain open:
 - `INCLUDED_PATTERNS` missed Turkish İ→i̇ lowercase variant → added `/dahi̇l/i` fallback
 - Sigorta bedeli production regex also had Turkish İ issue → fixed to `s[iİ]gorta\s+bedel[iİ]`
 
+### Note: Prettier Auto-Formatted Unrelated Code in `table-parser.ts`
+
+The lint-staged pre-commit hook ran `prettier --write` on `table-parser.ts` and reformatted ~25 lines of code unrelated to our bug fixes:
+- 6 arrow functions: `(p =>` → `((p) =>`
+- ~12 quoted object keys: `'hırsızlık':` → `hırsızlık:`
+- `mainTypes` array reformatted to multi-line
+
+These are zero-functional-impact stylistic changes. Reviewers should NOT flag them as suspicious. Functional changes in `table-parser.ts` are limited to: `INCLUDED_PATTERNS` array, `EXCLUDED_PATTERN` regex, `extractCoverageFromRow()` block (~248-275), and `isIncludedValue()` default return.
+
 ## Files Modified / Created (This Session)
 
 | File | Change |
@@ -106,7 +115,7 @@ From the original QA report, these remain open:
 | `src/lib/policy-evaluation/evaluator-branches.test.ts` | Split expired test into recent/historical cases |
 | `src/lib/ai/__tests__/qa-regression-fixes.test.ts` | **NEW** — 38 unit regression tests |
 | `src/lib/ai/__tests__/qa-pdf-golden.test.ts` | **NEW** — 25 golden tests against 4 real PDFs |
-| `CLAUDE.md` | Added gotchas #62-#70; updated project state + Last Updated |
+| `CLAUDE.md` | Added "Next Session Instructions" block (PR #351 merge priority + deferred PDF upload); added gotchas #62-#72 (extends #70 with #71 lint-staged + #72 parseTurkishCurrency dot-only ambiguity); updated project state + Last Updated |
 | `SESSION_HANDOFF.md` | This file |
 
 ## Environment / Configuration
@@ -117,6 +126,12 @@ From the original QA report, these remain open:
 - `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_CLOUD_API_KEY`, `GCP_SERVICE_ACCOUNT_BASE64`
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_JWT_SECRET`
 - `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+
+## Known Issues / Limitations (NOT bugs to fix this round)
+
+- **`parseTurkishCurrency('500.000')` returns 500, not 500,000**: Known dot-only ambiguity. See CLAUDE.md gotcha #72. Production impact: zero today (all premium/coverage values come from text containing `,XX` cents); future risk if a PDF presents a round amount without cents.
+- **`[ClauseResolver]` warnings in test stderr**: Intentional. The relationship-resolver fix (gotcha #67) routes ambiguous edges to `console.warn` instead of user-visible `aiInsights`. Tests exercising this path will print warnings — these prove the fix works.
+- **Prettier reformatted unrelated arrow-function syntax in `table-parser.ts`**: 25 lines of stylistic-only changes from the lint-staged pre-commit hook. Not bug fixes; do not revert.
 
 ## Verification Commands (for the next agent)
 
@@ -138,6 +153,19 @@ npx vitest run src/lib/policy-evaluation/evaluator-branches.test.ts # 75 pass
 npx tsc --noEmit  # 0 errors expected
 ```
 
+### GitHub Operations (PR management, comments, merge)
+
+The `gh` CLI is **NOT available** in this sandbox. All GitHub operations must use the GitHub MCP server tools (prefixed `mcp__github__`):
+
+| Task | Tool |
+|------|------|
+| Read PR #351 | `mcp__github__pull_request_read` |
+| Add PR comment | `mcp__github__add_issue_comment` |
+| Merge PR | `mcp__github__merge_pull_request` |
+| Check CI status | `mcp__github__list_commits` (then inspect `status`) |
+
+If the MCP github server is disconnected at session start, ToolSearch with `select:mcp__github__create_pull_request` (or similar) loads the schema. The server may disconnect/reconnect mid-session — handle gracefully.
+
 ## Carry-Forward Priorities
 
 | # | Priority | Status |
@@ -147,7 +175,7 @@ npx tsc --noEmit  # 0 errors expected
 | 3 | Address deferred P1/P2 bugs (#6, #7, #9, #10, #13, #14, #15) | 🟡 NOT STARTED |
 | 4 | Pilot threshold calibration monitoring | ⏳ ONGOING (from prior session) |
 | 5 | Phase E production scale-up | ⏳ PENDING (from prior session) |
-| 6 | Vitest console noise cleanup | ⏳ PENDING (from prior session) |
+| 6 | Vitest console noise cleanup | ⏳ PENDING (from prior session) — **EXCLUDE `[ClauseResolver]` warnings from `qa-regression-fixes.test.ts`; they are intentional verification of the unresolved-relationship fix (gotcha #67), not noise** |
 | 7 | `[ConfidenceDiag]` log gating | ⏳ PENDING (from prior session) |
 
 ## Non-Negotiable Rules (Carry Forward)
