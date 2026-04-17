@@ -19,14 +19,16 @@ const log = logger.child('Validation')
  * Remove potentially dangerous characters from strings
  */
 export function sanitizeString(input: string): string {
-  return input
-    // Remove null bytes
-    .replace(/\0/g, '')
-    // Remove control characters (except newlines and tabs)
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-    // Trim excessive whitespace
-    .trim()
+  return (
+    input
+      // Remove null bytes
+      .replace(/\0/g, '')
+      // Remove control characters (except newlines and tabs)
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+      // Trim excessive whitespace
+      .trim()
+  )
 }
 
 /**
@@ -34,14 +36,16 @@ export function sanitizeString(input: string): string {
  * More permissive than general string sanitization
  */
 export function sanitizeDocumentText(input: string): string {
-  return input
-    // Remove null bytes
-    .replace(/\0/g, '')
-    // Remove most control characters (keep newlines, tabs, carriage returns)
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-    // Limit length to prevent abuse (10MB text limit)
-    .slice(0, 10 * 1024 * 1024)
+  return (
+    input
+      // Remove null bytes
+      .replace(/\0/g, '')
+      // Remove most control characters (keep newlines, tabs, carriage returns)
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+      // Limit length to prevent abuse (10MB text limit)
+      .slice(0, 10 * 1024 * 1024)
+  )
 }
 
 /**
@@ -142,11 +146,7 @@ export const documentAISchema = z.object({
   mimeType: z
     .enum(['application/pdf', 'image/png', 'image/jpeg', 'image/tiff', 'image/gif'])
     .default('application/pdf'),
-  languageHints: z
-    .array(z.string().max(10))
-    .max(5)
-    .optional()
-    .default(['tr', 'en']),
+  languageHints: z.array(z.string().max(10)).max(5).optional().default(['tr', 'en']),
 })
 
 // =============================================================================
@@ -176,11 +176,13 @@ export function validate<T extends ZodSchema>(
       }
 
       // Replace request data with validated/sanitized data
-      req[source] = result.data as typeof req[typeof source]
+      req[source] = result.data as (typeof req)[typeof source]
 
       next()
     } catch (error) {
-      log.debug('Validation error', { error: error instanceof Error ? error.message : String(error) })
+      log.debug('Validation error', {
+        error: error instanceof Error ? error.message : String(error),
+      })
       return res.status(400).json({
         error: 'Invalid request data',
         code: 'VALIDATION_ERROR',
@@ -355,7 +357,7 @@ export const chatSchema = z.object({
   message: z
     .string()
     .min(1, 'Message is required')
-    .max(4000, 'Message too long (max 4KB)')
+    .max(500000, 'Message too long (max 500KB)')
     .transform(sanitizeString),
   conversationHistory: z
     .array(chatMessageSchema)
@@ -367,10 +369,7 @@ export const chatSchema = z.object({
     .max(50000, 'Policy context too long (max 50KB)')
     .optional()
     .transform((val) => (val ? sanitizeDocumentText(val) : undefined)),
-  provider: z
-    .enum(['openai', 'anthropic'])
-    .optional()
-    .default('openai'),
+  provider: z.enum(['openai', 'anthropic']).optional().default('openai'),
 })
 
 /**

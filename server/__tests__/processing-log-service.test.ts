@@ -96,6 +96,7 @@ function setupChain(finalResult: { data: unknown; error: unknown; count?: number
   chain.ilike = vi.fn().mockReturnValue(chain)
   chain.lt = vi.fn().mockReturnValue(chain)
   chain.single = vi.fn().mockResolvedValue(finalResult)
+  chain.maybeSingle = vi.fn().mockResolvedValue(finalResult)
   // For queries without .single(), resolve from any terminal point
   chain.then = (resolve: (v: unknown) => void) => resolve(finalResult)
 
@@ -128,8 +129,8 @@ describe('processing-log-service', () => {
   afterEach(() => {
     if (savedUrl) process.env.SUPABASE_URL = savedUrl
     else delete process.env.SUPABASE_URL
-      delete process.env.VITE_SUPABASE_URL
-      delete process.env.VITE_SUPABASE_URL
+    delete process.env.VITE_SUPABASE_URL
+    delete process.env.VITE_SUPABASE_URL
     if (savedKey) process.env.SUPABASE_SERVICE_ROLE_KEY = savedKey
     else delete process.env.SUPABASE_SERVICE_ROLE_KEY
   })
@@ -263,7 +264,10 @@ describe('processing-log-service', () => {
       chain.single = vi.fn().mockImplementation(() => {
         callCount++
         if (callCount === 1) {
-          return Promise.resolve({ data: { stages: [{ stage: 'pdf_extraction', status: 'completed' }] }, error: null })
+          return Promise.resolve({
+            data: { stages: [{ stage: 'pdf_extraction', status: 'completed' }] },
+            error: null,
+          })
         }
         return Promise.resolve({ data: null, error: null })
       })

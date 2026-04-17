@@ -178,6 +178,12 @@ export interface Policy {
   exclusionsEn?: string[] | null
   specialConditions: string[]
   insuranceLine: string
+  /** Discounts applied to the policy */
+  discounts?: Array<{ type: string; rate: string; description: string }>
+  /** Entity Type */
+  insuredEntityType?: 'individual' | 'corporate' | null
+  /** Usage Type */
+  vehicleUsage?: 'private' | 'commercial' | null
   /** Currency code for this policy (TRY, USD, EUR, GBP) - defaults to TRY */
   currency?: string
   /** Amendment information - populated if document has Zeyilname markers */

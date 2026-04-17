@@ -249,9 +249,9 @@ async function main() {
 
   // 7. Apply or warn
   if (!sufficiency.sufficient) {
-    console.log(
-      'WARNING: Sample size too small for reliable calibration, but proceeding anyway for PILOT.'
-    )
+    console.log('BLOCKED: Sample size too small for reliable calibration.')
+    console.log('Collect more policy evaluations before running --apply.')
+    process.exit(0)
   }
   if (isDryRun) {
     console.log('DRY RUN complete. No changes written.')

@@ -342,21 +342,35 @@ export function PolicyUpload() {
       try {
         if (!createPromise) {
           // First call - create a promise for the create operation
-          console.warn('[ProcessingLog] Creating new log for document:', log.document_id)
+          const isTest =
+            (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') ||
+            import.meta.env.MODE === 'test' ||
+            import.meta.env.TEST
+          if (!isTest) {
+            console.warn('[ProcessingLog] Creating new log for document:', log.document_id)
+          }
           createPromise = (async () => {
             const result = await createProcessingLog(log)
-            console.warn('[ProcessingLog] Create result:', result ? 'success' : 'failed')
+            if (!isTest) {
+              console.warn('[ProcessingLog] Create result:', result ? 'success' : 'failed')
+            }
             return !!result
           })()
           await createPromise
         } else {
           // Wait for create to finish, then update
-          console.warn(
-            '[ProcessingLog] Updating log for document:',
-            log.document_id,
-            'stages:',
-            log.stages.length
-          )
+          const isTest =
+            (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') ||
+            import.meta.env.MODE === 'test' ||
+            import.meta.env.TEST
+          if (!isTest) {
+            console.warn(
+              '[ProcessingLog] Updating log for document:',
+              log.document_id,
+              'stages:',
+              log.stages.length
+            )
+          }
           await createPromise
           await updateProcessingLog(log.document_id, log)
         }

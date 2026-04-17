@@ -97,6 +97,10 @@ export function usePolicyComparison(
       .join('|')
   }, [policies])
 
+  // Stable reference to policies based on hash
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const stablePolicies = useMemo(() => policies, [policiesHash])
+
   // Merge database config with provided config
   const mergedConfig = useMemo(() => {
     // Convert database config to evaluator format if it exists
@@ -136,7 +140,7 @@ export function usePolicyComparison(
 
     setResult((prev) => ({ ...prev, isLoading: true, error: null }))
 
-    comparePoliciesAsync(policies, memoizedLabels, mergedConfig)
+    comparePoliciesAsync(stablePolicies, memoizedLabels, mergedConfig)
       .then((comparison) => {
         if (mounted) {
           setResult({
@@ -164,7 +168,7 @@ export function usePolicyComparison(
       mounted = false
     }
   }, [
-    policies,
+    stablePolicies,
     policiesHash,
     memoizedLabels,
     mergedConfig,

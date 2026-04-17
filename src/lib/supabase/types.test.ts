@@ -70,11 +70,11 @@ describe('Type Guards', () => {
       expect(isPolicyStatus('expiring')).toBe(true)
       expect(isPolicyStatus('expired')).toBe(true)
       expect(isPolicyStatus('pending')).toBe(true)
+      expect(isPolicyStatus('draft')).toBe(true)
     })
 
     it('should return false for invalid values', () => {
       expect(isPolicyStatus('cancelled')).toBe(false)
-      expect(isPolicyStatus('draft')).toBe(false)
       expect(isPolicyStatus('')).toBe(false)
       expect(isPolicyStatus(null)).toBe(false)
       expect(isPolicyStatus(undefined)).toBe(false)

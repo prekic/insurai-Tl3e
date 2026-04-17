@@ -156,7 +156,12 @@ function assessBenchmarkConfidence(
   let suppressionReason: string | undefined
   let suppressionReasonTr: string | undefined
 
-  if (presentCount >= 3) {
+  if (policy.type === 'kasko' && analyzedPolicy.vehicleInfo?.usage === 'commercial') {
+    level = 'suppressed'
+    suppressionReason =
+      'Commercial/niche vehicle policies are excluded from standard market benchmark comparisons'
+    suppressionReasonTr = 'Ticari/niş araç poliçeleri standart piyasa karşılaştırmalarından muaftır'
+  } else if (presentCount >= 3) {
     level = 'high'
   } else if (presentCount >= 1) {
     level = 'low'
@@ -1079,6 +1084,40 @@ function evaluateCompliance(policy: Policy, config: EvaluationConfig): Complianc
     })
     textIssues.push('Contains sanctions clause')
     textIssuesTR.push('Yaptırım klozu içeriyor')
+  }
+
+  // Check for non-OEM parts clause
+  const hasNonOemParts =
+    (policy as import('@/types/policy').AnalyzedPolicy).aiInsights?.some(
+      (i: string) =>
+        i.toLowerCase().includes('yan sanayi') ||
+        i.toLowerCase().includes('eşdeğer parça') ||
+        i.toLowerCase().includes('orijinal olmayan')
+    ) ||
+    (policy as import('@/types/policy').AnalyzedPolicy).aiInsightsEn?.some(
+      (i: string) => i.toLowerCase().includes('non-oem') || i.toLowerCase().includes('aftermarket')
+    ) ||
+    (policy as { specialConditions?: unknown[] }).specialConditions?.some(
+      (c) =>
+        typeof c === 'string' &&
+        (c.toLowerCase().includes('yan sanayi') ||
+          c.toLowerCase().includes('eşdeğer parça') ||
+          c.toLowerCase().includes('orijinal olmayan') ||
+          c.toLowerCase().includes('non-oem') ||
+          c.toLowerCase().includes('aftermarket'))
+    )
+
+  if (hasNonOemParts) {
+    score -= 15
+    issues.push({
+      type: 'regulatory',
+      severity: 'medium',
+      description: 'Policy enforces use of non-OEM or aftermarket parts for repairs',
+      descriptionTR:
+        'Poliçe, onarımlarda yan sanayi veya eşdeğer parça kullanımını zorunlu kılıyor',
+    })
+    textIssues.push('Enforces non-OEM parts')
+    textIssuesTR.push('Yan sanayi parça zorunluluğu')
   }
 
   // Ensure minimum score

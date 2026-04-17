@@ -45,6 +45,18 @@ export const EXTRACTION_JSON_SCHEMA = {
         type: ['string', 'null'],
         description: 'Address of the insured property or person',
       },
+      insuredEntityType: {
+        type: ['string', 'null'],
+        enum: ['individual', 'corporate', null],
+        description:
+          'Type of insured entity based on ID: TCKN (individual/gerçek kişi) vs VKN (corporate/tüzel kişi)',
+      },
+      vehicleUsage: {
+        type: ['string', 'null'],
+        enum: ['private', 'commercial', null],
+        description:
+          'Type of vehicle usage (KULLANIM TARZI): private (Hususi) or commercial (Ticari/Kamyonet/etc)',
+      },
       startDate: {
         type: ['string', 'null'],
         description: 'Policy start date in YYYY-MM-DD format',
@@ -67,6 +79,27 @@ export const EXTRACTION_JSON_SCHEMA = {
         type: ['string', 'null'],
         enum: ['annual', 'semi-annual', 'quarterly', 'monthly', null],
         description: 'How often premium is paid',
+      },
+      discounts: {
+        type: ['array', 'null'],
+        items: {
+          type: 'object',
+          properties: {
+            type: {
+              type: 'string',
+              description: 'Type of discount (e.g. Hasarsızlık/NCD, Meslek/Group, Peşin/Cash)',
+            },
+            rate: {
+              type: 'string',
+              description: 'Discount rate if specified (e.g. %30, %10), wait for exact wording',
+            },
+            description: { type: 'string', description: 'Details about the discount' },
+          },
+          required: ['type', 'rate', 'description'],
+          additionalProperties: false,
+        },
+        description:
+          'Any discounts applied to the policy such as Hasarsızlık İndirimi (No Claim Discount) or meslek/grup indirimi (Group/Profession discount)',
       },
       coverages: {
         type: 'array',
@@ -342,6 +375,25 @@ export const EXTRACTION_JSON_SCHEMA = {
         additionalProperties: false,
         description: 'Confidence scores for extracted fields',
       },
+      qualityScore: {
+        type: ['object', 'null'],
+        properties: {
+          readabilityStructure: { type: 'number' },
+          completenessKeyFields: { type: 'number' },
+          numericLimitsReconciled: { type: 'number' },
+          noGuessingUncertaintiesListed: { type: 'number' },
+          total: { type: 'number' },
+        },
+        required: [
+          'readabilityStructure',
+          'completenessKeyFields',
+          'numericLimitsReconciled',
+          'noGuessingUncertaintiesListed',
+          'total',
+        ],
+        additionalProperties: false,
+        description: 'Self-assessed extraction quality score',
+      },
     },
     // STRICT MODE: ALL top-level properties must be in required (Issue #331).
     // exclusionsEn and conditionalDeductibles are nullable types, so the LLM
@@ -354,11 +406,14 @@ export const EXTRACTION_JSON_SCHEMA = {
       'policyType',
       'insuredName',
       'insuredAddress',
+      'insuredEntityType',
+      'vehicleUsage',
       'startDate',
       'endDate',
       'premium',
       'currency',
       'paymentFrequency',
+      'discounts',
       'coverages',
       'specialConditions',
       'exclusions',
@@ -368,6 +423,7 @@ export const EXTRACTION_JSON_SCHEMA = {
       'evidence',
       'clauseGraph',
       'confidence',
+      'qualityScore',
     ],
     additionalProperties: false,
   },

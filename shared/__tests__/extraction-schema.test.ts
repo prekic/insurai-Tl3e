@@ -21,8 +21,8 @@ describe('shared/extraction-schema', () => {
     expect(schema.additionalProperties).toBe(false)
   })
 
-  it('has 19 top-level required fields', () => {
-    expect(schema.required).toHaveLength(19)
+  it('has 23 top-level required fields', () => {
+    expect(schema.required).toHaveLength(23)
   })
 
   it('has every property in required array (strict mode)', () => {

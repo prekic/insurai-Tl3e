@@ -363,15 +363,17 @@ export function TryAnalysis() {
             : undefined
 
         // === CONFIDENCE DIAGNOSTIC CHECKPOINT (TryAnalysis) ===
-        console.warn('[TryAnalysis ConfidenceDiag] Extraction result confidence state:', {
-          lowConfidence: isLowConfidence,
-          confidenceScore:
-            confidenceScore != null ? Math.round(confidenceScore * 100) + '%' : 'not provided',
-          policyAiConfidence:
-            policy.aiConfidence != null ? Math.round(policy.aiConfidence * 100) + '%' : 'not set',
-          aiConfidenceValue: policy.aiConfidence,
-          tier: isLowConfidence ? 'LOW_CONFIDENCE_WARNING' : 'FULL_CONFIDENCE',
-        })
+        if (import.meta.env.VITE_DEBUG_LOGS === 'true') {
+          console.warn('[TryAnalysis ConfidenceDiag] Extraction result confidence state:', {
+            lowConfidence: isLowConfidence,
+            confidenceScore:
+              confidenceScore != null ? Math.round(confidenceScore * 100) + '%' : 'not provided',
+            policyAiConfidence:
+              policy.aiConfidence != null ? Math.round(policy.aiConfidence * 100) + '%' : 'not set',
+            aiConfidenceValue: policy.aiConfidence,
+            tier: isLowConfidence ? 'LOW_CONFIDENCE_WARNING' : 'FULL_CONFIDENCE',
+          })
+        }
 
         // Ensure policy has required fields for display
         const policyWithDefaults = {
