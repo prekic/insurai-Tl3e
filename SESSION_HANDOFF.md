@@ -1,6 +1,6 @@
 # Session Handoff — April 18, 2026 (Date-Corruption Audit Tooling)
 
-> **Branch**: `claude/load-project-context-RJ0Qd` — 3 commits ahead of `origin/main`, clean working tree, all pushed.
+> **Branch**: `claude/load-project-context-RJ0Qd` — 4+ commits ahead of `origin/main` (listed below; this handoff may itself land as a 5th stabilization commit — authoritative count: `git rev-list origin/main..HEAD --count`). Clean working tree, all pushed.
 > **No PR opened** (user-gated). Merge-ready.
 
 ## 🎯 Immediate Next Steps — Priority Order
@@ -18,15 +18,16 @@
 
 ---
 
-## What This Session Shipped (3 commits on branch)
+## What This Session Shipped (4 commits on branch)
 
 ```
 1ed2284 test(extraction): wire Ray Sigorta scanned PDF fixture into qa-pdf-golden
 93c56bd feat(scripts): audit-only mode for V8 DD.MM.YYYY date-corruption script
 c73f877 chore(docs): session handoff — gotcha #83 + next-step rewrite
+0f6854d chore(docs): completeness-audit fixes — commit count, qa-pdf-golden, parser drift
 ```
 
-`1ed2284` was the Apr 18 pre-session commit that also touched `CLAUDE.md` (2 lines). `93c56bd` is the primary session deliverable. `c73f877` synced the core docs. A 4th commit adds post-audit QA fixes to this handoff + CLAUDE.md.
+`1ed2284` was the Apr 18 pre-session commit that also touched `CLAUDE.md` (2 lines). `93c56bd` is the primary session deliverable. `c73f877` synced the core docs. `0f6854d` applied QA-audit corrections (commit-count correction, qa-pdf-golden inventory entry, parser-drift warning).
 
 ### Session scope summary
 
