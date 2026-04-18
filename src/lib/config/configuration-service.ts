@@ -59,6 +59,7 @@ import {
 
 import { configPerformanceMonitor } from './config-performance-monitor'
 import { mergeWithUserPreferences, isUserOverridableCategory } from './user-overridable'
+import { computeRolloutBucket } from './rollout-hash'
 
 // =============================================================================
 // CACHE IMPLEMENTATION
@@ -793,10 +794,10 @@ export class ConfigurationService {
 
       // Check rollout percentage
       if (flag.rolloutPercentage < 100) {
-        // Use user ID or random for consistent bucketing
-        const bucket = userId
-          ? this.hashString(userId + flagKey) % 100
-          : Math.floor(Math.random() * 100)
+        // Shared bucketing — keeps `isFeatureEnabled()` consistent with
+        // `evaluateKaskoPilotGate()` so a user can't flip in/out of a
+        // rollout depending on which caller asks.
+        const bucket = computeRolloutBucket(userId, flagKey)
 
         if (bucket >= flag.rolloutPercentage) {
           configPerformanceMonitor.record({
@@ -1239,19 +1240,6 @@ export class ConfigurationService {
   // ===========================================================================
   // UTILITY METHODS
   // ===========================================================================
-
-  /**
-   * Simple string hash for consistent bucketing
-   */
-  private hashString(str: string): number {
-    let hash = 0
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i)
-      hash = (hash << 5) - hash + char
-      hash = hash & hash // Convert to 32bit integer
-    }
-    return Math.abs(hash)
-  }
 }
 
 // =============================================================================

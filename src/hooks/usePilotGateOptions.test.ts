@@ -32,10 +32,11 @@ describe('usePilotGateOptions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
 
-    // Default: feature flags load successfully
+    // Default: feature flags load successfully (Phase E shape — includes
+    // rolloutPercentage so gate can do gradual rollout bucketing)
     mockGetFeatureFlags.mockResolvedValue([
-      { key: 'kasko_ai_extraction_pilot', enabled: true },
-      { key: 'actuarial_engine_enabled', enabled: false },
+      { key: 'kasko_ai_extraction_pilot', enabled: true, rolloutPercentage: 100 },
+      { key: 'actuarial_engine_enabled', enabled: false, rolloutPercentage: 0 },
     ])
 
     // Default: user segments load successfully
@@ -51,16 +52,19 @@ describe('usePilotGateOptions', () => {
     mockUseAuth.mockReturnValue({ user: { id: 'user-123' } })
   })
 
-  it('loads feature flags as a boolean map', async () => {
+  it('loads feature flags with rolloutPercentage preserved', async () => {
     const { result } = renderHook(() => usePilotGateOptions())
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false)
     })
 
+    // Phase E shape: `{ enabled, rolloutPercentage }` per flag so the pilot
+    // gate can do gradual rollout bucketing. Previously this was a flat
+    // `Record<string, boolean>` which stripped the rollout info.
     expect(result.current.featureFlags).toEqual({
-      kasko_ai_extraction_pilot: true,
-      actuarial_engine_enabled: false,
+      kasko_ai_extraction_pilot: { enabled: true, rolloutPercentage: 100 },
+      actuarial_engine_enabled: { enabled: false, rolloutPercentage: 0 },
     })
   })
 
