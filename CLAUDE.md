@@ -2687,14 +2687,10 @@ VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX  # Optional: GA4 analytics
 - The production DB may have a different schema than `005b_admin_tables.sql` (e.g., missing `display_name` column) — this does NOT affect login, which only needs `id`, `email`, `password_hash`, `role`, `status`, `permissions`
 - There are two admin users in production: `prekic@gmail.com` (super_admin) and `admin@insurai.com` (super_admin)
 
-**`[ConfidenceDiag]` Diagnostic Logs in Production (Added Mar 14, 2026):**
-- Commit `fdedfea` added `console.warn('[ConfidenceDiag] ...')` checkpoints across 5 files in the extraction confidence pipeline
-- These are intentional diagnostic logs, NOT errors — they trace how confidence scores flow from AI provider → server → client → UI
-- **Server-side** (`server/routes/ai.ts`): Logs raw AI confidence JSON at all 3 extraction success paths
-- **Client-side** (`policy-extractor.ts`, `openai.ts`, `claude.ts`): Logs confidence recalculation, cache hits, default fallbacks
-- **UI-level** (`TryAnalysis.tsx`): Logs tier decision (LOW_CONFIDENCE_WARNING vs FULL_CONFIDENCE)
-- These logs will be noisy in Railway — consider removing or gating behind `LOG_LEVEL=debug` once confidence investigation is complete
-- To find them: search Railway logs for `[ConfidenceDiag]`
+**`[ConfidenceDiag]` Diagnostic Logs (Added Mar 14, 2026; gated Apr 18, 2026):**
+- The "5 checkpoints across the extraction confidence pipeline" described in prior handoffs do NOT exist in this repository — only **one** `[ConfidenceDiag]` site is present: `src/components/TryAnalysis.tsx:372`. The server-side and provider-level sites referenced in earlier gotchas (`server/routes/ai.ts`, `src/lib/ai/policy-extractor.ts`, `src/lib/ai/providers/openai.ts`, `src/lib/ai/providers/claude.ts`) were never committed here; the commit hash `fdedfea` cited previously cannot be resolved in this repo's history. Do NOT try to find them in Railway logs.
+- The single live site (TryAnalysis.tsx) logs the tier decision (LOW_CONFIDENCE_WARNING vs FULL_CONFIDENCE) and is now **gated** behind either `import.meta.env.DEV` or `localStorage.LOG_LEVEL === 'debug'`. In production Railway the log stays quiet unless a debugger explicitly opts in via browser console `localStorage.setItem('LOG_LEVEL', 'debug')`.
+- If you need equivalent server-side confidence tracing in the future, use `server/lib/logger.ts` `logger.debug()` — do NOT add raw `console.warn('[ConfidenceDiag] ...')` calls. Gating via the shared logger is the canonical pattern now.
 
 **AnalyzedPolicy Type — No `rawData` Property (Fixed Mar 14, 2026):**
 - `AnalyzedPolicy` in `src/types/policy.ts` has `aiConfidence: number` directly — there is NO `rawData` property

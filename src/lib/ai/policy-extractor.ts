@@ -3349,6 +3349,36 @@ export async function extractPolicyComprehensive(
  * Convert comprehensive extraction result to AnalyzedPolicy
  * Bridges the new extraction format with existing policy type
  */
+/**
+ * Derive the canonical `discounts` field from the comprehensive extraction
+ * path when the AI didn't populate `data.discounts` directly. Reuses the
+ * existing `noClaimsBonus.discountRate` value (already extracted by the
+ * kasko parser prompt) so NCD surfaces through the unified field path.
+ *
+ * Returns undefined when no NCD / discount data is recoverable, matching
+ * the `discounts?:` optional semantics.
+ */
+export function deriveDiscountsFromStructured(
+  data: StructuredPolicyData
+): AnalyzedPolicy['discounts'] | undefined {
+  const ncb = (data as unknown as { noClaimsBonus?: { discountRate?: string | null } })
+    .noClaimsBonus
+  if (!ncb || !ncb.discountRate) return undefined
+
+  // Parse "40%" / "%40" / "40" / "%40,5" → 40 (int). If unparseable, skip.
+  const digits = String(ncb.discountRate).match(/(\d+(?:[.,]\d+)?)/)
+  if (!digits) return undefined
+  const parsed = Math.round(Number(digits[1].replace(',', '.')))
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) return undefined
+
+  return {
+    ncdDiscount: parsed,
+    groupDiscount: null,
+    otherDiscountPct: null,
+    evidence: ncb.discountRate,
+  }
+}
+
 export function comprehensiveToAnalyzedPolicy(
   result: ComprehensiveExtractionResult,
   file: File,
@@ -3450,6 +3480,7 @@ export function comprehensiveToAnalyzedPolicy(
           usage: data.vehicle.usageType,
         }
       : undefined,
+    discounts: data.discounts ?? deriveDiscountsFromStructured(data),
   }
 
   // Translate insights to Turkish at extraction time

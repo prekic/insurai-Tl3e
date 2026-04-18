@@ -2584,17 +2584,12 @@
 - **File Changed**: `server/__tests__/ai-routes-extended.test.ts`
 - **Commit**: `6ad5b66`
 
-### 171. Confidence Diagnostic Checkpoints Added (Mar 14, 2026)
-- **Feature**: Added `[ConfidenceDiag]` diagnostic `console.warn` checkpoints across the entire AI extraction confidence pipeline to trace how confidence scores flow from AI provider → server → client → UI
-- **Files Changed** (5 files, +105 lines):
-  - `server/routes/ai.ts` — 3 server-side checkpoints at OpenAI standalone, Anthropic unified, and OpenAI fallback/unified success paths
-  - `src/lib/ai/policy-extractor.ts` — Client-side checkpoint after `recalculateOverallConfidence()` with weights source (`admin_db_config` vs `hardcoded_defaults`), per-field breakdown, and delta from AI-reported overall
-  - `src/lib/ai/providers/claude.ts` — Cache HIT checkpoint, missing confidence default checkpoint, AI-returned confidence checkpoint
-  - `src/lib/ai/providers/openai.ts` — Same 3 checkpoints (cache, missing, returned) for both proxy and direct API paths
-  - `src/components/TryAnalysis.tsx` — UI-level checkpoint before confidence warning/tier decision
-- **Log Prefix**: All checkpoints use `[ConfidenceDiag]` — search Railway logs to trace confidence flow
-- **Note**: These are diagnostic logs intended for investigation. Consider removing or gating behind a feature flag once confidence scoring is validated in production.
-- **Commit**: `fdedfea`
+### 171. Confidence Diagnostic Checkpoints (Mar 14, 2026; audited & corrected Apr 18, 2026)
+- **Original claim**: Added `[ConfidenceDiag]` `console.warn` checkpoints across 5 files in the extraction confidence pipeline, tied to commit `fdedfea`.
+- **Audit result (Apr 18, 2026)**: The commit `fdedfea` does NOT exist in this repository's history, and only **one** of the described checkpoints is actually present: `src/components/TryAnalysis.tsx:372` (the UI-level tier-decision log). The four other sites — `server/routes/ai.ts`, `src/lib/ai/policy-extractor.ts`, `src/lib/ai/providers/claude.ts`, `src/lib/ai/providers/openai.ts` — were never committed here. Treat the original "5 files / +105 lines" claim as inaccurate for this repo.
+- **Current state**: The single TryAnalysis.tsx site is now gated behind `import.meta.env.DEV || localStorage.LOG_LEVEL === 'debug'` — production Railway logs stay clean unless explicitly opted in.
+- **If you need server-side confidence tracing later**: use `server/lib/logger.ts` `logger.debug()` — do NOT reintroduce raw `console.warn('[ConfidenceDiag] ...')` calls.
+- **Log Prefix (for the one live site)**: `[TryAnalysis ConfidenceDiag]`.
 
 ### 172. TryAnalysis `rawData` Property Access Build Error (Fixed Mar 14, 2026)
 - **Problem**: Railway build failed with `TS2339: Property 'rawData' does not exist on type 'AnalyzedPolicy'` at `TryAnalysis.tsx:343`

@@ -533,6 +533,64 @@ describe('P2-15: Locale mixing guard', () => {
 })
 
 // ============================================================================
+// Bug #9 follow-up — discounts field flows through comprehensive path too
+// ============================================================================
+
+describe('Bug #9: discounts on comprehensive extraction path', () => {
+  it('derives ncdDiscount from noClaimsBonus.discountRate when data.discounts absent', async () => {
+    const { deriveDiscountsFromStructured } = await import('../policy-extractor')
+    const data = {
+      premium: { totalPremium: 5000, currency: 'TRY' },
+      noClaimsBonus: { discountRate: '40%', currentLevel: '4', protectionIncluded: false },
+    }
+    const result = deriveDiscountsFromStructured(data as never)
+    expect(result).toBeDefined()
+    expect(result!.ncdDiscount).toBe(40)
+    expect(result!.evidence).toBe('40%')
+    expect(result!.groupDiscount).toBeNull()
+    expect(result!.otherDiscountPct).toBeNull()
+  })
+
+  it('parses percentage with comma decimal (Turkish) like "%40,5"', async () => {
+    const { deriveDiscountsFromStructured } = await import('../policy-extractor')
+    const data = {
+      premium: { totalPremium: 5000, currency: 'TRY' },
+      noClaimsBonus: { discountRate: '%40,5' },
+    }
+    const result = deriveDiscountsFromStructured(data as never)
+    // Math.round(40.5) → 41
+    expect(result?.ncdDiscount).toBe(41)
+  })
+
+  it('returns undefined when noClaimsBonus is missing', async () => {
+    const { deriveDiscountsFromStructured } = await import('../policy-extractor')
+    const result = deriveDiscountsFromStructured({
+      premium: { totalPremium: 5000, currency: 'TRY' },
+    } as never)
+    expect(result).toBeUndefined()
+  })
+
+  it('returns undefined when discountRate is unparseable', async () => {
+    const { deriveDiscountsFromStructured } = await import('../policy-extractor')
+    const result = deriveDiscountsFromStructured({
+      premium: { totalPremium: 5000, currency: 'TRY' },
+      noClaimsBonus: { discountRate: 'unknown' },
+    } as never)
+    expect(result).toBeUndefined()
+  })
+
+  it('rejects out-of-range percentages (>100 or negative)', async () => {
+    const { deriveDiscountsFromStructured } = await import('../policy-extractor')
+    expect(
+      deriveDiscountsFromStructured({
+        premium: { totalPremium: 5000, currency: 'TRY' },
+        noClaimsBonus: { discountRate: '150%' },
+      } as never)
+    ).toBeUndefined()
+  })
+})
+
+// ============================================================================
 // P1-6: Historical Policy Detection
 // ============================================================================
 

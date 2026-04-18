@@ -176,7 +176,7 @@ If the MCP github server is disconnected at session start, ToolSearch with `sele
 | 4 | Pilot threshold calibration monitoring | ⏳ ONGOING (from prior session) |
 | 5 | Phase E production scale-up | ⏳ PENDING (from prior session) |
 | 6 | Vitest console noise cleanup | ⏳ PENDING (from prior session) — **EXCLUDE `[ClauseResolver]` warnings from `qa-regression-fixes.test.ts`; they are intentional verification of the unresolved-relationship fix (gotcha #67), not noise** |
-| 7 | `[ConfidenceDiag]` log gating | ⏳ PENDING (from prior session) |
+| 7 | `[ConfidenceDiag]` log gating | ✅ RESOLVED (Apr 18) — audited: only 1 site exists (`TryAnalysis.tsx:372`), gated behind `DEV` / `localStorage.LOG_LEVEL=debug`. See CLAUDE.md + KNOWN_ISSUES_ARCHIVE.md entries for audit trail. |
 
 ## Non-Negotiable Rules (Carry Forward)
 
