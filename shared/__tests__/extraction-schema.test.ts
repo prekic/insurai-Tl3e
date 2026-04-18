@@ -21,8 +21,24 @@ describe('shared/extraction-schema', () => {
     expect(schema.additionalProperties).toBe(false)
   })
 
-  it('has 19 top-level required fields', () => {
-    expect(schema.required).toHaveLength(19)
+  it('has 20 top-level required fields', () => {
+    expect(schema.required).toHaveLength(20)
+  })
+
+  it('has discounts object with required sub-fields', () => {
+    expect(props.discounts).toBeDefined()
+    expect(schema.required).toContain('discounts')
+    const discountProps = props.discounts.properties as Record<string, unknown>
+    expect(discountProps.ncdDiscount).toBeDefined()
+    expect(discountProps.groupDiscount).toBeDefined()
+    expect(discountProps.otherDiscountPct).toBeDefined()
+    expect(discountProps.evidence).toBeDefined()
+    expect(props.discounts.required).toEqual([
+      'ncdDiscount',
+      'groupDiscount',
+      'otherDiscountPct',
+      'evidence',
+    ])
   })
 
   it('has every property in required array (strict mode)', () => {

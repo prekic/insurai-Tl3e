@@ -1,8 +1,22 @@
 import { AnalyzedPolicy, ClauseGraph, ClauseRelationship } from '@/types/policy'
 
+// Quiet [ClauseResolver] warnings under Vitest unless a caller explicitly opts in
+// (qa-regression-fixes.test.ts sets VERBOSE_CLAUSE_RESOLVER=1 to verify the fix).
+const QUIET_CLAUSE_RESOLVER =
+  typeof process !== 'undefined' &&
+  process.env?.NODE_ENV === 'test' &&
+  process.env?.VERBOSE_CLAUSE_RESOLVER !== '1'
+
+export interface ClauseResolverStats {
+  unresolvedCount: number
+}
+
 /**
  * Resolves relationships between policy clauses based on the extracted clauseGraph
  * and applies precedence rules to override or merge coverages and conditions.
+ *
+ * Pass an optional `stats` object to capture the number of unresolved edges
+ * (used by the confidence post-processing penalty in policy-extractor).
  */
 export function resolveClauseRelationships(
   policy: AnalyzedPolicy,
@@ -14,7 +28,8 @@ export function resolveClauseRelationships(
       description?: string
       isCandidate?: boolean
     }>
-  }
+  },
+  stats?: ClauseResolverStats
 ): AnalyzedPolicy {
   // 1. Convert extracted raw edges to typed ClauseRelationships
   const targetGraph: ClauseGraph = {
@@ -46,11 +61,16 @@ export function resolveClauseRelationships(
     if (edge.isCandidate || !edge.targetId) {
       // Log internally for debugging — do NOT surface to end user UI.
       // These are graph-construction ambiguities, not actionable user insights.
-      console.warn(
-        `[ClauseResolver] Unresolved relationship: ${edge.sourceId} affects ${
-          edge.targetId ?? 'unknown'
-        } (${edge.relationshipType})`
-      )
+      if (stats) {
+        stats.unresolvedCount += 1
+      }
+      if (!QUIET_CLAUSE_RESOLVER) {
+        console.warn(
+          `[ClauseResolver] Unresolved relationship: ${edge.sourceId} affects ${
+            edge.targetId ?? 'unknown'
+          } (${edge.relationshipType})`
+        )
+      }
       continue
     }
 

@@ -10,10 +10,15 @@
  *   npx tsx scripts/calibrate-grade-thresholds.ts --apply
  *
  * Flags:
- *   --dry-run   (default) Print report only, write nothing.
- *   --apply     Write recommended thresholds to app_settings.
- *   --type=X    Filter to a specific policy type (e.g., kasko).
- *   --min=N     Override minimum sample size (default: 50).
+ *   --dry-run     (default) Print report only, write nothing.
+ *   --apply       Write recommended thresholds to app_settings.
+ *   --type=X      Filter to a specific policy type (e.g., kasko).
+ *   --min=N       Override minimum sample size (default: 50).
+ *   --force       Allow --apply to proceed below the sample minimum.
+ *                 Required for pilot-phase calibration at small n. Prints a
+ *                 loud warning and records the event for audit.
+ *   --production  Enforce MIN_SAMPLE_SIZE = 50 and reject --force.
+ *                 Use once pilot volume is sufficient (post Phase E).
  *
  * Requires .env with SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY.
  */
@@ -36,13 +41,31 @@ dotenv.config({ path: '.env' })
 // CLI argument parsing
 // ---------------------------------------------------------------------------
 
+const PRODUCTION_MIN_SAMPLE_SIZE = 50
+
 const args = process.argv.slice(2)
 const isApply = args.includes('--apply')
 const isDryRun = !isApply // default is dry-run
+const isForce = args.includes('--force')
+const isProduction = args.includes('--production')
 const typeArg = args.find((a) => a.startsWith('--type='))
 const filterType = typeArg ? typeArg.split('=')[1] : undefined
 const minArg = args.find((a) => a.startsWith('--min='))
-const minSample = minArg ? parseInt(minArg.split('=')[1], 10) : 50
+const requestedMin = minArg ? parseInt(minArg.split('=')[1], 10) : PRODUCTION_MIN_SAMPLE_SIZE
+const minSample = isProduction ? PRODUCTION_MIN_SAMPLE_SIZE : requestedMin
+
+if (isProduction && isForce) {
+  console.error('ERROR: --production and --force are mutually exclusive.')
+  console.error('       --production enforces the sample minimum; --force bypasses it.')
+  process.exit(1)
+}
+if (isProduction && requestedMin < PRODUCTION_MIN_SAMPLE_SIZE) {
+  console.error(
+    `ERROR: --production refuses to lower the sample minimum below ${PRODUCTION_MIN_SAMPLE_SIZE} ` +
+      `(requested --min=${requestedMin}).`
+  )
+  process.exit(1)
+}
 
 // ---------------------------------------------------------------------------
 // Supabase init (bypasses Vite — uses process.env directly)
@@ -179,6 +202,54 @@ async function applyThresholds(recommended: GradeThresholds): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Audit trail — record the last calibration event in app_settings
+// ---------------------------------------------------------------------------
+
+interface CalibrationAuditMeta {
+  forced: boolean
+  minSample: number
+  production: boolean
+  filterType?: string
+}
+
+async function recordCalibrationAudit(
+  applied: GradeThresholds,
+  sampleCount: number,
+  meta: CalibrationAuditMeta
+): Promise<void> {
+  const audit = {
+    appliedAt: new Date().toISOString(),
+    sampleCount,
+    forced: meta.forced,
+    minSample: meta.minSample,
+    production: meta.production,
+    filterType: meta.filterType ?? 'all',
+    thresholds: applied,
+  }
+
+  const { error } = await supabase.from('app_settings').upsert(
+    {
+      category: 'evaluation',
+      key: 'grade_thresholds_last_calibrated',
+      value: JSON.stringify(audit),
+      value_type: 'json',
+      description:
+        'Audit record of the last grade threshold calibration (timestamp, sample size, mode).',
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'category,key' }
+  )
+
+  if (error) {
+    console.error(`  Audit record write failed (non-fatal): ${error.message}`)
+  } else {
+    console.log(
+      `  Audit recorded: n=${sampleCount}, forced=${meta.forced}, production=${meta.production}`
+    )
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -186,7 +257,10 @@ async function main() {
   console.log('='.repeat(60))
   console.log('  Grade Threshold Calibration')
   console.log(`  Mode: ${isDryRun ? 'DRY RUN (read-only)' : 'APPLY (will write to DB)'}`)
+  if (isProduction) console.log('  Profile: PRODUCTION (min sample = 50, --force disabled)')
+  else if (isForce) console.log('  Profile: PILOT (sample minimum override via --force)')
   if (filterType) console.log(`  Filter: type = ${filterType}`)
+  console.log(`  Min sample: ${minSample}`)
   console.log('='.repeat(60))
   console.log()
 
@@ -247,11 +321,24 @@ async function main() {
   }
   console.log()
 
-  // 7. Apply or warn
+  // 7. Apply, warn, or block
   if (!sufficiency.sufficient) {
-    console.log(
-      'WARNING: Sample size too small for reliable calibration, but proceeding anyway for PILOT.'
-    )
+    if (isApply && !isForce) {
+      console.error(
+        `ERROR: Sample size ${scores.length} is below minimum ${minSample}. ` +
+          `Refusing to --apply without --force.`
+      )
+      console.error(
+        'Either gather more samples, lower --min=N, or pass --force for a pilot-phase override.'
+      )
+      process.exit(2)
+    }
+    if (isApply && isForce) {
+      console.log(
+        `WARNING: Sample size ${scores.length} below minimum ${minSample}. ` +
+          `Proceeding because --force was passed (pilot-phase override).`
+      )
+    }
   }
   if (isDryRun) {
     console.log('DRY RUN complete. No changes written.')
@@ -259,6 +346,12 @@ async function main() {
   } else {
     console.log('Applying recommended thresholds to app_settings (category: evaluation)...')
     await applyThresholds(recommended)
+    await recordCalibrationAudit(recommended, scores.length, {
+      forced: isForce,
+      minSample,
+      production: isProduction,
+      filterType,
+    })
     console.log()
     console.log('Done. Cache will refresh within 5 minutes (default TTL).')
   }

@@ -19,6 +19,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { applySafeWording } from '@/lib/analysis/display-interpreter'
 import { COVERAGE_NAMES_EN_TO_TR, lookupCoverageNameTr } from '@/lib/i18n/coverage-names'
 import { getShortCompanyName } from '@/lib/insurance-display'
+import { detectInsuredEntityType, type InsuredEntityType } from '@/lib/ai/turkish-utils'
 import {
   detectCoverageCategory,
   groupCoverageSubLimits,
@@ -77,6 +78,13 @@ export interface ReviewerSummary {
   premiumMissing: boolean
   insuredMissing: boolean
   aiConfidence: number | null
+
+  /** Bug #10 — Commercial template branching: entity + vehicle usage context. */
+  entityType: InsuredEntityType
+  vehicleUsage: 'commercial' | 'private' | 'unknown'
+  /** Localized labels derived from entity + usage (e.g. "Ticari Kasko Poliçesi"). */
+  typeLabel: string
+  entityLabel: string
 }
 
 export interface ReviewerSummaryOptions {
@@ -496,6 +504,12 @@ export function buildPolicyReviewerSummary(
     isCommercial
   )
 
+  // Bug #10 — entity + vehicle-usage branching for summary labels
+  const entityType = detectInsuredEntityType(policy.insuredPerson)
+  const vehicleUsage = deriveVehicleUsage(policy)
+  const typeLabel = buildTypeLabel(policy, vehicleUsage, locale)
+  const entityLabel = buildEntityLabel(entityType, locale)
+
   return {
     policyNumber: policy.policyNumber,
     provider: policy.provider,
@@ -535,5 +549,68 @@ export function buildPolicyReviewerSummary(
       typeof policy.aiConfidence === 'number' && !Number.isNaN(policy.aiConfidence)
         ? policy.aiConfidence
         : null,
+
+    entityType,
+    vehicleUsage,
+    typeLabel,
+    entityLabel,
+  }
+}
+
+/**
+ * Detect whether the vehicle usage is commercial (KAMYON, TIR, Ticari, filo, ...)
+ * — mirrors the niche-vehicle detection in evaluator.ts but returns a ternary.
+ */
+export function deriveVehicleUsage(policy: AnalyzedPolicy): 'commercial' | 'private' | 'unknown' {
+  const signals = [policy.vehicleInfo?.vehicleClass, policy.vehicleInfo?.usage]
+    .filter((s): s is string => typeof s === 'string' && s.length > 0)
+    .map((s) => s.toLowerCase())
+  if (signals.length === 0) return 'unknown'
+
+  const COMMERCIAL_PATTERNS: RegExp[] = [
+    /\bkamyon(et)?\b/i,
+    /\bt[iı]r\b/i,
+    /\botob[uü]s\b/i,
+    /\bmin[iı]b[uü]s\b/i,
+    /\bmid[iı]b[uü]s\b/i,
+    /\b[iı]ş\s*mak[iı]nes[iı]\b/i,
+    /\bt[iı]car[iı]\b/i,
+    /\bf[iı]lo\b/i,
+    /\bçek[iı]c[iı]\b/i,
+  ]
+  const PRIVATE_PATTERNS: RegExp[] = [/\bhusus[iı]\b/i, /\bb[iı]nek\b/i, /\botomob[iı]l\b/i]
+
+  for (const sig of signals) {
+    for (const p of COMMERCIAL_PATTERNS) if (p.test(sig)) return 'commercial'
+    for (const p of PRIVATE_PATTERNS) if (p.test(sig)) return 'private'
+  }
+  return 'unknown'
+}
+
+function buildTypeLabel(
+  policy: AnalyzedPolicy,
+  usage: 'commercial' | 'private' | 'unknown',
+  locale: string
+): string {
+  const isTr = locale === 'tr'
+  const base = isTr ? policy.typeTr || 'Poliçe' : policy.type || 'Policy'
+  if (usage === 'commercial') {
+    return isTr ? `Ticari ${base}` : `Commercial ${base}`
+  }
+  if (usage === 'private') {
+    return isTr ? `Hususi ${base}` : `Private ${base}`
+  }
+  return base
+}
+
+function buildEntityLabel(entityType: InsuredEntityType, locale: string): string {
+  const isTr = locale === 'tr'
+  switch (entityType) {
+    case 'business':
+      return isTr ? 'İşletme' : 'Business entity'
+    case 'personal':
+      return isTr ? 'Gerçek kişi' : 'Individual'
+    default:
+      return isTr ? 'Belirtilmemiş' : 'Unspecified'
   }
 }

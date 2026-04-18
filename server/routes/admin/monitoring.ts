@@ -673,6 +673,39 @@ router.get(
         ).length,
       }
 
+      // ── Calibration status (D1 — Apr 2026) ────────────────────────────
+      // Surface current sample count vs minimum + last-calibration audit so
+      // the admin UI can render a "Pilot samples: N/50 · Next recalibration at 50"
+      // tile and call out when pilot-phase overrides were used.
+      const PRODUCTION_MIN_SAMPLE_SIZE = 50
+      const sampleCount = metricsRecords.length
+      const samplesUntilRecalibration = Math.max(0, PRODUCTION_MIN_SAMPLE_SIZE - sampleCount)
+
+      let lastCalibration: {
+        appliedAt: string
+        sampleCount: number
+        forced: boolean
+        minSample: number
+        production: boolean
+        filterType: string
+        thresholds: Record<string, number>
+      } | null = null
+      try {
+        const { data: auditRow } = await supabase
+          .from('app_settings')
+          .select('value')
+          .eq('category', 'evaluation')
+          .eq('key', 'grade_thresholds_last_calibrated')
+          .maybeSingle()
+        if (auditRow?.value && typeof auditRow.value === 'string') {
+          lastCalibration = JSON.parse(auditRow.value)
+        }
+      } catch (err) {
+        log.warn('Failed to read grade_thresholds_last_calibrated audit row', {
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+
       res.json({
         success: true,
         data: {
@@ -682,6 +715,14 @@ router.get(
           triggers: rollbackStatus.triggers,
           admissionBreakdown,
           recentRecords: rows.slice(-10).reverse(), // Last 10 records for display
+          calibration: {
+            sampleCount,
+            productionMinSampleSize: PRODUCTION_MIN_SAMPLE_SIZE,
+            samplesUntilRecalibration,
+            readyForProductionRecalibration:
+              sampleCount >= PRODUCTION_MIN_SAMPLE_SIZE && !rollbackStatus.shouldPause,
+            lastCalibration,
+          },
         },
       })
     } catch (error) {

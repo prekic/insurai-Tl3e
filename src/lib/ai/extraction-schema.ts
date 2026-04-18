@@ -42,6 +42,16 @@ export interface ExtractedPolicyData {
     evidence: string // verbatim quote from policy text
   }> | null
 
+  // Premium discounts (NCD / group / other) — Bug #9 (Apr 2026)
+  // Set to null if no discount rows appear on the policy. Individual fields
+  // are percent integers (e.g., 40 means 40%). `evidence` is a verbatim quote.
+  discounts?: {
+    ncdDiscount: number | null
+    groupDiscount: number | null
+    otherDiscountPct: number | null
+    evidence: string | null
+  } | null
+
   // Amendment/Zeyilname detection (NEW)
   // Turkish insurance amendments have specific markers that distinguish them from original policies
   amendmentInfo: {
@@ -298,5 +308,25 @@ Your task is to extract structured information from insurance policy documents.
     - 'evidence': A verbatim direct quote from the policy text. DO NOT paraphrase. Copy exactly.
 
     If NO conditional deductibles are present, return an empty array or null. Do NOT fabricate.
+
+12. **Premium Discounts (NCD / Group / Other)**:
+    Turkish policies typically show discount rows near the premium breakdown. Extract them into the 'discounts' object.
+    - 'ncdDiscount': No-Claim Discount (Hasarsızlık İndirimi) — percent integer (e.g. 40 for 40%)
+    - 'groupDiscount': Fleet/Group discount (Grup İndirimi / Filo İndirimi) — percent integer
+    - 'otherDiscountPct': Any other named discount (Özel İndirim, Kampanya) — percent integer
+    - 'evidence': Verbatim quote of the discount line as it appears. Do NOT paraphrase.
+    Set the whole 'discounts' object to null ONLY if no discount rows appear on the policy.
+    Use null for individual fields when that specific discount is absent.
+
+13. **Vehicle Depreciation Clauses (Eskime Payı / Kıymet Artışı)**:
+    Turkish kasko policies on older vehicles (model year >10yr) often apply
+    age-based depreciation caps (e.g. "50% kıymet artışı" or "yaş endeksli eskime").
+    Capture these as entries in 'conditionalDeductibles' with trigger describing
+    the age condition (e.g. "vehicle age >10yr depreciation cap 50%").
+
+14. **Replacement Parts Clauses (Eşdeğer / Çıkma Parça)**:
+    If the policy restricts repair parts to 'eşdeğer' (equivalent/aftermarket) or
+    'çıkma parça' (salvage), surface this as a special condition string verbatim so
+    downstream logic can risk-flag older commercial vehicles.
 
 Be thorough but accurate. It's better to return null than to guess incorrectly.`

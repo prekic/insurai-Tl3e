@@ -438,3 +438,51 @@ describe('Legacy Precedence and Hydration', () => {
     expect(summaryTr.premium).toBe('Belirtilmemiş')
   })
 })
+
+// ============================================================================
+// Bug #10 — Commercial template branching (entity + vehicle usage)
+// ============================================================================
+
+describe('Bug #10: entity + vehicle usage branching', () => {
+  it('tags commercial usage + business entity from KAMYON + company suffix', () => {
+    const p = createSpecimen({
+      insuredPerson: 'ÖRNEK LOJİSTİK LİMİTED ŞİRKETİ',
+      vehicleInfo: { year: 1997, make: 'IVECO', vehicleClass: 'KAMYON' },
+    })
+    const s = buildPolicyReviewerSummary(p, { locale: 'tr' })
+    expect(s.vehicleUsage).toBe('commercial')
+    expect(s.entityType).toBe('business')
+    expect(s.typeLabel).toMatch(/Ticari/)
+    expect(s.entityLabel).toBe('İşletme')
+  })
+
+  it('tags private usage + personal entity for individual + Hususi car', () => {
+    const p = createSpecimen({
+      insuredPerson: 'Erdem Yılmaz',
+      vehicleInfo: { year: 2023, vehicleClass: 'Binek', usage: 'Hususi' },
+    })
+    const s = buildPolicyReviewerSummary(p, { locale: 'tr' })
+    expect(s.vehicleUsage).toBe('private')
+    expect(s.entityType).toBe('unknown') // no VKN/TCKN digits in name → unknown
+    expect(s.typeLabel).toMatch(/Hususi/)
+  })
+
+  it('defaults to unknown when neither signal is present', () => {
+    const p = createSpecimen({ insuredPerson: '', vehicleInfo: undefined })
+    const s = buildPolicyReviewerSummary(p, { locale: 'tr' })
+    expect(s.vehicleUsage).toBe('unknown')
+    expect(s.entityType).toBe('unknown')
+  })
+
+  it('uses English labels under locale=en', () => {
+    const p = createSpecimen({
+      insuredPerson: 'DEMO TRUCKING LTD.',
+      vehicleInfo: { year: 2020, vehicleClass: 'KAMYONET' },
+    })
+    const s = buildPolicyReviewerSummary(p, { locale: 'en' })
+    expect(s.vehicleUsage).toBe('commercial')
+    expect(s.entityType).toBe('business')
+    expect(s.typeLabel).toMatch(/Commercial/)
+    expect(s.entityLabel).toBe('Business entity')
+  })
+})

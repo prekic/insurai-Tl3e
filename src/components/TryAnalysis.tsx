@@ -363,15 +363,22 @@ export function TryAnalysis() {
             : undefined
 
         // === CONFIDENCE DIAGNOSTIC CHECKPOINT (TryAnalysis) ===
-        console.warn('[TryAnalysis ConfidenceDiag] Extraction result confidence state:', {
-          lowConfidence: isLowConfidence,
-          confidenceScore:
-            confidenceScore != null ? Math.round(confidenceScore * 100) + '%' : 'not provided',
-          policyAiConfidence:
-            policy.aiConfidence != null ? Math.round(policy.aiConfidence * 100) + '%' : 'not set',
-          aiConfidenceValue: policy.aiConfidence,
-          tier: isLowConfidence ? 'LOW_CONFIDENCE_WARNING' : 'FULL_CONFIDENCE',
-        })
+        // Gated behind LOG_LEVEL=debug (via localStorage) or Vite DEV mode to keep
+        // Railway production logs clean. Enable via: localStorage.LOG_LEVEL='debug'.
+        if (
+          import.meta.env.DEV ||
+          (typeof localStorage !== 'undefined' && localStorage.getItem('LOG_LEVEL') === 'debug')
+        ) {
+          console.warn('[TryAnalysis ConfidenceDiag] Extraction result confidence state:', {
+            lowConfidence: isLowConfidence,
+            confidenceScore:
+              confidenceScore != null ? Math.round(confidenceScore * 100) + '%' : 'not provided',
+            policyAiConfidence:
+              policy.aiConfidence != null ? Math.round(policy.aiConfidence * 100) + '%' : 'not set',
+            aiConfidenceValue: policy.aiConfidence,
+            tier: isLowConfidence ? 'LOW_CONFIDENCE_WARNING' : 'FULL_CONFIDENCE',
+          })
+        }
 
         // Ensure policy has required fields for display
         const policyWithDefaults = {

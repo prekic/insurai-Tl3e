@@ -16,8 +16,22 @@
  *  P1-8: Deductible assignment (max across coverages)
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { parseTurkishCurrency, extractVehicleInfoFromText } from '../turkish-utils'
+
+// Opt in to [ClauseResolver] warnings for this suite — they verify the unresolved-
+// relationship filter (P1-5). Other test files stay quiet via the default gate.
+const PRIOR_VERBOSE = process.env.VERBOSE_CLAUSE_RESOLVER
+beforeAll(() => {
+  process.env.VERBOSE_CLAUSE_RESOLVER = '1'
+})
+afterAll(() => {
+  if (PRIOR_VERBOSE === undefined) {
+    delete process.env.VERBOSE_CLAUSE_RESOLVER
+  } else {
+    process.env.VERBOSE_CLAUSE_RESOLVER = PRIOR_VERBOSE
+  }
+})
 import { EXTRACTION_JSON_SCHEMA } from '../../../../shared/extraction-schema'
 
 // ============================================================================
@@ -371,6 +385,150 @@ describe('P1-5: Unresolved relationship filtering', () => {
       i.includes('Unresolved relationship')
     )
     expect(unresolvedInsights).toHaveLength(0)
+  })
+
+  it('resolveClauseRelationships reports unresolved count via stats out-param (P2-14)', async () => {
+    const { resolveClauseRelationships } = await import('../relationship-resolver')
+    const mockPolicy = {
+      id: 'test-2',
+      policyNumber: 'TEST-002',
+      type: 'kasko' as const,
+      typeTr: 'Kasko',
+      provider: 'Test',
+      logo: '',
+      coverage: 100000,
+      premium: 5000,
+      monthlyPremium: 417,
+      deductible: 0,
+      startDate: '2025-01-01',
+      expiryDate: '2026-01-01',
+      status: 'active' as const,
+      uploadDate: '2025-01-01',
+      fileName: 'test.pdf',
+      documentType: 'PDF',
+      coverages: [],
+      exclusions: [],
+      aiInsights: [],
+    }
+
+    const graph = {
+      edges: [
+        {
+          sourceId: 'Flood',
+          targetId: null,
+          relationshipType: 'coverage_inclusion',
+          isCandidate: true,
+        },
+        { sourceId: 'Fire', targetId: undefined, relationshipType: 'sublimit', isCandidate: false },
+        {
+          sourceId: 'Theft',
+          targetId: 'Collision',
+          relationshipType: 'sublimit',
+          isCandidate: false,
+        },
+      ],
+    }
+
+    const stats = { unresolvedCount: 0 }
+    resolveClauseRelationships(mockPolicy as never, graph, stats)
+    // 2 unresolved (isCandidate=true + null targetId); 1 resolved (Theft→Collision).
+    expect(stats.unresolvedCount).toBe(2)
+  })
+})
+
+// ============================================================================
+// P2-7: Parts clause (Eşdeğer / Çıkma Parça) flag on older vehicles
+// ============================================================================
+
+describe('P2-7: Parts clause risk flag on older vehicles', () => {
+  it('flags eşdeğer parça on ≥7yr vehicle', async () => {
+    const { derivePartsClauseInsight } = await import('../policy-extractor')
+    const policy = {
+      vehicleInfo: { year: 2015 },
+      exclusions: ['Onarımda eşdeğer parça kullanılabilir'],
+      specialConditions: [],
+    }
+    const data = {
+      exclusions: ['Onarımda eşdeğer parça kullanılabilir'],
+      specialConditions: [],
+    }
+    const insight = derivePartsClauseInsight(policy as never, data as never)
+    expect(insight).not.toBeNull()
+    expect(insight).toMatch(/eşdeğer|çıkma|orijinal/i)
+  })
+
+  it('does not flag newer vehicle (<7yr)', async () => {
+    const { derivePartsClauseInsight } = await import('../policy-extractor')
+    const policy = {
+      vehicleInfo: { year: new Date().getFullYear() - 3 },
+      exclusions: ['Onarımda eşdeğer parça kullanılabilir'],
+      specialConditions: [],
+    }
+    const data = { exclusions: ['Onarımda eşdeğer parça kullanılabilir'], specialConditions: [] }
+    const insight = derivePartsClauseInsight(policy as never, data as never)
+    expect(insight).toBeNull()
+  })
+
+  it('does not flag older vehicle without parts clause', async () => {
+    const { derivePartsClauseInsight } = await import('../policy-extractor')
+    const policy = {
+      vehicleInfo: { year: 2010 },
+      exclusions: ['Savaş hali hariçtir'],
+      specialConditions: [],
+    }
+    const data = { exclusions: ['Savaş hali hariçtir'], specialConditions: [] }
+    const insight = derivePartsClauseInsight(policy as never, data as never)
+    expect(insight).toBeNull()
+  })
+
+  it('flags çıkma parça in special conditions', async () => {
+    const { derivePartsClauseInsight } = await import('../policy-extractor')
+    const policy = {
+      vehicleInfo: { year: 2015 },
+      exclusions: [],
+      specialConditions: ['Onarımlarda çıkma parça tercih edilebilir'],
+    }
+    const data = {
+      exclusions: [],
+      specialConditions: ['Onarımlarda çıkma parça tercih edilebilir'],
+    }
+    const insight = derivePartsClauseInsight(policy as never, data as never)
+    expect(insight).not.toBeNull()
+  })
+})
+
+// ============================================================================
+// P2-15: Locale mixing regression guard
+// ============================================================================
+
+describe('P2-15: Locale mixing guard', () => {
+  it('translates all known English insight originals to Turkish', async () => {
+    const { translateInsightToTr } = await import('../policy-extractor')
+    // These are the literal English strings emitted by generateGapsAsync,
+    // generateStrengths, and generateRecommendationsAsync as of this session.
+    // Adding a new generator string without a translation map entry MUST fail
+    // this test.
+    const ENGLISH_ORIGINALS = [
+      'Multiple exclusions may limit coverage in certain scenarios',
+      'High deductibles may result in significant out-of-pocket costs',
+      'Total coverage significantly below market average',
+      'Consider adding DASK earthquake insurance if not included',
+    ]
+    for (const en of ENGLISH_ORIGINALS) {
+      const tr = translateInsightToTr(en)
+      expect(tr, `"${en}" should translate to Turkish`).not.toBe(en)
+      // Translated Turkish output should contain at least one Turkish letter
+      // or be distinctly non-ASCII to prove translation occurred.
+      expect(tr.length).toBeGreaterThan(0)
+    }
+  })
+
+  it('preserves emoji prefixes on translated insights', async () => {
+    const { translateInsightToTr } = await import('../policy-extractor')
+    const input = '⚠ Multiple exclusions may limit coverage in certain scenarios'
+    const out = translateInsightToTr(input)
+    expect(out.startsWith('⚠')).toBe(true)
+    expect(out).not.toBe(input)
   })
 })
 

@@ -477,6 +477,73 @@ export function isValidTCKimlik(tcNo: string): boolean {
   return true
 }
 
+/**
+ * Validate Turkish Tax Identification Number (VKN / Vergi Kimlik No)
+ * 10 digits with a checksum. Used for business entities (as opposed to the
+ * 11-digit TCKN for individuals).
+ *
+ * Algorithm: for each of the first 9 digits at position i (0-indexed),
+ * compute v = (d + 10 - i) % 10, then t = (v * 2^(9 - i)) % 9 (0 → 9).
+ * Sum of the nine t values modulo 10 must equal the 10th digit.
+ */
+export function isValidVKN(vknNo: string): boolean {
+  if (!vknNo || typeof vknNo !== 'string') return false
+  const cleaned = vknNo.replace(/\D/g, '')
+  if (cleaned.length !== 10) return false
+
+  const digits = cleaned.split('').map(Number)
+  let sum = 0
+  for (let i = 0; i < 9; i++) {
+    const d = digits[i]
+    const v = (d + 10 - i) % 10
+    // v === 0 → contribution is 0; else (v * 2^(9 - i)) % 9, mapping 0→9
+    if (v === 0) continue
+    let t = (v * Math.pow(2, 9 - i)) % 9
+    if (t === 0) t = 9
+    sum += t
+  }
+  const check = (10 - (sum % 10)) % 10
+  return check === digits[9]
+}
+
+/**
+ * Detect insured-entity type from an insuredPerson / identifier string.
+ * Returns 'business' when a valid 10-digit VKN is found, 'personal' when a
+ * valid 11-digit TCKN is found, 'unknown' otherwise. Also handles common
+ * merged forms like "ŞİRKETİ" / "LİMİTED" / "A.Ş." / "LTD." in the name
+ * (business heuristics even if no ID digits are present).
+ */
+export type InsuredEntityType = 'business' | 'personal' | 'unknown'
+
+export function detectInsuredEntityType(value: string | undefined | null): InsuredEntityType {
+  if (!value || typeof value !== 'string') return 'unknown'
+
+  // Extract all digit runs and test for VKN / TCKN
+  const digitRuns = value.match(/\d{10,11}/g) ?? []
+  for (const run of digitRuns) {
+    if (run.length === 11 && isValidTCKimlik(run)) return 'personal'
+    if (run.length === 10 && isValidVKN(run)) return 'business'
+  }
+
+  // Name-based business heuristics (company suffixes)
+  const BUSINESS_NAME_PATTERNS = [
+    /\bA\.?Ş\.?\b/i,
+    /\bLTD\.?\b/i,
+    /\bL[İI]M[İI]TED\b/i,
+    /\bANON[İI]M\b/i,
+    /\bŞ[İI]RKET[İI]?\b/i,
+    /\bT[İI]CARET\b/i,
+    /\bSANAY[İI]\b/i,
+    /\bHOLDING\b/i,
+    /\bKOOPERAT[İI]F\b/i,
+    /\bDERNEK\b/i,
+  ]
+  for (const pattern of BUSINESS_NAME_PATTERNS) {
+    if (pattern.test(value)) return 'business'
+  }
+  return 'unknown'
+}
+
 // =============================================================================
 // POLICY NUMBER NORMALIZATION
 // =============================================================================

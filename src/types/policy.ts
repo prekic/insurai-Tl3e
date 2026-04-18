@@ -293,6 +293,16 @@ export interface AnalyzedPolicy extends Policy {
   deductiblePercent?: number
   /** True when this policy is a draft (not yet approved by reviewer) */
   isDraft?: boolean
+  /**
+   * Premium discounts extracted from the policy (NCD, group/fleet, other).
+   * Values are percent integers (e.g. 40 = 40%). evidence is a verbatim quote.
+   */
+  discounts?: {
+    ncdDiscount: number | null
+    groupDiscount: number | null
+    otherDiscountPct: number | null
+    evidence: string | null
+  }
 }
 
 export const POLICY_TYPES: Record<PolicyType, { label: string; labelTr: string; icon: string }> = {

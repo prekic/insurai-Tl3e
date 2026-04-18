@@ -62,7 +62,7 @@ function makeRichPolicy() {
       make: 'Ford',
       model: 'Transit Custom',
       year: 2023,
-      vehicleClass: 'Ticari',
+      vehicleClass: 'Binek', // private passenger car — benchmarks apply
       plate: '34 RZ 9511',
     },
   }
@@ -146,6 +146,39 @@ describe('Benchmark Confidence Assessment', () => {
       expect(result.benchmarkConfidence).toBeDefined()
       expect(result.benchmarkConfidence!.presentCount).toBe(2)
       expect(result.benchmarkConfidence!.level).toBe('low')
+    })
+
+    it('downgrades confidence for commercial vehicle (Bug #13 — KAMYON / Ticari)', () => {
+      const rich = makeRichPolicy()
+      // Swap to a commercial-truck vehicleClass — benchmarks don't apply.
+      rich.vehicleInfo!.vehicleClass = 'KAMYON'
+      // @ts-expect-error - mismatch due to schema update
+      const result = evaluatePolicy(rich)
+      expect(result.benchmarkConfidence).toBeDefined()
+      // presentCount is still 5 (all context factors present), but the niche
+      // check downgrades level from 'high' to 'low'.
+      expect(result.benchmarkConfidence!.presentCount).toBe(5)
+      expect(result.benchmarkConfidence!.level).toBe('low')
+    })
+
+    it('suppresses comparison for commercial vehicle with 2 context factors (Bug #13)', () => {
+      // 2 factors (vehicleClass + coverage) → level 'low' → niche downgrade → 'suppressed'
+      const commercial = {
+        ...makePartialPolicy(),
+        provider: '', // strip provider so only 2 factors remain (coverage + vehicleClass)
+        vehicleInfo: { vehicleClass: 'TIR' },
+      } as ReturnType<typeof makeRichPolicy>
+      // @ts-expect-error - mismatch due to schema update
+      const result = evaluatePolicy(commercial)
+      expect(result.benchmarkConfidence).toBeDefined()
+      expect(result.benchmarkConfidence!.presentCount).toBe(2)
+      expect(result.benchmarkConfidence!.level).toBe('suppressed')
+      expect(result.benchmarkConfidence!.suppressionReason).toMatch(
+        /commercial|niche|truck|bus|fleet/i
+      )
+      expect(result.benchmarkConfidence!.suppressionReasonTr).toMatch(
+        /ticar[iı]|kamyon|otob[uü]s|filo/i
+      )
     })
 
     it('includes factor names and presence flags', () => {
