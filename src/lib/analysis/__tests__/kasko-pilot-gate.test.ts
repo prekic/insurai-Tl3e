@@ -131,3 +131,92 @@ describe('KASKO pilot gate — non-interference', () => {
     expect(result.isDraft).toBe(false)
   })
 })
+
+// ============================================================================
+// Phase E — Gradual rollout via rolloutPercentage
+// ============================================================================
+
+describe('evaluateKaskoPilotGate — Phase E gradual rollout', () => {
+  const SEGMENT = ['kasko_pilot_reviewers']
+
+  it('activates at 100% rollout regardless of userId bucket', () => {
+    for (const userId of ['a', 'b', 'user-123', '00000000-0000-0000-0000-000000000001']) {
+      const result = evaluateKaskoPilotGate(
+        'kasko',
+        userId,
+        { kasko_ai_extraction_pilot: { enabled: true, rolloutPercentage: 100 } },
+        SEGMENT
+      )
+      expect(result.isPilotActive).toBe(true)
+    }
+  })
+
+  it('rejects segment members when rolloutPercentage is 0', () => {
+    for (const userId of ['a', 'b', 'c']) {
+      const result = evaluateKaskoPilotGate(
+        'kasko',
+        userId,
+        { kasko_ai_extraction_pilot: { enabled: true, rolloutPercentage: 0 } },
+        SEGMENT
+      )
+      expect(result.isPilotActive).toBe(false)
+    }
+  })
+
+  it('bucket assignment is deterministic per userId', () => {
+    const flags = { kasko_ai_extraction_pilot: { enabled: true, rolloutPercentage: 50 } }
+    // Same userId → same result across 20 invocations
+    const userId = 'e2e-test-user-42'
+    const first = evaluateKaskoPilotGate('kasko', userId, flags, SEGMENT).isPilotActive
+    for (let i = 0; i < 20; i++) {
+      expect(evaluateKaskoPilotGate('kasko', userId, flags, SEGMENT).isPilotActive).toBe(first)
+    }
+  })
+
+  it('anonymous users (no userId) skip the bucket check', () => {
+    // Undefined userId: the segment check also treats undefined as allowed,
+    // so pilot activates despite low rollout percentage.
+    const result = evaluateKaskoPilotGate(
+      'kasko',
+      undefined,
+      { kasko_ai_extraction_pilot: { enabled: true, rolloutPercentage: 5 } },
+      SEGMENT
+    )
+    expect(result.isPilotActive).toBe(true)
+  })
+
+  it('distribution sanity: 50% rollout buckets ~half of 1000 synthetic users', () => {
+    const flags = { kasko_ai_extraction_pilot: { enabled: true, rolloutPercentage: 50 } }
+    let active = 0
+    for (let i = 0; i < 1000; i++) {
+      const userId = `synthetic-user-${i}`
+      if (evaluateKaskoPilotGate('kasko', userId, flags, SEGMENT).isPilotActive) active++
+    }
+    // Chi-square-ish sanity: 50% should produce 400-600 on 1000 samples.
+    // Wide band guards against flakiness while still catching gross bias.
+    expect(active).toBeGreaterThanOrEqual(400)
+    expect(active).toBeLessThanOrEqual(600)
+  })
+
+  it('back-compat: legacy boolean flag form is treated as fully rolled out', () => {
+    // Critical: existing call sites pass Record<string, boolean>. They must
+    // continue to activate the pilot (no silent regression to 0%).
+    const result = evaluateKaskoPilotGate(
+      'kasko',
+      'user-1',
+      { kasko_ai_extraction_pilot: true },
+      SEGMENT
+    )
+    expect(result.isPilotActive).toBe(true)
+  })
+
+  it('segment is PRIMARY gate — out-of-bucket users never activate even at 100%', () => {
+    const result = evaluateKaskoPilotGate(
+      'kasko',
+      'user-1',
+      { kasko_ai_extraction_pilot: { enabled: true, rolloutPercentage: 100 } },
+      ['other_segment']
+    )
+    expect(result.isPilotActive).toBe(false)
+  })
+})

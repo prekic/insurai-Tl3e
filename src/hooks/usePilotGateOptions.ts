@@ -3,6 +3,17 @@ import { useAuth } from '@/lib/supabase/auth-context'
 import { configService } from '@/lib/config'
 
 /**
+ * Minimal slice of `FeatureFlag` the pilot gate needs. Preserving
+ * `rolloutPercentage` lets the gate make per-user bucket decisions. This
+ * replaces the earlier `Record<string, boolean>` shape which forced the
+ * gate to treat rollout as all-or-nothing.
+ */
+export interface PilotFeatureFlag {
+  enabled: boolean
+  rolloutPercentage: number
+}
+
+/**
  * Hook that loads feature flags and user segments needed for pilot gating.
  *
  * Returns the `options` object expected by `useDisplaySafeSummary`:
@@ -12,13 +23,13 @@ import { configService } from '@/lib/config'
  * User segments are loaded from the user_segments table via Supabase.
  */
 export function usePilotGateOptions(): {
-  featureFlags: Record<string, boolean>
+  featureFlags: Record<string, PilotFeatureFlag>
   userSegments: string[]
   userId: string | undefined
   isLoading: boolean
 } {
   const { user } = useAuth()
-  const [featureFlags, setFeatureFlags] = useState<Record<string, boolean>>({})
+  const [featureFlags, setFeatureFlags] = useState<Record<string, PilotFeatureFlag>>({})
   const [userSegments, setUserSegments] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -30,9 +41,12 @@ export function usePilotGateOptions(): {
         // Load feature flags from ConfigurationService
         const flags = await configService.getFeatureFlags()
         if (cancelled) return
-        const flagMap: Record<string, boolean> = {}
+        const flagMap: Record<string, PilotFeatureFlag> = {}
         for (const flag of flags) {
-          flagMap[flag.key] = flag.enabled
+          flagMap[flag.key] = {
+            enabled: flag.enabled,
+            rolloutPercentage: flag.rolloutPercentage,
+          }
         }
         setFeatureFlags(flagMap)
 

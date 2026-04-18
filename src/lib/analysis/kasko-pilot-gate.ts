@@ -11,6 +11,8 @@
  * KASKO is internal-pilot-ready with mandatory human review, not production-ready.
  */
 
+import { computeRolloutBucket } from '@/lib/config/rollout-hash'
+
 // ============================================================================
 // PILOT ADMISSION
 // ============================================================================
@@ -150,54 +152,69 @@ const KASKO_PILOT_FLAG = 'kasko_ai_extraction_pilot'
 const KASKO_PILOT_SEGMENT = 'kasko_pilot_reviewers'
 
 /**
+ * Feature-flag slice consumed by the pilot gate. We accept two shapes for
+ * backward compatibility:
+ *   1. `boolean` — legacy, treats flag as fully enabled (rolloutPercentage=100)
+ *   2. `{ enabled, rolloutPercentage }` — preferred, enables gradual rollout
+ *
+ * Phase E clients should pass the object form via `usePilotGateOptions`.
+ */
+export type PilotFeatureFlagValue = boolean | { enabled: boolean; rolloutPercentage: number }
+
+function inactiveResult(): PilotReviewGateResult {
+  return {
+    isPilotActive: false,
+    reviewStatus: 'pending_review',
+    requiresHumanReview: false,
+    reviewBannerText: '',
+    isDraft: false,
+  }
+}
+
+/**
  * Check if the KASKO pilot is active for a given user and branch.
+ *
+ * Phase E ordering: branch → flag.enabled → rollout bucket (if < 100%) →
+ * user segment. The segment check remains the PRIMARY gate — rollout is an
+ * additive filter. `rolloutPercentage` is ignored when `userId` is absent
+ * so anonymous callers fall through to the segment check unchanged.
  *
  * @param branch - The insurance branch (must be 'kasko' for pilot)
  * @param userId - The current user's ID
- * @param featureFlags - Map of feature flag keys to their enabled status
+ * @param featureFlags - Map of feature flag keys to enabled+rollout info
+ *                      (boolean form accepted for back-compat)
  * @param userSegments - The user's assigned segments
  * @returns PilotReviewGateResult with gating information
  */
 export function evaluateKaskoPilotGate(
   branch: string,
   userId: string | undefined,
-  featureFlags: Record<string, boolean>,
+  featureFlags: Record<string, PilotFeatureFlagValue>,
   userSegments: string[] = []
 ): PilotReviewGateResult {
   // Only applies to KASKO
-  if (branch !== 'kasko') {
-    return {
-      isPilotActive: false,
-      reviewStatus: 'pending_review',
-      requiresHumanReview: false,
-      reviewBannerText: '',
-      isDraft: false,
-    }
-  }
+  if (branch !== 'kasko') return inactiveResult()
 
-  // Check feature flag
-  const flagEnabled = featureFlags[KASKO_PILOT_FLAG] === true
-  if (!flagEnabled) {
-    return {
-      isPilotActive: false,
-      reviewStatus: 'pending_review',
-      requiresHumanReview: false,
-      reviewBannerText: '',
-      isDraft: false,
-    }
+  // Normalize the flag value. Boolean form → treat as fully rolled out.
+  const rawFlag = featureFlags[KASKO_PILOT_FLAG]
+  const flag =
+    typeof rawFlag === 'boolean'
+      ? { enabled: rawFlag, rolloutPercentage: 100 }
+      : (rawFlag ?? { enabled: false, rolloutPercentage: 0 })
+
+  if (!flag.enabled) return inactiveResult()
+
+  // Gradual rollout: if partial, bucket the user and reject out-of-bucket.
+  // Anonymous (no userId) users skip the bucket check — they fall through
+  // to the segment check, which also allows them (Phase D anonymous policy).
+  if (flag.rolloutPercentage < 100 && userId) {
+    const bucket = computeRolloutBucket(userId, KASKO_PILOT_FLAG)
+    if (bucket >= flag.rolloutPercentage) return inactiveResult()
   }
 
   // Check user segment
   const userInSegment = userSegments.includes(KASKO_PILOT_SEGMENT) || !userId
-  if (!userInSegment) {
-    return {
-      isPilotActive: false,
-      reviewStatus: 'pending_review',
-      requiresHumanReview: false,
-      reviewBannerText: '',
-      isDraft: false,
-    }
-  }
+  if (!userInSegment) return inactiveResult()
 
   // Pilot is active for this user + branch
   return {

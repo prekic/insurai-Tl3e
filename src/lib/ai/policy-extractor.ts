@@ -1239,10 +1239,28 @@ export async function extractPolicyFromDocument(
     )
 
     // Apply relationship resolution and precedence rules
+    const resolverStats = { unresolvedCount: 0 }
     policy = resolveClauseRelationships(
       policy,
-      enhancedExtractedData.clauseGraph as Parameters<typeof resolveClauseRelationships>[1]
+      enhancedExtractedData.clauseGraph as Parameters<typeof resolveClauseRelationships>[1],
+      resolverStats
     )
+
+    // Bug #14 — confidence post-processing. A graph with many unresolved edges
+    // means the LLM returned ambiguous relationships even while self-reporting
+    // 99% confidence. Apply a soft penalty: -1% per unresolved edge, floored
+    // at 50% so we never over-penalize. Keeps trustworthiness UI honest.
+    if (resolverStats.unresolvedCount > 0 && typeof policy.aiConfidence === 'number') {
+      const original = policy.aiConfidence
+      const penalized = Math.max(0.5, original * (1 - resolverStats.unresolvedCount / 100))
+      if (penalized < original) {
+        policy.aiConfidence = penalized
+        policy.extractionWarnings = [
+          ...(policy.extractionWarnings ?? []),
+          `Güven skoru ${Math.round(original * 100)}% → ${Math.round(penalized * 100)}% düşürüldü (${resolverStats.unresolvedCount} çözülemeyen ilişki)`,
+        ]
+      }
+    }
 
     // Add validation warnings to AI insights
     if (patternValidation) {
@@ -1913,6 +1931,7 @@ async function convertToAnalyzedPolicy(
     insuredMissing,
     deductibleUncertain,
     extractionWarnings: extractionWarnings.length > 0 ? extractionWarnings : undefined,
+    discounts: data.discounts ?? undefined,
   }
 
   // Prepend AI generated evidence-based insights
@@ -1931,6 +1950,15 @@ async function convertToAnalyzedPolicy(
 
   // Generate base strings (Strengths, Gaps, Recs)
   const generatedInsights = await generateAIInsightsAsync(data)
+
+  // ── Bug #7 — Parts clause flag for older vehicles ─────────────────────
+  // Non-OEM (eşdeğer) or salvage (çıkma parça) parts materially affect repair
+  // quality on older cars. If vehicle age ≥7yr AND the policy text mentions
+  // these terms in exclusions or special conditions, surface a Turkish warning.
+  const partsClauseInsight = derivePartsClauseInsight(basePolicy, data)
+  if (partsClauseInsight) {
+    generatedInsights.unshift(partsClauseInsight)
+  }
 
   // ── Reviewer-mode prioritization ──────────────────────────────────────
   // Prepend extraction-quality warnings BEFORE generic insights so reviewers
@@ -2366,7 +2394,20 @@ export function translateInsightToTr(insight: string): string {
     return prefix ? `${prefix}${translated}` : translated
   }
 
-  // No translation found — return original
+  // No translation found — flag in DEV so locale-mixing regressions are visible
+  // during development (Bug #15). Guard by `process.env.NODE_ENV !== 'production'`
+  // so Railway stays quiet.
+  if (
+    typeof process !== 'undefined' &&
+    process.env?.NODE_ENV !== 'production' &&
+    /^[\x20-\x7E]{6,}$/.test(text) && // mostly ASCII → likely English
+    /\s[a-z]+\s/i.test(text) // has multi-word spacing
+  ) {
+    // Skip known safe patterns (emoji-only, short tokens).
+    console.warn(
+      `[LocaleMixAudit] insight passed through untranslated — consider adding to insightTranslations: "${text.slice(0, 120)}"`
+    )
+  }
   return insight
 }
 
@@ -2399,6 +2440,53 @@ export function translateInsightToEn(insight: string): string {
  */
 function translateInsightsToTr(insights: string[]): string[] {
   return insights.map(translateInsightToTr)
+}
+
+/**
+ * Bug #7 — Detect replacement-parts clauses (Eşdeğer / Çıkma Parça) on older
+ * vehicles. Returns a Turkish reviewer insight or null if not applicable.
+ *
+ * Fires when:
+ *   - Vehicle model year is known AND age ≥ 7yr
+ *   - Any exclusion / special condition mentions "eşdeğer parça", "çıkma parça",
+ *     "orijinal olmayan", or similar OEM-restricting language.
+ *
+ * Turkish İ handled via character classes (gotcha #62).
+ */
+export function derivePartsClauseInsight(
+  policy: AnalyzedPolicy,
+  data: ExtractedPolicyData
+): string | null {
+  const year = policy.vehicleInfo?.year
+  if (!year || year <= 0) return null
+  const age = new Date().getFullYear() - year
+  if (age < 7) return null
+
+  const NON_OEM_PATTERNS = [
+    /eşdeğer\s+parça/i,
+    /ç[iı]kma\s+parça/i,
+    /or[iı]j[iı]nal\s+olmayan/i,
+    /yan\s+sanay[iı]/i,
+    /OEM\s+olmayan/i,
+  ]
+
+  const hayBlob = [
+    ...(data.exclusions ?? []),
+    ...(policy.exclusions ?? []),
+    ...(data.specialConditions ?? []),
+    ...(policy.specialConditions ?? []),
+  ]
+    .filter((s): s is string => typeof s === 'string')
+    .join(' | ')
+
+  if (!hayBlob) return null
+
+  for (const pattern of NON_OEM_PATTERNS) {
+    if (pattern.test(hayBlob)) {
+      return `⚠ ${age} yaşında araçta eşdeğer/çıkma parça kullanımı — onarım kalitesi ve ikinci el değeri etkilenebilir; orijinal parça (OEM) zeyilnamesi düşünülmelidir`
+    }
+  }
+  return null
 }
 
 /**
@@ -3261,6 +3349,36 @@ export async function extractPolicyComprehensive(
  * Convert comprehensive extraction result to AnalyzedPolicy
  * Bridges the new extraction format with existing policy type
  */
+/**
+ * Derive the canonical `discounts` field from the comprehensive extraction
+ * path when the AI didn't populate `data.discounts` directly. Reuses the
+ * existing `noClaimsBonus.discountRate` value (already extracted by the
+ * kasko parser prompt) so NCD surfaces through the unified field path.
+ *
+ * Returns undefined when no NCD / discount data is recoverable, matching
+ * the `discounts?:` optional semantics.
+ */
+export function deriveDiscountsFromStructured(
+  data: StructuredPolicyData
+): AnalyzedPolicy['discounts'] | undefined {
+  const ncb = (data as unknown as { noClaimsBonus?: { discountRate?: string | null } })
+    .noClaimsBonus
+  if (!ncb || !ncb.discountRate) return undefined
+
+  // Parse "40%" / "%40" / "40" / "%40,5" → 40 (int). If unparseable, skip.
+  const digits = String(ncb.discountRate).match(/(\d+(?:[.,]\d+)?)/)
+  if (!digits) return undefined
+  const parsed = Math.round(Number(digits[1].replace(',', '.')))
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) return undefined
+
+  return {
+    ncdDiscount: parsed,
+    groupDiscount: null,
+    otherDiscountPct: null,
+    evidence: ncb.discountRate,
+  }
+}
+
 export function comprehensiveToAnalyzedPolicy(
   result: ComprehensiveExtractionResult,
   file: File,
@@ -3362,6 +3480,7 @@ export function comprehensiveToAnalyzedPolicy(
           usage: data.vehicle.usageType,
         }
       : undefined,
+    discounts: data.discounts ?? deriveDiscountsFromStructured(data),
   }
 
   // Translate insights to Turkish at extraction time

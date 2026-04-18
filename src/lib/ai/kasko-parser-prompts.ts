@@ -187,6 +187,12 @@ OUTPUT FORMAT (MUST FOLLOW EXACTLY):
     "paymentPlan": "string or null",
     "installments": number or null
   },
+  "discounts": {
+    "ncdDiscount": number or null,
+    "groupDiscount": number or null,
+    "otherDiscountPct": number or null,
+    "evidence": "string or null"
+  },
   "coverages": [
     {
       "name": "string",
@@ -431,6 +437,18 @@ export interface StructuredPolicyData {
     paymentPlan: string | null
     installments: number | null
   }
+  /**
+   * Premium discounts (NCD / group / other). Optional — set the whole
+   * object to null (or omit) if no discount rows appear on the policy.
+   * Percent integers (e.g. 40 = 40%). Mirrors `ExtractedPolicyData.discounts`
+   * so both extraction paths surface the same field on `AnalyzedPolicy`.
+   */
+  discounts?: {
+    ncdDiscount: number | null
+    groupDiscount: number | null
+    otherDiscountPct: number | null
+    evidence: string | null
+  } | null
   coverages: Array<{
     name: string
     nameTr: string

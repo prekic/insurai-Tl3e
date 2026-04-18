@@ -97,11 +97,14 @@ describe('EXTRACTION_JSON_SCHEMA Required Fields', () => {
     expect(required).toContain('clauseGraph')
   })
 
-  it('should have exactly 19 required fields', () => {
-    // 17 original + exclusionsEn + conditionalDeductibles (added in #331 to
-    // satisfy OpenAI strict mode — every property in `properties` must also
-    // be in `required[]`. Both are nullable types so the LLM can return null.)
-    expect(required.length).toBe(19)
+  it('should have exactly 20 required fields', () => {
+    // 17 original + exclusionsEn + conditionalDeductibles (#331) + discounts
+    // (Bug #9, Apr 2026). All nullable types so the LLM can return null.
+    expect(required.length).toBe(20)
+  })
+
+  it('should require discounts', () => {
+    expect(required).toContain('discounts')
   })
 })
 

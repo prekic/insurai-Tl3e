@@ -167,6 +167,35 @@ export const EXTRACTION_JSON_SCHEMA = {
         description:
           'Structured conditional deductibles (muafiyet / tenzili muafiyet). List every scenario-triggered deductible: age-based, license-based, non-contracted service, repair-conditional, partial/total loss. Each entry MUST include a verbatim evidence quote. Return null or empty array ONLY if none are present in the document.',
       },
+      discounts: {
+        type: ['object', 'null'],
+        properties: {
+          ncdDiscount: {
+            type: ['number', 'null'],
+            description:
+              'No-Claim Discount percentage (Hasarsızlık İndirimi). Integer percent, e.g. 40 for 40%. Null if not specified.',
+          },
+          groupDiscount: {
+            type: ['number', 'null'],
+            description:
+              'Group / fleet discount percentage (Grup İndirimi / Filo İndirimi). Integer percent. Null if not specified.',
+          },
+          otherDiscountPct: {
+            type: ['number', 'null'],
+            description:
+              'Any other discount percentage (Özel İndirim, Kampanya İndirimi, etc.). Integer percent. Null if not specified.',
+          },
+          evidence: {
+            type: ['string', 'null'],
+            description:
+              'Verbatim quote from the policy text showing the discount line. DO NOT paraphrase. Null if no discount row found.',
+          },
+        },
+        required: ['ncdDiscount', 'groupDiscount', 'otherDiscountPct', 'evidence'],
+        additionalProperties: false,
+        description:
+          'Premium discounts applied to the policy. Set the whole object to null if no discount rows appear on the policy.',
+      },
       amendmentInfo: {
         type: 'object',
         properties: {
@@ -364,6 +393,7 @@ export const EXTRACTION_JSON_SCHEMA = {
       'exclusions',
       'exclusionsEn',
       'conditionalDeductibles',
+      'discounts',
       'amendmentInfo',
       'evidence',
       'clauseGraph',

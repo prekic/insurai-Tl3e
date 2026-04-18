@@ -1,206 +1,271 @@
-# Session Handoff — April 16, 2026 (Ray Sigorta Commercial Kasko QA Fixes)
+# Session Handoff — April 18, 2026 (Phase E + Autonomous Follow-ups)
 
-> **Session type**: Bug fix + test hardening. User provided a detailed QA bug report from a Ray Sigorta 32630901/3 Grup Kasko policy (1997 IVECO commercial fleet truck) surfacing 16 extraction/interpretation bugs. We fixed the 8 most impactful ones (P0 + key P1) and added 63 regression tests guarding against them. All changes committed and pushed on feature branch; PR #351 open.
+> **Branch**: `claude/load-project-context-d2ylb` — 4 commits ahead of `origin/main`, clean working tree, all pushed.
+> **No PR opened** (user held back). Merge-ready: CI should pass on push.
 
-## 🎯 Immediate Next Steps for the Next Agent
+## 🎯 Immediate Next Steps — Priority Order
 
-### Priority 1: Merge PR #351
-- **URL**: https://github.com/prekic/insurai/pull/351
-- **Branch**: `claude/load-project-context-BkEVh`
-- **Status**: 3 commits pushed, clean working tree, CI should be green (617 tests across 11 suites verified locally, 0 TS errors)
-- **PR Title**: `fix(extraction): fix 8 QA bugs from Ray Sigorta commercial kasko` (valid Conventional Commit — will trigger release-please correctly)
+| # | Action | Blocker | Link |
+|---|--------|---------|------|
+| 1 | **Open PR → main** for this branch | User gating decision only | Suggested squash title in Step 5 below |
+| 2 | **Upload Ray Sigorta PDF fixture** — `KRK_35_VD_458_Kasko_Police_32630901_3.pdf` → `policies/` + add fixture entry to `src/lib/ai/__tests__/qa-pdf-golden.test.ts` (premium 755.21 TL, 17 DAHİL + 10 HARİÇ, IVECO/KAMYON 80-12 1997, plate 35 VD 458) | User has the PDF | Previous handoff carry-forward |
+| 3 | **Pilot activation — 3 operator SQL steps** | Manual operator work | `docs/runbooks/04-phase-e-production-scaleup.md` §1–§4 |
+| 4 | **DB date-corruption audit + repair** (gotcha #52) | Needs prod DB access | `docs/runbooks/05-date-corruption-audit.md` — diagnostic SQL ready to paste |
+| 5 | **Privacy review for email resolver** → set `ENABLE_ADMIN_EMAIL_RESOLVER=true` after review | Operational decision | ADR-0004 documents the rationale |
+| 6 | Pilot calibration auto-escalation | Waits on pilot n ≥ 50 | `scripts/calibrate-grade-thresholds.ts --auto-production --apply` — cron-safe, no manual action needed now |
+| 7 | Phase F runbook completion | Waits on Phase E E2 soak data | `docs/runbooks/06-phase-f-draft-removal.md` skeleton is in place |
 
-### Priority 2: Upload Ray Sigorta PDF Fixture (DEFERRED)
-- The original Ray Sigorta PDF `KRK_35_VD_458_Kasko_Police_32630901_3.pdf` is NOT in the repo
-- **User was asked to upload it** but we ended the session before it happened
-- **Where to drop it**: `policies/` folder (committed, runs in CI) OR `test-data/` (gitignored, local-only for PII)
-- **Once uploaded**, add a fixture entry to `src/lib/ai/__tests__/qa-pdf-golden.test.ts`:
-  ```ts
-  {
-    path: 'policies/KRK_35_VD_458_Kasko_Police_32630901_3.pdf',
-    insurer: 'Ray Sigorta',
-    description: 'Ray Sigorta Commercial Fleet Truck (1997 IVECO)',
-    expectedMakeContains: 'IVECO',
-    expectedYear: 1997,
-    expectedPlate: '35 VD 458',
-    expectedPremiumOneOf: [755.21, 719.25], // Brüt / Net
-    shouldFindDahilHaric: true,
-  },
-  ```
-- Then run: `npx vitest run src/lib/ai/__tests__/qa-pdf-golden.test.ts`
+**Nothing on this list is a blocker for merging the branch.** Items 2–7 are operational follow-ups that happen post-merge, or external to code.
 
-### Priority 3: Monitor KASKO Pilot Calibration (carry-forward)
-- Pilot thresholds A: 93, B: 85, C/D: 60 were forced at n=29. Monitor for skew as volume grows past 50 policies.
-- `scripts/calibrate-grade-thresholds.ts` min sample was lowered 50→5 to unblock pilot; revert to 50 when volume sufficient.
+---
 
-### Priority 4: Address Deferred P1/P2 Bugs (not fixed this session)
-From the original QA report, these remain open:
-- **#6 Depreciation clause (Eskime Payı/Kıymet Artışı)**: Add AI prompt guidance for 50%-max depreciation on aged vehicles
-- **#7 Parts clause (Eşdeğer/Çıkma Parça)**: Add risk flag for non-OEM parts on older vehicles
-- **#9 NCD/Group discount extraction**: Add `discounts` section to schema (ncdDiscount, groupDiscount %)
-- **#10 Commercial template**: Branch output language by `KULLANIM TARZI` (KAMYON/OTOMOBİL) and insured entity type (VKN vs TCKN)
-- **#13 Market comparison for commercial/truck**: Integrate TSB data or suppress market comparison when benchmark confidence is low for niche vehicles
-- **#14 Confidence score post-processing**: AI returns 99% even with 30+ graph warnings; add post-extraction confidence adjustment
-- **#15 Locale mixing in output**: Some recommendation strings still leak English into Turkish UI
+## What This Session Shipped (4 commits)
 
-## Current State
-
-**Branch**: `claude/load-project-context-BkEVh` — 3 commits ahead of `origin/main`.
-**Working tree**: Clean (after docs update).
-**Tests**: 617 passing across 11 suites (verified locally). 0 TS errors.
-
-## What This Session Produced
-
-### Bug Fixes (8 bugs across 10 files)
-
-**P0 (Critical Parser/Extraction Bugs)**:
-
-1. **Premium 100× Turkish decimal comma**: Expanded `premiumPatterns` in `policy-extractor.ts:1697-1731` to handle Turkish İ (U+0130) with character classes `pr[iİ]m`, `br[uü]t`, and to allow intervening words like "NET" in "TOPLAM NET PRİM". Root cause: JS `/i` flag does simple case folding and does not match `PRİM` against `prim`.
-
-2. **Vehicle make/model column-aligned extraction**: Widened `extractVehicleInfoFromText()` regex in `turkish-utils.ts:388-433` to allow `\s{0,50}` spacing, handle `MARKASI/TİPİ` variant (commercial policies), and added standalone `MODEL:` pattern.
-
-3. **Sigorta Bedeli raw-text fallback**: Added patterns in `calculateMainCoverage()` block (`policy-extractor.ts:1682-1701`) to match `sigorta bedeli (16750 -TL)` free-text references when structured coverages don't contain the sum insured. Uses `s[iİ]gorta\s+bedel[iİ]` for Turkish İ.
-
-4. **DAHİL/HARİÇ flag inversion (6-part fix)**:
-   - `shared/extraction-schema.ts`: Added `included: boolean` to coverage items; required array 8→9
-   - `src/lib/ai/extraction-schema.ts`: Added `included?: boolean` to `ExtractedCoverage`; DAHİL/HARİÇ + commercial alcohol prompt guidance
-   - `src/lib/ai/policy-extractor.ts`: Changed hardcoded `included: true` to `c.included ?? true` (both sites)
-   - `src/lib/ai/kasko-parser-prompts.ts`: Added `included?: boolean` to `StructuredPolicyData.coverages`
-   - `src/lib/ai/table-parser.ts`: Keep excluded coverages with `included: false` instead of returning `null`; `isIncludedValue()` default is now `false` (safe); patterns strengthened with `/dahi̇l/i` variant and `/^x$/i` (anchored, was `/x/i`)
-   - `shared/__tests__/extraction-schema.test.ts`: Updated coverage property count 8→9
-
-**P1 (Interpretation/Logic)**:
-
-5. **Unresolved relationship filtering**: `relationship-resolver.ts:44-54` now `console.warn()` internal warnings instead of pushing to `policy.aiInsights[]`.
-
-6. **Historical policy detection**: `evaluator.ts:1347-1362` adds >2-year threshold — policies expired >2yr get "Historical Policy — For Reference Only" instead of absurd "Renew Expired Policy Immediately".
-
-7. **Commercial vehicle alcohol exclusion (prompt-only)**: Added AI prompt guidance in `extraction-schema.ts` for 0.00‰ ticari araç rules vs 0.50‰ hususi.
-
-8. **Deductible assignment max-across**: `policy-extractor.ts` two sites (1834, 3324) now use `Math.max(0, ...coverages.map((c) => c.deductible ?? 0))` instead of `coverages[0]?.deductible ?? 0`.
-
-### Regression Tests Added (63 new tests)
-
-- **`src/lib/ai/__tests__/qa-regression-fixes.test.ts`** (38 tests): Unit tests per bug — parseTurkishCurrency, vehicle regex, sigorta bedeli patterns, DAHİL/HARİÇ schema, isIncludedValue behavior, resolveClauseRelationships, historical policy, deductible max.
-- **`src/lib/ai/__tests__/qa-pdf-golden.test.ts`** (25 tests): Loads 4 real Turkish kasko PDFs from `policies/` directory (Eriş Ambalaj/VOLKSWAGEN, Allianz/PEUGEOT, Anadolu/RENAULT, Anadolu/VOLKSWAGEN) and asserts extraction patterns work. Includes cross-PDF aggregate check that guards against 100× bug regression (fails if any premium >200K TL appears).
-
-### Additional Bugs Discovered During Test Authoring
-
-- `INCLUDED_PATTERNS` in `table-parser.ts` had `/x/i` matching any word containing x ("text", "next") → changed to `/^x$/i` (anchored)
-- `INCLUDED_PATTERNS` missed Turkish İ→i̇ lowercase variant → added `/dahi̇l/i` fallback
-- Sigorta bedeli production regex also had Turkish İ issue → fixed to `s[iİ]gorta\s+bedel[iİ]`
-
-### Note: Prettier Auto-Formatted Unrelated Code in `table-parser.ts`
-
-The lint-staged pre-commit hook ran `prettier --write` on `table-parser.ts` and reformatted ~25 lines of code unrelated to our bug fixes:
-- 6 arrow functions: `(p =>` → `((p) =>`
-- ~12 quoted object keys: `'hırsızlık':` → `hırsızlık:`
-- `mainTypes` array reformatted to multi-line
-
-These are zero-functional-impact stylistic changes. Reviewers should NOT flag them as suspicious. Functional changes in `table-parser.ts` are limited to: `INCLUDED_PATTERNS` array, `EXCLUDED_PATTERN` regex, `extractCoverageFromRow()` block (~248-275), and `isIncludedValue()` default return.
-
-## Files Modified / Created (This Session)
-
-| File | Change |
-|------|--------|
-| `shared/extraction-schema.ts` | Added `included` boolean to coverage items + required array (8→9) |
-| `shared/__tests__/extraction-schema.test.ts` | Updated coverage property count assertion 8→9 |
-| `src/lib/ai/extraction-schema.ts` | Added `included?` to `ExtractedCoverage`; expanded prompt with DAHİL/HARİÇ + alcohol guidance |
-| `src/lib/ai/policy-extractor.ts` | Fixed 4 premium patterns for Turkish İ; added sigorta bedeli fallback; `c.included ?? true`; deductible max-across |
-| `src/lib/ai/table-parser.ts` | Preserve excluded coverages; `isIncludedValue()` default false; `/^x$/i` + `/dahi̇l/i` patterns |
-| `src/lib/ai/turkish-utils.ts` | Widened vehicle make/model regex (MARKASI/TİPİ + wide spacing) |
-| `src/lib/ai/kasko-parser-prompts.ts` | Added `included?: boolean` to `StructuredPolicyData.coverages` |
-| `src/lib/ai/relationship-resolver.ts` | Filtered unresolved warnings from aiInsights → console.warn |
-| `src/lib/policy-evaluation/evaluator.ts` | Historical policy detection (>2yr expired) |
-| `src/lib/policy-evaluation/evaluator-branches.test.ts` | Split expired test into recent/historical cases |
-| `src/lib/ai/__tests__/qa-regression-fixes.test.ts` | **NEW** — 38 unit regression tests |
-| `src/lib/ai/__tests__/qa-pdf-golden.test.ts` | **NEW** — 25 golden tests against 4 real PDFs |
-| `CLAUDE.md` | Added "Next Session Instructions" block (PR #351 merge priority + deferred PDF upload); added gotchas #62-#72 (extends #70 with #71 lint-staged + #72 parseTurkishCurrency dot-only ambiguity); updated project state + Last Updated |
-| `SESSION_HANDOFF.md` | This file |
-
-## Environment / Configuration
-
-**No new environment variables added.** No config changes to `app_settings` or database schema required. The `shared/extraction-schema.ts` change (added `included` field) changes the OpenAI strict-mode JSON schema sent to the LLM — next AI extraction call will include the new field. No migration needed; AI will default `included: true` when the DAHİL/HARİÇ column isn't present.
-
-**Existing env vars still required** (all pre-existing — verify in `.env` before running locally):
-- `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_CLOUD_API_KEY`, `GCP_SERVICE_ACCOUNT_BASE64`
-- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_JWT_SECRET`
-- `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
-
-## Known Issues / Limitations (NOT bugs to fix this round)
-
-- **`parseTurkishCurrency('500.000')` returns 500, not 500,000**: Known dot-only ambiguity. See CLAUDE.md gotcha #72. Production impact: zero today (all premium/coverage values come from text containing `,XX` cents); future risk if a PDF presents a round amount without cents.
-- **`[ClauseResolver]` warnings in test stderr**: Intentional. The relationship-resolver fix (gotcha #67) routes ambiguous edges to `console.warn` instead of user-visible `aiInsights`. Tests exercising this path will print warnings — these prove the fix works.
-- **Prettier reformatted unrelated arrow-function syntax in `table-parser.ts`**: 25 lines of stylistic-only changes from the lint-staged pre-commit hook. Not bug fixes; do not revert.
-
-## Verification Commands (for the next agent)
-
-```bash
-# Branch state
-git status                           # should be clean
-git log --oneline -5                 # top 3 should be this session's commits
-git diff origin/main...HEAD --stat   # should show ~12-14 files
-
-# Tests (isolated — DO NOT run full suite without permission)
-npx vitest run src/lib/ai/__tests__/qa-pdf-golden.test.ts          # 25 pass
-npx vitest run src/lib/ai/__tests__/qa-regression-fixes.test.ts    # 38 pass
-npx vitest run shared/__tests__/extraction-schema.test.ts          # 12 pass
-npx vitest run src/lib/ai/extraction-schema.test.ts                # 69 pass
-npx vitest run src/lib/ai/turkish-utils.test.ts                    # 44 pass
-npx vitest run src/lib/policy-evaluation/evaluator-branches.test.ts # 75 pass
-
-# TypeScript
-npx tsc --noEmit  # 0 errors expected
+```
+26e49ee fix(extraction): address 7 deferred QA bugs + calibration guard + console cleanup
+2f3f0b7 feat(pilot): Phase E production scale-up — rollout bucketing + Segments admin UI + runbook
+33c2c65 fix(ui,docs): unblock 6 pre-existing TrustworthinessUI tests + align [ConfidenceDiag] docs + extend discounts to comprehensive path
+b1e6072 feat(admin,docs): autonomous follow-ups — email resolver, calibration auto-prod, RLS comment fix, runbooks 05+06
 ```
 
-### GitHub Operations (PR management, comments, merge)
+### By track
 
-The `gh` CLI is **NOT available** in this sandbox. All GitHub operations must use the GitHub MCP server tools (prefixed `mcp__github__`):
+**Track A — Console cleanup + calibration guard** (`26e49ee`)
+- `[ClauseResolver]` warnings gated under `NODE_ENV=test` with `VERBOSE_CLAUSE_RESOLVER=1` opt-in
+- `[TryAnalysis ConfidenceDiag]` gated behind `import.meta.env.DEV || localStorage.LOG_LEVEL==='debug'`
+- `calibrate-grade-thresholds.ts` gained `--force` + `--production` flags with mutual exclusion; writes audit row `app_settings.evaluation.grade_thresholds_last_calibrated` on every `--apply`
 
-| Task | Tool |
-|------|------|
-| Read PR #351 | `mcp__github__pull_request_read` |
-| Add PR comment | `mcp__github__add_issue_comment` |
-| Merge PR | `mcp__github__merge_pull_request` |
-| Check CI status | `mcp__github__list_commits` (then inspect `status`) |
+**Track B — Deferred QA bug fixes** (`26e49ee`)
+- #9 Discounts schema: `ncdDiscount / groupDiscount / otherDiscountPct / evidence` added to canonical extraction schema (+ client mirror + `AnalyzedPolicy`)
+- #13 Niche benchmark suppression: `isCommercialOrNicheVehicle()` downgrades confidence for KAMYON/TIR/Ticari/Filo/OTOBÜS
+- #6 Depreciation prompt, #7 parts clause (`derivePartsClauseInsight()`), #10 commercial branching (`detectInsuredEntityType` + `deriveVehicleUsage`), #14 confidence penalty from resolver warnings, #15 locale mixing DEV warning + regression test
 
-If the MCP github server is disconnected at session start, ToolSearch with `select:mcp__github__create_pull_request` (or similar) loads the schema. The server may disconnect/reconnect mid-session — handle gracefully.
+**Track C — Phase E production scale-up** (`2f3f0b7`)
+- New `src/lib/config/rollout-hash.ts` — shared `computeRolloutBucket(userId, flagKey)` reused by both `ConfigurationService.isFeatureEnabled()` and `evaluateKaskoPilotGate()`
+- `usePilotGateOptions` now surfaces `{ enabled, rolloutPercentage }` (was flattened to boolean map)
+- `evaluateKaskoPilotGate()` signature extended (back-compat with boolean form), bucket check runs between flag-enabled and segment-membership checks — anonymous users bypass the bucket
+- New `src/components/admin/tabs/SegmentsTab.tsx` + backend already existed at `server/routes/admin/segments.ts`
+- Product decisions baked into runbook: ladder 25%→100% / 7-day soak / zero-rollback-trigger advance criterion
+- Runbook `docs/runbooks/04-phase-e-production-scaleup.md`
 
-## Carry-Forward Priorities
+**Track D — UI/docs hygiene** (`33c2c65`)
+- `PolicyDetailView.tsx` banner gained "Unverified AI output" / "Doğrulanmamış AI çıktısı" prefix, aligning with PolicyCard + toast wording → 6 pre-existing tests unblocked
+- `[ConfidenceDiag]` claim in CLAUDE.md audited: commit `fdedfea` never existed here; only 1 site is real (TryAnalysis.tsx). Docs rewritten.
+- `discounts` field extended to `comprehensiveToAnalyzedPolicy` via new `deriveDiscountsFromStructured()` helper (parses `noClaimsBonus.discountRate` as fallback)
 
-| # | Priority | Status |
-|---|----------|--------|
-| 1 | Merge PR #351 (Ray Sigorta fixes) | 🟢 READY — CI should be green |
-| 2 | Upload Ray Sigorta PDF fixture | ⚠️ DEFERRED — awaiting user upload |
-| 3 | Address deferred P1/P2 bugs (#6, #7, #9, #10, #13, #14, #15) | 🟡 NOT STARTED |
-| 4 | Pilot threshold calibration monitoring | ⏳ ONGOING (from prior session) |
-| 5 | Phase E production scale-up | ⏳ PENDING (from prior session) |
-| 6 | Vitest console noise cleanup | ⏳ PENDING (from prior session) — **EXCLUDE `[ClauseResolver]` warnings from `qa-regression-fixes.test.ts`; they are intentional verification of the unresolved-relationship fix (gotcha #67), not noise** |
-| 7 | `[ConfidenceDiag]` log gating | ⏳ PENDING (from prior session) |
+**Track E — Autonomous follow-ups** (`b1e6072`)
+- `TrustworthinessUI.test.tsx:64` mock key fixed (`flags` → `featureFlags`) — closes a latent regression
+- Migration 040 RLS comments rewritten to accurately document the intentional-open policy design; CLAUDE.md gotcha #39 updated
+- `calibrate-grade-thresholds.ts --auto-production` flag added — cron-safe probe that escalates to production mode only when sample count ≥ 50 AND last audit shows `forced: true`
+- New runbook `05-date-corruption-audit.md` (V8 DD.MM.YYYY gotcha #52 diagnostic + repair SQL)
+- New runbook `06-phase-f-draft-removal.md` (skeleton for Phase F)
+- **New gated endpoint**: `POST /api/admin/app-users/resolve-emails` — resolves emails → UUIDs via `supabase.auth.admin.listUsers`, returns 403 `RESOLVER_DISABLED` unless server env has `ENABLE_ADMIN_EMAIL_RESOLVER=true`
+- `SegmentsTab` gained UUID/Email mode toggle with missing-email reporting
+
+---
+
+## Configuration Requirements
+
+### New environment variable (opt-in, privacy-sensitive)
+```
+# Default: disabled. Set to "true" ONLY after a privacy review.
+# When enabled, POST /api/admin/app-users/resolve-emails exposes
+# auth.users.email to super-admins via the Segments admin tab.
+ENABLE_ADMIN_EMAIL_RESOLVER=true
+```
+See `docs/adr/0004-env-var-gated-admin-features.md` for the design rationale. `.env.example` has been updated.
+
+### Existing vars — unchanged
+All pre-existing vars (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_CLOUD_API_KEY`, `GCP_SERVICE_ACCOUNT_BASE64`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_JWT_SECRET`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VAPID_*`, `CRON_SECRET`, `PILOT_REVIEWER_USER_ID`) still required per prior handoffs.
+
+### Schema — no new migrations
+All schema changes this session were either to inline migration comments (040) or to code-only (no `CREATE TABLE` / `ALTER TABLE`). No migration numbers consumed.
+
+---
+
+## Test / Build Status
+
+- **Typecheck**: 0 errors (client `npx tsc --noEmit` + server `npx tsc -p server/tsconfig.json`)
+- **Lint**: 0 errors, 0 warnings across all 35+ files touched this session
+- **Tests**: 
+  - qa-regression-fixes: 38 → 50 (+12 new)
+  - kasko-pilot-gate: 22 → 29 (+7 new for Phase E rollout)
+  - SegmentsTab: 13 total (+ 5 email-mode)
+  - admin-segments server: 12 → 18 (+6 email-resolver)
+  - benchmark-confidence: 18 → 20 (+2 for niche vehicle)
+  - reviewer-summary: 40 → 44 (+4 for entity/vehicle usage labels)
+  - TrustworthinessUI: 7/7 (6 previously failing → now pass)
+  - All touched suites: 100% pass rate
+- **Full test suite NOT run** (>10 min rule).
+
+---
+
+## Known Issues / Carry-Forward
+
+### Not bugs — flagged for awareness
+- **Phase F thresholds are provisional** in runbook 06 — tune after Phase E E2 produces real data
+- **Email resolver is feature-complete but disabled** — requires explicit privacy-review opt-in via env var
+- **`comprehensiveToAnalyzedPolicy` `discounts` field** relies on `deriveDiscountsFromStructured` parsing `noClaimsBonus.discountRate` — re-extractions under the updated kasko parser prompt (now including `discounts` in JSON template) will populate the field natively
+
+### Pre-existing issues flagged this session (not this-session regressions)
+- `[ClauseResolver]` diagnostic logs will still appear in `qa-regression-fixes.test.ts` (VERBOSE_CLAUSE_RESOLVER=1 opt-in) — that's intentional. They verify the unresolved-relationship filter works.
+- Commit `fdedfea` referenced in old CLAUDE.md gotcha about `[ConfidenceDiag]` does not exist in this repo — corrected in this session's docs
+
+---
 
 ## Non-Negotiable Rules (Carry Forward)
 
 1. Legacy arrays (`coverages`, `exclusions`, `insights`) NEVER overwritten
 2. Full test suite NEVER run without explicit user permission (>10 min)
-3. Pilot evidence from real live data only
+3. Pilot evidence from real live data only (no simulation)
 4. Never `VITE_` prefix on API keys
-5. All admin endpoints must have auth middleware
+5. All admin endpoints require auth middleware
 6. Market conclusions gated by `BenchmarkConfidence`
 7. Draft policies: TASLAK/DRAFT labeling on export/share
 8. Benchmark test mocks MUST include `dataDate`
 9. User-facing comparison: "estimate" / "model-based" qualifiers
 10. `auditLogs` array MUST have `MAX_ENTRIES` cap after `.push()`
-11. Extraction schema changes go in `shared/extraction-schema.ts` only (both client & server re-export)
+11. Extraction schema changes go in `shared/extraction-schema.ts` only
 12. `ProcessingLogger.onStageChange()` listener errors are caught individually
 13. `translations-skeleton.ts` accepts new KEYS with empty-string VALUES
-14. Server `__dirname` paths: `dist-server/server/` is the base — need 2 levels up to reach project root
-15. **NEW**: Turkish regex patterns must handle Turkish İ (U+0130) via `[iİ]` character class — JS `/i` flag alone does NOT match `PRİM` against `prim` (see gotcha #62)
-16. **NEW**: Coverage `included` field is now end-to-end required — schema, prompt, converter, and both extraction paths must preserve it (see gotcha #65)
-17. **NEW**: Historical policy threshold is 2 years — tests using hardcoded expired dates must use dates >2yr old or dynamic `setMonth(-6)` for Renew case (see gotcha #66)
+14. Server `__dirname` paths: `dist-server/server/` is the base
+15. Turkish regex patterns must handle Turkish İ via `[iİ]` character class (gotcha #62)
+16. Coverage `included` field is end-to-end required (gotcha #65)
+17. Historical policy threshold is 2 years (gotcha #66)
+18. **NEW (Apr 18)**: Pilot gate flag shape is polymorphic `boolean | {enabled, rolloutPercentage}` — prefer the object form for new callers (gotcha #73)
+19. **NEW (Apr 18)**: Rollout bucketing via `computeRolloutBucket()` — do NOT substitute hash algorithms without a migration plan (gotcha #74)
+20. **NEW (Apr 18)**: Privacy-sensitive admin features use env-var opt-in pattern (gotcha #75, ADR-0004)
+21. **NEW (Apr 18)**: Migration 040 RLS is intentionally open — do NOT tighten without proxying client-side calls (gotcha #76)
 
-## Anti-Patterns Not Repeated
+---
 
-- No full test suite run (>10 min rule) without prompting the user
-- No push to `main` — commit stays on feature branch `claude/load-project-context-BkEVh`
-- No mocking of real AI API calls — PDF golden tests use only deterministic regex layer, no API keys required
-- No hardcoded test dates near the 2-year threshold (`'2024-01-01'` would flip Renew/Historical over time)
+## Verification Commands (for the next agent)
+
+```bash
+# Branch state
+git status                                   # should be clean
+git log --oneline -5                         # top 4 should be this session's commits
+git diff origin/main...HEAD --stat           # shows ~35 files changed
+
+# Tests (isolated — DO NOT run full suite without permission)
+npx vitest run src/lib/ai/__tests__/qa-regression-fixes.test.ts       # 50 pass
+npx vitest run src/lib/analysis/__tests__/kasko-pilot-gate.test.ts    # 29 pass
+npx vitest run src/components/admin/tabs/SegmentsTab.test.tsx          # 13 pass
+npx vitest run server/__tests__/admin-segments.test.ts                 # 18 pass
+npx vitest run src/components/__tests__/TrustworthinessUI.test.tsx     # 7 pass
+npx vitest run src/lib/policy-evaluation/__tests__/benchmark-confidence.test.ts # 20 pass
+npx vitest run src/lib/reviewer/__tests__/policy-reviewer-summary.test.ts       # 44 pass
+
+# TypeScript
+npx tsc --noEmit                             # 0 errors
+npx tsc -p server/tsconfig.json              # 0 errors
+```
+
+### GitHub operations
+`gh` CLI is **NOT available** in this sandbox. Use `mcp__github__*` tools — see `docs/runbooks/*.md` for patterns.
+
+### Railway deploy
+Sandbox `git push` does NOT trigger Railway webhook (gotcha #22). Use `mcp__github__push_files` or merge PR via `mcp__github__merge_pull_request` to get Railway to redeploy.
+
+---
+
+## Complete File Inventory (from `git diff main...HEAD --name-status`)
+
+42 files changed (6 new, 36 modified) across 5 commits. Listed below verbatim so grep-by-filename resolves every entry.
+
+### New files (A)
+| File | Commit | Purpose |
+|------|--------|---------|
+| `src/lib/config/rollout-hash.ts` | `2f3f0b7` | Shared `computeRolloutBucket()` + `hashString()` |
+| `src/components/admin/tabs/SegmentsTab.tsx` | `2f3f0b7` | Admin UI for reviewer segment management |
+| `src/components/admin/tabs/SegmentsTab.test.tsx` | `2f3f0b7` / `b1e6072` | RTL tests (13 total incl. email mode) |
+| `docs/runbooks/04-phase-e-production-scaleup.md` | `2f3f0b7` | 25% → 100% Phase E runbook |
+| `docs/runbooks/05-date-corruption-audit.md` | `b1e6072` | V8 DD.MM.YYYY audit + repair SQL |
+| `docs/runbooks/06-phase-f-draft-removal.md` | `b1e6072` | Phase F runbook skeleton |
+| `docs/adr/0004-env-var-gated-admin-features.md` | `2eefddb` | Env-var-opt-in pattern ADR |
+
+### Modified files (M) — grouped by subsystem
+
+**Extraction schema + types**
+- `shared/extraction-schema.ts` — `discounts` object added; required bumped 19→20
+- `shared/__tests__/extraction-schema.test.ts` — count assertion + new discounts test
+- `src/lib/ai/extraction-schema.ts` — `ExtractedPolicyData.discounts?`, prompt #12 (discounts), #13 (depreciation), #14 (parts clause)
+- `src/lib/ai/extraction-schema.test.ts` — count bump + new discounts test
+- `src/lib/ai/kasko-parser-prompts.ts` — `StructuredPolicyData.discounts?` + JSON template entry
+- `src/types/policy.ts` — `AnalyzedPolicy.discounts?`
+- `src/types/admin.ts` — `AdminSection` union + `'segments'`
+
+**AI extraction pipeline**
+- `src/lib/ai/policy-extractor.ts` — all 7 QA fixes; `deriveDiscountsFromStructured`, `derivePartsClauseInsight`, `detectInsuredEntityType` hookups; confidence penalty via resolver stats
+- `src/lib/ai/relationship-resolver.ts` — `QUIET_CLAUSE_RESOLVER` gate + new `stats.unresolvedCount` out-param
+- `src/lib/ai/turkish-utils.ts` — `isValidVKN()`, `detectInsuredEntityType()`
+
+**Pilot gate + rollout**
+- `src/lib/analysis/kasko-pilot-gate.ts` — polymorphic flag shape + bucket check + `inactiveResult()` helper
+- `src/lib/analysis/__tests__/kasko-pilot-gate.test.ts` — +7 Phase E distribution/determinism tests (29 total)
+- `src/hooks/usePilotGateOptions.ts` — preserves `rolloutPercentage`, new `PilotFeatureFlag` type
+- `src/hooks/usePilotGateOptions.test.ts` — mock updated to new shape
+- `src/hooks/useDisplaySafeSummary.ts` — option type widened to accept both boolean and object flag shapes
+- `src/lib/config/configuration-service.ts` — `isFeatureEnabled()` uses shared `computeRolloutBucket()`; private `hashString()` removed
+
+**Policy evaluator**
+- `src/lib/policy-evaluation/evaluator.ts` — `isCommercialOrNicheVehicle()` niche-benchmark downgrade
+- `src/lib/policy-evaluation/__tests__/benchmark-confidence.test.ts` — fixture tweak + 2 new commercial-downgrade tests
+
+**Reviewer summary**
+- `src/lib/reviewer/policy-reviewer-summary.ts` — `entityType`, `vehicleUsage`, `typeLabel`, `entityLabel` + derive helpers
+- `src/lib/reviewer/__tests__/policy-reviewer-summary.test.ts` — +4 commercial-template-branching tests (44 total)
+
+**Admin backend + UI**
+- `server/routes/admin/segments.ts` — new `POST /app-users/resolve-emails` endpoint + env gate
+- `server/__tests__/admin-segments.test.ts` — +6 resolver tests (18 total)
+- `server/routes/admin/monitoring.ts` — D1 pilot monitoring: `calibration` block on rollback-status response
+- `src/lib/admin/api.ts` — Phase E segment helpers + `resolveEmailsToUuids` + `EmailResolverDisabledError`
+- `src/components/admin/AdminDashboard.tsx` — Segments tab registration (import + TABS + render switch)
+
+**UI hygiene**
+- `src/components/PolicyDetailView.tsx` — UNVERIFIED banner prefix copy
+- `src/components/TryAnalysis.tsx` — `[ConfidenceDiag]` log gated behind DEV/`localStorage.LOG_LEVEL`
+- `src/components/__tests__/TrustworthinessUI.test.tsx` — mock key typo fix (`flags` → `featureFlags`)
+
+**QA regression tests**
+- `src/lib/ai/__tests__/qa-regression-fixes.test.ts` — 38 → 50 tests (VERBOSE_CLAUSE_RESOLVER=1 opt-in, +12 covering bugs #6-#15 and discounts derivation)
+
+**Operations / ops tooling**
+- `scripts/calibrate-grade-thresholds.ts` — `--force`, `--production`, `--auto-production` flags; `recordCalibrationAudit()`
+- `supabase/migrations/040_kasko_pilot_flag_and_segment.sql` — RLS policy names + inline comments corrected (fresh-install only; see nuance below)
+
+**Docs**
+- `CLAUDE.md` — Next Session Instructions rewritten; 6 new gotchas #73-#78; env var section; Last Updated Apr 18
+- `SESSION_HANDOFF.md` — this file
+- `.env.example` — `ENABLE_ADMIN_EMAIL_RESOLVER` documented
+- `docs/KNOWN_ISSUES_ARCHIVE.md` — entry #171 (`[ConfidenceDiag]`) corrected to match repo reality
+
+---
+
+## Environment / Config Nuances
+
+### `VERBOSE_CLAUSE_RESOLVER` (test-time only)
+Not in `.env.example` because it's a **test runner override**, not a runtime config. `src/lib/ai/relationship-resolver.ts` suppresses its own `[ClauseResolver]` warnings when `NODE_ENV=test` unless the test file opts in via `process.env.VERBOSE_CLAUSE_RESOLVER = '1'` in `beforeAll`. Currently only `qa-regression-fixes.test.ts` opts in (the warnings verify the unresolved-relationship filter). If you notice `[ClauseResolver]` noise in a different test file, it means that test exercises the resolver without opting in — the noise is harmless and suppressible by scoping the opt-in or removing it.
+
+### `localStorage.LOG_LEVEL` (browser only)
+Not an env var. Browser-side debug toggle for `[TryAnalysis ConfidenceDiag]` (the only live `[ConfidenceDiag]` site). Set via `localStorage.setItem('LOG_LEVEL','debug')` in the browser devtools to surface the log in production builds. Removing the key returns to silent.
+
+### Migration 040 — file-vs-prod-DB divergence
+`supabase/migrations/040_kasko_pilot_flag_and_segment.sql` was edited this session to rename the two RLS policies to `"Open read/write (API layer enforces auth)"` and add inline comments explaining intent. **But the migration already ran in production**, so the prod DB still carries the old policy names (`"Service role manages segments"` and `"Service role manages QA records"`). Fresh installs / local dev recreate with the new names. Do not write a "rename policy" migration unless there's an operational need — the policy bodies are identical either way. The CLAUDE.md update to gotcha #76 reflects this nuance.
+
+---
+
+## Session-Specific Gotchas Worth Surfacing
+
+These got written into code but belong in a quick-reference list:
+
+1. **`vi.hoisted()` must wrap class definitions, not just `vi.fn`** (SegmentsTab.test.tsx). When a test's `vi.mock()` factory needs to return a class (e.g. an Error subclass for `instanceof` checks), the class definition itself must be inside `vi.hoisted(() => { class X extends Error {...}; return { X, ... } })`. A top-level `class MockErr extends Error {}` referenced from `vi.mock()` throws `ReferenceError: Cannot access 'MockErr' before initialization` because `vi.mock()` is hoisted above all top-level statements including class declarations. This is a sharper variant of the general `vi.hoisted()` pattern documented elsewhere in CLAUDE.md.
+
+2. **Email resolver caps at 1000 auth.users**. `server/routes/admin/segments.ts` `POST /app-users/resolve-emails` paginates via `supabase.auth.admin.listUsers({ perPage: 1000, page: 1 })` — a single page. Platforms with more than 1000 users will see emails falsely reported as "missing" when they in fact exist beyond the first 1000. Response includes `cappedAtUserListLimit: true` so the UI can show a notice. **If the pilot scales past 1000 users**, upgrade the endpoint to a server-side SQL function that indexes by email (auth schema queries require the service-role client).
+
+3. **`evaluateKaskoPilotGate()` anonymous-userId bypass**. If `userId` is undefined, the gate skips **both** the rollout-bucket check (can't hash without userId) AND the segment check (anonymous → `userInSegment = true` fallthrough). This is intentional — anonymous TryAnalysis uploads must keep working post-Phase-D without a user account. But it means `rolloutPercentage = 0` does NOT block anonymous users; it only blocks logged-in non-segment users. Document this if/when Phase F locks anonymous paths to the same rollout %.
+
+4. **The Turkish comma decimal parse in `deriveDiscountsFromStructured` rounds aggressively**. `'%40,5' → 40.5 → Math.round(40.5) → 41`. This is correct for percent-integer storage but surprising if an operator expects fractional percent. If future policies show fractional NCDs (unlikely in Turkey), the field should be changed from `number` to `number | string` and storage kept as-written.
+
+5. **`.husky/pre-commit` can silently exit `lint-staged` as no-op** when a commit contains only files already linted via a previous stash. Saw the message `"lint-staged could not find any staged files matching configured tasks"` on the handoff commit — this is normal (the docs files matched no lint-staged config). Don't mistake it for an error.

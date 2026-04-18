@@ -96,6 +96,44 @@ function computeBenchmarkFreshness(
   return { freshness, dataAgeDays }
 }
 
+/**
+ * Detect commercial or niche vehicles (trucks, buses, construction equipment,
+ * fleet) that fall outside the MARKET_BENCHMARKS private-kasko cohort.
+ *
+ * Matches Turkish vehicle class / usage strings. Case-insensitive and handles
+ * Turkish İ via character class (gotcha #62).
+ */
+function isCommercialOrNicheVehicle(
+  analyzedPolicy: import('@/types/policy').AnalyzedPolicy
+): boolean {
+  const signals = [analyzedPolicy.vehicleInfo?.vehicleClass, analyzedPolicy.vehicleInfo?.usage]
+    .filter((s): s is string => typeof s === 'string' && s.length > 0)
+    .map((s) => s.toLowerCase())
+
+  if (signals.length === 0) return false
+
+  // Kamyon, Kamyonet, Tır, Otobüs, Minibüs, Midibüs, İş makinesi, Ticari, Filo
+  const NICHE_PATTERNS: RegExp[] = [
+    /\bkamyon(et)?\b/i,
+    /\bt[iı]r\b/i,
+    /\botob[uü]s\b/i,
+    /\bmin[iı]b[uü]s\b/i,
+    /\bmid[iı]b[uü]s\b/i,
+    /\b[iı]ş\s*mak[iı]nes[iı]\b/i,
+    /\btar[iı]m\s*mak[iı]nes[iı]\b/i,
+    /\bt[iı]car[iı]\b/i, // "ticari" — commercial usage flag
+    /\bf[iı]lo\b/i,
+    /\bkrom\b|\bçek[iı]c[iı]\b/i, // tractor/tractor-trailer
+  ]
+
+  for (const signal of signals) {
+    for (const pattern of NICHE_PATTERNS) {
+      if (pattern.test(signal)) return true
+    }
+  }
+  return false
+}
+
 function assessBenchmarkConfidence(
   policy: Policy,
   dataDate?: string,
@@ -166,6 +204,23 @@ function assessBenchmarkConfidence(
       'Insufficient context for meaningful market comparison — vehicle, location, and coverage data missing'
     suppressionReasonTr =
       'Anlamlı piyasa karşılaştırması için yeterli bağlam yok — araç, konum ve teminat bilgileri eksik'
+  }
+
+  // Commercial / niche-vehicle downgrade (Bug #13, Apr 2026).
+  // Our MARKET_BENCHMARKS cover private kasko; trucks, buses, and construction
+  // equipment have fundamentally different premium/loss profiles. Downgrade
+  // confidence one step (high → low, low → suppressed) and emit a specific
+  // suppression reason so the UI can show a niche-vehicle notice.
+  if (isCommercialOrNicheVehicle(analyzedPolicy) && level !== 'suppressed') {
+    if (level === 'high') {
+      level = 'low'
+    } else if (level === 'low') {
+      level = 'suppressed'
+      suppressionReason =
+        'Commercial or niche vehicle (truck / bus / fleet) — private-vehicle benchmarks are not applicable. Market comparison suppressed pending TSB commercial data.'
+      suppressionReasonTr =
+        'Ticari veya özel kullanımlı araç (kamyon / otobüs / filo) — özel araç piyasa karşılaştırması uygulanamaz. TSB ticari araç verileri gelene kadar karşılaştırma yapılmıyor.'
+    }
   }
 
   // Stale data downgrades confidence by one step

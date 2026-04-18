@@ -4,7 +4,7 @@ import type { DisplaySafePolicySummary } from '@/types/display'
 import type { ExtractedPolicyData } from '@/lib/ai/extraction-schema'
 import { generateDisplaySafeSummary } from '@/lib/analysis/display-interpreter'
 import { generateAnalysisBundle } from '@/lib/analysis/engine'
-import { evaluateKaskoPilotGate } from '@/lib/analysis/kasko-pilot-gate'
+import { evaluateKaskoPilotGate, type PilotFeatureFlagValue } from '@/lib/analysis/kasko-pilot-gate'
 
 /**
  * Hook that converts an AnalyzedPolicy into a DisplaySafePolicySummary.
@@ -24,7 +24,12 @@ import { evaluateKaskoPilotGate } from '@/lib/analysis/kasko-pilot-gate'
 export function useDisplaySafeSummary(
   policy: AnalyzedPolicy | undefined | null,
   options?: {
-    featureFlags?: Record<string, boolean>
+    /**
+     * Feature-flag map. Legacy `Record<string, boolean>` and the Phase E
+     * `Record<string, { enabled, rolloutPercentage }>` forms are both
+     * accepted — `evaluateKaskoPilotGate` normalizes internally.
+     */
+    featureFlags?: Record<string, PilotFeatureFlagValue>
     userSegments?: string[]
     userId?: string
   }

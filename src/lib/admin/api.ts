@@ -95,10 +95,7 @@ export async function adminFetch(url: string, options: RequestInit = {}): Promis
 // Base Request Helper
 // ============================================================================
 
-async function request<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<ApiResponse<T>> {
+async function request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
   const token = getAccessToken()
 
   const headers: Record<string, string> = {
@@ -342,12 +339,16 @@ export async function getUsageStats(params?: {
 // Prompt Management API
 // ============================================================================
 
-export async function getPromptTemplates(category?: string): Promise<ApiResponse<PromptTemplate[]>> {
+export async function getPromptTemplates(
+  category?: string
+): Promise<ApiResponse<PromptTemplate[]>> {
   const query = category ? `?category=${category}` : ''
   return request<PromptTemplate[]>(`/prompts${query}`)
 }
 
-export async function getPromptTemplate(id: string): Promise<ApiResponse<PromptTemplate & { versions: PromptVersion[] }>> {
+export async function getPromptTemplate(
+  id: string
+): Promise<ApiResponse<PromptTemplate & { versions: PromptVersion[] }>> {
   return request<PromptTemplate & { versions: PromptVersion[] }>(`/prompts/${id}`)
 }
 
@@ -383,7 +384,10 @@ export async function getPromptVersions(templateId: string): Promise<ApiResponse
   return request<PromptVersion[]>(`/prompts/templates/${templateId}/versions`)
 }
 
-export async function rollbackPromptVersion(templateId: string, versionId: string): Promise<ApiResponse<PromptTemplate>> {
+export async function rollbackPromptVersion(
+  templateId: string,
+  versionId: string
+): Promise<ApiResponse<PromptTemplate>> {
   return request<PromptTemplate>(`/prompts/templates/${templateId}/rollback/${versionId}`, {
     method: 'POST',
   })
@@ -393,12 +397,14 @@ export async function previewPrompt(params: {
   templateId?: string
   versionId?: string
   variables?: Record<string, string>
-}): Promise<ApiResponse<{
-  systemPrompt: string
-  userPrompt: string
-  variables: string[]
-  missingVariables: string[]
-}>> {
+}): Promise<
+  ApiResponse<{
+    systemPrompt: string
+    userPrompt: string
+    variables: string[]
+    missingVariables: string[]
+  }>
+> {
   return request(`/prompts/preview`, {
     method: 'POST',
     body: JSON.stringify(params),
@@ -484,7 +490,9 @@ export async function getTrends(params?: {
   return request<AnalyticsTrends>(`/monitoring/trends?${query}`)
 }
 
-export async function getRecentActivity(limit?: number): Promise<ApiResponse<DashboardSummary['recentActivity']>> {
+export async function getRecentActivity(
+  limit?: number
+): Promise<ApiResponse<DashboardSummary['recentActivity']>> {
   const query = limit ? `?limit=${limit}` : ''
   return request(`/monitoring/activity${query}`)
 }
@@ -586,7 +594,11 @@ export async function getRateLimits(): Promise<ApiResponse<RateLimitInfo>> {
   return request<RateLimitInfo>('/security/rate-limits')
 }
 
-export async function blockIP(ip: string, reason: string, expiresIn?: number): Promise<ApiResponse<void>> {
+export async function blockIP(
+  ip: string,
+  reason: string,
+  expiresIn?: number
+): Promise<ApiResponse<void>> {
   return request<void>('/security/block-ip', {
     method: 'POST',
     body: JSON.stringify({ ip, reason, expiresIn }),
@@ -653,13 +665,154 @@ export async function updateFeatureFlag(
 // Export API
 // ============================================================================
 
-export async function exportData(): Promise<ApiResponse<{
-  aiRequests: AIRequest[]
-  policyOperations: unknown[]
-  securityLogs: SecurityLog[]
-  auditLogs: AuditLog[]
-  exportedAt: string
-  exportedBy?: string
-}>> {
+export async function exportData(): Promise<
+  ApiResponse<{
+    aiRequests: AIRequest[]
+    policyOperations: unknown[]
+    securityLogs: SecurityLog[]
+    auditLogs: AuditLog[]
+    exportedAt: string
+    exportedBy?: string
+  }>
+> {
   return request('/export')
+}
+
+// ============================================================================
+// User Segments (Phase E — pilot reviewer management)
+// ============================================================================
+
+export interface SegmentMember {
+  id: string
+  user_id: string
+  segment_name: string
+  assigned_at: string
+  assigned_by: string | null
+}
+
+export interface SegmentBulkAddResult {
+  userId: string
+  status: 'added' | 'already_assigned' | 'error'
+  message?: string
+}
+
+/**
+ * List all members of a named segment.
+ */
+export async function fetchSegmentMembers(segmentName: string): Promise<SegmentMember[]> {
+  const res = await adminFetch(`/api/admin/segments?name=${encodeURIComponent(segmentName)}`)
+  if (!res.ok) {
+    throw new Error(`Failed to load segment members: ${res.status}`)
+  }
+  const data = await res.json()
+  return (data?.data ?? data?.members ?? []) as SegmentMember[]
+}
+
+/**
+ * Add a single user to a segment. Returns per-user status so bulk callers can
+ * render a summary (already_assigned is not an error).
+ */
+export async function addSegmentMember(
+  userId: string,
+  segmentName: string
+): Promise<SegmentBulkAddResult> {
+  const res = await adminFetch('/api/admin/segments', {
+    method: 'POST',
+    body: JSON.stringify({ userId, segmentName }),
+  })
+  if (res.ok) {
+    return { userId, status: 'added' }
+  }
+  if (res.status === 409) {
+    const body = await res.json().catch(() => ({}))
+    return {
+      userId,
+      status: 'already_assigned',
+      message: body?.message ?? 'User already in segment',
+    }
+  }
+  const body = await res.json().catch(() => ({}))
+  return {
+    userId,
+    status: 'error',
+    message: body?.error ?? body?.message ?? `HTTP ${res.status}`,
+  }
+}
+
+/**
+ * Bulk-add multiple users to a segment. Runs serially to avoid overwhelming
+ * the admin API; collects per-user results for UI display.
+ */
+export async function bulkAddSegmentMembers(
+  userIds: string[],
+  segmentName: string
+): Promise<SegmentBulkAddResult[]> {
+  const results: SegmentBulkAddResult[] = []
+  for (const userId of userIds) {
+    const r = await addSegmentMember(userId, segmentName)
+    results.push(r)
+  }
+  return results
+}
+
+/**
+ * Remove a user from a segment.
+ */
+export async function removeSegmentMember(userId: string, segmentName: string): Promise<void> {
+  const res = await adminFetch(
+    `/api/admin/segments/${encodeURIComponent(userId)}/${encodeURIComponent(segmentName)}`,
+    { method: 'DELETE' }
+  )
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.error ?? body?.message ?? `HTTP ${res.status}`)
+  }
+}
+
+// =============================================================================
+// Admin email → UUID resolver (opt-in, env-gated on server)
+// =============================================================================
+
+export interface ResolveEmailsResult {
+  resolved: Array<{ email: string; userId: string }>
+  missing: string[]
+  cappedAtUserListLimit: boolean
+}
+
+export class EmailResolverDisabledError extends Error {
+  constructor() {
+    super(
+      'Email resolver is disabled on the server. Set ENABLE_ADMIN_EMAIL_RESOLVER=true after a privacy review.'
+    )
+    this.name = 'EmailResolverDisabledError'
+  }
+}
+
+/**
+ * Resolve pasted emails to auth.users UUIDs. Server must have
+ * ENABLE_ADMIN_EMAIL_RESOLVER=true (see server/routes/admin/segments.ts) —
+ * otherwise throws EmailResolverDisabledError.
+ *
+ * Max 50 emails per call. Missing emails come back in `missing`.
+ */
+export async function resolveEmailsToUuids(emails: string[]): Promise<ResolveEmailsResult> {
+  const res = await adminFetch('/api/admin/app-users/resolve-emails', {
+    method: 'POST',
+    body: JSON.stringify({ emails }),
+  })
+
+  if (res.status === 403) {
+    const body = await res.json().catch(() => ({}))
+    if (body?.code === 'RESOLVER_DISABLED') {
+      throw new EmailResolverDisabledError()
+    }
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.error ?? body?.message ?? `HTTP ${res.status}`)
+  }
+
+  const body = await res.json()
+  return body.data as ResolveEmailsResult
 }

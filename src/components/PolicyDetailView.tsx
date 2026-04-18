@@ -1107,6 +1107,10 @@ export function PolicyDetailView() {
           <div className="max-w-6xl mx-auto flex items-center justify-center gap-2">
             <AlertTriangle size={18} className="flex-shrink-0" />
             <span className="text-sm sm:text-base">
+              <strong className="uppercase tracking-wide">
+                {locale === 'tr' ? 'Doğrulanmamış AI çıktısı' : 'Unverified AI output'}
+              </strong>
+              {' — '}
               {locale === 'tr'
                 ? 'Yapay zeka çıkarımı henüz insan uzman onayı almamıştır. Sonuçları dikkatle inceleyiniz.'
                 : 'AI output has not yet received human expert verification. Please review results carefully.'}
