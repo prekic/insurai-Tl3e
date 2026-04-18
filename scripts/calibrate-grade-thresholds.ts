@@ -10,15 +10,21 @@
  *   npx tsx scripts/calibrate-grade-thresholds.ts --apply
  *
  * Flags:
- *   --dry-run     (default) Print report only, write nothing.
- *   --apply       Write recommended thresholds to app_settings.
- *   --type=X      Filter to a specific policy type (e.g., kasko).
- *   --min=N       Override minimum sample size (default: 50).
- *   --force       Allow --apply to proceed below the sample minimum.
- *                 Required for pilot-phase calibration at small n. Prints a
- *                 loud warning and records the event for audit.
- *   --production  Enforce MIN_SAMPLE_SIZE = 50 and reject --force.
- *                 Use once pilot volume is sufficient (post Phase E).
+ *   --dry-run         (default) Print report only, write nothing.
+ *   --apply           Write recommended thresholds to app_settings.
+ *   --type=X          Filter to a specific policy type (e.g., kasko).
+ *   --min=N           Override minimum sample size (default: 50).
+ *   --force           Allow --apply to proceed below the sample minimum.
+ *                     Required for pilot-phase calibration at small n.
+ *                     Prints a loud warning and records the event for audit.
+ *   --production      Enforce MIN_SAMPLE_SIZE = 50 and reject --force.
+ *                     Use once pilot volume is sufficient (post Phase E).
+ *   --auto-production Detect whether the sample count has crossed 50 since
+ *                     the last forced calibration. If yes, behave as if
+ *                     --production was passed (no further action needed).
+ *                     If no (still below 50, OR last calibration already
+ *                     ran in production mode), exits 0 as a no-op so the
+ *                     script can be safely cron-scheduled.
  *
  * Requires .env with SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY.
  */
@@ -47,16 +53,26 @@ const args = process.argv.slice(2)
 const isApply = args.includes('--apply')
 const isDryRun = !isApply // default is dry-run
 const isForce = args.includes('--force')
-const isProduction = args.includes('--production')
+const isAutoProduction = args.includes('--auto-production')
+// --production is explicit; --auto-production escalates to it below after probe
+let isProduction = args.includes('--production')
 const typeArg = args.find((a) => a.startsWith('--type='))
 const filterType = typeArg ? typeArg.split('=')[1] : undefined
 const minArg = args.find((a) => a.startsWith('--min='))
 const requestedMin = minArg ? parseInt(minArg.split('=')[1], 10) : PRODUCTION_MIN_SAMPLE_SIZE
-const minSample = isProduction ? PRODUCTION_MIN_SAMPLE_SIZE : requestedMin
+let minSample = isProduction ? PRODUCTION_MIN_SAMPLE_SIZE : requestedMin
 
 if (isProduction && isForce) {
   console.error('ERROR: --production and --force are mutually exclusive.')
   console.error('       --production enforces the sample minimum; --force bypasses it.')
+  process.exit(1)
+}
+if (isAutoProduction && isForce) {
+  console.error('ERROR: --auto-production and --force are mutually exclusive.')
+  process.exit(1)
+}
+if (isAutoProduction && isProduction) {
+  console.error('ERROR: --auto-production and --production are redundant; pick one.')
   process.exit(1)
 }
 if (isProduction && requestedMin < PRODUCTION_MIN_SAMPLE_SIZE) {
@@ -250,6 +266,63 @@ async function recordCalibrationAudit(
 }
 
 // ---------------------------------------------------------------------------
+// --auto-production probe
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true when:
+ *   - Sample count ≥ PRODUCTION_MIN_SAMPLE_SIZE, AND
+ *   - The last recorded calibration audit (if any) was either absent OR
+ *     ran with `forced: true` (i.e. pilot-phase). This means the thresholds
+ *     on disk were produced under pilot assumptions and should now be
+ *     recomputed at production scale.
+ *
+ * Returns false otherwise (stay pilot / already migrated / below threshold).
+ */
+async function probeAutoProductionGate(sampleCount: number): Promise<boolean> {
+  if (sampleCount < PRODUCTION_MIN_SAMPLE_SIZE) {
+    console.log(
+      `AUTO-PRODUCTION: sample count ${sampleCount} < ${PRODUCTION_MIN_SAMPLE_SIZE} — no action.`
+    )
+    return false
+  }
+
+  const { data: row } = await supabase
+    .from('app_settings')
+    .select('value')
+    .eq('category', 'evaluation')
+    .eq('key', 'grade_thresholds_last_calibrated')
+    .maybeSingle()
+
+  if (!row?.value) {
+    console.log(
+      'AUTO-PRODUCTION: no prior calibration audit on record — escalating to production mode.'
+    )
+    return true
+  }
+
+  try {
+    const prior = JSON.parse(String(row.value)) as { forced?: boolean; production?: boolean }
+    if (prior.production === true) {
+      console.log('AUTO-PRODUCTION: last calibration already ran in --production mode — no action.')
+      return false
+    }
+    if (prior.forced === true) {
+      console.log('AUTO-PRODUCTION: last calibration ran with --force at small n — escalating.')
+      return true
+    }
+    // Unexpected shape (neither forced nor production) — be conservative.
+    console.log(
+      'AUTO-PRODUCTION: prior audit was neither forced nor production — escalating anyway.'
+    )
+    return true
+  } catch {
+    console.log('AUTO-PRODUCTION: could not parse prior audit JSON — escalating.')
+    return true
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -257,7 +330,8 @@ async function main() {
   console.log('='.repeat(60))
   console.log('  Grade Threshold Calibration')
   console.log(`  Mode: ${isDryRun ? 'DRY RUN (read-only)' : 'APPLY (will write to DB)'}`)
-  if (isProduction) console.log('  Profile: PRODUCTION (min sample = 50, --force disabled)')
+  if (isAutoProduction) console.log('  Profile: AUTO-PRODUCTION (probing sample count + audit)')
+  else if (isProduction) console.log('  Profile: PRODUCTION (min sample = 50, --force disabled)')
   else if (isForce) console.log('  Profile: PILOT (sample minimum override via --force)')
   if (filterType) console.log(`  Filter: type = ${filterType}`)
   console.log(`  Min sample: ${minSample}`)
@@ -269,6 +343,21 @@ async function main() {
     fetchPolicyScores(),
     fetchCurrentThresholds(),
   ])
+
+  // 1a. --auto-production probe: exit as no-op unless we're at/above the
+  // production threshold AND the last calibration ran in force mode.
+  if (isAutoProduction) {
+    const shouldEscalate = await probeAutoProductionGate(scores.length)
+    if (!shouldEscalate) {
+      // Safe no-op — script can be cron-scheduled without spamming DB writes.
+      process.exit(0)
+    }
+    // Escalate to production mode for the rest of this run.
+    isProduction = true
+    minSample = PRODUCTION_MIN_SAMPLE_SIZE
+    console.log('AUTO-PRODUCTION: gate crossed — escalating to --production mode for this run.')
+    console.log()
+  }
 
   // 2. Check sample sufficiency
   const sufficiency = isSampleSufficient(scores.length, minSample)

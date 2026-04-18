@@ -278,4 +278,132 @@ router.delete(
   }
 )
 
+// =============================================================================
+// Email → UUID resolver (opt-in, env-gated)
+// =============================================================================
+
+/**
+ * The resolver exposes `auth.users.email` to admins. It is OPT-IN:
+ * operators must explicitly set `ENABLE_ADMIN_EMAIL_RESOLVER=true` in the
+ * server environment after a privacy review. Default: disabled (returns 403).
+ *
+ * Why env var instead of a DB feature flag?
+ *   - Zero migration cost
+ *   - Can't be toggled via the admin panel (avoids accidental enable)
+ *   - Explicit operational decision required at deploy time
+ *
+ * Rate-limit: caller can request ≤ RESOLVE_MAX_EMAILS emails per call, and
+ * we page through auth.users up to RESOLVE_MAX_USER_LIST. If the platform
+ * has more users than the latter, the response includes
+ * `cappedAtUserListLimit: true` so the operator knows partial data came back.
+ */
+const RESOLVE_MAX_EMAILS = 50
+const RESOLVE_MAX_USER_LIST = 1000
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function isResolverEnabled(): boolean {
+  return process.env.ENABLE_ADMIN_EMAIL_RESOLVER === 'true'
+}
+
+/**
+ * Resolve a batch of emails to Supabase auth user UUIDs.
+ * POST /api/admin/app-users/resolve-emails
+ * Body: { emails: string[] }
+ * Returns: { resolved: Array<{ email, userId }>, missing: string[], cappedAtUserListLimit: boolean }
+ */
+router.post(
+  '/app-users/resolve-emails',
+  ...requireSuperAdmin(),
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      if (!isResolverEnabled()) {
+        res.status(403).json({
+          success: false,
+          error: 'Email resolver is disabled.',
+          code: 'RESOLVER_DISABLED',
+          hint: 'Set ENABLE_ADMIN_EMAIL_RESOLVER=true in the server environment after a privacy review.',
+        })
+        return
+      }
+
+      const { emails } = (req.body ?? {}) as { emails?: unknown }
+      if (!Array.isArray(emails) || emails.length === 0) {
+        res
+          .status(400)
+          .json({ success: false, error: 'Body must be { emails: string[] } with ≥ 1 entry' })
+        return
+      }
+      if (emails.length > RESOLVE_MAX_EMAILS) {
+        res.status(400).json({
+          success: false,
+          error: `Too many emails (max ${RESOLVE_MAX_EMAILS})`,
+        })
+        return
+      }
+
+      // Normalize + validate
+      const normalized: string[] = []
+      for (const raw of emails) {
+        if (typeof raw !== 'string') continue
+        const trimmed = raw.trim().toLowerCase()
+        if (!trimmed || !EMAIL_REGEX.test(trimmed)) continue
+        if (!normalized.includes(trimmed)) normalized.push(trimmed)
+      }
+      if (normalized.length === 0) {
+        res.status(400).json({ success: false, error: 'No valid email addresses in request' })
+        return
+      }
+
+      const { client: supabase, error: dbError } = getSupabaseWithError()
+      if (!supabase) {
+        res.status(503).json({ success: false, error: dbError || 'Database not configured' })
+        return
+      }
+
+      // Page through auth.users up to RESOLVE_MAX_USER_LIST.
+      // Supabase admin API paginates 1-indexed; perPage capped at 1000.
+      const { data: listData, error: listErr } = await supabase.auth.admin.listUsers({
+        page: 1,
+        perPage: RESOLVE_MAX_USER_LIST,
+      })
+      if (listErr) {
+        log.error('auth.admin.listUsers failed for email resolver', { error: listErr.message })
+        res.status(500).json({ success: false, error: 'Failed to load user list' })
+        return
+      }
+
+      const users = listData?.users ?? []
+      const byEmail = new Map<string, string>()
+      for (const u of users) {
+        if (u.email) byEmail.set(u.email.toLowerCase(), u.id)
+      }
+
+      const resolved: Array<{ email: string; userId: string }> = []
+      const missing: string[] = []
+      for (const email of normalized) {
+        const id = byEmail.get(email)
+        if (id) resolved.push({ email, userId: id })
+        else missing.push(email)
+      }
+
+      const cappedAtUserListLimit = users.length >= RESOLVE_MAX_USER_LIST
+
+      await logAdminAction(req, 'view', 'auth_users', undefined, undefined, {
+        emails_requested: normalized.length,
+        emails_resolved: resolved.length,
+        emails_missing: missing.length,
+        capped: cappedAtUserListLimit,
+      })
+
+      res.json({
+        success: true,
+        data: { resolved, missing, cappedAtUserListLimit },
+      })
+    } catch (error) {
+      log.error('Email resolver failed', { error: String(error) })
+      res.status(500).json({ success: false, error: 'Email resolver failed' })
+    }
+  }
+)
+
 export default router

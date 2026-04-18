@@ -28,8 +28,25 @@ CREATE TABLE IF NOT EXISTS public.user_segments (
 -- Enable RLS
 ALTER TABLE public.user_segments ENABLE ROW LEVEL SECURITY;
 
--- Service role can manage all segments
-CREATE POLICY "Service role manages segments"
+-- OPEN policy (USING true, WITH CHECK true) — intentionally permissive.
+--
+-- The pilot gate is evaluated CLIENT-SIDE by `usePilotGateOptions.ts`, which
+-- uses the Supabase ANON key to read a single user's segment membership. An
+-- `auth.role() = 'service_role'` restriction here would break that hook and
+-- cause `evaluateKaskoPilotGate()` to always return inactive.
+--
+-- Access is enforced at the API layer for writes:
+--   - POST   /api/admin/segments      → requireSuperAdmin
+--   - DELETE /api/admin/segments/...  → requireSuperAdmin
+-- Reads via the API use the service-role client; direct anon reads via the
+-- client hook only reveal the current user's own assignments by filtering
+-- `.eq('user_id', user.id)` (row-level selectivity, not row-level security).
+--
+-- If you later tighten this policy, also update:
+--   - src/hooks/usePilotGateOptions.ts (would need server-side proxy)
+--   - src/lib/ai/policy-extractor.ts persistPilotQARecord
+--   - CLAUDE.md gotcha #39 (RLS mismatch)
+CREATE POLICY "Open read/write (API layer enforces auth)"
   ON public.user_segments
   FOR ALL
   USING (true)
@@ -84,10 +101,20 @@ CREATE TABLE IF NOT EXISTS public.kasko_pilot_qa_records (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Enable RLS (admin-only access via service role)
+-- OPEN policy (USING true, WITH CHECK true) — intentionally permissive.
+--
+-- `persistPilotQARecord()` in src/lib/ai/policy-extractor.ts runs on the
+-- client using the ANON key (fire-and-forget INSERT). Tightening this to
+-- `auth.role() = 'service_role'` would cause QA records to silently fail
+-- to persist, breaking the rollback-trigger monitoring downstream.
+--
+-- Reads happen only through the authenticated admin API
+-- (`/api/admin/monitoring/pilot-rollback-status`, service-role client).
+--
+-- If you tighten this policy, also proxy persist through a server endpoint.
 ALTER TABLE public.kasko_pilot_qa_records ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Service role manages QA records"
+CREATE POLICY "Open read/write (API layer enforces auth)"
   ON public.kasko_pilot_qa_records
   FOR ALL
   USING (true)

@@ -20,6 +20,8 @@ import {
   fetchSegmentMembers,
   bulkAddSegmentMembers,
   removeSegmentMember,
+  resolveEmailsToUuids,
+  EmailResolverDisabledError,
   type SegmentMember,
   type SegmentBulkAddResult,
 } from '@/lib/admin/api'
@@ -29,7 +31,10 @@ import {
 const AVAILABLE_SEGMENTS = ['kasko_pilot_reviewers'] as const
 type SegmentName = (typeof AVAILABLE_SEGMENTS)[number]
 
+type InputMode = 'uuid' | 'email'
+
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function parseUuids(input: string): { valid: string[]; invalid: string[] } {
   const tokens = input
@@ -45,6 +50,21 @@ function parseUuids(input: string): { valid: string[]; invalid: string[] } {
   return { valid, invalid }
 }
 
+function parseEmails(input: string): { valid: string[]; invalid: string[] } {
+  const tokens = input
+    .split(/[\s,;]+/)
+    .map((t) => t.trim())
+    .filter(Boolean)
+  const valid: string[] = []
+  const invalid: string[] = []
+  for (const t of tokens) {
+    const lower = t.toLowerCase()
+    if (EMAIL_REGEX.test(lower) && !valid.includes(lower)) valid.push(lower)
+    else if (!EMAIL_REGEX.test(lower)) invalid.push(t)
+  }
+  return { valid, invalid }
+}
+
 export function SegmentsTab() {
   const [selectedSegment, setSelectedSegment] = useState<SegmentName>(AVAILABLE_SEGMENTS[0])
   const [members, setMembers] = useState<SegmentMember[]>([])
@@ -52,9 +72,12 @@ export function SegmentsTab() {
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const [isAddOpen, setIsAddOpen] = useState(false)
+  const [inputMode, setInputMode] = useState<InputMode>('uuid')
   const [pasteInput, setPasteInput] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [bulkResults, setBulkResults] = useState<SegmentBulkAddResult[] | null>(null)
+  const [resolveError, setResolveError] = useState<string | null>(null)
+  const [missingEmails, setMissingEmails] = useState<string[]>([])
 
   const [removingId, setRemovingId] = useState<string | null>(null)
 
@@ -76,14 +99,38 @@ export function SegmentsTab() {
     loadMembers()
   }, [loadMembers])
 
-  const parsed = useMemo(() => parseUuids(pasteInput), [pasteInput])
+  const parsed = useMemo(
+    () => (inputMode === 'uuid' ? parseUuids(pasteInput) : parseEmails(pasteInput)),
+    [pasteInput, inputMode]
+  )
 
   const handleSubmitBulk = async () => {
     if (parsed.valid.length === 0 || isSubmitting) return
     setIsSubmitting(true)
     setBulkResults(null)
+    setResolveError(null)
+    setMissingEmails([])
     try {
-      const results = await bulkAddSegmentMembers(parsed.valid, selectedSegment)
+      let userIds: string[] = parsed.valid
+      if (inputMode === 'email') {
+        try {
+          const { resolved, missing } = await resolveEmailsToUuids(parsed.valid)
+          userIds = resolved.map((r) => r.userId)
+          if (missing.length > 0) setMissingEmails(missing)
+          if (userIds.length === 0) {
+            setResolveError(`No emails resolved to users (${missing.length} missing).`)
+            return
+          }
+        } catch (err) {
+          if (err instanceof EmailResolverDisabledError) {
+            setResolveError(err.message)
+          } else {
+            setResolveError(err instanceof Error ? err.message : 'Email resolver failed')
+          }
+          return
+        }
+      }
+      const results = await bulkAddSegmentMembers(userIds, selectedSegment)
       setBulkResults(results)
       await loadMembers()
     } finally {
@@ -220,22 +267,73 @@ export function SegmentsTab() {
               Add members to <code>{selectedSegment}</code>
             </CardTitle>
             <CardDescription>
-              Paste user UUIDs (one per line, or separated by spaces/commas). Each will be validated
-              client-side and assigned one by one. Invalid rows are dropped silently — they appear
-              under &quot;Invalid&quot; below.
+              Paste identifiers (one per line, or separated by spaces/commas). Each will be
+              validated client-side and assigned one by one. Invalid rows are dropped silently —
+              they appear under &quot;Invalid&quot; below.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div
+              className="inline-flex rounded-md border bg-gray-50 p-0.5 text-xs"
+              role="tablist"
+              data-testid="input-mode-toggle"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={inputMode === 'uuid'}
+                onClick={() => {
+                  setInputMode('uuid')
+                  setPasteInput('')
+                  setResolveError(null)
+                  setMissingEmails([])
+                }}
+                className={`px-3 py-1 rounded ${
+                  inputMode === 'uuid' ? 'bg-white shadow-sm font-medium' : 'text-gray-600'
+                }`}
+                data-testid="mode-uuid"
+              >
+                Paste UUIDs
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={inputMode === 'email'}
+                onClick={() => {
+                  setInputMode('email')
+                  setPasteInput('')
+                  setResolveError(null)
+                  setMissingEmails([])
+                }}
+                className={`px-3 py-1 rounded ${
+                  inputMode === 'email' ? 'bg-white shadow-sm font-medium' : 'text-gray-600'
+                }`}
+                data-testid="mode-email"
+              >
+                Paste Emails
+              </button>
+            </div>
+            {inputMode === 'email' && (
+              <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-2">
+                Email resolution requires <code>ENABLE_ADMIN_EMAIL_RESOLVER=true</code> on the
+                server. Disabled by default pending a privacy review of exposing{' '}
+                <code>auth.users.email</code> to admins.
+              </div>
+            )}
             <textarea
               value={pasteInput}
               onChange={(e) => setPasteInput(e.target.value)}
-              placeholder="00000000-0000-0000-0000-000000000001&#10;00000000-0000-0000-0000-000000000002"
+              placeholder={
+                inputMode === 'uuid'
+                  ? '00000000-0000-0000-0000-000000000001\n00000000-0000-0000-0000-000000000002'
+                  : 'alice@example.com\nbob@example.com'
+              }
               className="w-full h-40 border rounded-md p-3 text-sm font-mono"
               data-testid="add-members-textarea"
             />
             <div className="flex items-center gap-2 text-xs text-gray-600">
               <Badge variant="secondary" data-testid="valid-count">
-                {parsed.valid.length} valid
+                {parsed.valid.length} valid {inputMode === 'email' ? 'emails' : 'UUIDs'}
               </Badge>
               {parsed.invalid.length > 0 && (
                 <Badge variant="destructive" data-testid="invalid-count">
@@ -253,6 +351,32 @@ export function SegmentsTab() {
                     </li>
                   ))}
                   {parsed.invalid.length > 10 && <li>… and {parsed.invalid.length - 10} more</li>}
+                </ul>
+              </details>
+            )}
+
+            {resolveError && (
+              <div
+                className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md p-2"
+                data-testid="resolve-error"
+              >
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                {resolveError}
+              </div>
+            )}
+            {missingEmails.length > 0 && (
+              <details className="text-xs text-amber-700" data-testid="missing-emails">
+                <summary className="cursor-pointer font-medium">
+                  {missingEmails.length} email{missingEmails.length === 1 ? '' : 's'} did not match
+                  any user — expand to review
+                </summary>
+                <ul className="mt-1 list-disc list-inside">
+                  {missingEmails.slice(0, 10).map((e, i) => (
+                    <li key={i} className="font-mono">
+                      {e}
+                    </li>
+                  ))}
+                  {missingEmails.length > 10 && <li>… and {missingEmails.length - 10} more</li>}
                 </ul>
               </details>
             )}

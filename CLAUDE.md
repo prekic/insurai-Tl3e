@@ -2717,12 +2717,11 @@ VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX  # Optional: GA4 analytics
 - The `as string` cast suppresses TypeScript path resolution errors
 - If you see `Cannot find module` errors on the pilot-rollback-status endpoint, check that the server build output includes the `kasko-pilot-gate.js` file at the expected relative path
 
-**KASKO Pilot RLS Policy — Misleading Comment (Added Mar 16, 2026):**
-- Migration 040 comments say "admin-only access via service role" on both `kasko_pilot_qa_records` and `user_segments` tables
-- **Actual RLS policy**: `USING (true) WITH CHECK (true)` — open to ALL roles including `anon`
-- Both `persistPilotQARecord()` (in `policy-extractor.ts`) and `usePilotGateOptions` (hook) use the **anon key** (`VITE_SUPABASE_ANON_KEY`), which works ONLY because the policy is open
-- **Risk**: If someone tightens the RLS based on the misleading comment (e.g., restricts to `service_role`), both `persistPilotQARecord()` and `usePilotGateOptions` will silently fail — pilot QA records won't persist and the gate will always return inactive
-- To properly restrict: update RLS to allow `anon` SELECT on `user_segments` and `anon` INSERT on `kasko_pilot_qa_records`, then restrict other operations to `service_role`
+**KASKO Pilot RLS Policy — Intentionally Open (Added Mar 16, 2026; comments corrected Apr 18, 2026):**
+- Migration 040's RLS policies on `user_segments` and `kasko_pilot_qa_records` are `USING (true) WITH CHECK (true)` — open to ALL roles including `anon`. **This is intentional** — auth is enforced at the API layer for writes (`requireSuperAdmin` on `/api/admin/segments` POST/DELETE endpoints) and the client-side hooks rely on open reads with `.eq('user_id', user.id)` row filters.
+- Earlier versions of the migration comments said "admin-only access via service role", which was misleading. Fixed Apr 18, 2026 — the policy names are now `"Open read/write (API layer enforces auth)"` and the inline SQL comments explain why tightening would silently break `persistPilotQARecord()` and `usePilotGateOptions`.
+- The production DB still carries the original policy names (`"Service role manages segments"` and `"Service role manages QA records"`) because migration 040 already ran — the correction only affects fresh installs / local dev. Don't rename the live policies without a follow-up migration.
+- **If you ever tighten the policy**: proxy `persistPilotQARecord()` through a new server endpoint with service-role credentials AND proxy `usePilotGateOptions`'s segment read through an authenticated API call. Don't partially restrict.
 
 **Stale Local `main` Mismatches `origin/main` After Sandbox Merges (Added Apr 9, 2026):**
 - The Claude Code sandbox does **not** automatically fast-forward local `main` after a PR is merged on GitHub. This means `git diff main...HEAD --name-status` can return a phantom list of files that look "unmerged" but are already on `origin/main`.

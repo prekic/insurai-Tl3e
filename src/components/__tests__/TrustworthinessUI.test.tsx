@@ -61,7 +61,16 @@ vi.mock('@/hooks/useDisplayCurrency', () => ({
   useDisplayCurrency: () => ({ formatConverted: (val: any) => String(val), targetCurrency: 'TRY' }),
 }))
 vi.mock('@/hooks/usePilotGateOptions', () => ({
-  usePilotGateOptions: () => ({ flags: {} }),
+  // Return shape mirrors the real hook — `featureFlags`, NOT `flags`. The old
+  // mock used `{ flags: {} }` which only passed because `useDisplaySafeSummary`
+  // has a defensive `options?.featureFlags || {}` fallback. Using the real key
+  // here means tests regress loudly if that fallback ever tightens.
+  usePilotGateOptions: () => ({
+    featureFlags: {},
+    userSegments: [],
+    userId: undefined,
+    isLoading: false,
+  }),
 }))
 vi.mock('@/hooks/useFileUpload', () => ({
   useFileUpload: () => ({ uploadFiles: vi.fn(), isUploading: false }),

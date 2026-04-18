@@ -108,7 +108,14 @@ Click the red trash icon in the member's row. Requires confirmation. DELETE hits
 
 ### 4.4 Finding user UUIDs
 
-The admin UI does **not** currently resolve emails → UUIDs (follow-up task). Three options to obtain UUIDs:
+The admin UI has an **email-paste mode** but it is opt-in: the server environment must have `ENABLE_ADMIN_EMAIL_RESOLVER=true` (default disabled pending a privacy review of exposing `auth.users.email` to admins). Without the env var the endpoint returns 403 `RESOLVER_DISABLED`.
+
+With the flag enabled:
+1. Open the Segments tab, click Add Members, click **Paste Emails**
+2. Paste one email per line
+3. The resolver returns the UUID + flags any emails that didn't match a `auth.users` row under "Missing emails"
+
+Otherwise, three offline options to obtain UUIDs:
 
 **Option A — Supabase Studio**:
 1. Authentication → Users

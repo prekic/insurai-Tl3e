@@ -11,16 +11,38 @@ import { SegmentsTab } from './SegmentsTab'
 
 // Mock the admin API module — we mock each helper individually so we can
 // assert per-call behavior (bulk-add flow visits addSegmentMember N times).
-const mockFetch = vi.fn()
-const mockAdd = vi.fn()
-const mockBulkAdd = vi.fn()
-const mockRemove = vi.fn()
+// Use vi.hoisted() to make the mock class + spies available inside the
+// hoisted vi.mock() factory (gotcha: top-level `const` doesn't hoist).
+const mocks = vi.hoisted(() => {
+  class MockEmailResolverDisabledError extends Error {
+    constructor() {
+      super('Email resolver is disabled on the server.')
+      this.name = 'EmailResolverDisabledError'
+    }
+  }
+  return {
+    fetchSegmentMembers: vi.fn(),
+    addSegmentMember: vi.fn(),
+    bulkAddSegmentMembers: vi.fn(),
+    removeSegmentMember: vi.fn(),
+    resolveEmailsToUuids: vi.fn(),
+    EmailResolverDisabledError: MockEmailResolverDisabledError,
+  }
+})
+
+const mockFetch = mocks.fetchSegmentMembers
+const mockBulkAdd = mocks.bulkAddSegmentMembers
+const mockRemove = mocks.removeSegmentMember
+const mockResolveEmails = mocks.resolveEmailsToUuids
+const MockEmailResolverDisabledError = mocks.EmailResolverDisabledError
 
 vi.mock('@/lib/admin/api', () => ({
-  fetchSegmentMembers: (...args: unknown[]) => mockFetch(...args),
-  addSegmentMember: (...args: unknown[]) => mockAdd(...args),
-  bulkAddSegmentMembers: (...args: unknown[]) => mockBulkAdd(...args),
-  removeSegmentMember: (...args: unknown[]) => mockRemove(...args),
+  fetchSegmentMembers: (...args: unknown[]) => mocks.fetchSegmentMembers(...args),
+  addSegmentMember: (...args: unknown[]) => mocks.addSegmentMember(...args),
+  bulkAddSegmentMembers: (...args: unknown[]) => mocks.bulkAddSegmentMembers(...args),
+  removeSegmentMember: (...args: unknown[]) => mocks.removeSegmentMember(...args),
+  resolveEmailsToUuids: (...args: unknown[]) => mocks.resolveEmailsToUuids(...args),
+  EmailResolverDisabledError: mocks.EmailResolverDisabledError,
 }))
 
 const VALID_UUID_1 = '11111111-1111-1111-1111-111111111111'
@@ -190,5 +212,96 @@ describe('SegmentsTab', () => {
     expect(screen.getByTestId(`member-row-${VALID_UUID_1}`)).toBeInTheDocument()
 
     vi.unstubAllGlobals()
+  })
+})
+
+// ===========================================================================
+// Email-mode (gated email resolver)
+// ===========================================================================
+
+describe('SegmentsTab — email mode', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockFetch.mockResolvedValue([])
+  })
+
+  it('toggles to email mode and parses emails separately from UUIDs', async () => {
+    render(<SegmentsTab />)
+    await waitFor(() => screen.getByText(/No members/i))
+    fireEvent.click(screen.getByTestId('add-members-open'))
+    fireEvent.click(screen.getByTestId('mode-email'))
+
+    fireEvent.change(screen.getByTestId('add-members-textarea'), {
+      target: { value: 'alice@example.com\nnot-an-email\nbob@example.com' },
+    })
+
+    expect(screen.getByTestId('valid-count')).toHaveTextContent('2 valid emails')
+    expect(screen.getByTestId('invalid-count')).toHaveTextContent('1 invalid')
+  })
+
+  it('resolves emails, reports missing, and bulk-adds resolved UUIDs', async () => {
+    mockResolveEmails.mockResolvedValue({
+      resolved: [{ email: 'alice@example.com', userId: VALID_UUID_1 }],
+      missing: ['ghost@example.com'],
+      cappedAtUserListLimit: false,
+    })
+    mockBulkAdd.mockResolvedValue([{ userId: VALID_UUID_1, status: 'added' }])
+
+    render(<SegmentsTab />)
+    await waitFor(() => screen.getByText(/No members/i))
+
+    fireEvent.click(screen.getByTestId('add-members-open'))
+    fireEvent.click(screen.getByTestId('mode-email'))
+    fireEvent.change(screen.getByTestId('add-members-textarea'), {
+      target: { value: 'alice@example.com\nghost@example.com' },
+    })
+    fireEvent.click(screen.getByTestId('bulk-submit'))
+
+    await waitFor(() => {
+      expect(mockResolveEmails).toHaveBeenCalledWith(['alice@example.com', 'ghost@example.com'])
+    })
+    expect(mockBulkAdd).toHaveBeenCalledWith([VALID_UUID_1], 'kasko_pilot_reviewers')
+    expect(await screen.findByTestId('missing-emails')).toBeInTheDocument()
+    expect(screen.getByTestId('missing-emails')).toHaveTextContent('ghost@example.com')
+  })
+
+  it('surfaces resolver-disabled error and does not call bulk-add', async () => {
+    mockResolveEmails.mockRejectedValue(new MockEmailResolverDisabledError())
+
+    render(<SegmentsTab />)
+    await waitFor(() => screen.getByText(/No members/i))
+
+    fireEvent.click(screen.getByTestId('add-members-open'))
+    fireEvent.click(screen.getByTestId('mode-email'))
+    fireEvent.change(screen.getByTestId('add-members-textarea'), {
+      target: { value: 'alice@example.com' },
+    })
+    fireEvent.click(screen.getByTestId('bulk-submit'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('resolve-error')).toHaveTextContent(/Email resolver is disabled/i)
+    })
+    expect(mockBulkAdd).not.toHaveBeenCalled()
+  })
+
+  it('shows resolver-disabled notice when email mode selected', async () => {
+    render(<SegmentsTab />)
+    await waitFor(() => screen.getByText(/No members/i))
+    fireEvent.click(screen.getByTestId('add-members-open'))
+    fireEvent.click(screen.getByTestId('mode-email'))
+    expect(screen.getByText(/ENABLE_ADMIN_EMAIL_RESOLVER=true/i)).toBeInTheDocument()
+  })
+
+  it('clears paste input when toggling between modes', async () => {
+    render(<SegmentsTab />)
+    await waitFor(() => screen.getByText(/No members/i))
+    fireEvent.click(screen.getByTestId('add-members-open'))
+
+    const textarea = screen.getByTestId('add-members-textarea') as HTMLTextAreaElement
+    fireEvent.change(textarea, { target: { value: VALID_UUID_1 } })
+    expect(textarea.value).toBe(VALID_UUID_1)
+
+    fireEvent.click(screen.getByTestId('mode-email'))
+    expect((screen.getByTestId('add-members-textarea') as HTMLTextAreaElement).value).toBe('')
   })
 })

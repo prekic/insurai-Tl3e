@@ -768,3 +768,51 @@ export async function removeSegmentMember(userId: string, segmentName: string): 
     throw new Error(body?.error ?? body?.message ?? `HTTP ${res.status}`)
   }
 }
+
+// =============================================================================
+// Admin email → UUID resolver (opt-in, env-gated on server)
+// =============================================================================
+
+export interface ResolveEmailsResult {
+  resolved: Array<{ email: string; userId: string }>
+  missing: string[]
+  cappedAtUserListLimit: boolean
+}
+
+export class EmailResolverDisabledError extends Error {
+  constructor() {
+    super(
+      'Email resolver is disabled on the server. Set ENABLE_ADMIN_EMAIL_RESOLVER=true after a privacy review.'
+    )
+    this.name = 'EmailResolverDisabledError'
+  }
+}
+
+/**
+ * Resolve pasted emails to auth.users UUIDs. Server must have
+ * ENABLE_ADMIN_EMAIL_RESOLVER=true (see server/routes/admin/segments.ts) —
+ * otherwise throws EmailResolverDisabledError.
+ *
+ * Max 50 emails per call. Missing emails come back in `missing`.
+ */
+export async function resolveEmailsToUuids(emails: string[]): Promise<ResolveEmailsResult> {
+  const res = await adminFetch('/api/admin/app-users/resolve-emails', {
+    method: 'POST',
+    body: JSON.stringify({ emails }),
+  })
+
+  if (res.status === 403) {
+    const body = await res.json().catch(() => ({}))
+    if (body?.code === 'RESOLVER_DISABLED') {
+      throw new EmailResolverDisabledError()
+    }
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.error ?? body?.message ?? `HTTP ${res.status}`)
+  }
+
+  const body = await res.json()
+  return body.data as ResolveEmailsResult
+}
