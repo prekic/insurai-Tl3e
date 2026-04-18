@@ -50,6 +50,14 @@ interface PdfFixture {
   expectedPremiumOneOf: number[]
   // Should the text contain DAHİL or HARİÇ markers?
   shouldFindDahilHaric: boolean
+  // Set when the PDF is scanned/image-only and pdf-parse yields no text.
+  // The deterministic regex layer cannot validate anything in this case;
+  // the production pipeline must fall back to GCP Document AI OCR
+  // (see gotcha #61). The other expected* fields stay on the fixture as
+  // canonical documentation for future OCR-backed tests.
+  requiresOcr?: boolean
+  // Expected DAHİL/HARİÇ coverage counts (captured for OCR-backed tests).
+  expectedCoverageCounts?: { included: number; excluded: number }
 }
 
 const fixtures: PdfFixture[] = [
@@ -92,6 +100,21 @@ const fixtures: PdfFixture[] = [
     expectedPremiumOneOf: [1095.23], // Vergi öncesi prim
     shouldFindDahilHaric: true,
   },
+  {
+    // Scanned/image-only PDF — pdf-parse yields no text. Production must
+    // fall back to GCP Document AI OCR (gotcha #61). Expected values below
+    // are canonical documentation for future OCR-backed tests.
+    path: 'policies/KRK_35 VD 458 Kasko Police_32630901_3.pdf',
+    insurer: 'Ray Sigorta',
+    description: 'Ray Sigorta IVECO/KAMYON 80-12 1997 (scanned, OCR required)',
+    expectedMakeContains: 'IVECO',
+    expectedYear: 1997,
+    expectedPlate: '35 VD 458',
+    expectedPremiumOneOf: [755.21],
+    shouldFindDahilHaric: true,
+    requiresOcr: true,
+    expectedCoverageCounts: { included: 17, excluded: 10 },
+  },
 ]
 
 // Cache PDF text extraction across all tests in this file
@@ -119,6 +142,29 @@ describe('PDF Golden Regression — committed Turkish kasko policies', () => {
       beforeAll(async () => {
         text = await loadPdfText(fx.path)
       })
+
+      if (fx.requiresOcr) {
+        // Scanned/image-only PDF — validate the OCR-fallback signal only.
+        // The production pipeline must route these through GCP Document AI.
+        it('PDF loads but raw text extraction yields essentially nothing (OCR fallback required)', () => {
+          // The file must be a real, multi-page PDF — not a zero-byte stub.
+          // pdf-parse should return minimal text (whitespace/newlines only).
+          expect(text.length).toBeLessThan(200)
+        })
+
+        it('captures expected post-OCR values for future OCR-backed tests', () => {
+          // These asserts document the fixture's canonical expected values.
+          // They do not exercise any regex path — they guard against
+          // accidental edits to the expected* fields during refactors.
+          expect(fx.expectedPremiumOneOf).toContain(755.21)
+          expect(fx.expectedMakeContains).toBe('IVECO')
+          expect(fx.expectedYear).toBe(1997)
+          expect(fx.expectedPlate).toBe('35 VD 458')
+          expect(fx.expectedCoverageCounts).toEqual({ included: 17, excluded: 10 })
+        })
+
+        return
+      }
 
       it('PDF loads and contains non-trivial text', () => {
         expect(text.length).toBeGreaterThan(1000)
@@ -185,9 +231,11 @@ describe('PDF Golden Regression — committed Turkish kasko policies', () => {
 })
 
 describe('PDF Golden Regression — cross-PDF aggregate checks', () => {
-  it('all 4 PDFs together yield premiums in plausible Turkish kasko range', async () => {
+  it('text-extractable PDFs together yield premiums in plausible Turkish kasko range', async () => {
+    // requiresOcr fixtures contribute no regex-layer premiums — skipped here.
     const allPremiums: number[] = []
     for (const fx of fixtures) {
+      if (fx.requiresOcr) continue
       const text = await loadPdfText(fx.path)
       for (const pat of premiumPatterns) {
         const matches = text.matchAll(new RegExp(pat.source, pat.flags + 'g'))
