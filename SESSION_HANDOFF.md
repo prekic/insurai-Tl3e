@@ -1,6 +1,6 @@
 # Session Handoff — April 18, 2026 (Date-Corruption Audit Tooling)
 
-> **Branch**: `claude/load-project-context-RJ0Qd` — 2 commits ahead of `origin/main`, clean working tree, all pushed.
+> **Branch**: `claude/load-project-context-RJ0Qd` — 3 commits ahead of `origin/main`, clean working tree, all pushed.
 > **No PR opened** (user-gated). Merge-ready.
 
 ## 🎯 Immediate Next Steps — Priority Order
@@ -18,13 +18,15 @@
 
 ---
 
-## What This Session Shipped (1 new commit)
+## What This Session Shipped (3 commits on branch)
 
 ```
+1ed2284 test(extraction): wire Ray Sigorta scanned PDF fixture into qa-pdf-golden
 93c56bd feat(scripts): audit-only mode for V8 DD.MM.YYYY date-corruption script
+c73f877 chore(docs): session handoff — gotcha #83 + next-step rewrite
 ```
 
-The branch also carries `1ed2284 test(extraction): wire Ray Sigorta scanned PDF fixture into qa-pdf-golden` from an earlier micro-session on the same branch; that work is already documented as ✅ DONE in CLAUDE.md handoff item #2.
+`1ed2284` was the Apr 18 pre-session commit that also touched `CLAUDE.md` (2 lines). `93c56bd` is the primary session deliverable. `c73f877` synced the core docs. A 4th commit adds post-audit QA fixes to this handoff + CLAUDE.md.
 
 ### Session scope summary
 
@@ -32,13 +34,16 @@ The branch also carries `1ed2284 test(extraction): wire Ray Sigorta scanned PDF 
 
 **Outcome**: The repair script at `scripts/backfill-date-bug.ts` was rewritten. Old version wrote UPDATEs on invocation with no dry-run. New version defaults to `--audit-only` (read-only, emits 4-count summary + CSV report). Explicit `--apply` required for writes, with interactive `promptConfirm()` (skippable via `--yes`). Audit and apply modes share a single `classifyRow()` classifier so the report reflects exactly what repair would touch. Runbook 05 gains a new §4.4 "Option D" documenting the workflow.
 
-### Files changed (3)
+### Files changed (full branch delta vs origin/main — 6 files)
 
-| File | Action | Purpose |
-|------|--------|---------|
-| `scripts/backfill-date-bug.ts` | **Rewritten** | CLI parser (`--audit-only` default, `--apply`, `--yes`, `--csv`, `--help`); shared `classifyRow()`; CSV emitter; interactive confirm; applied-log output |
-| `scripts/__tests__/backfill-date-bug.test.ts` | **New** | 12 unit tests covering CORRUPTED / OK / MANUAL_REVIEW / null-candidate paths (day ≤ 12 swap, day > 12 safe-branch, ISO datetime DB values, empty/null DB, single-digit pad, non-dot separators, non-string inputs) |
-| `docs/runbooks/05-date-corruption-audit.md` | **Modified** | Added §4.4 Option D — Script-Assisted Audit & Repair |
+| File | Commit | Action | Purpose |
+|------|--------|--------|---------|
+| `scripts/backfill-date-bug.ts` | `93c56bd` | **Rewritten** | CLI parser (`--audit-only` default, `--apply`, `--yes`, `--csv`, `--help`); shared `classifyRow()`; CSV emitter; interactive confirm; applied-log output |
+| `scripts/__tests__/backfill-date-bug.test.ts` | `93c56bd` | **New** | 12 unit tests covering CORRUPTED / OK / MANUAL_REVIEW / null-candidate paths (day ≤ 12 swap, day > 12 safe-branch, ISO datetime DB values, empty/null DB, single-digit pad, non-dot separators, non-string inputs) |
+| `docs/runbooks/05-date-corruption-audit.md` | `93c56bd` | **Modified** | Added §4.4 Option D — Script-Assisted Audit & Repair |
+| `src/lib/ai/__tests__/qa-pdf-golden.test.ts` | `1ed2284` | **Modified** | Added `requiresOcr: true` branch on `PdfFixture`, new `expectedCoverageCounts` field, Ray Sigorta fixture entry; 25 → 27 tests |
+| `CLAUDE.md` | `1ed2284` + `c73f877` + post-audit | **Modified** | Next-session instructions, gotcha #83, Last Updated section, commit-count corrections |
+| `SESSION_HANDOFF.md` | `c73f877` + post-audit | **Modified** | This document (full rewrite for the new branch) |
 
 ### Classifier semantics pinned in code (`classifyRow()`)
 
@@ -62,6 +67,10 @@ Locally, with `.env` containing `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`:
 ```bash
 # Read-only. Prints counts + writes ./date-audit-report-<timestamp>.csv
 npx tsx scripts/backfill-date-bug.ts --audit-only
+
+# --- Before --apply: confirm the pilot parser hasn't drifted from production ---
+# (runs the 22-test drift canary; must be green or STOP and re-sync the mirror)
+npx vitest run scripts/__tests__/simple-date-parser.test.ts
 
 # After reviewing the report, repair CORRUPTED rows only:
 npx tsx scripts/backfill-date-bug.ts --apply
@@ -94,6 +103,7 @@ No schema changes. This is a one-time data repair path; no `CREATE TABLE` / `ALT
 - **Audit scope is kasko-only**: `fetchCandidates()` filters `.eq('type', 'kasko')` because gotcha #52 (the V8 bug) lands when call sites parse extracted Turkish PDFs and those are currently kasko. If any other policy type runs through `new Date('01.12.2024')` in prior code, extend the filter. Current scan of the 5 fixed call sites suggests this is safe.
 - **`--apply` is single-threaded sequential UPDATEs**: one HTTP round-trip per row. For an audit showing tens of thousands of `CORRUPTED` rows, this would be slow. If the real count turns out to be that large, add a batch-UPDATE path using `.in('id', batch)`. Current expectation per runbook §5 is tens to low-hundreds of rows.
 - **CSV contains `policy_number` and `provider`** — operator may want to review before sharing. Sanitize or trim columns before posting anywhere.
+- **🚨 Parser-drift trap — `--apply` uses `_simple-date-parser.ts`, NOT production `turkish-utils.ts`**: The `--apply` write path calls `parseExtractedDate` from `scripts/_simple-date-parser.ts`, which is a manual MIRROR of production's `parseTurkishDate()` in `src/lib/ai/turkish-utils.ts` (gotcha #16 explains why the pilot scripts can't import from `src/lib/` — `import.meta.env` Vite crash). Non-negotiable rule #11 already requires the two stay in sync manually. **Specific consequence for this script**: if production `parseTurkishDate()` is ever changed without updating `_simple-date-parser.ts`, a future operator running `--apply` will write dates produced by the STALE parser, potentially re-introducing corruption the script was meant to remove. Before running `--apply` in prod, diff the two parsers and confirm they're in sync. The unit test suite for `_simple-date-parser.ts` at `scripts/__tests__/simple-date-parser.test.ts` (22 tests) is the drift canary — if its assertions ever mismatch production behavior, the mirror is stale.
 
 ### Pre-existing issues flagged this session (not this-session regressions)
 None. The audit script is net-new functionality on top of existing runbook SQL.
@@ -124,6 +134,7 @@ None. The audit script is net-new functionality on top of existing runbook SQL.
 20. Privacy-sensitive admin features use env-var opt-in pattern (gotcha #75, ADR-0004)
 21. Migration 040 RLS is intentionally open — do NOT tighten without proxying client-side calls (gotcha #76)
 22. **NEW (Apr 18)**: Operator repair scripts default to read-only (`--audit-only`); writes require explicit `--apply` flag + interactive confirm. Audit and apply share one classifier. Writes emit `audit-applied-<timestamp>.csv` for rollback reference. (gotcha #83)
+23. **NEW (Apr 18)**: `scripts/backfill-date-bug.ts --apply` writes via `_simple-date-parser.ts`, the pilot-script mirror of production's `turkish-utils.ts parseTurkishDate()`. Before any prod `--apply` run, verify the 22-test drift canary (`scripts/__tests__/simple-date-parser.test.ts`) is green against the current production parser. Stale mirror → silent re-corruption. (extends non-negotiable rule #11 for this specific script)
 
 ---
 
