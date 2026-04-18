@@ -166,3 +166,106 @@ npx tsc -p server/tsconfig.json              # 0 errors
 
 ### Railway deploy
 Sandbox `git push` does NOT trigger Railway webhook (gotcha #22). Use `mcp__github__push_files` or merge PR via `mcp__github__merge_pull_request` to get Railway to redeploy.
+
+---
+
+## Complete File Inventory (from `git diff main...HEAD --name-status`)
+
+42 files changed (6 new, 36 modified) across 5 commits. Listed below verbatim so grep-by-filename resolves every entry.
+
+### New files (A)
+| File | Commit | Purpose |
+|------|--------|---------|
+| `src/lib/config/rollout-hash.ts` | `2f3f0b7` | Shared `computeRolloutBucket()` + `hashString()` |
+| `src/components/admin/tabs/SegmentsTab.tsx` | `2f3f0b7` | Admin UI for reviewer segment management |
+| `src/components/admin/tabs/SegmentsTab.test.tsx` | `2f3f0b7` / `b1e6072` | RTL tests (13 total incl. email mode) |
+| `docs/runbooks/04-phase-e-production-scaleup.md` | `2f3f0b7` | 25% → 100% Phase E runbook |
+| `docs/runbooks/05-date-corruption-audit.md` | `b1e6072` | V8 DD.MM.YYYY audit + repair SQL |
+| `docs/runbooks/06-phase-f-draft-removal.md` | `b1e6072` | Phase F runbook skeleton |
+| `docs/adr/0004-env-var-gated-admin-features.md` | `2eefddb` | Env-var-opt-in pattern ADR |
+
+### Modified files (M) — grouped by subsystem
+
+**Extraction schema + types**
+- `shared/extraction-schema.ts` — `discounts` object added; required bumped 19→20
+- `shared/__tests__/extraction-schema.test.ts` — count assertion + new discounts test
+- `src/lib/ai/extraction-schema.ts` — `ExtractedPolicyData.discounts?`, prompt #12 (discounts), #13 (depreciation), #14 (parts clause)
+- `src/lib/ai/extraction-schema.test.ts` — count bump + new discounts test
+- `src/lib/ai/kasko-parser-prompts.ts` — `StructuredPolicyData.discounts?` + JSON template entry
+- `src/types/policy.ts` — `AnalyzedPolicy.discounts?`
+- `src/types/admin.ts` — `AdminSection` union + `'segments'`
+
+**AI extraction pipeline**
+- `src/lib/ai/policy-extractor.ts` — all 7 QA fixes; `deriveDiscountsFromStructured`, `derivePartsClauseInsight`, `detectInsuredEntityType` hookups; confidence penalty via resolver stats
+- `src/lib/ai/relationship-resolver.ts` — `QUIET_CLAUSE_RESOLVER` gate + new `stats.unresolvedCount` out-param
+- `src/lib/ai/turkish-utils.ts` — `isValidVKN()`, `detectInsuredEntityType()`
+
+**Pilot gate + rollout**
+- `src/lib/analysis/kasko-pilot-gate.ts` — polymorphic flag shape + bucket check + `inactiveResult()` helper
+- `src/lib/analysis/__tests__/kasko-pilot-gate.test.ts` — +7 Phase E distribution/determinism tests (29 total)
+- `src/hooks/usePilotGateOptions.ts` — preserves `rolloutPercentage`, new `PilotFeatureFlag` type
+- `src/hooks/usePilotGateOptions.test.ts` — mock updated to new shape
+- `src/hooks/useDisplaySafeSummary.ts` — option type widened to accept both boolean and object flag shapes
+- `src/lib/config/configuration-service.ts` — `isFeatureEnabled()` uses shared `computeRolloutBucket()`; private `hashString()` removed
+
+**Policy evaluator**
+- `src/lib/policy-evaluation/evaluator.ts` — `isCommercialOrNicheVehicle()` niche-benchmark downgrade
+- `src/lib/policy-evaluation/__tests__/benchmark-confidence.test.ts` — fixture tweak + 2 new commercial-downgrade tests
+
+**Reviewer summary**
+- `src/lib/reviewer/policy-reviewer-summary.ts` — `entityType`, `vehicleUsage`, `typeLabel`, `entityLabel` + derive helpers
+- `src/lib/reviewer/__tests__/policy-reviewer-summary.test.ts` — +4 commercial-template-branching tests (44 total)
+
+**Admin backend + UI**
+- `server/routes/admin/segments.ts` — new `POST /app-users/resolve-emails` endpoint + env gate
+- `server/__tests__/admin-segments.test.ts` — +6 resolver tests (18 total)
+- `server/routes/admin/monitoring.ts` — D1 pilot monitoring: `calibration` block on rollback-status response
+- `src/lib/admin/api.ts` — Phase E segment helpers + `resolveEmailsToUuids` + `EmailResolverDisabledError`
+- `src/components/admin/AdminDashboard.tsx` — Segments tab registration (import + TABS + render switch)
+
+**UI hygiene**
+- `src/components/PolicyDetailView.tsx` — UNVERIFIED banner prefix copy
+- `src/components/TryAnalysis.tsx` — `[ConfidenceDiag]` log gated behind DEV/`localStorage.LOG_LEVEL`
+- `src/components/__tests__/TrustworthinessUI.test.tsx` — mock key typo fix (`flags` → `featureFlags`)
+
+**QA regression tests**
+- `src/lib/ai/__tests__/qa-regression-fixes.test.ts` — 38 → 50 tests (VERBOSE_CLAUSE_RESOLVER=1 opt-in, +12 covering bugs #6-#15 and discounts derivation)
+
+**Operations / ops tooling**
+- `scripts/calibrate-grade-thresholds.ts` — `--force`, `--production`, `--auto-production` flags; `recordCalibrationAudit()`
+- `supabase/migrations/040_kasko_pilot_flag_and_segment.sql` — RLS policy names + inline comments corrected (fresh-install only; see nuance below)
+
+**Docs**
+- `CLAUDE.md` — Next Session Instructions rewritten; 6 new gotchas #73-#78; env var section; Last Updated Apr 18
+- `SESSION_HANDOFF.md` — this file
+- `.env.example` — `ENABLE_ADMIN_EMAIL_RESOLVER` documented
+- `docs/KNOWN_ISSUES_ARCHIVE.md` — entry #171 (`[ConfidenceDiag]`) corrected to match repo reality
+
+---
+
+## Environment / Config Nuances
+
+### `VERBOSE_CLAUSE_RESOLVER` (test-time only)
+Not in `.env.example` because it's a **test runner override**, not a runtime config. `src/lib/ai/relationship-resolver.ts` suppresses its own `[ClauseResolver]` warnings when `NODE_ENV=test` unless the test file opts in via `process.env.VERBOSE_CLAUSE_RESOLVER = '1'` in `beforeAll`. Currently only `qa-regression-fixes.test.ts` opts in (the warnings verify the unresolved-relationship filter). If you notice `[ClauseResolver]` noise in a different test file, it means that test exercises the resolver without opting in — the noise is harmless and suppressible by scoping the opt-in or removing it.
+
+### `localStorage.LOG_LEVEL` (browser only)
+Not an env var. Browser-side debug toggle for `[TryAnalysis ConfidenceDiag]` (the only live `[ConfidenceDiag]` site). Set via `localStorage.setItem('LOG_LEVEL','debug')` in the browser devtools to surface the log in production builds. Removing the key returns to silent.
+
+### Migration 040 — file-vs-prod-DB divergence
+`supabase/migrations/040_kasko_pilot_flag_and_segment.sql` was edited this session to rename the two RLS policies to `"Open read/write (API layer enforces auth)"` and add inline comments explaining intent. **But the migration already ran in production**, so the prod DB still carries the old policy names (`"Service role manages segments"` and `"Service role manages QA records"`). Fresh installs / local dev recreate with the new names. Do not write a "rename policy" migration unless there's an operational need — the policy bodies are identical either way. The CLAUDE.md update to gotcha #76 reflects this nuance.
+
+---
+
+## Session-Specific Gotchas Worth Surfacing
+
+These got written into code but belong in a quick-reference list:
+
+1. **`vi.hoisted()` must wrap class definitions, not just `vi.fn`** (SegmentsTab.test.tsx). When a test's `vi.mock()` factory needs to return a class (e.g. an Error subclass for `instanceof` checks), the class definition itself must be inside `vi.hoisted(() => { class X extends Error {...}; return { X, ... } })`. A top-level `class MockErr extends Error {}` referenced from `vi.mock()` throws `ReferenceError: Cannot access 'MockErr' before initialization` because `vi.mock()` is hoisted above all top-level statements including class declarations. This is a sharper variant of the general `vi.hoisted()` pattern documented elsewhere in CLAUDE.md.
+
+2. **Email resolver caps at 1000 auth.users**. `server/routes/admin/segments.ts` `POST /app-users/resolve-emails` paginates via `supabase.auth.admin.listUsers({ perPage: 1000, page: 1 })` — a single page. Platforms with more than 1000 users will see emails falsely reported as "missing" when they in fact exist beyond the first 1000. Response includes `cappedAtUserListLimit: true` so the UI can show a notice. **If the pilot scales past 1000 users**, upgrade the endpoint to a server-side SQL function that indexes by email (auth schema queries require the service-role client).
+
+3. **`evaluateKaskoPilotGate()` anonymous-userId bypass**. If `userId` is undefined, the gate skips **both** the rollout-bucket check (can't hash without userId) AND the segment check (anonymous → `userInSegment = true` fallthrough). This is intentional — anonymous TryAnalysis uploads must keep working post-Phase-D without a user account. But it means `rolloutPercentage = 0` does NOT block anonymous users; it only blocks logged-in non-segment users. Document this if/when Phase F locks anonymous paths to the same rollout %.
+
+4. **The Turkish comma decimal parse in `deriveDiscountsFromStructured` rounds aggressively**. `'%40,5' → 40.5 → Math.round(40.5) → 41`. This is correct for percent-integer storage but surprising if an operator expects fractional percent. If future policies show fractional NCDs (unlikely in Turkey), the field should be changed from `number` to `number | string` and storage kept as-written.
+
+5. **`.husky/pre-commit` can silently exit `lint-staged` as no-op** when a commit contains only files already linted via a previous stash. Saw the message `"lint-staged could not find any staged files matching configured tasks"` on the handoff commit — this is normal (the docs files matched no lint-staged config). Don't mistake it for an error.
