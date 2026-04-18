@@ -185,6 +185,43 @@ RETURNING p.id, p.start_date, p.expiry_date;
 
 If the original PDF is still available in `policy_documents`, re-run the extraction via `scripts/pilot-batch-ingest.ts --persist-policies` (or equivalent). The current code uses `parseTurkishDate()` so re-extracted rows will be correct. This is the safest option but slowest.
 
+### 4.4 Option D — Script-Assisted Audit & Repair (recommended for >10 rows)
+
+`scripts/backfill-date-bug.ts` packages Sections 2–4 into a single command. It uses the same classification logic as Section 3 (CASE on Turkish vs V8 interpretation) and never touches rows classified `OK` or `MANUAL_REVIEW`.
+
+**Prerequisites**: `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` in `.env` (service role bypasses RLS — see Section 1).
+
+```bash
+# Read-only audit. Prints 4 counts and writes a CSV report. No DB writes.
+npx tsx scripts/backfill-date-bug.ts --audit-only
+
+# Same, with a custom CSV path:
+npx tsx scripts/backfill-date-bug.ts --audit-only --csv ./my-report.csv
+
+# Repair confirmed-corrupted rows. Interactive confirm unless --yes.
+npx tsx scripts/backfill-date-bug.ts --apply
+
+# Skip interactive prompt (for CI / scripted repair):
+npx tsx scripts/backfill-date-bug.ts --apply --yes
+```
+
+**Audit report columns** (CSV):
+`id, policy_number, provider, created_at, raw_start, raw_end, db_start, db_end, tr_interpreted_start, v8_interpreted_start, status`
+
+**Status values**:
+- `CORRUPTED` — DB date matches V8 swap, disagrees with Turkish. Repair-eligible.
+- `OK` — DB date already matches Turkish interpretation. Skipped on repair.
+- `MANUAL_REVIEW` — DB date matches neither interpretation. Skipped on repair; review by hand.
+
+After `--apply` completes, it writes `date-audit-applied-<timestamp>.csv` logging exactly which rows were updated (for rollback reference).
+
+**Post-repair steps**:
+
+1. Re-run `--audit-only` — expect `confirmed_corrupted == 0`.
+2. Run `npx tsx scripts/backfill-evaluation-scores.ts` to rescore `raw_data.evaluation.overallScore` for rows whose dates just changed.
+
+Unit tests for the classification logic live in `scripts/__tests__/backfill-date-bug.test.ts` — run in isolation via `npx vitest run scripts/__tests__/backfill-date-bug.test.ts`.
+
 ---
 
 ## 5. Verification
