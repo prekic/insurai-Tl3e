@@ -201,6 +201,68 @@ describe('validateKasko — parts standard', () => {
     )
     expect(flagFields(result)).toContain('specialConditions.partsStandard')
   })
+
+  it('should not warn when "yan sanayi" is found in conditions', () => {
+    const result = validateExtractionSafety(
+      makeKaskoData({
+        coverages: [
+          {
+            name: 'Collision',
+            limit: null,
+            deductible: 500,
+            isMarketValue: true,
+            category: 'main',
+            description: null,
+          },
+          { name: 'Theft', nameTr: 'Hırsızlık', limit: null, deductible: 0, description: null },
+          { name: 'Fire', nameTr: 'Yangın', limit: null, deductible: 0, description: null },
+        ],
+        specialConditions: ['Yan sanayi parça kullanılabilir'],
+      })
+    )
+    expect(flagFields(result)).not.toContain('specialConditions.partsStandard')
+  })
+
+  it('should not warn when "çıkma" is found in coverage description', () => {
+    const result = validateExtractionSafety(
+      makeKaskoData({
+        coverages: [
+          {
+            name: 'Collision',
+            limit: null,
+            deductible: 500,
+            isMarketValue: true,
+            category: 'main',
+            description: 'Çıkma parça kullanılabilir',
+          },
+          { name: 'Theft', nameTr: 'Hırsızlık', limit: null, deductible: 0, description: null },
+          { name: 'Fire', nameTr: 'Yangın', limit: null, deductible: 0, description: null },
+        ],
+      })
+    )
+    expect(flagFields(result)).not.toContain('specialConditions.partsStandard')
+  })
+
+  it('should not warn when "logolu olmayan" is found in conditions', () => {
+    const result = validateExtractionSafety(
+      makeKaskoData({
+        coverages: [
+          {
+            name: 'Collision',
+            limit: null,
+            deductible: 500,
+            isMarketValue: true,
+            category: 'main',
+            description: null,
+          },
+          { name: 'Theft', nameTr: 'Hırsızlık', limit: null, deductible: 0, description: null },
+          { name: 'Fire', nameTr: 'Yangın', limit: null, deductible: 0, description: null },
+        ],
+        specialConditions: ['Logolu olmayan parça kullanılır'],
+      })
+    )
+    expect(flagFields(result)).not.toContain('specialConditions.partsStandard')
+  })
 })
 
 // ============================================================================

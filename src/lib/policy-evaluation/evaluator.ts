@@ -156,7 +156,10 @@ function assessBenchmarkConfidence(
   let suppressionReason: string | undefined
   let suppressionReasonTr: string | undefined
 
-  if (policy.type === 'kasko' && analyzedPolicy.vehicleInfo?.usage === 'commercial') {
+  if (
+    policy.type === 'kasko' &&
+    (policy.vehicleUsage === 'commercial' || analyzedPolicy.vehicleInfo?.usage === 'commercial')
+  ) {
     level = 'suppressed'
     suppressionReason =
       'Commercial/niche vehicle policies are excluded from standard market benchmark comparisons'
@@ -1092,7 +1095,9 @@ function evaluateCompliance(policy: Policy, config: EvaluationConfig): Complianc
       (i: string) =>
         i.toLowerCase().includes('yan sanayi') ||
         i.toLowerCase().includes('eşdeğer parça') ||
-        i.toLowerCase().includes('orijinal olmayan')
+        i.toLowerCase().includes('orijinal olmayan') ||
+        i.toLowerCase().includes('çıkma parça') ||
+        i.toLowerCase().includes('logolu olmayan')
     ) ||
     (policy as import('@/types/policy').AnalyzedPolicy).aiInsightsEn?.some(
       (i: string) => i.toLowerCase().includes('non-oem') || i.toLowerCase().includes('aftermarket')
@@ -1103,6 +1108,8 @@ function evaluateCompliance(policy: Policy, config: EvaluationConfig): Complianc
         (c.toLowerCase().includes('yan sanayi') ||
           c.toLowerCase().includes('eşdeğer parça') ||
           c.toLowerCase().includes('orijinal olmayan') ||
+          c.toLowerCase().includes('çıkma parça') ||
+          c.toLowerCase().includes('logolu olmayan') ||
           c.toLowerCase().includes('non-oem') ||
           c.toLowerCase().includes('aftermarket'))
     )

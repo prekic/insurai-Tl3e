@@ -117,6 +117,20 @@ Extract these additional vehicle-specific fields:
   - "Sınırsız" = Unlimited → Set isUnlimited=true, limit=null
   - "Rayiç Değer" = Market Value → Set isMarketValue=true, limit=null
 
+- **Depreciation Clause (Eskime Payı / Kıymet Artışı)** (CRITICAL):
+  Turkish kasko policies frequently include depreciation clauses that cap the
+  age-related reduction applied to parts during repair or total-loss settlement.
+  Look for these patterns:
+  - "Eskime payı azami %50 ile sınırlıdır" (depreciation capped at 50%)
+  - "Eskime payı uygulanır" (depreciation applies)
+  - "Kıymet artışı/kazancı dikkate alınmaz" (betterment disregarded)
+  - "Yıpranma payı" (wear-and-tear deduction)
+  If found, extract as a conditionalDeductible with:
+    trigger: "depreciation / eskime payı"
+    rate: the percentage cap (e.g., "%50", "%30") or "uygulanır" if uncapped
+    evidence: verbatim quote from the policy
+  Do NOT put depreciation clauses into exclusions — they are deductible modifiers.
+
 - **Coverage Types to Look For**:
   - Tam Kasko = Full comprehensive (category: main)
   - Mini Kasko = Limited comprehensive

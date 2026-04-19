@@ -11,13 +11,15 @@
  *  - DAHİL/HARİÇ detection in real policy text
  *  - Vehicle make/model extraction across formats
  *  - Sigorta bedeli pattern matching
+ *  - Ray Sigorta OCR sidecar validation (scanned PDF → pre-extracted .txt)
  *
  * NOTE: This test extracts PDF text via pdf-parse. It does NOT call any
  * AI APIs — it only validates the deterministic regex/parsing layer.
+ * Scanned/image-only PDFs (e.g. Ray Sigorta) use pre-extracted .txt sidecars.
  */
 
 import { describe, it, expect, beforeAll } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseTurkishCurrency, extractVehicleInfoFromText } from '../turkish-utils'
 
@@ -92,6 +94,9 @@ const fixtures: PdfFixture[] = [
     expectedPremiumOneOf: [1095.23], // Vergi öncesi prim
     shouldFindDahilHaric: true,
   },
+  // NOTE: Ray Sigorta (KRK_35 VD 458 Kasko Police_32630901_3.pdf) is a
+  // scanned/image-only PDF with NO embedded text layer. pdf-parse returns
+  // empty text. It is tested separately via the OCR sidecar block below.
 ]
 
 // Cache PDF text extraction across all tests in this file
@@ -217,5 +222,63 @@ describe('PDF Golden Regression — cross-PDF aggregate checks', () => {
     const hasNet = /net\s*pr[iİ]m/i.test(text)
     expect(hasBrut).toBe(true)
     expect(hasNet).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Ray Sigorta — scanned PDF, tested via pre-extracted OCR sidecar (.txt)
+// ---------------------------------------------------------------------------
+const RAY_SIGORTA_SIDECAR = 'policies/KRK_35 VD 458 Kasko Police_32630901_3.pdf.txt'
+
+describe('PDF Golden Regression — Ray Sigorta OCR sidecar', () => {
+  const sidecarPath = join(process.cwd(), RAY_SIGORTA_SIDECAR)
+  const sidecarExists = existsSync(sidecarPath)
+
+  // Skip the whole block if the sidecar hasn't been generated yet
+  if (!sidecarExists) {
+    it.skip('OCR sidecar not found — run Tesseract extraction first', () => {})
+    return
+  }
+
+  const text = readFileSync(sidecarPath, 'utf-8')
+
+  it('sidecar text is non-trivial (>1000 chars)', () => {
+    expect(text.length).toBeGreaterThan(1000)
+  })
+
+  it('extracts brüt prim 755.21', () => {
+    const found: number[] = []
+    for (const pat of premiumPatterns) {
+      const matches = text.matchAll(new RegExp(pat.source, pat.flags + 'g'))
+      for (const m of matches) {
+        if (m[1]) {
+          const v = parseTurkishCurrency(m[1])
+          if (v && v > 50 && v < 1_000_000) found.push(v)
+        }
+      }
+    }
+    expect(found.length).toBeGreaterThan(0)
+    const matched = [755.21, 719.25].some((expected) =>
+      found.some((f) => Math.abs(f - expected) < 1)
+    )
+    expect(matched, `Expected one of [755.21, 719.25] in found ${found}`).toBe(true)
+  })
+
+  it('finds IVECO make in text', () => {
+    expect(text.toUpperCase()).toContain('IVECO')
+  })
+
+  it('finds model year 1997 in text', () => {
+    expect(text).toContain('1997')
+  })
+
+  it('finds plate 35 VD 458 in text', () => {
+    expect(/35\s*VD\s*458/i.test(text)).toBe(true)
+  })
+
+  it('contains DAHİL or HARİÇ markers', () => {
+    const hasDahil = /dahil|DAHİL/i.test(text)
+    const hasHaric = /hari[çc]|HARİÇ|HARIC/i.test(text)
+    expect(hasDahil || hasHaric).toBe(true)
   })
 })

@@ -503,7 +503,17 @@ function validateKasko(data: Partial<ExtractedPolicyData>): SafetyFlag[] {
   }
 
   // 2. Parts standard — search conditions and coverage descriptions for parts terminology
-  const partsTerms = ['orijinal', 'original', 'eşdeğer', 'equivalent', 'muadil', 'oem']
+  const partsTerms = [
+    'orijinal',
+    'original',
+    'eşdeğer',
+    'equivalent',
+    'muadil',
+    'oem',
+    'yan sanayi',
+    'çıkma',
+    'logolu olmayan',
+  ]
   const hasPartsInConditions = conditions.some((c) =>
     partsTerms.some((term) => c.toLowerCase().includes(term))
   )
