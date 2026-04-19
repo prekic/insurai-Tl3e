@@ -1,5 +1,60 @@
 import '@testing-library/jest-dom'
-import type { AuditEvent, AuditEventType, AuditEventCategory, AuditSeverity } from '@/types/security'
+import type {
+  AuditEvent,
+  AuditEventType,
+  AuditEventCategory,
+  AuditSeverity,
+} from '@/types/security'
+
+// =============================================================================
+// Console Noise Suppression
+// =============================================================================
+// Silence diagnostic console.warn/error output from the extraction pipeline
+// during tests. This removes ~1000+ lines of [PolicyExtractor], [Document AI],
+// etc. noise while preserving:
+//   - [ClauseResolver] — intentional safety-guard output
+//   - Vitest spy-intercepted calls (tests using vi.spyOn still see output)
+//   - Genuine unexpected errors (anything not matching known prefixes)
+
+const SUPPRESSED_PREFIXES = [
+  '[PolicyExtractor]',
+  '[Document AI]',
+  '[Turkish Validation]',
+  '[Table Parser]',
+  '[convertToAnalyzedPolicy]',
+  '[ProcessingLog]',
+  '[TryAnalysis',
+  'AI provider',
+  'All AI providers failed',
+  'AI text processing failed',
+  'Clean-room processing failed',
+  'Text processing failed',
+  'Turkish pattern validation failed',
+  'Table coverage parsing failed',
+  'Successfully fetched',
+  'Warning: Required "glyf"',
+]
+
+const ALLOWED_PREFIXES = ['[ClauseResolver]']
+
+function isSuppressed(args: unknown[]): boolean {
+  const first = args[0]
+  if (typeof first !== 'string') return false
+  // Never suppress allowed prefixes
+  if (ALLOWED_PREFIXES.some((p) => first.startsWith(p))) return false
+  // Suppress known noisy prefixes
+  return SUPPRESSED_PREFIXES.some((p) => first.startsWith(p) || first.includes(p))
+}
+
+const originalWarn = console.warn
+const originalError = console.error
+
+console.warn = (...args: unknown[]) => {
+  if (!isSuppressed(args)) originalWarn(...args)
+}
+console.error = (...args: unknown[]) => {
+  if (!isSuppressed(args)) originalError(...args)
+}
 
 // =============================================================================
 // Test Helpers

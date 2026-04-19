@@ -21,8 +21,8 @@ describe('shared/extraction-schema', () => {
     expect(schema.additionalProperties).toBe(false)
   })
 
-  it('has 20 top-level required fields', () => {
-    expect(schema.required).toHaveLength(20)
+  it('has 23 top-level required fields', () => {
+    expect(schema.required).toHaveLength(23)
   })
 
   it('has discounts object with required sub-fields', () => {

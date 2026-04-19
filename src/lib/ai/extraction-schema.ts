@@ -22,6 +22,11 @@ export interface ExtractedPolicyData {
   premium: number | null
   currency: string | null
   paymentFrequency: 'annual' | 'semi-annual' | 'quarterly' | 'monthly' | null
+  discounts?: Array<{ type: string; rate: string; description: string }> | null
+
+  // Entity Details
+  insuredEntityType?: 'individual' | 'corporate' | null
+  vehicleUsage?: 'private' | 'commercial' | null
 
   // Coverage information
   coverages: ExtractedCoverage[]
@@ -214,6 +219,12 @@ Your task is to extract structured information from insurance policy documents.
    - DO NOT hallucinate, guess, or assume values.
    - If a field (e.g. deductible, premium, limits, dates) is not explicitly found, you MUST return null.
    - It is far better to return null than to extract an incorrect value.
+   - ALL extracted text fields, property names, and coverage descriptions MUST remain in Turkish UNLESS explicitly asked for an English translation (e.g. in exclusionsEn or textEn). Do NOT use literal english placeholders or labels.
+
+6b. **Entity and Vehicle Specifics** (CRITICAL):
+   - 'insuredEntityType': Check identification numbers. TCKN (11 digits, usually starts with non-zero) means 'individual' (gerçek kişi). VKN (10 digits) means 'corporate' (tüzel kişi). If absent, use null.
+   - 'vehicleUsage': Extract "KULLANIM TARZI". "Hususi" means 'private'. "Ticari", "Kamyonet", "Minibüs", "Kamyon" or others usually mean 'commercial'.
+   - 'discounts': Specifically check for Hasarsızlık İndirimi (NCD/No Claim Discount), group/profession discounts (meslek, grup), and cash discounts (peşin). Include the exact 'rate' (e.g. "%30") if found.
 
 7. **Coverages**: List all coverage items found, including:
    - Main coverage (Ana Teminat)
@@ -271,11 +282,14 @@ Your task is to extract structured information from insurance policy documents.
 
    If NO amendment markers are found, set isAmendment to false and all other amendmentInfo fields to null.
 
-9. **CRITICAL - Evidence Extraction**:
+9. **CRITICAL - Evidence Extraction & Insights**:
    You MUST extract verbatim quotes from the document to support your insights and exclusions.
    - For every insight and exclusion generated, extract the exact original text from the document.
    - DO NOT paraphrase the quote. Copy it exactly as it appears in the text.
    - Populate the 'evidence.insights' and 'evidence.exclusions' arrays. Ensure the 'text' perfectly matches the generated insight or exclusion string, and the 'quote' is the verbatim evidence.
+
+   **Specifically Flag These as Insights**:
+   - **Parts Clause (Yedek Parça)**: If the policy dictates the use of non-OEM/equivalent parts ("eşdeğer", "yan sanayi", "çıkma", "logolu olmayan"), flag this as a risk insight! For example: "Eşdeğer/yan sanayi orijinal olmayan parça kullanımı şartı vardır."
 
 10. **CRITICAL - Clause Graph & Relationships**:
     You MUST identify relationships and overrides between different clauses or coverages.
@@ -295,6 +309,7 @@ Your task is to extract structured information from insurance policy documents.
     - Repair-conditional: "Onarım muafiyeti %5"
     - Partial-loss deductible: "Kısmi hasarlarda %2 muafiyet"
     - Total-loss deductible: "Pert halinde %10 tenzil"
+    - Depreciation (Eskime Payı): If the policy caps depreciation (e.g., "Eskime payı azami %50 ile sınırlıdır" or "eskime payı uygulanır"), extract it explicitly here as a conditional deductible.
     - Any "tenzili muafiyet" or "muafiyet" with an explicit trigger condition
 
     **What does NOT go in conditionalDeductibles (use 'exclusions' instead):**

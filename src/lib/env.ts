@@ -83,9 +83,7 @@ function parseEnv(): EnvConfig {
 
   // AI is configured if proxy is available OR direct keys are set
   const isAIConfigured =
-    isProxyConfigured ||
-    isValidKey(openaiKey, 'sk-') ||
-    isValidKey(anthropicKey, 'sk-ant-')
+    isProxyConfigured || isValidKey(openaiKey, 'sk-') || isValidKey(anthropicKey, 'sk-ant-')
 
   return {
     supabaseUrl,
@@ -123,8 +121,7 @@ function generateWarnings(config: EnvConfig): EnvWarning[] {
     warnings.push({
       level: 'error',
       message: 'No AI service configured - policy analysis will fail',
-      suggestion:
-        'Set VITE_API_PROXY_URL and run backend server with: npm run dev:all',
+      suggestion: 'Set VITE_API_PROXY_URL and run backend server with: npm run dev:all',
     })
   } else if (config.isProxyConfigured) {
     // Proxy mode - server handles AI (recommended)
@@ -159,6 +156,16 @@ function generateWarnings(config: EnvConfig): EnvWarning[] {
  * Log environment status to console
  */
 function logEnvironmentStatus(config: EnvConfig, warnings: EnvWarning[]): void {
+  // Suppress environment logging in tests to prevent console noise
+  const isTest =
+    (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') ||
+    import.meta.env.MODE === 'test' ||
+    import.meta.env.TEST
+
+  if (isTest) {
+    return
+  }
+
   // In production, only log errors; in development, log everything
   const hasErrors = warnings.some((w) => w.level === 'error')
   if (config.isProduction && !hasErrors) {
@@ -170,20 +177,16 @@ function logEnvironmentStatus(config: EnvConfig, warnings: EnvWarning[]): void {
   console.group('🔧 InsurAI Environment')
 
   // Config summary
-  console.log(
-    '%cConfiguration:',
-    'font-weight: bold',
-    {
-      mode: config.isDevelopment ? 'development' : 'production',
-      storage: config.isSupabaseConfigured ? 'cloud' : 'local',
-      ai: config.isAIConfigured
-        ? config.isProxyConfigured
-          ? 'proxy'
-          : 'direct-keys'
-        : 'NOT CONFIGURED',
-      proxy: config.apiProxyUrl || 'none',
-    }
-  )
+  console.log('%cConfiguration:', 'font-weight: bold', {
+    mode: config.isDevelopment ? 'development' : 'production',
+    storage: config.isSupabaseConfigured ? 'cloud' : 'local',
+    ai: config.isAIConfigured
+      ? config.isProxyConfigured
+        ? 'proxy'
+        : 'direct-keys'
+      : 'NOT CONFIGURED',
+    proxy: config.apiProxyUrl || 'none',
+  })
 
   // Warnings
   if (warnings.length > 0) {

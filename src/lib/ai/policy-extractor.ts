@@ -1871,13 +1871,24 @@ async function convertToAnalyzedPolicy(
       : normalizeTurkishLegalEntityName(insuredPerson ?? ''),
     location: data.insuredAddress ?? (rawData.insured_address as string) ?? undefined,
     insuredAddress: data.insuredAddress ?? (rawData.insured_address as string) ?? undefined,
+    insuredEntityType: data.insuredEntityType ?? undefined,
+    discounts: data.discounts ?? undefined,
     // Extract vehicle metadata from raw text for kasko/traffic policies.
     // The standard ExtractedPolicyData schema does not request vehicle fields,
     // so we recover them from the document text via regex patterns.
-    vehicleInfo:
-      (policyType === 'kasko' || policyType === 'traffic') && rawText
-        ? extractVehicleInfoFromText(rawText)
-        : undefined,
+    // Also inject schema-extracted vehicleUsage
+    vehicleInfo: (() => {
+      const baseInfo =
+        (policyType === 'kasko' || policyType === 'traffic') && rawText
+          ? extractVehicleInfoFromText(rawText)
+          : undefined
+
+      if (!baseInfo && !data.vehicleUsage) return undefined
+      return {
+        ...(baseInfo || {}),
+        ...(data.vehicleUsage ? { usage: data.vehicleUsage } : {}),
+      }
+    })(),
     coverages,
     exclusions: data.exclusions,
     exclusionsEn: ensureExclusionsEn(data.exclusions, data.exclusionsEn),
@@ -1891,8 +1902,15 @@ async function convertToAnalyzedPolicy(
         : undefined) ??
       'TRY',
     // Confidence might be a number (0.95) or an object ({ overall: 0.95, ... })
-    aiConfidence:
-      typeof data.confidence === 'number' ? data.confidence : (data.confidence?.overall ?? 0.7),
+    aiConfidence: (() => {
+      let conf =
+        typeof data.confidence === 'number' ? data.confidence : (data.confidence?.overall ?? 0.7)
+      // Bug #14: Penalize confidence by 15% if clause graph has candidate/unresolved edges
+      if (data.clauseGraph?.edges?.some((e) => e.isCandidate || !e.targetId)) {
+        conf = Math.max(0, conf * 0.85)
+      }
+      return conf
+    })(),
     aiInsights: [],
     marketComparison: await generateMarketComparisonAsync(data),
     extractedText: rawText,
@@ -3253,13 +3271,13 @@ export async function extractPolicyComprehensive(
         preprocessed.slice(0, 25000)
       )
 
-      const response = await fetch(`${API_URL}/api/ai/chat`, {
+      const response = await fetch(`${API_URL}/api/ai/extract/${provider}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: userPrompt,
-          policyContext: EXTRACTION_SYSTEM_PROMPT,
-          provider,
+          documentText: userPrompt,
+          systemPrompt: EXTRACTION_SYSTEM_PROMPT,
+          policyType: 'kasko',
         }),
       })
 
@@ -3269,12 +3287,23 @@ export async function extractPolicyComprehensive(
 
       const data = await response.json()
 
-      if (!data.success || !data.response) {
+      if (!data.success || (!data.data && !data.response)) {
         throw new Error(data.error || 'Empty response from AI')
       }
 
-      const aiResponse = data.response
-      const qualityScore = extractQualityScore(aiResponse)
+      let aiResponse: string
+      let qualityScore: number
+
+      if (data.data) {
+        aiResponse = JSON.stringify(data.data, null, 2)
+        qualityScore = data.data.qualityScore?.total ?? 0
+      } else {
+        aiResponse = data.response
+        qualityScore = extractQualityScore(aiResponse)
+      }
+      if (import.meta.env.VITE_DEBUG_LOGS === 'true') {
+        console.warn('--- AI RESPONSE SCORE ---', qualityScore)
+      }
 
       // Keep best result
       if (!bestResult || qualityScore > bestResult.qualityScore) {

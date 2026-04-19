@@ -30,6 +30,7 @@ import {
   FileSpreadsheet,
   FileDown,
   Quote,
+  BadgePercent,
 } from 'lucide-react'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
@@ -1414,17 +1415,67 @@ export function PolicyDetailView() {
                     </p>
                   </div>
 
+                  {/* Discounts Section */}
+                  {policy.discounts && policy.discounts.length > 0 && (
+                    <div className="col-span-2 p-2 sm:p-2.5 bg-green-50 rounded-lg border border-green-100 overflow-hidden">
+                      <p className="text-[10px] sm:text-xs text-green-700 font-medium mb-1.5 flex items-center gap-1.5">
+                        <BadgePercent size={14} />
+                        {locale === 'tr'
+                          ? 'İndirimler / Ek Avantajlar'
+                          : 'Discounts / Extra Benefits'}
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                        {policy.discounts.map((discount, idx) => (
+                          <div
+                            key={idx}
+                            className="flex justify-between items-center text-xs sm:text-sm bg-white/60 px-2 py-1 rounded"
+                          >
+                            <span
+                              className="text-green-800 truncate"
+                              title={discount.type || discount.description}
+                            >
+                              {discount.type || discount.description}
+                            </span>
+                            <span className="font-semibold text-green-700 whitespace-nowrap ml-2">
+                              {discount.rate}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Insured - full width for long names */}
                   <div className="col-span-2 p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
                     <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">
                       {t.policy.insured}
                     </p>
-                    <p
-                      className="text-sm font-semibold text-gray-900 truncate"
-                      title={policy.insuredPerson}
-                    >
-                      {policy.insuredPerson || '-'}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p
+                        className="text-sm font-semibold text-gray-900 truncate"
+                        title={policy.insuredPerson}
+                      >
+                        {policy.insuredPerson || '-'}
+                      </p>
+                      {policy.insuredEntityType === 'corporate' && (
+                        <div
+                          className="flex items-center gap-1 text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded"
+                          title="Corporate / Ticari"
+                        >
+                          <Briefcase size={12} />
+                          <span>Kurumsal</span>
+                        </div>
+                      )}
+                      {policy.insuredEntityType === 'individual' && (
+                        <div
+                          className="flex items-center gap-1 text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded"
+                          title="Individual / Bireysel"
+                        >
+                          <Users size={12} />
+                          <span>Bireysel</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Policy number */}
@@ -2089,6 +2140,21 @@ export function PolicyDetailView() {
                     <Car className="text-blue-600" size={20} />
                     {t.policy.vehicleInfoTitle}
                   </CardTitle>
+                  {policy.vehicleInfo.usage?.toLowerCase() === 'commercial' && (
+                    <div className="mt-2 text-[10px] sm:text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded p-2 flex items-start gap-1.5">
+                      <Briefcase size={14} className="flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium">
+                          {locale === 'tr' ? 'Ticari Araç Politikası' : 'Commercial Vehicle Policy'}
+                        </p>
+                        <p className="text-blue-600 mt-0.5 opacity-90 leading-tight">
+                          {locale === 'tr'
+                            ? 'Bu araç ticari kullanım amaçlı olduğundan, pazar benchmark ve fiyat analizleri yanıltıcı olmaması adına devre dışı bırakılmıştır.'
+                            : 'As this is a commercial vehicle, market benchmark and price analyses are disabled to avoid misleading representations.'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div className="grid md:grid-cols-2 gap-4">

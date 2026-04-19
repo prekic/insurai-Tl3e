@@ -140,7 +140,9 @@ describe('Sprint 1: Trustworthiness Hardening UI Tests', () => {
     renderComponent()
 
     // Banner renders (English since locale = 'en')
-    expect(screen.getByText(/UNVERIFIED AI OUTPUT/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/AI output has not yet received human expert verification/i)
+    ).toBeInTheDocument()
 
     // Export blocked: the button inside the titled wrapper should be disabled
     const exportWrapper = screen.getByTitle('Export disabled for unverified policies')
@@ -162,7 +164,9 @@ describe('Sprint 1: Trustworthiness Hardening UI Tests', () => {
     } as any)
 
     renderComponent()
-    expect(screen.getByText(/UNVERIFIED AI OUTPUT/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/AI output has not yet received human expert verification/i)
+    ).toBeInTheDocument()
 
     // Share blocked
     const shareButton = screen.getByLabelText(/Share/i)
@@ -177,7 +181,9 @@ describe('Sprint 1: Trustworthiness Hardening UI Tests', () => {
     } as any)
 
     renderComponent({ lowConfidence: true })
-    expect(screen.getByText(/UNVERIFIED AI OUTPUT/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/AI output has not yet received human expert verification/i)
+    ).toBeInTheDocument()
 
     // Share blocked
     const shareButton = screen.getByLabelText(/Share/i)
@@ -211,7 +217,9 @@ describe('Sprint 1: Trustworthiness Hardening UI Tests', () => {
     } as any)
 
     renderComponent()
-    expect(screen.getByText(/UNVERIFIED AI OUTPUT/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/AI output has not yet received human expert verification/i)
+    ).toBeInTheDocument()
     expect(
       screen.getByTitle('Export disabled for unverified policies').querySelector('button')!.disabled
     ).toBe(true)
@@ -245,7 +253,9 @@ describe('Sprint 1: Trustworthiness Hardening UI Tests', () => {
     } as any)
 
     renderComponent()
-    expect(screen.getByText(/UNVERIFIED AI OUTPUT/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/AI output has not yet received human expert verification/i)
+    ).toBeInTheDocument()
     expect(
       screen.getByTitle('Export disabled for unverified policies').querySelector('button')!.disabled
     ).toBe(true)
@@ -279,7 +289,9 @@ describe('Sprint 1: Trustworthiness Hardening UI Tests', () => {
     } as any)
 
     renderComponent()
-    expect(screen.getByText(/UNVERIFIED AI OUTPUT/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/AI output has not yet received human expert verification/i)
+    ).toBeInTheDocument()
     expect(
       screen.getByTitle('Export disabled for unverified policies').querySelector('button')!.disabled
     ).toBe(true)

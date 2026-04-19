@@ -107,42 +107,42 @@ OUTPUT FORMAT (MUST FOLLOW EXACTLY):
 - [additional coverage 2]
 
 **Asistans:**
-- [assistance coverage 1]
+- [yardım teminatı 1]
 
 **İkame Araç:**
-- [replacement vehicle terms]
+- [ikame araç şartları]
 
 **Ferdi Kaza:**
-- [personal accident coverage]
+- [ferdi kaza teminatı]
 
 **Hukuki Koruma:**
-- [legal protection]
+- [hukuki koruma]
 
 **İhtiyari Mali Mesuliyet (İMM):**
-- [voluntary liability]
+- [ihtiyari mali mesuliyet]
 
 ### 4. Limitler ve Alt Limitler Tablosu
 | Teminat | Limit | Bazı | Koşullar |
 |---------|-------|------|----------|
-| [coverage name] | [amount/Sınırsız/Rayiç] | [per_event/annual/per_person] | [conditions] |
+| [teminat adı] | [tutar/Sınırsız/Rayiç] | [olay_başı/yıllık/kişi_başı] | [koşullar] |
 
 ### 5. Muafiyet ve Kesintiler Tablosu
 | Tetikleyici | Kesinti | Koşullar |
 |-------------|---------|----------|
-| [trigger condition] | [deduction %/amount] | [when applied] |
+| [tetikleyici koşul] | [kesinti %/tutar] | [ne zaman uygulanır] |
 
 ### 6. Önemli İstisnalar
-- [exclusion 1]
-- [exclusion 2]
+- [istisna 1]
+- [istisna 2]
 
 ### 7. Hasar Süreci
-- **Süre:** [deadline]
-- **İletişim:** [channels]
+- **Süre:** [süre sonu]
+- **İletişim:** [kanallar]
 - **Gerekli Belgeler:** [documents by claim type]
 
 ### 8. En Önemli 15 Dikkat Noktası
-1. [watch-out 1: clause that causes denial or deduction]
-2. [watch-out 2]
+1. [dikkat noktası 1: ret veya kesintiye neden olan kloz]
+2. [dikkat noktası 2]
 ...
 
 ---
@@ -579,13 +579,26 @@ export const COMMON_DEDUCTION_TRIGGERS = [
  */
 export function parseStructuredOutput(response: string): StructuredPolicyData | null {
   try {
+    // If it's already a valid JSON string (no markdown wraps), parse it directly
+    const trimmed = response.trim()
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        return JSON.parse(trimmed)
+      } catch (_e) {
+        // Fallback to regex if simple parse fails
+      }
+    }
+
     // Find JSON block in response
     const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/)
     if (!jsonMatch) {
-      // Try to find raw JSON object
-      const rawJsonMatch = response.match(/\{[\s\S]*"policy"[\s\S]*"qualityScore"[\s\S]*\}/)
-      if (!rawJsonMatch) return null
-      return JSON.parse(rawJsonMatch[0])
+      // Try to find raw JSON object by looking for the outermost braces
+      const firstBrace = response.indexOf('{')
+      const lastBrace = response.lastIndexOf('}')
+      if (firstBrace === -1 || lastBrace === -1 || lastBrace < firstBrace) return null
+
+      const potentialJson = response.substring(firstBrace, lastBrace + 1)
+      return JSON.parse(potentialJson)
     }
     return JSON.parse(jsonMatch[1])
   } catch {
