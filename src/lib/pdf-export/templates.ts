@@ -191,6 +191,54 @@ export function generatePolicyDetailHTML(
       : ''
   }
 
+  ${(() => {
+    if (!policy.discounts) return ''
+    const dList: Array<{ type: string; rate: string }> = []
+    if (policy.discounts.ncdDiscount)
+      dList.push({
+        type: isTr ? 'Hasarsızlık İndirimi' : 'No Claims Discount',
+        rate: '%' + policy.discounts.ncdDiscount,
+      })
+    if (policy.discounts.groupDiscount)
+      dList.push({
+        type: isTr ? 'Grup/Kurum İndirimi' : 'Group/Corporate Discount',
+        rate: '%' + policy.discounts.groupDiscount,
+      })
+    if (policy.discounts.otherDiscountPct)
+      dList.push({
+        type: isTr ? 'Diğer İndirimler' : 'Other Discounts',
+        rate: '%' + policy.discounts.otherDiscountPct,
+      })
+
+    if (dList.length === 0) return ''
+
+    return `
+  <!-- Discounts -->
+  <h2>${isTr ? 'İndirimler / Ek Avantajlar' : 'Discounts / Extra Benefits'}</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>${isTr ? 'İndirim Türü' : 'Discount Type'}</th>
+        <th style="text-align: right;">${isTr ? 'Oran / Tutar' : 'Rate / Amount'}</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${dList
+        .map(
+          (d) => `
+        <tr>
+          <td>${d.type}</td>
+          <td style="text-align: right; font-weight: bold; color: #166534;">${d.rate}</td>
+        </tr>
+      `
+        )
+        .join('')}
+    </tbody>
+  </table>
+  `
+  })()}
+
+
   ${
     sections.showRiskScore !== false && policy.riskScore
       ? `

@@ -40,6 +40,12 @@ async function importEnv(setup: EnvSetup = {}) {
   const metaEnv = import.meta.env as Record<string, unknown>
   metaEnv.PROD = isProd
   metaEnv.DEV = isDev
+  metaEnv.TEST = false
+  metaEnv.MODE = 'development'
+  metaEnv.FORCE_LOG_ENV = 'true'
+
+  // Stub process.env.NODE_ENV to avoid the isTest early return in env.ts
+  vi.stubEnv('NODE_ENV', 'development')
 
   // Stub VITE_ env vars
   vi.stubEnv('VITE_API_PROXY_URL', setup.VITE_API_PROXY_URL ?? '')
@@ -386,7 +392,7 @@ describe('generateWarnings() branches', () => {
     })
 
     const warnings = mod.getEnvWarnings()
-    const supabaseWarning = warnings.find(w => w.message.includes('Supabase not configured'))
+    const supabaseWarning = warnings.find((w) => w.message.includes('Supabase not configured'))
     expect(supabaseWarning).toBeDefined()
     expect(supabaseWarning!.level).toBe('info')
     expect(supabaseWarning!.suggestion).toContain('VITE_SUPABASE_URL')
@@ -406,7 +412,7 @@ describe('generateWarnings() branches', () => {
     })
 
     const warnings = mod.getEnvWarnings()
-    const aiWarning = warnings.find(w => w.message.includes('No AI service configured'))
+    const aiWarning = warnings.find((w) => w.message.includes('No AI service configured'))
     expect(aiWarning).toBeDefined()
     expect(aiWarning!.level).toBe('error')
     expect(aiWarning!.suggestion).toContain('VITE_API_PROXY_URL')
@@ -424,7 +430,7 @@ describe('generateWarnings() branches', () => {
     })
 
     const warnings = mod.getEnvWarnings()
-    const proxyWarning = warnings.find(w => w.message.includes('API proxy configured'))
+    const proxyWarning = warnings.find((w) => w.message.includes('API proxy configured'))
     expect(proxyWarning).toBeDefined()
     expect(proxyWarning!.level).toBe('info')
     expect(proxyWarning!.message).toContain('http://localhost:4001')
@@ -446,7 +452,7 @@ describe('generateWarnings() branches', () => {
     })
 
     const warnings = mod.getEnvWarnings()
-    const directKeyWarning = warnings.find(w => w.message.includes('direct API keys'))
+    const directKeyWarning = warnings.find((w) => w.message.includes('direct API keys'))
     expect(directKeyWarning).toBeDefined()
     expect(directKeyWarning!.level).toBe('warning')
     expect(directKeyWarning!.suggestion).toContain('API proxy')
@@ -465,7 +471,7 @@ describe('generateWarnings() branches', () => {
     })
 
     const warnings = mod.getEnvWarnings()
-    const prodWarning = warnings.find(w => w.message.includes('data will not persist'))
+    const prodWarning = warnings.find((w) => w.message.includes('data will not persist'))
     expect(prodWarning).toBeDefined()
     expect(prodWarning!.level).toBe('error')
   })
@@ -481,7 +487,7 @@ describe('generateWarnings() branches', () => {
     })
 
     const warnings = mod.getEnvWarnings()
-    const prodWarning = warnings.find(w => w.message.includes('data will not persist'))
+    const prodWarning = warnings.find((w) => w.message.includes('data will not persist'))
     expect(prodWarning).toBeUndefined()
   })
 })
@@ -814,7 +820,7 @@ describe('validateEnvironment() branches', () => {
     // Note: auto-proxy detection may prevent the "No AI service" error, but
     // "data will not persist" should be an error in production
     const warnings = mod.getEnvWarnings()
-    const criticalErrors = warnings.filter(w => w.level === 'error')
+    const criticalErrors = warnings.filter((w) => w.level === 'error')
 
     if (criticalErrors.length > 0) {
       expect(errorSpy).toHaveBeenCalled()
@@ -985,9 +991,9 @@ describe('combined scenarios', () => {
 
     const warnings = mod.getEnvWarnings()
     // When proxy is configured, the else-if branch for proxy runs, not the direct-key branch
-    const directKeyWarning = warnings.find(w => w.message.includes('direct API keys'))
+    const directKeyWarning = warnings.find((w) => w.message.includes('direct API keys'))
     expect(directKeyWarning).toBeUndefined()
-    const proxyWarning = warnings.find(w => w.message.includes('API proxy configured'))
+    const proxyWarning = warnings.find((w) => w.message.includes('API proxy configured'))
     expect(proxyWarning).toBeDefined()
   })
 
@@ -1003,7 +1009,7 @@ describe('combined scenarios', () => {
     })
 
     const warnings = mod.getEnvWarnings()
-    const errorWarnings = warnings.filter(w => w.level === 'error')
+    const errorWarnings = warnings.filter((w) => w.level === 'error')
     expect(errorWarnings).toHaveLength(0)
 
     expect(mod.isProductionReady()).toBe(true)
@@ -1024,8 +1030,8 @@ describe('combined scenarios', () => {
     // Should have at least: supabase not configured + no AI configured
     expect(warnings.length).toBeGreaterThanOrEqual(2)
 
-    const supabaseWarning = warnings.find(w => w.message.includes('Supabase not configured'))
-    const aiWarning = warnings.find(w => w.message.includes('No AI service configured'))
+    const supabaseWarning = warnings.find((w) => w.message.includes('Supabase not configured'))
+    const aiWarning = warnings.find((w) => w.message.includes('No AI service configured'))
     expect(supabaseWarning).toBeDefined()
     expect(aiWarning).toBeDefined()
   })

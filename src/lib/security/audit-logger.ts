@@ -209,7 +209,8 @@ class AuditLogger {
     // Debug output
     if (this.debug) {
       if (success) {
-        console.warn('[AUDIT]', type, details)
+        // eslint-disable-next-line no-console
+        console.info('[AUDIT]', type, details)
       } else {
         console.error('[AUDIT ERROR]', type, details)
       }

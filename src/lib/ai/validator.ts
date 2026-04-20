@@ -65,7 +65,27 @@ export function validateExtractionSafety(data: Partial<ExtractedPolicyData>): Va
       }
 
       // Limit sanity check
-      if (!coverage.isUnlimited && !coverage.isMarketValue && coverage.limit === null) {
+      const isStandardKasko =
+        data.policyType === 'kasko' &&
+        (coverage.category === 'main' ||
+          coverage.name?.toLowerCase().includes('kasko') ||
+          coverage.nameTr?.toLowerCase().includes('kasko') ||
+          coverage.name?.toLowerCase().includes('collision') ||
+          coverage.name?.toLowerCase().includes('çarp') ||
+          coverage.nameTr?.toLowerCase().includes('çarp') ||
+          coverage.name?.toLowerCase().includes('theft') ||
+          coverage.nameTr?.toLowerCase().includes('hırsızlık') ||
+          coverage.nameTr?.toLowerCase().includes('hirsizlik') ||
+          coverage.name?.toLowerCase().includes('fire') ||
+          coverage.nameTr?.toLowerCase().includes('yangın') ||
+          coverage.nameTr?.toLowerCase().includes('yangin'))
+
+      if (
+        !coverage.isUnlimited &&
+        !coverage.isMarketValue &&
+        coverage.limit === null &&
+        !isStandardKasko
+      ) {
         flags.push({
           level: 'Warning',
           message: `Coverage '${coverage.name}' has no limit specified and is not flagged as no-cap or market value.`,

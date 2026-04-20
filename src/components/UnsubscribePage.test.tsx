@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { UnsubscribePage } from './UnsubscribePage'
@@ -67,7 +67,9 @@ describe('UnsubscribePage', () => {
       expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.title)).toBeInTheDocument()
       expect(screen.getByText('test@example.com')).toBeInTheDocument()
       expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.areYouSure)).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton) })).toBeInTheDocument()
+      expect(
+        screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton) })
+      ).toBeInTheDocument()
     })
 
     it('displays the email address in confirm state', () => {
@@ -87,17 +89,16 @@ describe('UnsubscribePage', () => {
 
       renderWithRouter('/unsubscribe?email=test@example.com&token=validtoken')
 
-      const unsubscribeButton = screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton) })
+      const unsubscribeButton = screen.getByRole('button', {
+        name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton),
+      })
       await user.click(unsubscribeButton)
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:4001/api/email/unsubscribe',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: 'test@example.com', token: 'validtoken' }),
-        }
-      )
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4001/api/email/unsubscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'test@example.com', token: 'validtoken' }),
+      })
     })
 
     it('shows success state after successful unsubscribe', async () => {
@@ -109,7 +110,9 @@ describe('UnsubscribePage', () => {
 
       renderWithRouter('/unsubscribe?email=test@example.com&token=validtoken')
 
-      const unsubscribeButton = screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton) })
+      const unsubscribeButton = screen.getByRole('button', {
+        name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton),
+      })
       await user.click(unsubscribeButton)
 
       await waitFor(() => {
@@ -129,15 +132,19 @@ describe('UnsubscribePage', () => {
 
       renderWithRouter('/unsubscribe?email=test@example.com&token=validtoken')
 
-      const unsubscribeButton = screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton) })
+      const unsubscribeButton = screen.getByRole('button', {
+        name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton),
+      })
       await user.click(unsubscribeButton)
 
       expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.processing)).toBeInTheDocument()
 
       // Resolve the promise to clean up
-      resolvePromise!({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
+      await act(async () => {
+        resolvePromise!({
+          ok: true,
+          json: () => Promise.resolve({ success: true }),
+        })
       })
     })
   })
@@ -147,15 +154,18 @@ describe('UnsubscribePage', () => {
       const user = userEvent.setup()
       mockFetch.mockResolvedValueOnce({
         ok: false,
-        json: () => Promise.resolve({
-          error: 'Invalid unsubscribe token',
-          message: 'Please use the link from your most recent email.',
-        }),
+        json: () =>
+          Promise.resolve({
+            error: 'Invalid unsubscribe token',
+            message: 'Please use the link from your most recent email.',
+          }),
       })
 
       renderWithRouter('/unsubscribe?email=test@example.com&token=invalidtoken')
 
-      const unsubscribeButton = screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton) })
+      const unsubscribeButton = screen.getByRole('button', {
+        name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton),
+      })
       await user.click(unsubscribeButton)
 
       await waitFor(() => {
@@ -163,7 +173,9 @@ describe('UnsubscribePage', () => {
       })
 
       expect(screen.getByText('Invalid unsubscribe token')).toBeInTheDocument()
-      expect(screen.getByText('Please use the link from your most recent email.')).toBeInTheDocument()
+      expect(
+        screen.getByText('Please use the link from your most recent email.')
+      ).toBeInTheDocument()
     })
 
     it('shows network error when fetch fails', async () => {
@@ -172,14 +184,18 @@ describe('UnsubscribePage', () => {
 
       renderWithRouter('/unsubscribe?email=test@example.com&token=validtoken')
 
-      const unsubscribeButton = screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton) })
+      const unsubscribeButton = screen.getByRole('button', {
+        name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton),
+      })
       await user.click(unsubscribeButton)
 
       await waitFor(() => {
         expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.connectionError)).toBeInTheDocument()
       })
 
-      expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.connectionErrorDetails)).toBeInTheDocument()
+      expect(
+        screen.getByText(EN_TRANSLATIONS.unsubscribe.connectionErrorDetails)
+      ).toBeInTheDocument()
     })
 
     it('allows retry after error', async () => {
@@ -198,7 +214,9 @@ describe('UnsubscribePage', () => {
       renderWithRouter('/unsubscribe?email=test@example.com&token=validtoken')
 
       // First attempt
-      const unsubscribeButton = screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton) })
+      const unsubscribeButton = screen.getByRole('button', {
+        name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton),
+      })
       await user.click(unsubscribeButton)
 
       await waitFor(() => {
@@ -206,7 +224,9 @@ describe('UnsubscribePage', () => {
       })
 
       // Retry
-      const retryButton = screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.retry) })
+      const retryButton = screen.getByRole('button', {
+        name: new RegExp(EN_TRANSLATIONS.unsubscribe.retry),
+      })
       await user.click(retryButton)
 
       await waitFor(() => {
@@ -221,7 +241,9 @@ describe('UnsubscribePage', () => {
     it('has link back to home page in confirm state', () => {
       renderWithRouter('/unsubscribe?email=test@example.com&token=validtoken')
 
-      const homeLink = screen.getByRole('link', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.backToHome) })
+      const homeLink = screen.getByRole('link', {
+        name: new RegExp(EN_TRANSLATIONS.unsubscribe.backToHome),
+      })
       expect(homeLink).toHaveAttribute('href', '/')
     })
 
@@ -234,14 +256,18 @@ describe('UnsubscribePage', () => {
 
       renderWithRouter('/unsubscribe?email=test@example.com&token=validtoken')
 
-      const unsubscribeButton = screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton) })
+      const unsubscribeButton = screen.getByRole('button', {
+        name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton),
+      })
       await user.click(unsubscribeButton)
 
       await waitFor(() => {
         expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.titleSuccess)).toBeInTheDocument()
       })
 
-      const homeLink = screen.getByRole('link', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.backToHome) })
+      const homeLink = screen.getByRole('link', {
+        name: new RegExp(EN_TRANSLATIONS.unsubscribe.backToHome),
+      })
       expect(homeLink).toHaveAttribute('href', '/')
     })
 
@@ -251,14 +277,18 @@ describe('UnsubscribePage', () => {
 
       renderWithRouter('/unsubscribe?email=test@example.com&token=validtoken')
 
-      const unsubscribeButton = screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton) })
+      const unsubscribeButton = screen.getByRole('button', {
+        name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton),
+      })
       await user.click(unsubscribeButton)
 
       await waitFor(() => {
         expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.connectionError)).toBeInTheDocument()
       })
 
-      const homeLink = screen.getByRole('link', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.backToHome) })
+      const homeLink = screen.getByRole('link', {
+        name: new RegExp(EN_TRANSLATIONS.unsubscribe.backToHome),
+      })
       expect(homeLink).toHaveAttribute('href', '/')
     })
   })
@@ -279,7 +309,9 @@ describe('UnsubscribePage', () => {
 
       renderWithRouter('/unsubscribe?email=test%2Buser%40example.com&token=abc')
 
-      const unsubscribeButton = screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton) })
+      const unsubscribeButton = screen.getByRole('button', {
+        name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton),
+      })
       await user.click(unsubscribeButton)
 
       expect(mockFetch).toHaveBeenCalledWith(

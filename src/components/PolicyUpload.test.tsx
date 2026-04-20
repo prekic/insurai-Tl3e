@@ -171,7 +171,7 @@ describe('PolicyUpload', () => {
 
       expect(screen.getByText('Upload Policies')).toBeInTheDocument()
       expect(screen.getByText('Drop your policies here')).toBeInTheDocument()
-      expect(screen.getByText('or click to browse your files')).toBeInTheDocument()
+      expect(screen.getByText('Browse files')).toBeInTheDocument()
     })
 
     it('should show supported formats', () => {
@@ -183,10 +183,9 @@ describe('PolicyUpload', () => {
     it('should show sample policies option', () => {
       renderPolicyUpload()
 
-      expect(screen.getByText('Try with Sample Policies')).toBeInTheDocument()
-      expect(screen.getByText('Use Samples')).toBeInTheDocument()
+      expect(screen.getByText(/Or try with/i)).toBeInTheDocument()
+      expect(screen.getByText('sample policies')).toBeInTheDocument()
     })
-
   })
 
   describe('Sample Policies', () => {
@@ -194,7 +193,7 @@ describe('PolicyUpload', () => {
       const user = userEvent.setup()
       renderPolicyUpload()
 
-      await user.click(screen.getByText('Use Samples'))
+      await user.click(screen.getByText('sample policies'))
 
       expect(mockAddPolicies).toHaveBeenCalled()
       expect(mockNavigate).toHaveBeenCalledWith('/dashboard')
@@ -206,7 +205,7 @@ describe('PolicyUpload', () => {
       renderPolicyUpload()
 
       // Get the drop zone element with the border styling
-      const dropZone = screen.getByText('Drop your policies here').closest('[class*="border-dashed"]')!
+      const dropZone = screen.getByText('Drop your policies here').closest('div.border')!
 
       fireEvent.dragOver(dropZone, {
         dataTransfer: { files: [] },
@@ -222,7 +221,7 @@ describe('PolicyUpload', () => {
       renderPolicyUpload()
 
       // Get the drop zone element with the border styling
-      const dropZone = screen.getByText('Drop your policies here').closest('[class*="border-dashed"]')!
+      const dropZone = screen.getByText('Drop your policies here').closest('div.border')!
 
       fireEvent.dragOver(dropZone, {
         dataTransfer: { files: [] },
@@ -510,9 +509,12 @@ describe('PolicyUpload File Status Display', () => {
   it('should display analyzing status with AI indicator', async () => {
     // Make extraction hang so the analyzing state is visible
     let resolveExtraction: (value: unknown) => void
-    mockExtractPolicy.mockImplementationOnce(() => new Promise((resolve) => {
-      resolveExtraction = resolve
-    }))
+    mockExtractPolicy.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveExtraction = resolve
+        })
+    )
 
     renderPolicyUpload()
 
@@ -529,7 +531,31 @@ describe('PolicyUpload File Status Display', () => {
     // Resolve extraction to avoid unhandled promise rejection
     resolveExtraction!({
       success: true,
-      policy: { id: 'test-1', policyNumber: 'POL-001', provider: 'Test', type: 'home', typeTr: 'Konut', coverage: 100000, premium: 1000, deductible: 0, startDate: '2024-01-01', expiryDate: '2025-01-01', status: 'active', insuredPerson: 'Test', documentType: 'policy', uploadDate: '2024-01-01', logo: '', fileName: 'test.pdf', coverages: [], exclusions: [], specialConditions: [], insuranceLine: 'Property', aiConfidence: 0.95, aiInsights: [], monthlyPremium: 83 },
+      policy: {
+        id: 'test-1',
+        policyNumber: 'POL-001',
+        provider: 'Test',
+        type: 'home',
+        typeTr: 'Konut',
+        coverage: 100000,
+        premium: 1000,
+        deductible: 0,
+        startDate: '2024-01-01',
+        expiryDate: '2025-01-01',
+        status: 'active',
+        insuredPerson: 'Test',
+        documentType: 'policy',
+        uploadDate: '2024-01-01',
+        logo: '',
+        fileName: 'test.pdf',
+        coverages: [],
+        exclusions: [],
+        specialConditions: [],
+        insuranceLine: 'Property',
+        aiConfidence: 0.95,
+        aiInsights: [],
+        monthlyPremium: 83,
+      },
       source: 'fallback',
       extractedData: { confidence: { overall: 0.95 } },
     })
@@ -578,7 +604,7 @@ describe('PolicyUpload Drag and Drop', () => {
   it('should handle file drop', async () => {
     renderPolicyUpload()
 
-    const dropZone = screen.getByText('Drop your policies here').closest('[class*="border-dashed"]')!
+    const dropZone = screen.getByText('Drop your policies here').closest('div.border')!
     const file = new File(['test'], 'dropped.pdf', { type: 'application/pdf' })
 
     const dataTransfer = {
@@ -597,7 +623,7 @@ describe('PolicyUpload Drag and Drop', () => {
   it('should prevent default on dragOver', () => {
     renderPolicyUpload()
 
-    const dropZone = screen.getByText('Drop your policies here').closest('[class*="border-dashed"]')!
+    const dropZone = screen.getByText('Drop your policies here').closest('div.border')!
 
     const event = new Event('dragover', { bubbles: true, cancelable: true })
     Object.defineProperty(event, 'dataTransfer', { value: { files: [] } })
@@ -793,7 +819,9 @@ describe('PolicyUpload Detailed Error Messages', () => {
   it('should show AI not configured error with troubleshooting tip', async () => {
     // Re-mock extraction to fail
     vi.doMock('@/lib/ai', () => ({
-      extractPolicyFromDocument: vi.fn().mockRejectedValue(new Error('NO_AI_CONFIG: AI is not configured')),
+      extractPolicyFromDocument: vi
+        .fn()
+        .mockRejectedValue(new Error('NO_AI_CONFIG: AI is not configured')),
       isAIConfigured: vi.fn().mockReturnValue(true),
     }))
 
@@ -854,9 +882,7 @@ describe('PolicyUpload Error Retry Functionality', () => {
 
   it('should show retry button for failed files', async () => {
     const aiModule = await import('@/lib/ai')
-    vi.mocked(aiModule.extractPolicyFromDocument).mockRejectedValueOnce(
-      new Error('Network error')
-    )
+    vi.mocked(aiModule.extractPolicyFromDocument).mockRejectedValueOnce(new Error('Network error'))
 
     renderPolicyUpload()
 

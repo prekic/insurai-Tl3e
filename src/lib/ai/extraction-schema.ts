@@ -22,7 +22,6 @@ export interface ExtractedPolicyData {
   premium: number | null
   currency: string | null
   paymentFrequency: 'annual' | 'semi-annual' | 'quarterly' | 'monthly' | null
-  discounts?: Array<{ type: string; rate: string; description: string }> | null
 
   // Entity Details
   insuredEntityType?: 'individual' | 'corporate' | null

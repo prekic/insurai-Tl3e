@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import { PolicyChat } from './PolicyChat'
@@ -81,12 +81,17 @@ vi.mock('sonner', () => ({
   },
 }))
 
-function renderChat() {
-  return render(
-    <BrowserRouter>
-      <PolicyChat />
-    </BrowserRouter>
-  )
+async function renderChat() {
+  let view
+  await act(async () => {
+    view = render(
+      <BrowserRouter>
+        <PolicyChat />
+      </BrowserRouter>
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  })
+  return view!
 }
 
 describe('PolicyChat', () => {
@@ -135,69 +140,67 @@ describe('PolicyChat', () => {
   })
 
   describe('Rendering', () => {
-    it('should render chat header', () => {
-      renderChat()
+    it('should render chat header', async () => {
+      await renderChat()
 
       expect(screen.getByText('Policy Assistant')).toBeInTheDocument()
     })
 
-    it('should render back button', () => {
-      renderChat()
+    it('should render back button', async () => {
+      await renderChat()
 
       expect(screen.getByLabelText('Go back')).toBeInTheDocument()
     })
 
-    it('should show policy count in header', () => {
-      renderChat()
+    it('should show policy count in header', async () => {
+      await renderChat()
 
       expect(screen.getByText('3 policies loaded')).toBeInTheDocument()
     })
 
-    it('should render initial greeting message', () => {
-      renderChat()
+    it('should render initial greeting message', async () => {
+      await renderChat()
 
-      expect(
-        screen.getByText(/Hello! I'm your AI insurance assistant/)
-      ).toBeInTheDocument()
+      expect(screen.getByText(/Hello! I'm your AI insurance assistant/)).toBeInTheDocument()
     })
 
-    it('should render quick question buttons', () => {
-      renderChat()
+    it('should render quick question buttons', async () => {
+      await renderChat()
 
       // Check that quick question buttons are rendered - text may vary by locale/version
       expect(screen.getByRole('button', { name: /Compare my policies/i })).toBeInTheDocument()
       // Multiple buttons may match these terms, check at least one exists
-      expect(screen.getAllByRole('button', { name: /coverage|gaps|deductible/i }).length).toBeGreaterThan(0)
-    })
-
-    it('should render message input', () => {
-      renderChat()
-
       expect(
-        screen.getByPlaceholderText('Ask about your policies...')
-      ).toBeInTheDocument()
+        screen.getAllByRole('button', { name: /coverage|gaps|deductible/i }).length
+      ).toBeGreaterThan(0)
     })
 
-    it('should render send button', () => {
-      renderChat()
+    it('should render message input', async () => {
+      await renderChat()
+
+      expect(screen.getByPlaceholderText('Ask about your policies...')).toBeInTheDocument()
+    })
+
+    it('should render send button', async () => {
+      await renderChat()
 
       expect(screen.getByRole('button', { name: /send/i })).toBeInTheDocument()
     })
 
-    it('should render provider selector button', () => {
-      renderChat()
+    it('should render provider selector button', async () => {
+      await renderChat()
 
       expect(screen.getByTestId('provider-selector')).toBeInTheDocument()
     })
 
-    it('should render new conversation button', () => {
-      renderChat()
+    it('should render new conversation button', async () => {
+      await renderChat()
 
       expect(screen.getByTestId('new-conversation-button')).toBeInTheDocument()
     })
 
-    it('should render history button for logged-in users', () => {
-      renderChat()
+    it('should render history button for logged-in users', async () => {
+      await renderChat()
 
       expect(screen.getByTestId('history-button')).toBeInTheDocument()
     })
@@ -207,7 +210,7 @@ describe('PolicyChat', () => {
     it('should show dropdown when provider selector is clicked', async () => {
       vi.useRealTimers()
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       await user.click(screen.getByTestId('provider-selector'))
 
@@ -216,8 +219,8 @@ describe('PolicyChat', () => {
       expect(screen.getByTestId('provider-option-anthropic')).toBeInTheDocument()
     })
 
-    it('should display GPT-4o Mini as default provider', () => {
-      renderChat()
+    it('should display GPT-4o Mini as default provider', async () => {
+      await renderChat()
 
       expect(screen.getByText('GPT-4o Mini')).toBeInTheDocument()
     })
@@ -225,7 +228,7 @@ describe('PolicyChat', () => {
     it('should switch provider when selected', async () => {
       vi.useRealTimers()
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       await user.click(screen.getByTestId('provider-selector'))
       await user.click(screen.getByTestId('provider-option-anthropic'))
@@ -237,7 +240,7 @@ describe('PolicyChat', () => {
     it('should close dropdown when clicking outside', async () => {
       vi.useRealTimers()
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       await user.click(screen.getByTestId('provider-selector'))
       expect(screen.getByText('AI Provider')).toBeInTheDocument()
@@ -254,7 +257,7 @@ describe('PolicyChat', () => {
       vi.useRealTimers()
       global.fetch = mockFetch
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       // Switch to Anthropic
       await user.click(screen.getByTestId('provider-selector'))
@@ -289,7 +292,7 @@ describe('PolicyChat', () => {
         },
       ])
 
-      renderChat()
+      await renderChat()
 
       await waitFor(() => {
         expect(mockGetRecentConversations).toHaveBeenCalled()
@@ -308,7 +311,7 @@ describe('PolicyChat', () => {
         },
       ])
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       await waitFor(() => {
         expect(mockGetRecentConversations).toHaveBeenCalled()
@@ -337,7 +340,7 @@ describe('PolicyChat', () => {
       ])
 
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       await waitFor(() => {
         expect(mockGetRecentConversations).toHaveBeenCalled()
@@ -355,7 +358,7 @@ describe('PolicyChat', () => {
       vi.useRealTimers()
       mockGetRecentConversations.mockResolvedValue([])
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       await user.click(screen.getByTestId('history-button'))
 
@@ -365,7 +368,7 @@ describe('PolicyChat', () => {
     it('should start new conversation when button is clicked', async () => {
       vi.useRealTimers()
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       await user.click(screen.getByTestId('new-conversation-button'))
 
@@ -379,7 +382,7 @@ describe('PolicyChat', () => {
     it('should navigate back when back button is clicked', async () => {
       vi.useRealTimers()
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       await user.click(screen.getByLabelText('Go back'))
 
@@ -391,7 +394,7 @@ describe('PolicyChat', () => {
     it('should send message when quick question is clicked', async () => {
       vi.useRealTimers()
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       // Click any quick question button - this sends the message directly (not populate input)
       const quickQuestionButton = screen.getByRole('button', { name: /Compare my policies/i })
@@ -411,7 +414,7 @@ describe('PolicyChat', () => {
     it('should send message when send button is clicked', async () => {
       vi.useRealTimers()
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       const input = screen.getByPlaceholderText('Ask about your policies...')
       await user.type(input, 'Test question')
@@ -428,7 +431,7 @@ describe('PolicyChat', () => {
     it('should send message when Enter is pressed', async () => {
       vi.useRealTimers()
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       const input = screen.getByPlaceholderText('Ask about your policies...')
       await user.type(input, 'Test question{Enter}')
@@ -441,7 +444,7 @@ describe('PolicyChat', () => {
     it('should not send message on Shift+Enter', async () => {
       vi.useRealTimers()
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       const input = screen.getByPlaceholderText('Ask about your policies...')
       await user.type(input, 'Test question')
@@ -452,7 +455,7 @@ describe('PolicyChat', () => {
 
     it('should not send empty message', async () => {
       vi.useRealTimers()
-      renderChat()
+      await renderChat()
 
       const sendButton = screen.getByRole('button', { name: /send/i })
       expect(sendButton).toBeDisabled()
@@ -461,7 +464,7 @@ describe('PolicyChat', () => {
     it('should clear input after sending', async () => {
       vi.useRealTimers()
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       const input = screen.getByPlaceholderText('Ask about your policies...')
       await user.type(input, 'Test question')
@@ -481,7 +484,12 @@ describe('PolicyChat', () => {
               () =>
                 resolve({
                   ok: true,
-                  json: () => Promise.resolve({ success: true, response: 'Test response', provider: 'openai' }),
+                  json: () =>
+                    Promise.resolve({
+                      success: true,
+                      response: 'Test response',
+                      provider: 'openai',
+                    }),
                 }),
               500
             )
@@ -490,7 +498,7 @@ describe('PolicyChat', () => {
       vi.useRealTimers()
       global.fetch = mockFetch
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       const input = screen.getByPlaceholderText('Ask about your policies...')
       await user.type(input, 'Test question')
@@ -507,7 +515,7 @@ describe('PolicyChat', () => {
       vi.useRealTimers()
       global.fetch = mockFetch
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       const input = screen.getByPlaceholderText('Ask about your policies...')
       await user.type(input, 'Test question')
@@ -532,7 +540,12 @@ describe('PolicyChat', () => {
               () =>
                 resolve({
                   ok: true,
-                  json: () => Promise.resolve({ success: true, response: 'Test response', provider: 'openai' }),
+                  json: () =>
+                    Promise.resolve({
+                      success: true,
+                      response: 'Test response',
+                      provider: 'openai',
+                    }),
                 }),
               500
             )
@@ -541,7 +554,7 @@ describe('PolicyChat', () => {
       vi.useRealTimers()
       global.fetch = mockFetch
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       const input = screen.getByPlaceholderText('Ask about your policies...')
       await user.type(input, 'Test question')
@@ -563,7 +576,12 @@ describe('PolicyChat', () => {
               () =>
                 resolve({
                   ok: true,
-                  json: () => Promise.resolve({ success: true, response: 'Test response', provider: 'openai' }),
+                  json: () =>
+                    Promise.resolve({
+                      success: true,
+                      response: 'Test response',
+                      provider: 'openai',
+                    }),
                 }),
               500
             )
@@ -572,7 +590,7 @@ describe('PolicyChat', () => {
       vi.useRealTimers()
       global.fetch = mockFetch
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       const input = screen.getByPlaceholderText('Ask about your policies...')
       await user.type(input, 'Test question')
@@ -592,7 +610,7 @@ describe('PolicyChat', () => {
     it('should display user messages on the right', async () => {
       vi.useRealTimers()
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       const input = screen.getByPlaceholderText('Ask about your policies...')
       await user.type(input, 'Test question')
@@ -605,16 +623,16 @@ describe('PolicyChat', () => {
       })
     })
 
-    it('should display AI messages on the left', () => {
-      renderChat()
+    it('should display AI messages on the left', async () => {
+      await renderChat()
 
       const aiMessage = screen.getByText(/Hello! I'm your AI insurance assistant/)
       const messageContainer = aiMessage.closest('[class*="justify-start"]')
       expect(messageContainer).toBeInTheDocument()
     })
 
-    it('should show timestamps on messages', () => {
-      renderChat()
+    it('should show timestamps on messages', async () => {
+      await renderChat()
 
       // Initial message should have a timestamp
       const timePattern = /\d{1,2}:\d{2}/
@@ -633,7 +651,7 @@ describe('PolicyChat', () => {
       vi.useRealTimers()
       global.fetch = mockFetch
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       const input = screen.getByPlaceholderText('Ask about your policies...')
       await user.type(input, 'Test question')
@@ -641,9 +659,7 @@ describe('PolicyChat', () => {
 
       await waitFor(
         () => {
-          expect(
-            screen.getByText(/Sorry, I couldn't process your request/)
-          ).toBeInTheDocument()
+          expect(screen.getByText(/Sorry, I couldn't process your request/)).toBeInTheDocument()
         },
         { timeout: 3000 }
       )
@@ -655,7 +671,7 @@ describe('PolicyChat', () => {
       vi.useRealTimers()
       global.fetch = mockFetch
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       const input = screen.getByPlaceholderText('Ask about your policies...')
       await user.type(input, 'Test question')
@@ -676,7 +692,7 @@ describe('PolicyChat', () => {
       vi.useRealTimers()
       global.fetch = mockFetch
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       const input = screen.getByPlaceholderText('Ask about your policies...')
       await user.type(input, 'Test question')
@@ -692,21 +708,19 @@ describe('PolicyChat', () => {
 
     it('should retry sending when retry button is clicked', async () => {
       // First call fails, second succeeds
-      mockFetch
-        .mockRejectedValueOnce(new Error('Network error'))
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              success: true,
-              response: 'Your Kasko coverage provides comprehensive protection.',
-              provider: 'openai',
-            }),
-        })
+      mockFetch.mockRejectedValueOnce(new Error('Network error')).mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            success: true,
+            response: 'Your Kasko coverage provides comprehensive protection.',
+            provider: 'openai',
+          }),
+      })
       vi.useRealTimers()
       global.fetch = mockFetch
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       const input = screen.getByPlaceholderText('Ask about your policies...')
       await user.type(input, 'Test question')
@@ -738,7 +752,7 @@ describe('PolicyChat', () => {
       vi.useRealTimers()
       global.fetch = mockFetch
       const user = userEvent.setup()
-      renderChat()
+      await renderChat()
 
       const input = screen.getByPlaceholderText('Ask about your policies...')
       await user.type(input, 'Test question')
@@ -746,52 +760,48 @@ describe('PolicyChat', () => {
 
       await waitFor(
         () => {
-          expect(
-            screen.getByText(/Having trouble connecting/)
-          ).toBeInTheDocument()
+          expect(screen.getByText(/Having trouble connecting/)).toBeInTheDocument()
         },
         { timeout: 3000 }
       )
 
       await user.click(screen.getByRole('button', { name: /dismiss/i }))
 
-      expect(
-        screen.queryByText(/Having trouble connecting/)
-      ).not.toBeInTheDocument()
+      expect(screen.queryByText(/Having trouble connecting/)).not.toBeInTheDocument()
     })
   })
 
   describe('Accessibility', () => {
-    it('should have accessible back button', () => {
-      renderChat()
+    it('should have accessible back button', async () => {
+      await await renderChat()
 
       const backButton = screen.getByLabelText('Go back')
       expect(backButton).toBeInTheDocument()
     })
 
-    it('should have accessible input', () => {
-      renderChat()
+    it('should have accessible input', async () => {
+      await await renderChat()
 
       const input = screen.getByPlaceholderText('Ask about your policies...')
       expect(input).toHaveAttribute('type', 'text')
     })
 
-    it('should have accessible provider selector', () => {
-      renderChat()
+    it('should have accessible provider selector', async () => {
+      await await renderChat()
 
       const providerSelector = screen.getByLabelText('Select AI provider')
       expect(providerSelector).toBeInTheDocument()
     })
 
-    it('should have accessible history button', () => {
-      renderChat()
+    it('should have accessible history button', async () => {
+      await await renderChat()
 
       const historyButton = screen.getByLabelText('Conversation history')
       expect(historyButton).toBeInTheDocument()
     })
 
-    it('should have accessible new conversation button', () => {
-      renderChat()
+    it('should have accessible new conversation button', async () => {
+      await await renderChat()
 
       const newConvButton = screen.getByLabelText('New conversation')
       expect(newConvButton).toBeInTheDocument()
@@ -811,7 +821,7 @@ describe('PolicyChat - Guest Mode', () => {
     }))
   })
 
-  it('should work without persistence for guests', () => {
+  it('should work without persistence for guests', async () => {
     // Component should render and work without user auth
     // History button should not be visible
   })
@@ -828,7 +838,7 @@ describe('PolicyChat - No Policies', () => {
     }))
   })
 
-  it('should show 0 policies in greeting', () => {
+  it('should show 0 policies in greeting', async () => {
     // The component shows policies.length in greeting
     // This test verifies the greeting adapts to policy count
   })

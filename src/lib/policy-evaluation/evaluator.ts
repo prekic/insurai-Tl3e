@@ -39,6 +39,8 @@ import {
   evaluateValueBasedPremium,
 } from './benchmark-service'
 
+import { KASKO_COMMERCIAL_BENCHMARKS } from '@/data/market-data/benchmarks'
+
 // =============================================================================
 // BENCHMARK CONFIDENCE ASSESSMENT
 // =============================================================================
@@ -106,6 +108,13 @@ function computeBenchmarkFreshness(
 function isCommercialOrNicheVehicle(
   analyzedPolicy: import('@/types/policy').AnalyzedPolicy
 ): boolean {
+  if (
+    analyzedPolicy.vehicleUsage === 'commercial' ||
+    analyzedPolicy.insuredEntityType === 'corporate'
+  ) {
+    return true
+  }
+
   const signals = [analyzedPolicy.vehicleInfo?.vehicleClass, analyzedPolicy.vehicleInfo?.usage]
     .filter((s): s is string => typeof s === 'string' && s.length > 0)
     .map((s) => s.toLowerCase())
@@ -189,20 +198,12 @@ function assessBenchmarkConfidence(
     config.benchmarkStaleDays ?? 365
   )
 
-  // Determine confidence level from context factors
+  // Determine baseline confidence from context factors
   let level: BenchmarkConfidenceLevel
   let suppressionReason: string | undefined
   let suppressionReasonTr: string | undefined
 
-  if (
-    policy.type === 'kasko' &&
-    (policy.vehicleUsage === 'commercial' || analyzedPolicy.vehicleInfo?.usage === 'commercial')
-  ) {
-    level = 'suppressed'
-    suppressionReason =
-      'Commercial/niche vehicle policies are excluded from standard market benchmark comparisons'
-    suppressionReasonTr = 'Ticari/niş araç poliçeleri standart piyasa karşılaştırmalarından muaftır'
-  } else if (presentCount >= 3) {
+  if (presentCount >= 3) {
     level = 'high'
   } else if (presentCount >= 1) {
     level = 'low'
@@ -214,20 +215,14 @@ function assessBenchmarkConfidence(
       'Anlamlı piyasa karşılaştırması için yeterli bağlam yok — araç, konum ve teminat bilgileri eksik'
   }
 
-  // Commercial / niche-vehicle downgrade (Bug #13, Apr 2026).
-  // Our MARKET_BENCHMARKS cover private kasko; trucks, buses, and construction
-  // equipment have fundamentally different premium/loss profiles. Downgrade
-  // confidence one step (high → low, low → suppressed) and emit a specific
-  // suppression reason so the UI can show a niche-vehicle notice.
+  // Commercial / niche-vehicle downgrade
   if (isCommercialOrNicheVehicle(analyzedPolicy) && level !== 'suppressed') {
     if (level === 'high') {
       level = 'low'
     } else if (level === 'low') {
       level = 'suppressed'
-      suppressionReason =
-        'Commercial or niche vehicle (truck / bus / fleet) — private-vehicle benchmarks are not applicable. Market comparison suppressed pending TSB commercial data.'
-      suppressionReasonTr =
-        'Ticari veya özel kullanımlı araç (kamyon / otobüs / filo) — özel araç piyasa karşılaştırması uygulanamaz. TSB ticari araç verileri gelene kadar karşılaştırma yapılmıyor.'
+      suppressionReason = 'Benchmark data excludes niche commercial vehicles and fleets'
+      suppressionReasonTr = 'Karşılaştırma verileri ticari araçları ve filoları kapsamaz'
     }
   }
 
@@ -323,7 +318,12 @@ export function evaluatePolicy(
 
   // Get benchmark dataDate for freshness assessment
   const insuranceTypeForDate = POLICY_TYPE_TO_INSURANCE_TYPE[policy.type]
-  const benchmarkForDate = getPremiumBenchmarkWithFallback(insuranceTypeForDate)
+  const analyzedPolicy = policy as import('@/types/policy').AnalyzedPolicy
+  let subType: string | undefined
+  if (isCommercialOrNicheVehicle(analyzedPolicy)) {
+    subType = insuranceTypeForDate === 'zmss' ? 'commercial_vehicle' : 'commercial'
+  }
+  const benchmarkForDate = getPremiumBenchmarkWithFallback(insuranceTypeForDate, subType)
 
   // Assess benchmark confidence (context factors + data freshness)
   const benchmarkConfidence = assessBenchmarkConfidence(
@@ -460,13 +460,33 @@ function evaluatePremium(
   config: EvaluationConfig,
   confidence?: BenchmarkConfidence
 ): ScoreBreakdown {
+  const analyzedPolicy = policy as import('@/types/policy').AnalyzedPolicy
   const insuranceType = POLICY_TYPE_TO_INSURANCE_TYPE[policy.type]
-  const benchmark = getPremiumBenchmarkWithFallback(insuranceType)
+  let subType: string | undefined
+  if (isCommercialOrNicheVehicle(analyzedPolicy)) {
+    subType = insuranceType === 'zmss' ? 'commercial_vehicle' : 'commercial'
+  }
+  let benchmark = getPremiumBenchmarkWithFallback(insuranceType, subType)
+
+  if (policy.type === 'kasko' && isCommercialOrNicheVehicle(analyzedPolicy)) {
+    benchmark = {
+      insuranceType: 'kasko',
+      vehicleClass: 'commercial',
+      minPremium: KASKO_COMMERCIAL_BENCHMARKS.premiumRange.min,
+      avgPremium: KASKO_COMMERCIAL_BENCHMARKS.premiumRange.average,
+      maxPremium: KASKO_COMMERCIAL_BENCHMARKS.premiumRange.max,
+      currency: 'TRY',
+      year: parseInt(KASKO_COMMERCIAL_BENCHMARKS.dataDate.substring(0, 4), 10) || 2025,
+      source: KASKO_COMMERCIAL_BENCHMARKS.source,
+      comparisonMethod: 'direct_premium',
+      benchmarkStatus: 'trusted',
+      dataDate: KASKO_COMMERCIAL_BENCHMARKS.dataDate,
+    }
+  }
   const issues: string[] = []
   const issuesTR: string[] = []
 
   // Check if premium is missing (flagged by extractor or zero without explicit data)
-  const analyzedPolicy = policy as import('@/types/policy').AnalyzedPolicy
   const isPremiumMissing = analyzedPolicy.premiumMissing === true || policy.premium <= 0
 
   if (isPremiumMissing) {
@@ -1366,8 +1386,29 @@ function generateMarketComparison(
   policy: Policy,
   _branchStats: ReturnType<typeof getBranchStatistics>
 ): PolicyEvaluation['marketComparison'] {
+  const analyzedPolicy = policy as import('@/types/policy').AnalyzedPolicy
   const insuranceType = POLICY_TYPE_TO_INSURANCE_TYPE[policy.type]
-  const benchmark = getPremiumBenchmarkWithFallback(insuranceType)
+  let subType: string | undefined
+  if (isCommercialOrNicheVehicle(analyzedPolicy)) {
+    subType = insuranceType === 'zmss' ? 'commercial_vehicle' : 'commercial'
+  }
+  let benchmark = getPremiumBenchmarkWithFallback(insuranceType, subType)
+
+  if (policy.type === 'kasko' && isCommercialOrNicheVehicle(analyzedPolicy)) {
+    benchmark = {
+      insuranceType: 'kasko',
+      vehicleClass: 'commercial',
+      minPremium: KASKO_COMMERCIAL_BENCHMARKS.premiumRange.min,
+      avgPremium: KASKO_COMMERCIAL_BENCHMARKS.premiumRange.average,
+      maxPremium: KASKO_COMMERCIAL_BENCHMARKS.premiumRange.max,
+      currency: 'TRY',
+      year: parseInt(KASKO_COMMERCIAL_BENCHMARKS.dataDate.substring(0, 4), 10) || 2025,
+      source: KASKO_COMMERCIAL_BENCHMARKS.source,
+      comparisonMethod: 'direct_premium',
+      benchmarkStatus: 'trusted',
+      dataDate: KASKO_COMMERCIAL_BENCHMARKS.dataDate,
+    }
+  }
 
   let premiumPercentile = 50
   let coveragePercentile = 50

@@ -1416,34 +1416,61 @@ export function PolicyDetailView() {
                   </div>
 
                   {/* Discounts Section */}
-                  {policy.discounts && policy.discounts.length > 0 && (
-                    <div className="col-span-2 p-2 sm:p-2.5 bg-green-50 rounded-lg border border-green-100 overflow-hidden">
-                      <p className="text-[10px] sm:text-xs text-green-700 font-medium mb-1.5 flex items-center gap-1.5">
-                        <BadgePercent size={14} />
-                        {locale === 'tr'
-                          ? 'İndirimler / Ek Avantajlar'
-                          : 'Discounts / Extra Benefits'}
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                        {policy.discounts.map((discount, idx) => (
-                          <div
-                            key={idx}
-                            className="flex justify-between items-center text-xs sm:text-sm bg-white/60 px-2 py-1 rounded"
-                          >
-                            <span
-                              className="text-green-800 truncate"
-                              title={discount.type || discount.description}
-                            >
-                              {discount.type || discount.description}
-                            </span>
-                            <span className="font-semibold text-green-700 whitespace-nowrap ml-2">
-                              {discount.rate}
-                            </span>
+                  {(() => {
+                    if (!policy.discounts) return null
+                    const discountList = []
+                    if (policy.discounts.ncdDiscount) {
+                      discountList.push({
+                        type: locale === 'tr' ? 'Hasarsızlık İndirimi' : 'No Claims Discount',
+                        rate: '%' + policy.discounts.ncdDiscount,
+                      })
+                    }
+                    if (policy.discounts.groupDiscount) {
+                      discountList.push({
+                        type: locale === 'tr' ? 'Grup/Kurum İndirimi' : 'Group/Corporate Discount',
+                        rate: '%' + policy.discounts.groupDiscount,
+                      })
+                    }
+                    if (policy.discounts.otherDiscountPct) {
+                      discountList.push({
+                        type: locale === 'tr' ? 'Diğer İndirimler' : 'Other Discounts',
+                        rate: '%' + policy.discounts.otherDiscountPct,
+                      })
+                    }
+                    if (discountList.length === 0) return null
+
+                    return (
+                      <div className="col-span-2 bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent rounded-xl border border-emerald-500/20 overflow-hidden shadow-sm relative group transition-all duration-300 hover:shadow-md hover:border-emerald-500/30">
+                        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-teal-500/5 to-emerald-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl"></div>
+                        <div className="relative p-3 sm:p-4">
+                          <p className="text-[10px] sm:text-xs text-emerald-800 font-semibold mb-2.5 flex items-center gap-1.5 tracking-wide uppercase">
+                            <BadgePercent size={15} className="text-emerald-600" />
+                            {locale === 'tr'
+                              ? 'İndirimler / Ek Avantajlar'
+                              : 'Discounts / Extra Benefits'}
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {discountList.map((discount, idx) => (
+                              <div
+                                key={idx}
+                                className="flex justify-between items-center text-xs sm:text-sm bg-white/80 backdrop-blur-sm px-3 py-2 rounded-lg border border-emerald-100/50 hover:bg-white hover:-translate-y-0.5 transition-all duration-200 shadow-sm"
+                              >
+                                <span
+                                  className="text-emerald-900 font-medium truncate"
+                                  title={discount.type}
+                                >
+                                  {discount.type}
+                                </span>
+                                <span className="font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent whitespace-nowrap ml-2 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-100 shadow-inner">
+                                  {discount.rate}
+                                </span>
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )
+                  })()}
 
                   {/* Insured - full width for long names */}
                   <div className="col-span-2 p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">

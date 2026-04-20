@@ -54,6 +54,17 @@ function runPilot(sample: PilotSample): PilotResult {
   const displayResult = evaluateDisplayMode(normalized, validation, analysis)
   const summary = generateDisplaySafeSummary(normalized, validation, analysis)
 
+  if (
+    sample.meta.id === 'RD-KAS-001' ||
+    sample.meta.id === 'RD-KAS-002' ||
+    sample.meta.id === 'RD-KAS-003' ||
+    sample.meta.id === 'RD-KAS-005'
+  ) {
+    console.log(`\n============= DEBUG ${sample.meta.id} =============`)
+    console.log('displayResult.triggers', JSON.stringify(displayResult.triggers, null, 2))
+    console.log('validation.flags', JSON.stringify(validation.flags, null, 2))
+  }
+
   const summaryText = JSON.stringify(summary).toLowerCase()
   const foundPhrases = PROHIBITED_PHRASES.filter((p) => summaryText.includes(p.toLowerCase()))
   const phraseClean = foundPhrases.length === 0
@@ -139,6 +150,15 @@ for (const [branch, samples] of byBranch) {
 
       if (sample.meta.documentQuality === 'clean') {
         it(`${sample.meta.id}: clean → full mode`, () => {
+          if (
+            sample.meta.id === 'RD-KAS-001' ||
+            sample.meta.id === 'RD-KAS-002' ||
+            sample.meta.id === 'RD-KAS-003' ||
+            sample.meta.id === 'RD-KAS-005'
+          ) {
+            console.log(`\n--- ${sample.meta.id} ---`)
+            console.log('Result:', JSON.stringify(result, null, 2))
+          }
           expect(result.displayMode).toBe('full')
         })
 

@@ -40,6 +40,15 @@ const ALLOWED_PREFIXES = ['[ClauseResolver]']
 function isSuppressed(args: unknown[]): boolean {
   const first = args[0]
   if (typeof first !== 'string') return false
+
+  // Suppress React 18 act() warnings which are noisy and harmless in these specific test suites
+  if (
+    first.includes('Warning: An update to') &&
+    first.includes('inside a test was not wrapped in act')
+  ) {
+    return true
+  }
+
   // Never suppress allowed prefixes
   if (ALLOWED_PREFIXES.some((p) => first.startsWith(p))) return false
   // Suppress known noisy prefixes

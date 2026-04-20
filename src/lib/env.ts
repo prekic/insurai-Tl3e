@@ -162,7 +162,7 @@ function logEnvironmentStatus(config: EnvConfig, warnings: EnvWarning[]): void {
     import.meta.env.MODE === 'test' ||
     import.meta.env.TEST
 
-  if (isTest) {
+  if (isTest && import.meta.env.FORCE_LOG_ENV !== 'true') {
     return
   }
 

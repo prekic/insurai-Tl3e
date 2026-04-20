@@ -863,6 +863,7 @@ describe('PolicyUpload Coverage', () => {
     })
 
     it('continues if conflict check throws (fail open)', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       mockCheckPolicyBeforeUpload.mockRejectedValueOnce(new Error('Check failed'))
       renderUpload()
       await act(async () => {
@@ -872,6 +873,7 @@ describe('PolicyUpload Coverage', () => {
       await waitFor(() => {
         expect(screen.getByText(/AI extracted/i)).toBeInTheDocument()
       })
+      consoleSpy.mockRestore()
     })
   })
 
@@ -1090,6 +1092,7 @@ describe('PolicyUpload Coverage', () => {
     })
 
     it('continues if createPolicy fails', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       mockCreatePolicy.mockRejectedValueOnce(new Error('DB save error'))
       renderUpload()
       await act(async () => {
@@ -1099,9 +1102,11 @@ describe('PolicyUpload Coverage', () => {
         // Should still show as complete
         expect(screen.getByText(/AI extracted/i)).toBeInTheDocument()
       })
+      consoleSpy.mockRestore()
     })
 
     it('continues if uploadPolicyDocument fails', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       mockUploadPolicyDocument.mockRejectedValueOnce(new Error('Storage error'))
       renderUpload()
       await act(async () => {
@@ -1110,6 +1115,7 @@ describe('PolicyUpload Coverage', () => {
       await waitFor(() => {
         expect(screen.getByText(/AI extracted/i)).toBeInTheDocument()
       })
+      consoleSpy.mockRestore()
     })
   })
 

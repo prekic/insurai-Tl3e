@@ -91,8 +91,6 @@ export async function refreshBenchmarks(): Promise<PremiumBenchmark[]> {
       return benchmarkCache // Return stale cache on error
     }
 
-    console.log(`Successfully fetched ${data?.length || 0} benchmarks from DB`)
-
     // Transform database rows to our interface
     benchmarkCache = (data || []).map((row) => ({
       id: row.id,

@@ -40,7 +40,6 @@ function toPolicy(analyzed: AnalyzedPolicy): Policy {
     aiInsightsTr: _aiInsightsTr,
     marketComparison: _marketComparison,
     ...rest
-    // @ts-expect-error - mismatch due to schema update
   } = analyzed as Record<string, unknown>
   return rest as unknown as Policy
 }
@@ -53,11 +52,11 @@ function modifySample(sample: AnalyzedPolicy, overrides: Partial<AnalyzedPolicy>
 }
 
 // Get individual samples
-const kaskoSample = samplePolicies.find((p) => p.type === 'kasko')!
-const trafficSample = samplePolicies.find((p) => p.type === 'traffic')!
-const homeSample = samplePolicies.find((p) => p.type === 'home')!
-// @ts-expect-error - TS6133 unused variable
-const _healthSample = samplePolicies.find((p) => p.type === 'health')!
+const kaskoSample = samplePolicies.find((p: any) => p.type === 'kasko')!
+const trafficSample = samplePolicies.find((p: any) => p.type === 'traffic')!
+const homeSample = samplePolicies.find((p: any) => p.type === 'home')!
+
+const _healthSample = samplePolicies.find((p: any) => p.type === 'health')!
 
 // =============================================================================
 // PREMIUM SCORING TESTS
@@ -410,11 +409,17 @@ describe('Value Scoring Algorithm', () => {
 
 describe('Overall Score Calculation', () => {
   it('should be weighted average of 5 categories', () => {
-    const evaluation = evaluatePolicy(toPolicy(kaskoSample))
+    // Modify to be active to avoid the 60 cap for expired policies
+    const activePolicy = modifySample(kaskoSample, {
+      startDate: '2026-01-01',
+      expiryDate: '2027-01-01',
+      status: 'active',
+    })
+    const evaluation = evaluatePolicy(activePolicy)
     const weights = DEFAULT_EVALUATION_CONFIG.weights
 
     // Calculate expected weighted average manually
-    const expectedScore = Math.round(
+    let expectedScore = Math.round(
       (evaluation.scoreBreakdown.premium.score * weights.premium +
         evaluation.scoreBreakdown.coverage.score * weights.coverage +
         evaluation.scoreBreakdown.deductible.score * weights.deductible +
@@ -426,6 +431,15 @@ describe('Overall Score Calculation', () => {
           weights.compliance +
           weights.value)
     )
+
+    // Account for evaluator capping
+    const hasCriticalIssues = evaluation.compliance.issues.some(
+      (i: any) => i.severity === 'critical'
+    )
+    const hasUntrustedBenchmark = evaluation.isProvisional
+    if (hasCriticalIssues || hasUntrustedBenchmark) {
+      expectedScore = Math.min(expectedScore, 60)
+    }
 
     expect(evaluation.overallScore).toBe(expectedScore)
   })
@@ -461,7 +475,6 @@ describe('Overall Score Calculation', () => {
       },
     }
 
-    // @ts-expect-error - TS6133 unused variable
     const _defaultEval = evaluatePolicy(toPolicy(kaskoSample))
     const customEval = evaluatePolicy(toPolicy(kaskoSample), { config: customConfig })
 

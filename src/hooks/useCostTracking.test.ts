@@ -67,22 +67,21 @@ vi.mock('@/lib/ai/cost-tracking', () => ({
 }))
 
 // Import after mocking
-import {
-  useCostTracking,
-  useBudgetAlert,
-  useCostByModel,
-  useDailyCosts,
-} from './useCostTracking'
+import { useCostTracking, useBudgetAlert, useCostByModel, useDailyCosts } from './useCostTracking'
 
 describe('useCostTracking', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('should initialize with loading state', () => {
+  it('should initialize with loading state', async () => {
     const { result } = renderHook(() => useCostTracking())
 
     expect(result.current.isLoading).toBe(true)
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
   })
 
   it('should load cost data', async () => {
@@ -151,8 +150,8 @@ describe('useCostTracking', () => {
       expect(result.current.isLoading).toBe(false)
     })
 
-    act(() => {
-      result.current.setBudget({ monthlyLimit: 200 })
+    await act(async () => {
+      await result.current.setBudget({ monthlyLimit: 200 })
     })
 
     expect(mockSetBudget).toHaveBeenCalledWith({ monthlyLimit: 200 })
@@ -193,9 +192,14 @@ describe('useBudgetAlert', () => {
     const { result } = renderHook(() => useBudgetAlert())
 
     await waitFor(() => {
-      expect(result.current.showAlert).toBe(false)
+      expect(mockGetCurrentMonthStatus).toHaveBeenCalled()
     })
 
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(result.current.showAlert).toBe(false)
     expect(result.current.alertType).toBeNull()
     expect(result.current.message).toBeNull()
   })

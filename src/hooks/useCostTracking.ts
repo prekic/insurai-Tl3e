@@ -39,13 +39,10 @@ interface UseCostTrackingResult {
 
   // Actions
   refresh: () => Promise<void>
-  setBudget: (budget: Partial<CostBudget>) => void
+  setBudget: (budget: Partial<CostBudget>) => Promise<void>
 }
 
-export function useCostTracking(
-  startDate?: Date,
-  endDate?: Date
-): UseCostTrackingResult {
+export function useCostTracking(startDate?: Date, endDate?: Date): UseCostTrackingResult {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<UsageStats | null>(null)
@@ -94,10 +91,13 @@ export function useCostTracking(
     await loadData()
   }, [loadData])
 
-  const setBudgetConfig = useCallback((budget: Partial<CostBudget>) => {
-    costTracker.setBudget(budget)
-    loadData()
-  }, [loadData])
+  const setBudgetConfig = useCallback(
+    async (budget: Partial<CostBudget>) => {
+      costTracker.setBudget(budget)
+      await loadData()
+    },
+    [loadData]
+  )
 
   return {
     isLoading,

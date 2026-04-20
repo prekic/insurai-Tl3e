@@ -49,7 +49,6 @@ afterEach(() => {
 // ==================================================================
 describe('getCategoryFromType', () => {
   it('maps auth prefix to auth category', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await auditLogger.log('auth.login')
     expect(event.category).toBe('auth')
   })
@@ -65,31 +64,26 @@ describe('getCategoryFromType', () => {
   })
 
   it('maps ai prefix to ai category', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await auditLogger.log('ai.extraction')
     expect(event.category).toBe('ai')
   })
 
   it('maps export prefix to export category', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await auditLogger.log('export.pdf')
     expect(event.category).toBe('export')
   })
 
   it('maps search prefix to search category', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await auditLogger.log('search.executed')
     expect(event.category).toBe('search')
   })
 
   it('maps settings prefix to settings category', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await auditLogger.log('settings.updated')
     expect(event.category).toBe('settings')
   })
 
   it('maps security prefix to security category', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await auditLogger.log('security.violation')
     expect(event.category).toBe('security')
   })
@@ -110,13 +104,11 @@ describe('getCategoryFromType', () => {
 // ==================================================================
 describe('getSeverityFromType', () => {
   it('returns error for failed events with success=false', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await auditLogger.log('auth.login_failed', {}, { success: false })
     expect(event.severity).toBe('error')
   })
 
   it('returns warning for security type events', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await auditLogger.log('security.rate_limit', {}, { success: true })
     expect(event.severity).toBe('warning')
   })
@@ -137,32 +129,27 @@ describe('getSeverityFromType', () => {
 // ==================================================================
 describe('AuditLogger.log', () => {
   it('infers success from type when not explicitly set', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await auditLogger.log('auth.login')
     expect(event.success).toBe(true)
   })
 
   it('infers success=false from type containing "failed"', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await auditLogger.log('auth.login_failed')
     expect(event.success).toBe(false)
   })
 
   it('sets ipHash when ip is provided', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await auditLogger.log('auth.login', {}, { ip: '192.168.1.1' })
     expect(event.ipHash).toBeDefined()
     expect(typeof event.ipHash).toBe('string')
   })
 
   it('leaves ipHash undefined when no ip', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await auditLogger.log('auth.login')
     expect(event.ipHash).toBeUndefined()
   })
 
   it('includes durationMs when provided', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await auditLogger.log('ai.extraction', {}, { durationMs: 1500 })
     expect(event.durationMs).toBe(1500)
   })
@@ -195,15 +182,12 @@ describe('AuditLogger.log', () => {
   })
 
   it('generates unique IDs', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event1 = await auditLogger.log('auth.login')
-    // @ts-expect-error - mismatch due to schema update
     const event2 = await auditLogger.log('auth.login')
     expect(event1.id).not.toBe(event2.id)
   })
 
   it('sets timestampISO', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await auditLogger.log('auth.login')
     expect(event.timestampISO).toMatch(/^\d{4}-\d{2}-\d{2}T/)
   })
@@ -214,9 +198,8 @@ describe('AuditLogger.log', () => {
 // ==================================================================
 describe('debug mode', () => {
   it('logs to console when debug enabled', async () => {
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const consoleSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
     auditLogger.setDebug(true)
-    // @ts-expect-error - mismatch due to schema update
     await auditLogger.log('auth.login', { test: true })
     expect(consoleSpy).toHaveBeenCalledWith('[AUDIT]', 'auth.login', { test: true })
     auditLogger.setDebug(false)
@@ -224,9 +207,8 @@ describe('debug mode', () => {
   })
 
   it('logs with ERROR prefix for failed events in debug mode', async () => {
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     auditLogger.setDebug(true)
-    // @ts-expect-error - mismatch due to schema update
     await auditLogger.log('auth.login_failed', {}, { success: false })
     expect(consoleSpy).toHaveBeenCalledWith('[AUDIT ERROR]', 'auth.login_failed', {})
     auditLogger.setDebug(false)
@@ -234,12 +216,14 @@ describe('debug mode', () => {
   })
 
   it('does not log to console when debug disabled', async () => {
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const consoleSpyInfo = vi.spyOn(console, 'info').mockImplementation(() => {})
+    const consoleSpyError = vi.spyOn(console, 'error').mockImplementation(() => {})
     auditLogger.setDebug(false)
-    // @ts-expect-error - mismatch due to schema update
     await auditLogger.log('auth.login')
-    expect(consoleSpy).not.toHaveBeenCalled()
-    consoleSpy.mockRestore()
+    expect(consoleSpyInfo).not.toHaveBeenCalled()
+    expect(consoleSpyError).not.toHaveBeenCalled()
+    consoleSpyInfo.mockRestore()
+    consoleSpyError.mockRestore()
   })
 })
 
@@ -248,7 +232,6 @@ describe('debug mode', () => {
 // ==================================================================
 describe('logAuth maskEmail', () => {
   it('masks email with long local part', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await auditLogger.logAuth('auth.login', {
       method: 'password',
       email: 'john@example.com',
@@ -258,7 +241,6 @@ describe('logAuth maskEmail', () => {
   })
 
   it('masks email with short local part', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await auditLogger.logAuth('auth.login', {
       method: 'password',
       email: 'ab@example.com',
@@ -268,7 +250,6 @@ describe('logAuth maskEmail', () => {
   })
 
   it('masks email without domain', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await auditLogger.logAuth('auth.login', {
       method: 'password',
       email: 'nodomain',
@@ -277,7 +258,6 @@ describe('logAuth maskEmail', () => {
   })
 
   it('handles undefined email', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await auditLogger.logAuth('auth.login', {
       method: 'oauth',
     })
@@ -320,7 +300,6 @@ describe('queryMemory (memory fallback)', () => {
   beforeEach(async () => {
     // Log several events
     for (let i = 0; i < 10; i++) {
-      // @ts-expect-error - mismatch due to schema update
       await auditLogger.log('auth.login', { index: i }, { userId: `user-${i % 3}` })
     }
   })
@@ -342,7 +321,6 @@ describe('queryMemory (memory fallback)', () => {
   })
 
   it('filters by success', async () => {
-    // @ts-expect-error - mismatch due to schema update
     await auditLogger.log('auth.login_failed', {}, { success: false })
     const events = await auditLogger.query({ success: false })
     expect(events.every((e) => !e.success)).toBe(true)
@@ -367,9 +345,7 @@ describe('queryMemory (memory fallback)', () => {
   })
 
   it('filters by type', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const events = await auditLogger.query({ type: 'auth.login' })
-    // @ts-expect-error - mismatch due to schema update
     expect(events.every((e) => e.type === 'auth.login')).toBe(true)
   })
 
@@ -392,7 +368,6 @@ describe('onEvent', () => {
   it('notifies listeners on new events', async () => {
     const listener = vi.fn()
     const unsubscribe = auditLogger.onEvent(listener)
-    // @ts-expect-error - mismatch due to schema update
     await auditLogger.log('auth.login')
     expect(listener).toHaveBeenCalledTimes(1)
     unsubscribe()
@@ -401,11 +376,9 @@ describe('onEvent', () => {
   it('stops notifying after unsubscribe', async () => {
     const listener = vi.fn()
     const unsubscribe = auditLogger.onEvent(listener)
-    // @ts-expect-error - mismatch due to schema update
     await auditLogger.log('auth.login')
     expect(listener).toHaveBeenCalledTimes(1)
     unsubscribe()
-    // @ts-expect-error - mismatch due to schema update
     await auditLogger.log('auth.login')
     expect(listener).toHaveBeenCalledTimes(1)
   })
@@ -416,7 +389,6 @@ describe('onEvent', () => {
     })
     const unsubscribe = auditLogger.onEvent(badListener)
     // Should not throw
-    // @ts-expect-error - mismatch due to schema update
     await auditLogger.log('auth.login')
     expect(badListener).toHaveBeenCalled()
     unsubscribe()
@@ -441,7 +413,6 @@ describe('cleanup memory', () => {
   it('removes old info events', async () => {
     // Set short retention
     auditLogger.setRetentionPolicy({ infoRetentionDays: 0 })
-    // @ts-expect-error - mismatch due to schema update
     await auditLogger.log('auth.login')
     // Wait a tick so timestamp is old
     const cleaned = await auditLogger.cleanup()
@@ -454,7 +425,6 @@ describe('cleanup memory', () => {
 // ==================================================================
 describe('getStats', () => {
   it('returns stats for logged events', async () => {
-    // @ts-expect-error - mismatch due to schema update
     await auditLogger.log('auth.login', {}, { durationMs: 100 })
     await auditLogger.log('policy.created')
     await auditLogger.log('error.unhandled', {}, { success: false })
@@ -490,7 +460,6 @@ describe('getStats', () => {
 // ==================================================================
 describe('export', () => {
   it('exports events as JSON string', async () => {
-    // @ts-expect-error - mismatch due to schema update
     await auditLogger.log('auth.login')
     const json = await auditLogger.export()
     const parsed = JSON.parse(json)
@@ -499,7 +468,6 @@ describe('export', () => {
   })
 
   it('exports filtered events', async () => {
-    // @ts-expect-error - mismatch due to schema update
     await auditLogger.log('auth.login')
     await auditLogger.log('policy.created')
     const json = await auditLogger.export({ category: 'auth' })
@@ -513,13 +481,11 @@ describe('export', () => {
 // ==================================================================
 describe('audit convenience function', () => {
   it('logs via audit function', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await audit('auth.login', { foo: 'bar' })
     expect(event.type).toBe('auth.login')
   })
 
   it('handles no details', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await audit('auth.login')
     expect(event.type).toBe('auth.login')
   })
@@ -530,7 +496,6 @@ describe('audit convenience function', () => {
 // ==================================================================
 describe('createTimedAudit', () => {
   it('measures duration on complete', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const timed = createTimedAudit('ai.extraction', { model: 'gpt-4' })
     await new Promise((r) => setTimeout(r, 10))
     const event = await timed.complete({ tokens: 100 })
@@ -539,14 +504,12 @@ describe('createTimedAudit', () => {
   })
 
   it('allows setting success=false on complete', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const timed = createTimedAudit('ai.extraction')
     const event = await timed.complete({}, false)
     expect(event.success).toBe(false)
   })
 
   it('measures duration on fail with Error', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const timed = createTimedAudit('ai.extraction')
     const event = await timed.fail(new Error('timeout'))
     expect(event.success).toBe(false)
@@ -555,7 +518,6 @@ describe('createTimedAudit', () => {
   })
 
   it('measures duration on fail with string', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const timed = createTimedAudit('ai.extraction')
     const event = await timed.fail('string error')
     expect(event.success).toBe(false)
@@ -563,7 +525,6 @@ describe('createTimedAudit', () => {
   })
 
   it('includes extra details on fail', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const timed = createTimedAudit('ai.extraction', { model: 'gpt-4' })
     const event = await timed.fail('err', { retries: 3 })
     expect(event.durationMs).toBeGreaterThanOrEqual(0)
@@ -575,7 +536,6 @@ describe('createTimedAudit', () => {
 // ==================================================================
 describe('typed log methods', () => {
   it('logAI sets resourceType to ai_operation', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await auditLogger.logAI('ai.extraction', {
       provider: 'openai',
       model: 'gpt-4',
@@ -596,7 +556,6 @@ describe('typed log methods', () => {
   })
 
   it('logExport sets resourceType to export', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await auditLogger.logExport('export.pdf', {
       format: 'pdf',
       size: 1024,
@@ -605,7 +564,6 @@ describe('typed log methods', () => {
   })
 
   it('logSecurity sets success=false and resourceType to security', async () => {
-    // @ts-expect-error - mismatch due to schema update
     const event = await auditLogger.logSecurity('security.rate_limit', {
       reason: 'too many requests',
     })

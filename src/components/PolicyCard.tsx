@@ -7,6 +7,7 @@ import {
   Sparkles,
   Copy,
   AlertTriangle,
+  BadgePercent,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatDate } from '@/lib/utils'
@@ -308,6 +309,41 @@ export function PolicyCard({
             </p>
           </div>
         </div>
+
+        {/* Discounts section */}
+        {policy.discounts &&
+          (policy.discounts.ncdDiscount ||
+            policy.discounts.groupDiscount ||
+            policy.discounts.otherDiscountPct) && (
+            <div className="mb-4">
+              <div className="flex flex-wrap gap-1.5">
+                {policy.discounts.ncdDiscount && (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <BadgePercent className="w-3 h-3" />
+                    {locale === 'tr'
+                      ? `Hasarsızlık: %${policy.discounts.ncdDiscount}`
+                      : `NCD: ${policy.discounts.ncdDiscount}%`}
+                  </span>
+                )}
+                {policy.discounts.groupDiscount && (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <BadgePercent className="w-3 h-3" />
+                    {locale === 'tr'
+                      ? `Grup/Kurum: %${policy.discounts.groupDiscount}`
+                      : `Group: ${policy.discounts.groupDiscount}%`}
+                  </span>
+                )}
+                {policy.discounts.otherDiscountPct && (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <BadgePercent className="w-3 h-3" />
+                    {locale === 'tr'
+                      ? `Diğer: %${policy.discounts.otherDiscountPct}`
+                      : `Other: ${policy.discounts.otherDiscountPct}%`}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
         {/* Evaluation section */}
         {showEvaluation && evaluation && (

@@ -19,21 +19,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 // Hoisted mocks (available inside vi.mock factories)
 // ---------------------------------------------------------------------------
 
-const {
-  mockLogWarn,
-  mockLogError,
-  mockLogInfo,
-  mockLogDebug,
-  mockFrom,
-  mockCreateClient,
-} = vi.hoisted(() => ({
-  mockLogWarn: vi.fn(),
-  mockLogError: vi.fn(),
-  mockLogInfo: vi.fn(),
-  mockLogDebug: vi.fn(),
-  mockFrom: vi.fn(),
-  mockCreateClient: vi.fn(),
-}))
+const { mockLogWarn, mockLogError, mockLogInfo, mockLogDebug, mockFrom, mockCreateClient } =
+  vi.hoisted(() => ({
+    mockLogWarn: vi.fn(),
+    mockLogError: vi.fn(),
+    mockLogInfo: vi.fn(),
+    mockLogDebug: vi.fn(),
+    mockFrom: vi.fn(),
+    mockCreateClient: vi.fn(),
+  }))
 
 // Mock logger — suppress console output during tests
 vi.mock('../lib/logger.js', () => {
@@ -63,7 +57,7 @@ const savedEnv = { ...process.env }
 
 /** Build a fully chainable Supabase query mock that resolves to `finalResult` */
 function chainMock(finalResult: { data: unknown; error: unknown; count?: number | null }) {
-  const chain: Record<string, ReturnType<typeof vi.fn>> = {}
+  const chain: Record<string, any> = {}
   chain.select = vi.fn().mockReturnValue(chain)
   chain.insert = vi.fn().mockReturnValue(chain)
   chain.update = vi.fn().mockReturnValue(chain)
@@ -76,6 +70,7 @@ function chainMock(finalResult: { data: unknown; error: unknown; count?: number 
   chain.ilike = vi.fn().mockReturnValue(chain)
   chain.lt = vi.fn().mockReturnValue(chain)
   chain.single = vi.fn().mockResolvedValue(finalResult)
+  chain.maybeSingle = vi.fn().mockResolvedValue(finalResult)
   // For queries that don't end with .single() (list/stats/delete), resolve via thenable
   chain.then = (resolve: (v: unknown) => void) => resolve(finalResult)
 
@@ -135,7 +130,7 @@ describe('processing-log-service branch coverage', () => {
           hasUrl: 'false',
           hasKey: 'false',
           urlSource: 'none',
-        }),
+        })
       )
     })
 
@@ -151,7 +146,7 @@ describe('processing-log-service branch coverage', () => {
           hasUrl: 'true',
           hasKey: 'false',
           urlSource: 'SUPABASE_URL',
-        }),
+        })
       )
     })
 
@@ -167,7 +162,7 @@ describe('processing-log-service branch coverage', () => {
           hasUrl: 'false',
           hasKey: 'true',
           urlSource: 'none',
-        }),
+        })
       )
     })
 
@@ -182,7 +177,7 @@ describe('processing-log-service branch coverage', () => {
       expect(mockCreateClient).toHaveBeenCalledWith('https://vite-test.supabase.co', 'test-key')
       expect(mockLogInfo).toHaveBeenCalledWith(
         'Supabase configured',
-        expect.objectContaining({ url: expect.any(String) }),
+        expect.objectContaining({ url: expect.any(String) })
       )
     })
 
@@ -218,7 +213,7 @@ describe('processing-log-service branch coverage', () => {
           hasUrl: 'true',
           hasKey: 'false',
           urlSource: 'VITE_SUPABASE_URL',
-        }),
+        })
       )
     })
 
@@ -230,10 +225,9 @@ describe('processing-log-service branch coverage', () => {
       const svc = await importService()
       await svc.getProcessingLog('doc-1')
 
-      expect(mockLogInfo).toHaveBeenCalledWith(
-        'Supabase configured',
-        { url: longUrl.substring(0, 30) + '...' },
-      )
+      expect(mockLogInfo).toHaveBeenCalledWith('Supabase configured', {
+        url: longUrl.substring(0, 30) + '...',
+      })
     })
   })
 
@@ -287,10 +281,7 @@ describe('processing-log-service branch coverage', () => {
       const svc = await importService()
       await svc.createProcessingLog(minimalLog as any)
 
-      expect(mockLogInfo).toHaveBeenCalledWith(
-        'Log created successfully',
-        { id: 'created-id-123' },
-      )
+      expect(mockLogInfo).toHaveBeenCalledWith('Log created successfully', { id: 'created-id-123' })
     })
 
     it('logs data?.id as undefined when data is null on successful insert', async () => {
@@ -301,10 +292,7 @@ describe('processing-log-service branch coverage', () => {
       const result = await svc.createProcessingLog(minimalLog as any)
 
       // Should still log — data?.id is undefined
-      expect(mockLogInfo).toHaveBeenCalledWith(
-        'Log created successfully',
-        { id: undefined },
-      )
+      expect(mockLogInfo).toHaveBeenCalledWith('Log created successfully', { id: undefined })
       expect(result.data).toBeNull()
       expect(result.error).toBeNull()
     })
@@ -333,8 +321,8 @@ describe('processing-log-service branch coverage', () => {
 
       expect(result).toBeNull()
       expect(mockLogError).toHaveBeenCalledWith(
-        'Failed to update log',
-        expect.objectContaining({ error: expect.any(String) }),
+        'Failed to update processing log',
+        expect.objectContaining({ error: expect.any(String) })
       )
     })
 
@@ -356,7 +344,7 @@ describe('processing-log-service branch coverage', () => {
         expect.objectContaining({
           status: 'completed',
           updated_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
-        }),
+        })
       )
     })
   })
@@ -380,7 +368,7 @@ describe('processing-log-service branch coverage', () => {
     })
 
     it('returns false when initial fetch of stages fails', async () => {
-      const chain: Record<string, ReturnType<typeof vi.fn>> = {}
+      const chain: Record<string, any> = {}
       chain.select = vi.fn().mockReturnValue(chain)
       chain.eq = vi.fn().mockReturnValue(chain)
       chain.single = vi.fn().mockResolvedValue({
@@ -395,13 +383,13 @@ describe('processing-log-service branch coverage', () => {
       expect(result).toBe(false)
       expect(mockLogError).toHaveBeenCalledWith(
         'Failed to fetch log for stage update',
-        expect.any(Object),
+        expect.any(Object)
       )
     })
 
     it('falls back to empty array when current.stages is null', async () => {
       // Phase 1 returns null stages, phase 2 succeeds
-      const chain: Record<string, ReturnType<typeof vi.fn>> = {}
+      const chain: Record<string, any> = {}
       let callCount = 0
       chain.select = vi.fn().mockReturnValue(chain)
       chain.update = vi.fn().mockReturnValue(chain)
@@ -426,12 +414,12 @@ describe('processing-log-service branch coverage', () => {
         expect.objectContaining({
           stages: [newStage],
           updated_at: expect.any(String),
-        }),
+        })
       )
     })
 
     it('falls back to empty array when current data is null', async () => {
-      const chain: Record<string, ReturnType<typeof vi.fn>> = {}
+      const chain: Record<string, any> = {}
       let callCount = 0
       chain.select = vi.fn().mockReturnValue(chain)
       chain.update = vi.fn().mockReturnValue(chain)
@@ -454,13 +442,17 @@ describe('processing-log-service branch coverage', () => {
       expect(chain.update).toHaveBeenCalledWith(
         expect.objectContaining({
           stages: [newStage],
-        }),
+        })
       )
     })
 
     it('appends to existing stages when stages array is present', async () => {
-      const existingStage = { stage: 'pdf_extraction', status: 'completed', started_at: '2026-02-18T00:00:00Z' }
-      const chain: Record<string, ReturnType<typeof vi.fn>> = {}
+      const existingStage = {
+        stage: 'pdf_extraction',
+        status: 'completed',
+        started_at: '2026-02-18T00:00:00Z',
+      }
+      const chain: Record<string, any> = {}
       let callCount = 0
       chain.select = vi.fn().mockReturnValue(chain)
       chain.update = vi.fn().mockReturnValue(chain)
@@ -482,12 +474,12 @@ describe('processing-log-service branch coverage', () => {
       expect(chain.update).toHaveBeenCalledWith(
         expect.objectContaining({
           stages: [existingStage, newStage],
-        }),
+        })
       )
     })
 
     it('returns false when update (phase 2) fails after successful fetch', async () => {
-      const chain: Record<string, ReturnType<typeof vi.fn>> = {}
+      const chain: Record<string, any> = {}
       let callCount = 0
       chain.select = vi.fn().mockReturnValue(chain)
       chain.update = vi.fn().mockReturnValue(chain)
@@ -508,10 +500,7 @@ describe('processing-log-service branch coverage', () => {
       const result = await svc.addProcessingStage('doc-1', newStage as any)
 
       expect(result).toBe(false)
-      expect(mockLogError).toHaveBeenCalledWith(
-        'Failed to add stage',
-        expect.any(Object),
-      )
+      expect(mockLogError).toHaveBeenCalledWith('Failed to add stage', expect.any(Object))
     })
   })
 
@@ -539,7 +528,7 @@ describe('processing-log-service branch coverage', () => {
       expect(result).toBeNull()
       expect(mockLogError).toHaveBeenCalledWith(
         'Failed to get log',
-        expect.objectContaining({ error: expect.any(String) }),
+        expect.objectContaining({ error: expect.any(String) })
       )
     })
 
@@ -583,7 +572,7 @@ describe('processing-log-service branch coverage', () => {
       // PGRST116 should NOT trigger error logging
       expect(mockLogError).not.toHaveBeenCalledWith(
         'Failed to get log by policy',
-        expect.any(Object),
+        expect.any(Object)
       )
     })
 
@@ -596,7 +585,7 @@ describe('processing-log-service branch coverage', () => {
       expect(result).toBeNull()
       expect(mockLogError).toHaveBeenCalledWith(
         'Failed to get log by policy',
-        expect.objectContaining({ error: expect.any(String) }),
+        expect.objectContaining({ error: expect.any(String) })
       )
     })
 
@@ -800,10 +789,7 @@ describe('processing-log-service branch coverage', () => {
       const result = await svc.listProcessingLogs()
 
       expect(result).toEqual({ logs: [], total: 0 })
-      expect(mockLogError).toHaveBeenCalledWith(
-        'Failed to list logs',
-        expect.any(Object),
-      )
+      expect(mockLogError).toHaveBeenCalledWith('Failed to list logs', expect.any(Object))
     })
 
     it('falls back to empty array when data is null (data || [])', async () => {
@@ -865,10 +851,7 @@ describe('processing-log-service branch coverage', () => {
 
       expect(stats.total).toBe(0)
       expect(stats.avg_duration_ms).toBe(0)
-      expect(mockLogError).toHaveBeenCalledWith(
-        'Failed to get stats',
-        expect.any(Object),
-      )
+      expect(mockLogError).toHaveBeenCalledWith('Failed to get stats', expect.any(Object))
     })
 
     it('handles null data from query (data || [] fallback)', async () => {
@@ -889,7 +872,7 @@ describe('processing-log-service branch coverage', () => {
 
       expect(chain.gte).toHaveBeenCalledWith(
         'started_at',
-        expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/)
       )
     })
 
@@ -1124,10 +1107,7 @@ describe('processing-log-service branch coverage', () => {
       const count = await svc.deleteOldLogs(30)
 
       expect(count).toBe(0)
-      expect(mockLogError).toHaveBeenCalledWith(
-        'Failed to delete old logs',
-        expect.any(Object),
-      )
+      expect(mockLogError).toHaveBeenCalledWith('Failed to delete old logs', expect.any(Object))
     })
 
     it('uses default 90 days when parameter not specified', async () => {
@@ -1138,7 +1118,7 @@ describe('processing-log-service branch coverage', () => {
 
       expect(chain.lt).toHaveBeenCalledWith(
         'started_at',
-        expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/)
       )
     })
 
