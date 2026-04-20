@@ -37,7 +37,6 @@ describe('AuditLogger', () => {
   // =========================================================================
   describe('getCategoryFromType (via log)', () => {
     it('should categorize auth events', async () => {
-      // @ts-expect-error - mismatch due to schema update
       const event = await auditLogger.log('auth.signin_success')
       expect(event.category).toBe('auth')
     })
@@ -53,7 +52,6 @@ describe('AuditLogger', () => {
     })
 
     it('should categorize ai events', async () => {
-      // @ts-expect-error - mismatch due to schema update
       const event = await auditLogger.log('ai.extraction_complete')
       expect(event.category).toBe('ai')
     })
@@ -69,7 +67,6 @@ describe('AuditLogger', () => {
     })
 
     it('should categorize settings events', async () => {
-      // @ts-expect-error - mismatch due to schema update
       const event = await auditLogger.log('settings.updated')
       expect(event.category).toBe('settings')
     })
@@ -131,7 +128,6 @@ describe('AuditLogger', () => {
   // =========================================================================
   describe('log', () => {
     it('should create event with all fields', async () => {
-      // @ts-expect-error - mismatch due to schema update
       const event = await auditLogger.log(
         'auth.signin_success',
         { method: 'email' },
@@ -181,7 +177,6 @@ describe('AuditLogger', () => {
     })
 
     it('should handle ip hashing', async () => {
-      // @ts-expect-error - mismatch due to schema update
       const event = await auditLogger.log('auth.signin_success', {}, { ip: '10.0.0.1' })
       expect(event.ipHash).toBeTruthy()
       expect(event.ipHash).not.toBe('10.0.0.1')
@@ -203,7 +198,7 @@ describe('AuditLogger', () => {
   // =========================================================================
   describe('debug mode', () => {
     it('should log to console when debug enabled', async () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      const consoleSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
       auditLogger.setDebug(true)
       await auditLogger.log('policy.created', { test: true })
       expect(consoleSpy).toHaveBeenCalledWith('[AUDIT]', 'policy.created', { test: true })
@@ -212,7 +207,7 @@ describe('AuditLogger', () => {
     })
 
     it('should show ERROR prefix for failed events in debug mode', async () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       auditLogger.setDebug(true)
       await auditLogger.log('auth.signin_failed', { reason: 'bad password' })
       expect(consoleSpy).toHaveBeenCalledWith('[AUDIT ERROR]', 'auth.signin_failed', {
@@ -223,11 +218,14 @@ describe('AuditLogger', () => {
     })
 
     it('should not log to console when debug disabled', async () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      const consoleInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       auditLogger.setDebug(false)
       await auditLogger.log('policy.created')
-      expect(consoleSpy).not.toHaveBeenCalled()
-      consoleSpy.mockRestore()
+      expect(consoleInfoSpy).not.toHaveBeenCalled()
+      expect(consoleErrorSpy).not.toHaveBeenCalled()
+      consoleInfoSpy.mockRestore()
+      consoleErrorSpy.mockRestore()
     })
   })
 
@@ -236,7 +234,6 @@ describe('AuditLogger', () => {
   // =========================================================================
   describe('logAI', () => {
     it('should log AI events with typed details', async () => {
-      // @ts-expect-error - mismatch due to schema update
       const event = await auditLogger.logAI(
         'ai.extraction_complete',
         {
@@ -279,7 +276,6 @@ describe('AuditLogger', () => {
   // =========================================================================
   describe('logAuth', () => {
     it('should mask email in auth events', async () => {
-      // @ts-expect-error - mismatch due to schema update
       const event = await auditLogger.logAuth(
         'auth.signin_success',
         {
@@ -296,7 +292,6 @@ describe('AuditLogger', () => {
     })
 
     it('should handle short emails', async () => {
-      // @ts-expect-error - mismatch due to schema update
       const event = await auditLogger.logAuth('auth.signin_success', {
         method: 'email',
         email: 'ab@test.com',
@@ -306,7 +301,6 @@ describe('AuditLogger', () => {
     })
 
     it('should handle email without @ sign', async () => {
-      // @ts-expect-error - mismatch due to schema update
       const event = await auditLogger.logAuth('auth.signin_success', {
         method: 'email',
         email: 'invalid-email',
@@ -316,7 +310,6 @@ describe('AuditLogger', () => {
     })
 
     it('should handle undefined email', async () => {
-      // @ts-expect-error - mismatch due to schema update
       const event = await auditLogger.logAuth('auth.signin_success', {
         method: 'email',
       } as never)
@@ -338,7 +331,6 @@ describe('AuditLogger', () => {
     })
 
     it('should include mfaUsed flag', async () => {
-      // @ts-expect-error - mismatch due to schema update
       const event = await auditLogger.logAuth('auth.signin_success', {
         method: 'email',
         mfaUsed: true,
@@ -428,7 +420,6 @@ describe('AuditLogger', () => {
     })
 
     it('should filter by category', async () => {
-      // @ts-expect-error - mismatch due to schema update
       await auditLogger.log('auth.signin_success')
       await auditLogger.log('policy.created')
       const events = await auditLogger.query({ category: 'auth' })
@@ -436,12 +427,9 @@ describe('AuditLogger', () => {
     })
 
     it('should filter by type', async () => {
-      // @ts-expect-error - mismatch due to schema update
       await auditLogger.log('auth.signin_success')
       await auditLogger.log('auth.signin_failed')
-      // @ts-expect-error - mismatch due to schema update
       const events = await auditLogger.query({ type: 'auth.signin_success' })
-      // @ts-expect-error - mismatch due to schema update
       expect(events.every((e) => e.type === 'auth.signin_success')).toBe(true)
     })
 
@@ -454,7 +442,6 @@ describe('AuditLogger', () => {
 
     it('should filter by severity', async () => {
       await auditLogger.log('policy.created')
-      // @ts-expect-error - mismatch due to schema update
       await auditLogger.log('security.alert')
       const events = await auditLogger.query({ severity: 'info' })
       expect(events.every((e) => e.severity === 'info')).toBe(true)
@@ -468,7 +455,6 @@ describe('AuditLogger', () => {
     })
 
     it('should filter by success', async () => {
-      // @ts-expect-error - mismatch due to schema update
       await auditLogger.log('auth.signin_success', {}, { success: true })
       await auditLogger.log('auth.signin_failed', {}, { success: false })
       const events = await auditLogger.query({ success: true })
@@ -507,7 +493,6 @@ describe('AuditLogger', () => {
     it('should sort by timestamp descending', async () => {
       await auditLogger.log('policy.created')
       await new Promise((r) => setTimeout(r, 10))
-      // @ts-expect-error - mismatch due to schema update
       await auditLogger.log('auth.signin_success')
       const events = await auditLogger.query({ limit: 100 })
       if (events.length >= 2) {
@@ -525,7 +510,6 @@ describe('AuditLogger', () => {
     })
 
     it('should return stats for events', async () => {
-      // @ts-expect-error - mismatch due to schema update
       await auditLogger.log('auth.signin_success', {}, { durationMs: 100, success: true })
       await auditLogger.log('auth.signin_failed', {}, { success: false })
       await auditLogger.log('policy.created', {}, { durationMs: 200, success: true })
@@ -675,7 +659,6 @@ describe('AuditLogger', () => {
     })
 
     it('should pass options', async () => {
-      // @ts-expect-error - mismatch due to schema update
       const event = await audit('auth.signin_success', undefined, { userId: 'u-conv' })
       expect(event.userId).toBe('u-conv')
     })
@@ -686,7 +669,6 @@ describe('AuditLogger', () => {
   // =========================================================================
   describe('createTimedAudit', () => {
     it('should measure duration on complete', async () => {
-      // @ts-expect-error - mismatch due to schema update
       const timed = createTimedAudit('ai.extraction_complete', { provider: 'openai' })
       await new Promise((r) => setTimeout(r, 10))
       const event = await timed.complete({ result: 'ok' })
@@ -697,14 +679,12 @@ describe('AuditLogger', () => {
     })
 
     it('should support custom success on complete', async () => {
-      // @ts-expect-error - mismatch due to schema update
       const timed = createTimedAudit('ai.extraction_complete')
       const event = await timed.complete({}, false)
       expect(event.success).toBe(false)
     })
 
     it('should measure duration on fail', async () => {
-      // @ts-expect-error - mismatch due to schema update
       const timed = createTimedAudit('ai.extraction_complete', { provider: 'anthropic' })
       await new Promise((r) => setTimeout(r, 10))
       const event = await timed.fail(new Error('timeout'))
@@ -714,7 +694,6 @@ describe('AuditLogger', () => {
     })
 
     it('should handle string error on fail', async () => {
-      // @ts-expect-error - mismatch due to schema update
       const timed = createTimedAudit('ai.extraction_complete')
       const event = await timed.fail('network error')
       expect(event.errorMessage).toBe('network error')
@@ -732,17 +711,13 @@ describe('AuditLogger', () => {
   // =========================================================================
   describe('hashString (via ip hashing)', () => {
     it('should produce consistent hash for same input', async () => {
-      // @ts-expect-error - mismatch due to schema update
       const event1 = await auditLogger.log('auth.signin_success', {}, { ip: '1.2.3.4' })
-      // @ts-expect-error - mismatch due to schema update
       const event2 = await auditLogger.log('auth.signin_success', {}, { ip: '1.2.3.4' })
       expect(event1.ipHash).toBe(event2.ipHash)
     })
 
     it('should produce different hash for different input', async () => {
-      // @ts-expect-error - mismatch due to schema update
       const event1 = await auditLogger.log('auth.signin_success', {}, { ip: '1.2.3.4' })
-      // @ts-expect-error - mismatch due to schema update
       const event2 = await auditLogger.log('auth.signin_success', {}, { ip: '5.6.7.8' })
       expect(event1.ipHash).not.toBe(event2.ipHash)
     })

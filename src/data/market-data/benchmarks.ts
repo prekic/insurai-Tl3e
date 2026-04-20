@@ -740,6 +740,54 @@ const NAKLIYAT_EXCLUSIONS = [
  * All three fields must be non-empty. Without `provenance`, the recommendation
  * generator suppresses percentile and YoY claims.
  */
+export const KASKO_COMMERCIAL_BENCHMARKS: PolicyTypeMarketData = {
+  type: 'kasko',
+  typeTr: 'Ticari Kasko',
+  premiumRange: {
+    min: 8000,
+    max: 120000,
+    average: 25000,
+    median: 20000,
+    percentile25: 15000,
+    percentile75: 45000,
+  },
+  coverageRange: {
+    min: 250000,
+    max: 100000000,
+    average: 2500000,
+    median: 1500000,
+  },
+  commonCoverages: KASKO_COVERAGES,
+  commonExclusions: [
+    ...KASKO_EXCLUSIONS,
+    'Tonaj ve gabari sınırlarının aşılması',
+    'Tehlikeli madde taşıma',
+    'Yetki belgesi olmadan taşımacılık yapılması',
+    'Aracın uygun olmayan şartlarda kiralanması (Rent a car vb.)',
+  ],
+  trends: {
+    premiumChangeYoY: 55.5,
+    claimsRatio: 78.5,
+    marketGrowth: 15.0,
+  },
+  regionalFactors: {
+    marmara: 1.2,
+    ege: 1.1,
+    akdeniz: 1.12,
+    ic_anadolu: 0.95,
+    karadeniz: 0.88,
+    dogu_anadolu: 0.82,
+    guneydogu: 0.85,
+  },
+  dataDate: '2025-01-01',
+  source: 'TSB/SEDDK',
+  provenance: {
+    source: 'TSB/SEDDK 2025 Yıllık İstatistik Bülteni - Ticari Araçlar',
+    date: '2025-01-01',
+    cohort: 'Ağır Vasıta ve Ticari Kasko 2025 piyasa verileri',
+  },
+}
+
 export const MARKET_BENCHMARKS: Record<PolicyType, PolicyTypeMarketData> = {
   kasko: {
     type: 'kasko',
@@ -1074,15 +1122,25 @@ export const MARKET_BENCHMARKS: Record<PolicyType, PolicyTypeMarketData> = {
 /**
  * Get benchmark data for a policy type
  */
-export function getBenchmarkData(policyType: PolicyType): PolicyTypeMarketData {
+export function getBenchmarkData(
+  policyType: PolicyType,
+  isCommercial?: boolean
+): PolicyTypeMarketData {
+  if (policyType === 'kasko' && isCommercial) {
+    return KASKO_COMMERCIAL_BENCHMARKS
+  }
   return MARKET_BENCHMARKS[policyType]
 }
 
 /**
  * Get regional adjustment factor
  */
-export function getRegionalFactor(policyType: PolicyType, region: TurkishRegion): number {
-  const benchmark = MARKET_BENCHMARKS[policyType]
+export function getRegionalFactor(
+  policyType: PolicyType,
+  region: TurkishRegion,
+  isCommercial?: boolean
+): number {
+  const benchmark = getBenchmarkData(policyType, isCommercial)
   return benchmark.regionalFactors[region] ?? 1.0
 }
 
@@ -1092,16 +1150,17 @@ export function getRegionalFactor(policyType: PolicyType, region: TurkishRegion)
 export function calculatePremiumPercentile(
   premium: number,
   policyType: PolicyType,
-  region?: TurkishRegion
+  region?: TurkishRegion,
+  isCommercial?: boolean
 ): number {
-  const benchmark = MARKET_BENCHMARKS[policyType]
+  const benchmark = getBenchmarkData(policyType, isCommercial)
   const { min, max } = benchmark.premiumRange
 
   // Adjust for region if provided
   let adjustedMin = min
   let adjustedMax = max
   if (region) {
-    const factor = getRegionalFactor(policyType, region)
+    const factor = getRegionalFactor(policyType, region, isCommercial)
     adjustedMin = min * factor
     adjustedMax = max * factor
   }
@@ -1116,8 +1175,12 @@ export function calculatePremiumPercentile(
 /**
  * Calculate coverage percentile
  */
-export function calculateCoveragePercentile(coverage: number, policyType: PolicyType): number {
-  const benchmark = MARKET_BENCHMARKS[policyType]
+export function calculateCoveragePercentile(
+  coverage: number,
+  policyType: PolicyType,
+  isCommercial?: boolean
+): number {
+  const benchmark = getBenchmarkData(policyType, isCommercial)
   const { min, max } = benchmark.coverageRange
 
   const range = max - min

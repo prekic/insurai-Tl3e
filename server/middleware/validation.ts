@@ -357,7 +357,7 @@ export const chatSchema = z.object({
   message: z
     .string()
     .min(1, 'Message is required')
-    .max(500000, 'Message too long (max 500KB)')
+    .max(4000, 'Message too long (max 4000 chars)')
     .transform(sanitizeString),
   conversationHistory: z
     .array(chatMessageSchema)

@@ -121,25 +121,29 @@ export function comparePolicies(
 /**
  * Generate market benchmarks for each policy (async, DB-backed)
  */
-async function generateMarketBenchmarksAsync(policies: AnalyzedPolicy[]): Promise<PolicyMarketBenchmark[]> {
-  return Promise.all(policies.map(async policy => {
-    const marketComparison = await MarketDataService.getMarketComparisonAsync(policy)
-    const benchmarkResult = await MarketDataService.analyzePolicyBenchmarkAsync(policy)
+async function generateMarketBenchmarksAsync(
+  policies: AnalyzedPolicy[]
+): Promise<PolicyMarketBenchmark[]> {
+  return Promise.all(
+    policies.map(async (policy) => {
+      const marketComparison = await MarketDataService.getMarketComparisonAsync(policy)
+      const benchmarkResult = await MarketDataService.analyzePolicyBenchmarkAsync(policy)
 
-    return {
-      policyId: policy.id,
-      provider: policy.provider,
-      marketComparison,
-      insights: benchmarkResult.insights,
-    }
-  }))
+      return {
+        policyId: policy.id,
+        provider: policy.provider,
+        marketComparison,
+        insights: benchmarkResult.insights,
+      }
+    })
+  )
 }
 
 /**
  * Generate market benchmarks for each policy (sync, static data only)
  */
 function generateMarketBenchmarks(policies: AnalyzedPolicy[]): PolicyMarketBenchmark[] {
-  return policies.map(policy => {
+  return policies.map((policy) => {
     const marketComparison = MarketDataService.getMarketComparison(policy)
     const benchmarkResult = MarketDataService.analyzePolicyBenchmark(policy)
 
@@ -162,17 +166,19 @@ async function generateBenchmarkRecommendationsAsync(
   const recommendations: string[] = []
 
   const bestPremiumPosition = benchmarks.reduce((best, current) =>
-    current.marketComparison.premiumPercentile < best.marketComparison.premiumPercentile ? current : best
+    current.marketComparison.premiumPercentile < best.marketComparison.premiumPercentile
+      ? current
+      : best
   )
 
-  const policy = policies.find(p => p.id === bestPremiumPosition.policyId)
+  const policy = policies.find((p) => p.id === bestPremiumPosition.policyId)
   if (policy && bestPremiumPosition.marketComparison.premiumPercentile < 40) {
     recommendations.push(
       `📊 Pazar analizi: ${policy.provider} piyasa ortalamasının altında prim sunuyor (${bestPremiumPosition.marketComparison.premiumPercentile}. yüzdelik)`
     )
   }
 
-  const policyTypes = [...new Set(policies.map(p => p.type))]
+  const policyTypes = [...new Set(policies.map((p) => p.type))]
   for (const policyType of policyTypes) {
     const benchmark = await marketDataProvider.getBenchmark(policyType)
     if (benchmark.trends.premiumChangeYoY > 30) {
@@ -184,12 +190,17 @@ async function generateBenchmarkRecommendationsAsync(
 
   const bestValue = benchmarks.reduce((best, current) =>
     current.marketComparison.valueRating === 'excellent' ||
-    (current.marketComparison.valueRating === 'good' && best.marketComparison.valueRating !== 'excellent')
-      ? current : best
+    (current.marketComparison.valueRating === 'good' &&
+      best.marketComparison.valueRating !== 'excellent')
+      ? current
+      : best
   )
 
-  if (bestValue.marketComparison.valueRating === 'excellent' || bestValue.marketComparison.valueRating === 'good') {
-    const valuePolicy = policies.find(p => p.id === bestValue.policyId)
+  if (
+    bestValue.marketComparison.valueRating === 'excellent' ||
+    bestValue.marketComparison.valueRating === 'good'
+  ) {
+    const valuePolicy = policies.find((p) => p.id === bestValue.policyId)
     if (valuePolicy) {
       recommendations.push(
         `💎 ${valuePolicy.provider} prim/teminat oranında "${bestValue.marketComparison.valueRating === 'excellent' ? 'mükemmel' : 'iyi'}" değer sunuyor`
@@ -211,10 +222,12 @@ function generateBenchmarkRecommendations(
 
   // Find the best positioned policy in market
   const bestPremiumPosition = benchmarks.reduce((best, current) =>
-    current.marketComparison.premiumPercentile < best.marketComparison.premiumPercentile ? current : best
+    current.marketComparison.premiumPercentile < best.marketComparison.premiumPercentile
+      ? current
+      : best
   )
 
-  const policy = policies.find(p => p.id === bestPremiumPosition.policyId)
+  const policy = policies.find((p) => p.id === bestPremiumPosition.policyId)
   if (policy && bestPremiumPosition.marketComparison.premiumPercentile < 40) {
     recommendations.push(
       `📊 Pazar analizi: ${policy.provider} piyasa ortalamasının altında prim sunuyor (${bestPremiumPosition.marketComparison.premiumPercentile}. yüzdelik)`
@@ -222,7 +235,7 @@ function generateBenchmarkRecommendations(
   }
 
   // Check for market trends
-  const policyTypes = [...new Set(policies.map(p => p.type))]
+  const policyTypes = [...new Set(policies.map((p) => p.type))]
   for (const policyType of policyTypes) {
     const benchmark = MARKET_BENCHMARKS[policyType]
     if (benchmark.trends.premiumChangeYoY > 30) {
@@ -235,12 +248,17 @@ function generateBenchmarkRecommendations(
   // Value analysis
   const bestValue = benchmarks.reduce((best, current) =>
     current.marketComparison.valueRating === 'excellent' ||
-    (current.marketComparison.valueRating === 'good' && best.marketComparison.valueRating !== 'excellent')
-      ? current : best
+    (current.marketComparison.valueRating === 'good' &&
+      best.marketComparison.valueRating !== 'excellent')
+      ? current
+      : best
   )
 
-  if (bestValue.marketComparison.valueRating === 'excellent' || bestValue.marketComparison.valueRating === 'good') {
-    const valuePolicy = policies.find(p => p.id === bestValue.policyId)
+  if (
+    bestValue.marketComparison.valueRating === 'excellent' ||
+    bestValue.marketComparison.valueRating === 'good'
+  ) {
+    const valuePolicy = policies.find((p) => p.id === bestValue.policyId)
     if (valuePolicy) {
       recommendations.push(
         `💎 ${valuePolicy.provider} prim/teminat oranında "${bestValue.marketComparison.valueRating === 'excellent' ? 'mükemmel' : 'iyi'}" değer sunuyor`
@@ -272,9 +290,10 @@ function calculateSummary(policies: AnalyzedPolicy[]): ComparisonSummary {
 
   // Find coverages in all policies
   const allCoverageNames = Array.from(coveragesByPolicy.values())
-  const sharedCoverages = allCoverageNames.reduce((shared, current) =>
-    shared.filter((name) => current.has(name))
-  , [...allCoverageNames[0]])
+  const sharedCoverages = allCoverageNames.reduce(
+    (shared, current) => shared.filter((name) => current.has(name)),
+    [...allCoverageNames[0]]
+  )
 
   // Find unique coverages per policy
   const uniqueCoverages = new Map<string, string[]>()
@@ -321,7 +340,10 @@ function calculateSummary(policies: AnalyzedPolicy[]): ComparisonSummary {
     uniqueCoverages,
     lowestPremium: { policyId: lowestPremiumPolicy.id, value: lowestPremiumPolicy.premium },
     highestCoverage: { policyId: highestCoveragePolicy.id, value: highestCoveragePolicy.coverage },
-    lowestDeductible: { policyId: lowestDeductiblePolicy.id, value: lowestDeductiblePolicy.deductible },
+    lowestDeductible: {
+      policyId: lowestDeductiblePolicy.id,
+      value: lowestDeductiblePolicy.deductible,
+    },
     bestValue: bestValuePolicy,
   }
 }
@@ -341,6 +363,7 @@ function findDifferences(policies: AnalyzedPolicy[]): ComparisonDifference[] {
     { field: 'deductible', fieldTr: 'Muafiyet' },
     { field: 'expiryDate', fieldTr: 'Bitiş Tarihi' },
     { field: 'status', fieldTr: 'Durum' },
+    { field: 'discounts', fieldTr: 'İndirimler' },
   ]
 
   for (const { field, fieldTr } of fieldsToCompare) {
@@ -388,9 +411,7 @@ function compareCoverages(policies: AnalyzedPolicy[]): ComparisonDifference[] {
     const coverageValues: { policyId: string; provider: string; value: string | number }[] = []
 
     for (const policy of policies) {
-      const coverage = policy.coverages.find(
-        (c) => normalizeCoverageName(c.name) === coverageName
-      )
+      const coverage = policy.coverages.find((c) => normalizeCoverageName(c.name) === coverageName)
 
       if (coverage) {
         coverageValues.push({
@@ -434,9 +455,7 @@ function generateRecommendations(
   // Premium difference recommendation
   if (summary.premiumRange.diffPercent > 20) {
     const cheapest = policies.find((p) => p.id === summary.lowestPremium.policyId)
-    const mostExpensive = policies.find(
-      (p) => p.premium === summary.premiumRange.max
-    )
+    const mostExpensive = policies.find((p) => p.premium === summary.premiumRange.max)
     if (cheapest && mostExpensive) {
       recommendations.push(
         `Prim farkı %${summary.premiumRange.diffPercent.toFixed(0)} - ${cheapest.provider} en düşük primle ₺${summary.lowestPremium.value.toLocaleString('tr-TR')} sunuyor.`
@@ -484,6 +503,33 @@ function generateRecommendations(
     }
   }
 
+  // Discounts recommendation
+  const policiesWithDiscounts = policies.filter(
+    (p) =>
+      p.discounts &&
+      (p.discounts.ncdDiscount || p.discounts.groupDiscount || p.discounts.otherDiscountPct)
+  )
+  if (policiesWithDiscounts.length > 0 && policiesWithDiscounts.length < policies.length) {
+    const providers = policiesWithDiscounts.map((p) => p.provider).join(', ')
+    recommendations.push(`İndirim avantajı: ${providers} poliçesinde özel indirimler bulunuyor.`)
+  } else if (policiesWithDiscounts.length > 1) {
+    const highestNcd = policiesWithDiscounts.reduce((max, p) =>
+      (p.discounts?.ncdDiscount || 0) > (max.discounts?.ncdDiscount || 0) ? p : max
+    )
+    if (highestNcd.discounts?.ncdDiscount && highestNcd.discounts.ncdDiscount > 0) {
+      const others = policiesWithDiscounts.filter(
+        (p) =>
+          p.id !== highestNcd.id &&
+          (p.discounts?.ncdDiscount || 0) < (highestNcd.discounts?.ncdDiscount || 0)
+      )
+      if (others.length > 0) {
+        recommendations.push(
+          `İndirim avantajı: ${highestNcd.provider} en yüksek hasarsızlık indirimini (%${highestNcd.discounts.ncdDiscount}) sunuyor.`
+        )
+      }
+    }
+  }
+
   // Expiring soon warning
   const expiringPolicies = policies.filter((p) => p.status === 'expiring')
   if (expiringPolicies.length > 0) {
@@ -498,7 +544,12 @@ function generateRecommendations(
 /**
  * Helper: Calculate range statistics
  */
-function calculateRange(values: number[]): { min: number; max: number; diff: number; diffPercent: number } {
+function calculateRange(values: number[]): {
+  min: number
+  max: number
+  diff: number
+  diffPercent: number
+} {
   const min = Math.min(...values)
   const max = Math.max(...values)
   const diff = max - min
@@ -524,6 +575,15 @@ function formatFieldValue(value: unknown, field: string): string | number {
     return formatCurrency(Number(value))
   }
 
+  if (field === 'discounts' && typeof value === 'object' && value !== null) {
+    const d = value as { ncdDiscount?: number; groupDiscount?: number; otherDiscountPct?: number }
+    const parts: string[] = []
+    if (d.ncdDiscount) parts.push(`NCD: %${d.ncdDiscount}`)
+    if (d.groupDiscount) parts.push(`Grup: %${d.groupDiscount}`)
+    if (d.otherDiscountPct) parts.push(`Diğer: %${d.otherDiscountPct}`)
+    return parts.length > 0 ? parts.join(', ') : 'Yok'
+  }
+
   return String(value)
 }
 
@@ -538,19 +598,25 @@ function getFieldRecommendation(
   switch (field) {
     case 'premium': {
       const lowestValue = values.reduce((min, v) =>
-        typeof v.value === 'number' && (typeof min.value !== 'number' || v.value < min.value) ? v : min
+        typeof v.value === 'number' && (typeof min.value !== 'number' || v.value < min.value)
+          ? v
+          : min
       )
       return `${lowestValue.provider} en düşük primi sunuyor`
     }
     case 'coverage': {
       const highestValue = values.reduce((max, v) =>
-        typeof v.value === 'number' && (typeof max.value !== 'number' || v.value > max.value) ? v : max
+        typeof v.value === 'number' && (typeof max.value !== 'number' || v.value > max.value)
+          ? v
+          : max
       )
       return `${highestValue.provider} en yüksek teminatı sunuyor`
     }
     case 'deductible': {
       const lowestValue = values.reduce((min, v) =>
-        typeof v.value === 'number' && (typeof min.value !== 'number' || v.value < min.value) ? v : min
+        typeof v.value === 'number' && (typeof min.value !== 'number' || v.value < min.value)
+          ? v
+          : min
       )
       return `${lowestValue.provider} en düşük muafiyeti sunuyor`
     }
@@ -558,6 +624,15 @@ function getFieldRecommendation(
       const expired = values.filter((v) => v.value === 'expired')
       if (expired.length > 0) {
         return `${expired.map((v) => v.provider).join(', ')} poliçesi süresi dolmuş`
+      }
+      return undefined
+    }
+    case 'discounts': {
+      const valuesWithDiscount = values.filter(
+        (v) => typeof v.value === 'string' && v.value !== 'Yok' && v.value !== 'N/A'
+      )
+      if (valuesWithDiscount.length > 0 && valuesWithDiscount.length < values.length) {
+        return `${valuesWithDiscount.map((v) => v.provider).join(', ')} özel indirimler sunuyor`
       }
       return undefined
     }
@@ -588,9 +663,15 @@ export function generateComparisonReport(result: PolicyComparisonResult): string
   lines.push('-'.repeat(40))
   lines.push('ÖZET')
   lines.push('-'.repeat(40))
-  lines.push(`Prim aralığı: ${formatCurrency(result.summary.premiumRange.min)} - ${formatCurrency(result.summary.premiumRange.max)}`)
-  lines.push(`Teminat aralığı: ${formatCurrency(result.summary.coverageRange.min)} - ${formatCurrency(result.summary.coverageRange.max)}`)
-  lines.push(`Muafiyet aralığı: ${formatCurrency(result.summary.deductibleRange.min)} - ${formatCurrency(result.summary.deductibleRange.max)}`)
+  lines.push(
+    `Prim aralığı: ${formatCurrency(result.summary.premiumRange.min)} - ${formatCurrency(result.summary.premiumRange.max)}`
+  )
+  lines.push(
+    `Teminat aralığı: ${formatCurrency(result.summary.coverageRange.min)} - ${formatCurrency(result.summary.coverageRange.max)}`
+  )
+  lines.push(
+    `Muafiyet aralığı: ${formatCurrency(result.summary.deductibleRange.min)} - ${formatCurrency(result.summary.deductibleRange.max)}`
+  )
   lines.push('')
 
   // Market Benchmarks section
@@ -601,7 +682,9 @@ export function generateComparisonReport(result: PolicyComparisonResult): string
     for (const benchmark of result.marketBenchmarks) {
       const mc = benchmark.marketComparison
       lines.push(`${benchmark.provider}:`)
-      lines.push(`  Prim: ${formatCurrency(mc.userPremium)} (piyasa ort: ${formatCurrency(mc.marketAverage)})`)
+      lines.push(
+        `  Prim: ${formatCurrency(mc.userPremium)} (piyasa ort: ${formatCurrency(mc.marketAverage)})`
+      )
       lines.push(`  Piyasa konumu: ${mc.premiumPercentile}. yüzdelik dilim`)
       lines.push(`  Değer notu: ${translateValueRating(mc.valueRating)}`)
       lines.push('')

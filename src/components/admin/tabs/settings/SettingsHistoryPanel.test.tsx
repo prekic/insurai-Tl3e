@@ -85,6 +85,7 @@ describe('SettingsHistoryPanel', () => {
 
   describe('Error State', () => {
     it('should show error state when fetch fails', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       mockAdminFetch.mockRejectedValue(new Error('Network error'))
 
       render(<SettingsHistoryPanel />)
@@ -95,9 +96,11 @@ describe('SettingsHistoryPanel', () => {
 
       expect(screen.getByText(/Network error/i)).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument()
+      consoleSpy.mockRestore()
     })
 
     it('should retry fetch when retry button is clicked', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       mockAdminFetch.mockRejectedValueOnce(new Error('Network error')).mockResolvedValueOnce({
         json: () => Promise.resolve(createMockResponse(createMockHistory(3), 3)),
       })
@@ -116,6 +119,7 @@ describe('SettingsHistoryPanel', () => {
       })
 
       expect(mockAdminFetch).toHaveBeenCalledTimes(2)
+      consoleSpy.mockRestore()
     })
 
     it('should show error when API returns success: false', async () => {

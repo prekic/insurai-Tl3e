@@ -15,7 +15,23 @@ import { EN_TRANSLATIONS } from '@/lib/i18n/translations-en'
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
-  return { ...actual, useNavigate: () => mockNavigate, Link: ({ to, children, ...props }: { to: string; children: React.ReactNode; className?: string }) => <a href={to} {...props}>{children}</a> }
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+    Link: ({
+      to,
+      children,
+      ...props
+    }: {
+      to: string
+      children: React.ReactNode
+      className?: string
+    }) => (
+      <a href={to} {...props}>
+        {children}
+      </a>
+    ),
+  }
 })
 
 // Mock i18n
@@ -26,8 +42,20 @@ vi.mock('@/lib/i18n/i18n-context', () => ({
   useLanguageSelector: () => ({
     currentLocale: 'en',
     locales: [
-      { code: 'en', name: 'English', nativeName: 'English', flag: '\u{1F1EC}\u{1F1E7}', isActive: true },
-      { code: 'tr', name: 'Turkish', nativeName: 'T\u00FCrk\u00E7e', flag: '\u{1F1F9}\u{1F1F7}', isActive: false },
+      {
+        code: 'en',
+        name: 'English',
+        nativeName: 'English',
+        flag: '\u{1F1EC}\u{1F1E7}',
+        isActive: true,
+      },
+      {
+        code: 'tr',
+        name: 'Turkish',
+        nativeName: 'T\u00FCrk\u00E7e',
+        flag: '\u{1F1F9}\u{1F1F7}',
+        isActive: false,
+      },
     ],
     setLocale: mockSetLocale,
     isLoading: false,
@@ -61,7 +89,9 @@ vi.mock('sonner', () => ({
 // Mock sub-components
 vi.mock('./UploadWidget', () => ({
   UploadWidget: ({ compact, buttonText }: { compact?: boolean; buttonText?: string }) => (
-    <div data-testid="upload-widget" data-compact={compact}>{buttonText || 'Upload'}</div>
+    <div data-testid="upload-widget" data-compact={compact}>
+      {buttonText || 'Upload'}
+    </div>
   ),
 }))
 
@@ -75,8 +105,22 @@ vi.mock('./SampleReportPreview', () => ({
 }))
 
 vi.mock('../animations/AnimatedComponents', () => ({
-  StaggeredList: ({ children }: { children: React.ReactNode[] }) => <div data-testid="staggered-list">{children}</div>,
-  AnimatedButton: ({ children, onClick, className }: { children: React.ReactNode; onClick?: () => void; className?: string }) => <button onClick={onClick} className={className}>{children}</button>,
+  StaggeredList: ({ children }: { children: React.ReactNode[] }) => (
+    <div data-testid="staggered-list">{children}</div>
+  ),
+  AnimatedButton: ({
+    children,
+    onClick,
+    className,
+  }: {
+    children: React.ReactNode
+    onClick?: () => void
+    className?: string
+  }) => (
+    <button onClick={onClick} className={className}>
+      {children}
+    </button>
+  ),
   ScaleOnHover: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
 
@@ -276,6 +320,7 @@ describe('Hero', () => {
     })
 
     it('shows error toast on sign out failure', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       mockSignOut.mockRejectedValue(new Error('Sign out failed'))
       renderHero()
       fireEvent.click(screen.getByText('JD'))
@@ -284,6 +329,7 @@ describe('Hero', () => {
       })
       const { toast } = await import('sonner')
       expect(toast.error).toHaveBeenCalledWith(EN_TRANSLATIONS.landing.signOutFailed)
+      consoleSpy.mockRestore()
     })
 
     it('closes profile menu when backdrop is clicked', () => {
@@ -327,7 +373,10 @@ describe('Hero', () => {
     })
 
     it('shows 9+ when policies > 9', () => {
-      mockPolicies = Array.from({ length: 12 }, (_, i) => ({ id: String(i), policyNumber: `P${i}` }))
+      mockPolicies = Array.from({ length: 12 }, (_, i) => ({
+        id: String(i),
+        policyNumber: `P${i}`,
+      }))
       renderHero()
       expect(screen.getByText('9+')).toBeInTheDocument()
     })
@@ -490,7 +539,10 @@ describe('Hero', () => {
       const file = new File(['test'], 'policy.pdf', { type: 'application/pdf' })
       Object.defineProperty(fileInput, 'files', { value: [file] })
       fireEvent.change(fileInput)
-      expect(mockNavigate).toHaveBeenCalledWith('/upload', expect.objectContaining({ state: expect.any(Object) }))
+      expect(mockNavigate).toHaveBeenCalledWith(
+        '/upload',
+        expect.objectContaining({ state: expect.any(Object) })
+      )
     })
 
     it('navigates anonymous user to /try when file selected', () => {
@@ -500,7 +552,10 @@ describe('Hero', () => {
       const file = new File(['test'], 'policy.pdf', { type: 'application/pdf' })
       Object.defineProperty(fileInput, 'files', { value: [file] })
       fireEvent.change(fileInput)
-      expect(mockNavigate).toHaveBeenCalledWith('/try', expect.objectContaining({ state: expect.any(Object) }))
+      expect(mockNavigate).toHaveBeenCalledWith(
+        '/try',
+        expect.objectContaining({ state: expect.any(Object) })
+      )
     })
 
     it('does nothing when no files selected', () => {

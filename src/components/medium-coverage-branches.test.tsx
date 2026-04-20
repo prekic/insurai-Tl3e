@@ -68,6 +68,9 @@ vi.mock('@/lib/i18n', () => ({
     isLoading: false,
     isRTL: false,
   }),
+  useTranslation: () => ({
+    t: EN_TRANSLATIONS,
+  }),
   useLanguageSelector: () => ({
     currentLocale: 'en',
     locales: [

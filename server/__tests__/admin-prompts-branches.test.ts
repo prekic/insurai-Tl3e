@@ -109,7 +109,10 @@ vi.mock('../lib/logger.js', () => {
 
 vi.mock('../routes/admin/shared.js', () => ({
   authenticateAdmin: (...args: unknown[]) => mockAuthenticateAdmin(...args),
-  requireRole: (..._args: unknown[]) => (...args: unknown[]) => mockRequireRole(...args),
+  requireRole:
+    (..._args: unknown[]) =>
+    (...args: unknown[]) =>
+      mockRequireRole(...args),
   requireSuperAdmin: () => [
     (...args: unknown[]) => mockAuthenticateAdmin(...args),
     (...args: unknown[]) => mockRequireSuperAdmin(...args),
@@ -117,6 +120,7 @@ vi.mock('../routes/admin/shared.js', () => ({
   logAdminAction: (...args: unknown[]) => mockLogAdminAction(...args),
   auditLogs: [] as unknown[],
   requestCounters: { auditLogId: 0 },
+  MAX_ENTRIES: 1000,
   qstr: (val: string | string[] | undefined) => {
     if (Array.isArray(val)) return val[0] ?? ''
     return val ?? ''
@@ -221,18 +225,12 @@ const SAMPLE_AB_TEST = {
 
 function setupDefaultMocks() {
   // Middleware: pass through by default
-  mockAuthenticateAdmin.mockImplementation(
-    (req: any, _res: any, next: () => void) => {
-      req.adminUser = { ...ADMIN_USER }
-      next()
-    }
-  )
-  mockRequireRole.mockImplementation(
-    (_req: any, _res: any, next: () => void) => next()
-  )
-  mockRequireSuperAdmin.mockImplementation(
-    (_req: any, _res: any, next: () => void) => next()
-  )
+  mockAuthenticateAdmin.mockImplementation((req: any, _res: any, next: () => void) => {
+    req.adminUser = { ...ADMIN_USER }
+    next()
+  })
+  mockRequireRole.mockImplementation((_req: any, _res: any, next: () => void) => next())
+  mockRequireSuperAdmin.mockImplementation((_req: any, _res: any, next: () => void) => next())
   mockLogAdminAction.mockResolvedValue(undefined)
 
   // promptService defaults
@@ -408,58 +406,44 @@ describe('Admin Prompts Routes Branch Coverage', () => {
 
     it('returns 404 when previous template not found', async () => {
       mockGetPromptById.mockResolvedValue(null)
-      const res = await request(app)
-        .put('/api/admin/prompts/nonexistent')
-        .send({ name: 'Updated' })
+      const res = await request(app).put('/api/admin/prompts/nonexistent').send({ name: 'Updated' })
       expect(res.status).toBe(404)
       expect(res.body.error).toBe('Template not found')
     })
 
     it('returns 500 when updatePrompt returns null', async () => {
       mockUpdatePrompt.mockResolvedValue(null)
-      const res = await request(app)
-        .put('/api/admin/prompts/tpl-001')
-        .send({ name: 'Updated' })
+      const res = await request(app).put('/api/admin/prompts/tpl-001').send({ name: 'Updated' })
       expect(res.status).toBe(500)
       expect(res.body.error).toBe('Failed to update template')
     })
 
     it('creates audit log with adminUser id/email', async () => {
-      const res = await request(app)
-        .put('/api/admin/prompts/tpl-001')
-        .send({ name: 'Updated' })
+      const res = await request(app).put('/api/admin/prompts/tpl-001').send({ name: 'Updated' })
       expect(res.status).toBe(200)
       expect(mockLogAdminAction).toHaveBeenCalled()
     })
 
     it('uses "unknown" for audit when adminUser is missing', async () => {
-      mockAuthenticateAdmin.mockImplementation(
-        (req: any, _res: any, next: () => void) => {
-          req.adminUser = undefined
-          next()
-        }
-      )
-      const res = await request(app)
-        .put('/api/admin/prompts/tpl-001')
-        .send({ name: 'Updated' })
+      mockAuthenticateAdmin.mockImplementation((req: any, _res: any, next: () => void) => {
+        req.adminUser = undefined
+        next()
+      })
+      const res = await request(app).put('/api/admin/prompts/tpl-001').send({ name: 'Updated' })
       // Still succeeds, audit log should use 'unknown'
       expect(res.status).toBe(200)
     })
 
     it('returns 500 on error', async () => {
       mockGetPromptById.mockRejectedValue(new Error('DB error'))
-      const res = await request(app)
-        .put('/api/admin/prompts/tpl-001')
-        .send({ name: 'Updated' })
+      const res = await request(app).put('/api/admin/prompts/tpl-001').send({ name: 'Updated' })
       expect(res.status).toBe(500)
       expect(res.body.error).toBe('Failed to update prompt')
     })
 
     it('handles non-Error in catch', async () => {
       mockGetPromptById.mockRejectedValue('string error')
-      const res = await request(app)
-        .put('/api/admin/prompts/tpl-001')
-        .send({ name: 'Updated' })
+      const res = await request(app).put('/api/admin/prompts/tpl-001').send({ name: 'Updated' })
       expect(res.status).toBe(500)
     })
   })
@@ -476,9 +460,7 @@ describe('Admin Prompts Routes Branch Coverage', () => {
     }
 
     it('creates prompt with all required fields', async () => {
-      const res = await request(app)
-        .post('/api/admin/prompts')
-        .send(validBody)
+      const res = await request(app).post('/api/admin/prompts').send(validBody)
       expect(res.status).toBe(200)
       expect(res.body.success).toBe(true)
       expect(mockCreatePrompt).toHaveBeenCalled()
@@ -508,23 +490,15 @@ describe('Admin Prompts Routes Branch Coverage', () => {
     })
 
     it('uses empty string for description when not provided', async () => {
-      const res = await request(app)
-        .post('/api/admin/prompts')
-        .send(validBody)
+      const res = await request(app).post('/api/admin/prompts').send(validBody)
       expect(res.status).toBe(200)
-      expect(mockCreatePrompt).toHaveBeenCalledWith(
-        expect.objectContaining({ description: '' })
-      )
+      expect(mockCreatePrompt).toHaveBeenCalledWith(expect.objectContaining({ description: '' }))
     })
 
     it('uses empty array for variables when not provided', async () => {
-      const res = await request(app)
-        .post('/api/admin/prompts')
-        .send(validBody)
+      const res = await request(app).post('/api/admin/prompts').send(validBody)
       expect(res.status).toBe(200)
-      expect(mockCreatePrompt).toHaveBeenCalledWith(
-        expect.objectContaining({ variables: [] })
-      )
+      expect(mockCreatePrompt).toHaveBeenCalledWith(expect.objectContaining({ variables: [] }))
     })
 
     it('returns 400 when name is missing', async () => {
@@ -558,40 +532,30 @@ describe('Admin Prompts Routes Branch Coverage', () => {
 
     it('returns 500 when createPrompt returns null', async () => {
       mockCreatePrompt.mockResolvedValue(null)
-      const res = await request(app)
-        .post('/api/admin/prompts')
-        .send(validBody)
+      const res = await request(app).post('/api/admin/prompts').send(validBody)
       expect(res.status).toBe(500)
       expect(res.body.error).toBe('Failed to create template')
     })
 
     it('audit log uses "unknown" when adminUser is missing', async () => {
-      mockAuthenticateAdmin.mockImplementation(
-        (req: any, _res: any, next: () => void) => {
-          req.adminUser = undefined
-          next()
-        }
-      )
-      const res = await request(app)
-        .post('/api/admin/prompts')
-        .send(validBody)
+      mockAuthenticateAdmin.mockImplementation((req: any, _res: any, next: () => void) => {
+        req.adminUser = undefined
+        next()
+      })
+      const res = await request(app).post('/api/admin/prompts').send(validBody)
       expect(res.status).toBe(200)
     })
 
     it('returns 500 on error', async () => {
       mockCreatePrompt.mockRejectedValue(new Error('DB error'))
-      const res = await request(app)
-        .post('/api/admin/prompts')
-        .send(validBody)
+      const res = await request(app).post('/api/admin/prompts').send(validBody)
       expect(res.status).toBe(500)
       expect(res.body.error).toBe('Failed to create prompt')
     })
 
     it('handles non-Error in catch', async () => {
       mockCreatePrompt.mockRejectedValue({ code: 'UNIQUE' })
-      const res = await request(app)
-        .post('/api/admin/prompts')
-        .send(validBody)
+      const res = await request(app).post('/api/admin/prompts').send(validBody)
       expect(res.status).toBe(500)
     })
   })
@@ -642,9 +606,7 @@ describe('Admin Prompts Routes Branch Coverage', () => {
     }
 
     it('creates template with all required fields', async () => {
-      const res = await request(app)
-        .post('/api/admin/prompts/templates')
-        .send(validBody)
+      const res = await request(app).post('/api/admin/prompts/templates').send(validBody)
       expect(res.status).toBe(200)
       expect(res.body.success).toBe(true)
       expect(mockCreateTemplate).toHaveBeenCalled()
@@ -652,9 +614,7 @@ describe('Admin Prompts Routes Branch Coverage', () => {
     })
 
     it('passes optional description and isDefault with defaults', async () => {
-      const res = await request(app)
-        .post('/api/admin/prompts/templates')
-        .send(validBody)
+      const res = await request(app).post('/api/admin/prompts/templates').send(validBody)
       expect(res.status).toBe(200)
       expect(mockCreateTemplate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -678,9 +638,7 @@ describe('Admin Prompts Routes Branch Coverage', () => {
     })
 
     it('passes createdBy from adminUser email', async () => {
-      const res = await request(app)
-        .post('/api/admin/prompts/templates')
-        .send(validBody)
+      const res = await request(app).post('/api/admin/prompts/templates').send(validBody)
       expect(res.status).toBe(200)
       expect(mockCreateTemplate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -690,15 +648,11 @@ describe('Admin Prompts Routes Branch Coverage', () => {
     })
 
     it('passes undefined createdBy when adminUser is missing', async () => {
-      mockAuthenticateAdmin.mockImplementation(
-        (req: any, _res: any, next: () => void) => {
-          req.adminUser = undefined
-          next()
-        }
-      )
-      const res = await request(app)
-        .post('/api/admin/prompts/templates')
-        .send(validBody)
+      mockAuthenticateAdmin.mockImplementation((req: any, _res: any, next: () => void) => {
+        req.adminUser = undefined
+        next()
+      })
+      const res = await request(app).post('/api/admin/prompts/templates').send(validBody)
       expect(res.status).toBe(200)
       expect(mockCreateTemplate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -738,18 +692,14 @@ describe('Admin Prompts Routes Branch Coverage', () => {
 
     it('returns 500 on error', async () => {
       mockCreateTemplate.mockRejectedValue(new Error('DB error'))
-      const res = await request(app)
-        .post('/api/admin/prompts/templates')
-        .send(validBody)
+      const res = await request(app).post('/api/admin/prompts/templates').send(validBody)
       expect(res.status).toBe(500)
       expect(res.body.error).toBe('Failed to create template')
     })
 
     it('handles non-Error in catch', async () => {
       mockCreateTemplate.mockRejectedValue(undefined)
-      const res = await request(app)
-        .post('/api/admin/prompts/templates')
-        .send(validBody)
+      const res = await request(app).post('/api/admin/prompts/templates').send(validBody)
       expect(res.status).toBe(500)
     })
   })
@@ -786,12 +736,10 @@ describe('Admin Prompts Routes Branch Coverage', () => {
     })
 
     it('passes undefined email when adminUser is missing', async () => {
-      mockAuthenticateAdmin.mockImplementation(
-        (req: any, _res: any, next: () => void) => {
-          req.adminUser = undefined
-          next()
-        }
-      )
+      mockAuthenticateAdmin.mockImplementation((req: any, _res: any, next: () => void) => {
+        req.adminUser = undefined
+        next()
+      })
       const res = await request(app)
         .put('/api/admin/prompts/templates/tpl-001')
         .send({ name: 'Updated' })
@@ -952,8 +900,7 @@ describe('Admin Prompts Routes Branch Coverage', () => {
   // ===========================================================================
   describe('POST /prompts/templates/:templateId/rollback/:versionId', () => {
     it('rolls back successfully', async () => {
-      const res = await request(app)
-        .post('/api/admin/prompts/templates/tpl-001/rollback/ver-001')
+      const res = await request(app).post('/api/admin/prompts/templates/tpl-001/rollback/ver-001')
       expect(res.status).toBe(200)
       expect(res.body.success).toBe(true)
       expect(mockRollbackToVersion).toHaveBeenCalledWith('tpl-001', 'ver-001', 'admin@test.com')
@@ -961,38 +908,32 @@ describe('Admin Prompts Routes Branch Coverage', () => {
     })
 
     it('passes undefined email when adminUser is missing', async () => {
-      mockAuthenticateAdmin.mockImplementation(
-        (req: any, _res: any, next: () => void) => {
-          req.adminUser = undefined
-          next()
-        }
-      )
-      const res = await request(app)
-        .post('/api/admin/prompts/templates/tpl-001/rollback/ver-001')
+      mockAuthenticateAdmin.mockImplementation((req: any, _res: any, next: () => void) => {
+        req.adminUser = undefined
+        next()
+      })
+      const res = await request(app).post('/api/admin/prompts/templates/tpl-001/rollback/ver-001')
       expect(res.status).toBe(200)
       expect(mockRollbackToVersion).toHaveBeenCalledWith('tpl-001', 'ver-001', undefined)
     })
 
     it('returns 404 when rollback returns null', async () => {
       mockRollbackToVersion.mockResolvedValue(null)
-      const res = await request(app)
-        .post('/api/admin/prompts/templates/tpl-001/rollback/ver-001')
+      const res = await request(app).post('/api/admin/prompts/templates/tpl-001/rollback/ver-001')
       expect(res.status).toBe(404)
       expect(res.body.error).toBe('Template or version not found')
     })
 
     it('returns 500 on error', async () => {
       mockRollbackToVersion.mockRejectedValue(new Error('DB error'))
-      const res = await request(app)
-        .post('/api/admin/prompts/templates/tpl-001/rollback/ver-001')
+      const res = await request(app).post('/api/admin/prompts/templates/tpl-001/rollback/ver-001')
       expect(res.status).toBe(500)
       expect(res.body.error).toBe('Failed to rollback')
     })
 
     it('handles non-Error in catch', async () => {
       mockRollbackToVersion.mockRejectedValue(42)
-      const res = await request(app)
-        .post('/api/admin/prompts/templates/tpl-001/rollback/ver-001')
+      const res = await request(app).post('/api/admin/prompts/templates/tpl-001/rollback/ver-001')
       expect(res.status).toBe(500)
     })
   })
@@ -1007,7 +948,9 @@ describe('Admin Prompts Routes Branch Coverage', () => {
     it('is caught by GET /prompts/versions/:id with id="compare"', async () => {
       // Since versions/:id is defined first, id='compare' is passed to getVersion
       mockGetVersion.mockResolvedValue(null)
-      const res = await request(app).get('/api/admin/prompts/versions/compare?versionA=a&versionB=b')
+      const res = await request(app).get(
+        '/api/admin/prompts/versions/compare?versionA=a&versionB=b'
+      )
       // The versions/:id handler runs and returns 404 since there's no version with id='compare'
       expect(res.status).toBe(404)
       expect(res.body.error).toBe('Version not found')
@@ -1023,9 +966,7 @@ describe('Admin Prompts Routes Branch Coverage', () => {
       const controlVersion = { ...SAMPLE_VERSION, id: 'ver-001' }
       const treatmentVersion = { ...SAMPLE_VERSION, id: 'ver-002' }
       mockGetABTest.mockResolvedValue(SAMPLE_AB_TEST)
-      mockGetVersion
-        .mockResolvedValueOnce(controlVersion)
-        .mockResolvedValueOnce(treatmentVersion)
+      mockGetVersion.mockResolvedValueOnce(controlVersion).mockResolvedValueOnce(treatmentVersion)
 
       const res = await request(app).get('/api/admin/prompts/ab-tests/ab-001')
       expect(res.status).toBe(200)
@@ -1043,7 +984,7 @@ describe('Admin Prompts Routes Branch Coverage', () => {
       mockGetVersion
         .mockResolvedValueOnce({ ...SAMPLE_VERSION, id: 'ver-ctrl' }) // control
         .mockResolvedValueOnce({ ...SAMPLE_VERSION, id: 'ver-002' }) // treatment 1
-        .mockResolvedValueOnce(null)                                 // treatment 2 not found
+        .mockResolvedValueOnce(null) // treatment 2 not found
 
       const res = await request(app).get('/api/admin/prompts/ab-tests/ab-001')
       expect(res.status).toBe(200)
@@ -1058,7 +999,7 @@ describe('Admin Prompts Routes Branch Coverage', () => {
       })
       mockGetVersion
         .mockResolvedValueOnce({ ...SAMPLE_VERSION, id: 'ver-ctrl' }) // control
-        .mockResolvedValueOnce(null)                                   // treatment not found
+        .mockResolvedValueOnce(null) // treatment not found
 
       const res = await request(app).get('/api/admin/prompts/ab-tests/ab-001')
       expect(res.status).toBe(200)
@@ -1099,9 +1040,7 @@ describe('Admin Prompts Routes Branch Coverage', () => {
     }
 
     it('creates AB test with required fields', async () => {
-      const res = await request(app)
-        .post('/api/admin/prompts/ab-tests')
-        .send(validBody)
+      const res = await request(app).post('/api/admin/prompts/ab-tests').send(validBody)
       expect(res.status).toBe(200)
       expect(res.body.success).toBe(true)
       expect(mockCreateABTest).toHaveBeenCalled()
@@ -1109,9 +1048,7 @@ describe('Admin Prompts Routes Branch Coverage', () => {
     })
 
     it('passes optional fields with defaults', async () => {
-      const res = await request(app)
-        .post('/api/admin/prompts/ab-tests')
-        .send(validBody)
+      const res = await request(app).post('/api/admin/prompts/ab-tests').send(validBody)
       expect(res.status).toBe(200)
       expect(mockCreateABTest).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1143,9 +1080,7 @@ describe('Admin Prompts Routes Branch Coverage', () => {
     })
 
     it('passes createdBy from adminUser', async () => {
-      const res = await request(app)
-        .post('/api/admin/prompts/ab-tests')
-        .send(validBody)
+      const res = await request(app).post('/api/admin/prompts/ab-tests').send(validBody)
       expect(res.status).toBe(200)
       expect(mockCreateABTest).toHaveBeenCalledWith(
         expect.objectContaining({ createdBy: 'admin@test.com' })
@@ -1153,15 +1088,11 @@ describe('Admin Prompts Routes Branch Coverage', () => {
     })
 
     it('passes undefined createdBy when adminUser is missing', async () => {
-      mockAuthenticateAdmin.mockImplementation(
-        (req: any, _res: any, next: () => void) => {
-          req.adminUser = undefined
-          next()
-        }
-      )
-      const res = await request(app)
-        .post('/api/admin/prompts/ab-tests')
-        .send(validBody)
+      mockAuthenticateAdmin.mockImplementation((req: any, _res: any, next: () => void) => {
+        req.adminUser = undefined
+        next()
+      })
+      const res = await request(app).post('/api/admin/prompts/ab-tests').send(validBody)
       expect(res.status).toBe(200)
       expect(mockCreateABTest).toHaveBeenCalledWith(
         expect.objectContaining({ createdBy: undefined })
@@ -1239,18 +1170,14 @@ describe('Admin Prompts Routes Branch Coverage', () => {
 
     it('returns 500 on error', async () => {
       mockCreateABTest.mockRejectedValue(new Error('DB error'))
-      const res = await request(app)
-        .post('/api/admin/prompts/ab-tests')
-        .send(validBody)
+      const res = await request(app).post('/api/admin/prompts/ab-tests').send(validBody)
       expect(res.status).toBe(500)
       expect(res.body.error).toBe('Failed to create A/B test')
     })
 
     it('handles non-Error in catch', async () => {
       mockCreateABTest.mockRejectedValue(false)
-      const res = await request(app)
-        .post('/api/admin/prompts/ab-tests')
-        .send(validBody)
+      const res = await request(app).post('/api/admin/prompts/ab-tests').send(validBody)
       expect(res.status).toBe(500)
     })
   })
@@ -1298,9 +1225,7 @@ describe('Admin Prompts Routes Branch Coverage', () => {
     })
 
     it('returns 400 when status is missing', async () => {
-      const res = await request(app)
-        .put('/api/admin/prompts/ab-tests/ab-001/status')
-        .send({})
+      const res = await request(app).put('/api/admin/prompts/ab-tests/ab-001/status').send({})
       expect(res.status).toBe(400)
       expect(res.body.error).toContain('Valid status is required')
     })
@@ -1404,8 +1329,7 @@ describe('Admin Prompts Routes Branch Coverage', () => {
       mockUpdateTemplate.mockResolvedValue({ ...SAMPLE_TEMPLATE })
       mockUpdateABTestStatus.mockResolvedValue({ ...testWithWinner, status: 'completed' })
 
-      const res = await request(app)
-        .post('/api/admin/prompts/ab-tests/ab-001/apply-winner')
+      const res = await request(app).post('/api/admin/prompts/ab-tests/ab-001/apply-winner')
       expect(res.status).toBe(200)
       expect(res.body.success).toBe(true)
       expect(mockUpdateTemplate).toHaveBeenCalledWith(
@@ -1420,16 +1344,14 @@ describe('Admin Prompts Routes Branch Coverage', () => {
 
     it('returns 404 when test not found', async () => {
       mockGetABTest.mockResolvedValue(null)
-      const res = await request(app)
-        .post('/api/admin/prompts/ab-tests/ab-001/apply-winner')
+      const res = await request(app).post('/api/admin/prompts/ab-tests/ab-001/apply-winner')
       expect(res.status).toBe(404)
       expect(res.body.error).toBe('A/B test not found')
     })
 
     it('returns 400 when results is undefined', async () => {
       mockGetABTest.mockResolvedValue({ ...SAMPLE_AB_TEST, results: undefined })
-      const res = await request(app)
-        .post('/api/admin/prompts/ab-tests/ab-001/apply-winner')
+      const res = await request(app).post('/api/admin/prompts/ab-tests/ab-001/apply-winner')
       expect(res.status).toBe(400)
       expect(res.body.error).toBe('No winner determined yet')
     })
@@ -1439,8 +1361,7 @@ describe('Admin Prompts Routes Branch Coverage', () => {
         ...SAMPLE_AB_TEST,
         results: { totalSamples: 50, byVersion: {}, statisticallySignificant: false },
       })
-      const res = await request(app)
-        .post('/api/admin/prompts/ab-tests/ab-001/apply-winner')
+      const res = await request(app).post('/api/admin/prompts/ab-tests/ab-001/apply-winner')
       expect(res.status).toBe(400)
       expect(res.body.error).toBe('No winner determined yet')
     })
@@ -1457,19 +1378,16 @@ describe('Admin Prompts Routes Branch Coverage', () => {
       })
       mockGetVersion.mockResolvedValue(null)
 
-      const res = await request(app)
-        .post('/api/admin/prompts/ab-tests/ab-001/apply-winner')
+      const res = await request(app).post('/api/admin/prompts/ab-tests/ab-001/apply-winner')
       expect(res.status).toBe(404)
       expect(res.body.error).toBe('Winning version not found')
     })
 
     it('passes undefined email when adminUser is missing', async () => {
-      mockAuthenticateAdmin.mockImplementation(
-        (req: any, _res: any, next: () => void) => {
-          req.adminUser = undefined
-          next()
-        }
-      )
+      mockAuthenticateAdmin.mockImplementation((req: any, _res: any, next: () => void) => {
+        req.adminUser = undefined
+        next()
+      })
       mockGetABTest.mockResolvedValue({
         ...SAMPLE_AB_TEST,
         results: {
@@ -1481,8 +1399,7 @@ describe('Admin Prompts Routes Branch Coverage', () => {
       })
       mockGetVersion.mockResolvedValue(SAMPLE_VERSION)
 
-      const res = await request(app)
-        .post('/api/admin/prompts/ab-tests/ab-001/apply-winner')
+      const res = await request(app).post('/api/admin/prompts/ab-tests/ab-001/apply-winner')
       expect(res.status).toBe(200)
       expect(mockUpdateTemplate).toHaveBeenCalledWith(
         expect.anything(),
@@ -1494,16 +1411,14 @@ describe('Admin Prompts Routes Branch Coverage', () => {
 
     it('returns 500 on error', async () => {
       mockGetABTest.mockRejectedValue(new Error('DB error'))
-      const res = await request(app)
-        .post('/api/admin/prompts/ab-tests/ab-001/apply-winner')
+      const res = await request(app).post('/api/admin/prompts/ab-tests/ab-001/apply-winner')
       expect(res.status).toBe(500)
       expect(res.body.error).toBe('Failed to apply winner')
     })
 
     it('handles non-Error in catch', async () => {
       mockGetABTest.mockRejectedValue('err')
-      const res = await request(app)
-        .post('/api/admin/prompts/ab-tests/ab-001/apply-winner')
+      const res = await request(app).post('/api/admin/prompts/ab-tests/ab-001/apply-winner')
       expect(res.status).toBe(500)
     })
   })
@@ -1557,10 +1472,7 @@ describe('Admin Prompts Routes Branch Coverage', () => {
         .post('/api/admin/prompts/preview')
         .send({ versionId: 'ver-001' })
       expect(res.status).toBe(200)
-      expect(mockRenderPrompt).toHaveBeenCalledWith(
-        SAMPLE_VERSION.systemPrompt,
-        {}
-      )
+      expect(mockRenderPrompt).toHaveBeenCalledWith(SAMPLE_VERSION.systemPrompt, {})
     })
 
     it('returns missingVariables for unset variables', async () => {
@@ -1614,17 +1526,13 @@ describe('Admin Prompts Routes Branch Coverage', () => {
     })
 
     it('returns 400 when neither templateId nor versionId provided', async () => {
-      const res = await request(app)
-        .post('/api/admin/prompts/preview')
-        .send({ variables: {} })
+      const res = await request(app).post('/api/admin/prompts/preview').send({ variables: {} })
       expect(res.status).toBe(400)
       expect(res.body.error).toBe('templateId or versionId is required')
     })
 
     it('returns 400 with empty body', async () => {
-      const res = await request(app)
-        .post('/api/admin/prompts/preview')
-        .send({})
+      const res = await request(app).post('/api/admin/prompts/preview').send({})
       expect(res.status).toBe(400)
     })
 
@@ -1678,9 +1586,7 @@ describe('Admin Prompts Routes Branch Coverage', () => {
     })
 
     it('returns 400 when template is missing', async () => {
-      const res = await request(app)
-        .post('/api/admin/prompts/extract-variables')
-        .send({})
+      const res = await request(app).post('/api/admin/prompts/extract-variables').send({})
       expect(res.status).toBe(400)
       expect(res.body.error).toBe('template is required')
     })
@@ -1700,7 +1606,9 @@ describe('Admin Prompts Routes Branch Coverage', () => {
     })
 
     it('returns 500 on error (Error thrown)', async () => {
-      mockExtractVariables.mockImplementation(() => { throw new Error('Parse error') })
+      mockExtractVariables.mockImplementation(() => {
+        throw new Error('Parse error')
+      })
       const res = await request(app)
         .post('/api/admin/prompts/extract-variables')
         .send({ template: 'test {{var}}' })
@@ -1709,7 +1617,9 @@ describe('Admin Prompts Routes Branch Coverage', () => {
     })
 
     it('handles non-Error thrown in catch', async () => {
-      mockExtractVariables.mockImplementation(() => { throw 'string error' })
+      mockExtractVariables.mockImplementation(() => {
+        throw 'string error'
+      })
       const res = await request(app)
         .post('/api/admin/prompts/extract-variables')
         .send({ template: 'test' })
@@ -1735,9 +1645,7 @@ describe('Admin Prompts Routes Branch Coverage', () => {
 
     it('logs String(error) when number is thrown', async () => {
       mockGetPromptById.mockRejectedValue(404)
-      const res = await request(app)
-        .put('/api/admin/prompts/tpl-001')
-        .send({ name: 'test' })
+      const res = await request(app).put('/api/admin/prompts/tpl-001').send({ name: 'test' })
       expect(res.status).toBe(500)
     })
 
@@ -1756,9 +1664,7 @@ describe('Admin Prompts Routes Branch Coverage', () => {
         treatmentVersionIds: ['ver-002'],
         trafficAllocation: { 'ver-001': 50, 'ver-002': 50 },
       }
-      const res = await request(app)
-        .post('/api/admin/prompts/ab-tests')
-        .send(validBody)
+      const res = await request(app).post('/api/admin/prompts/ab-tests').send(validBody)
       expect(res.status).toBe(500)
     })
   })

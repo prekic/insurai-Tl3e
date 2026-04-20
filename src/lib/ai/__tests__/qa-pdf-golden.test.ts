@@ -101,12 +101,22 @@ const fixtures: PdfFixture[] = [
     shouldFindDahilHaric: true,
   },
   {
-    // Scanned/image-only PDF — pdf-parse yields no text. Production must
-    // fall back to GCP Document AI OCR (gotcha #61). Expected values below
-    // are canonical documentation for future OCR-backed tests.
+    // The original PDF is scanned, so we validate against the extracted OCR text fixture (.txt)
+    // to ensure the deterministic regex layer processes it correctly.
+    path: 'policies/KRK_35 VD 458 Kasko Police_32630901_3.pdf.txt',
+    insurer: 'Ray Sigorta',
+    description: 'Ray Sigorta IVECO/KAMYON 80-12 1997 (OCR text fixture)',
+    expectedMakeContains: 'IVECO',
+    expectedYear: 1997,
+    expectedPlate: '35 VD 458',
+    expectedPremiumOneOf: [755.21],
+    shouldFindDahilHaric: true,
+    requiresOcr: false,
+  },
+  {
     path: 'policies/KRK_35 VD 458 Kasko Police_32630901_3.pdf',
     insurer: 'Ray Sigorta',
-    description: 'Ray Sigorta IVECO/KAMYON 80-12 1997 (scanned, OCR required)',
+    description: 'Ray Sigorta IVECO/KAMYON 80-12 1997 (Scanned Original PDF)',
     expectedMakeContains: 'IVECO',
     expectedYear: 1997,
     expectedPlate: '35 VD 458',
@@ -122,14 +132,19 @@ const pdfTextCache = new Map<string, string>()
 
 async function loadPdfText(relPath: string): Promise<string> {
   if (pdfTextCache.has(relPath)) return pdfTextCache.get(relPath)!
-  const mod = await import('pdf-parse')
-  const { PDFParse } = mod as unknown as {
-    PDFParse: new (data: Uint8Array) => { getText(): Promise<{ pages: Array<{ text: string }> }> }
-  }
   const buf = readFileSync(join(process.cwd(), relPath))
-  const parser = new PDFParse(new Uint8Array(buf))
-  const result = await parser.getText()
-  const text = result.pages.map((p) => p.text).join('\n')
+  let text = ''
+  if (relPath.endsWith('.txt')) {
+    text = buf.toString('utf-8')
+  } else {
+    const mod = await import('pdf-parse')
+    const { PDFParse } = mod as unknown as {
+      PDFParse: new (data: Uint8Array) => { getText(): Promise<{ pages: Array<{ text: string }> }> }
+    }
+    const parser = new PDFParse(new Uint8Array(buf))
+    const result = await parser.getText()
+    text = result.pages.map((p) => p.text).join('\n')
+  }
   pdfTextCache.set(relPath, text)
   return text
 }

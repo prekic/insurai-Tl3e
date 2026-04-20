@@ -179,7 +179,12 @@ export interface Policy {
   specialConditions: string[]
   insuranceLine: string
   /** Discounts applied to the policy */
-  discounts?: Array<{ type: string; rate: string; description: string }>
+  discounts?: {
+    ncdDiscount: number | null
+    groupDiscount: number | null
+    otherDiscountPct: number | null
+    evidence: string | null
+  } | null
   /** Entity Type */
   insuredEntityType?: 'individual' | 'corporate' | null
   /** Usage Type */

@@ -856,6 +856,8 @@ describe('Edge cases - Hash function fallback', () => {
 describe('Edge cases - Debug mode logging', () => {
   beforeEach(async () => {
     await auditLogger.clear()
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
     vi.spyOn(console, 'log').mockImplementation(() => {})
   })
 
@@ -869,7 +871,7 @@ describe('Edge cases - Debug mode logging', () => {
 
     await auditLogger.log('auth.signin', { method: 'email' })
 
-    expect(console.log).toHaveBeenCalled()
+    expect(console.info).toHaveBeenCalled()
   })
 
   it('should not log to console when debug is disabled', async () => {
@@ -877,7 +879,7 @@ describe('Edge cases - Debug mode logging', () => {
 
     await auditLogger.log('auth.signin', { method: 'email' })
 
-    expect(console.log).not.toHaveBeenCalled()
+    expect(console.info).not.toHaveBeenCalled()
   })
 
   it('should include ERROR prefix for failed events in debug', async () => {
@@ -885,7 +887,7 @@ describe('Edge cases - Debug mode logging', () => {
 
     await auditLogger.log('auth.signin_failed', {})
 
-    expect(console.log).toHaveBeenCalledWith(
+    expect(console.error).toHaveBeenCalledWith(
       '[AUDIT ERROR]',
       'auth.signin_failed',
       expect.any(Object)

@@ -32,7 +32,9 @@ const {
     mockSecurityMonitorInitialize: vi.fn(),
     mockRateLimiterOnViolation: vi.fn((cb: (v: unknown) => void) => {
       violationCb = cb
-      return () => { violationCb = null }
+      return () => {
+        violationCb = null
+      }
     }),
     mockRateLimiterCleanup: vi.fn(),
     mockAuditLoggerLogSecurity: vi.fn(),
@@ -197,14 +199,11 @@ describe('Security Module index.ts', () => {
       expect(cb).toBeTruthy()
       cb!({ operation: 'ai_extraction', limit: 30, current: 31 })
 
-      expect(mockAuditLoggerLogSecurity).toHaveBeenCalledWith(
-        'security.rate_limit_exceeded',
-        {
-          operation: 'ai_extraction',
-          limit: 30,
-          current: 31,
-        }
-      )
+      expect(mockAuditLoggerLogSecurity).toHaveBeenCalledWith('security.rate_limit_exceeded', {
+        operation: 'ai_extraction',
+        limit: 30,
+        current: 31,
+      })
 
       vi.doUnmock('./key-manager')
       vi.doUnmock('./security-monitor')
@@ -307,7 +306,7 @@ describe('Audit Logger - Branch Coverage', () => {
       const timed = auditLoggerReal.createTimedAudit('ai.extraction_started', { model: 'gpt-4o' })
 
       // Wait a tick so duration > 0
-      await new Promise(r => setTimeout(r, 5))
+      await new Promise((r) => setTimeout(r, 5))
 
       const event = await timed.complete({ result: 'ok' })
 
@@ -344,18 +343,21 @@ describe('Audit Logger - Branch Coverage', () => {
   describe('logError', () => {
     it('should handle Error object with stack trace', async () => {
       const err = new Error('Test error')
-      err.stack = 'Error: Test error\n  at line1\n  at line2\n  at line3\n  at line4\n  at line5\n  at line6'
+      err.stack =
+        'Error: Test error\n  at line1\n  at line2\n  at line3\n  at line4\n  at line5\n  at line6'
 
       const event = await auditLoggerReal.auditLogger.logError(err, { context: 'test' })
 
       expect(event.type).toBe('error.unhandled')
       expect(event.success).toBe(false)
       expect(event.errorMessage).toBe('Test error')
-      expect(event.details).toEqual(expect.objectContaining({
-        name: 'Error',
-        message: 'Test error',
-        context: 'test',
-      }))
+      expect(event.details).toEqual(
+        expect.objectContaining({
+          name: 'Error',
+          message: 'Test error',
+          context: 'test',
+        })
+      )
       // Stack should be truncated to first 5 lines
       const stack = event.details?.stack as string
       expect(stack.split('\n')).toHaveLength(5)
@@ -365,15 +367,21 @@ describe('Audit Logger - Branch Coverage', () => {
       const event = await auditLoggerReal.auditLogger.logError('string error message')
 
       expect(event.errorMessage).toBe('string error message')
-      expect(event.details).toEqual(expect.objectContaining({
-        message: 'string error message',
-      }))
+      expect(event.details).toEqual(
+        expect.objectContaining({
+          message: 'string error message',
+        })
+      )
     })
   })
 
   describe('log severity branches', () => {
     it('should assign error severity for failed event types', async () => {
-      const event = await auditLoggerReal.auditLogger.log('auth.signin_failed', {}, { success: false })
+      const event = await auditLoggerReal.auditLogger.log(
+        'auth.signin_failed',
+        {},
+        { success: false }
+      )
       expect(event.severity).toBe('error')
     })
 
@@ -417,7 +425,10 @@ describe('Audit Logger - Branch Coverage', () => {
       const exportEvent = await auditLoggerReal.auditLogger.log('export.csv_generated', {})
       expect(exportEvent.category).toBe('export')
 
-      const settingsEvent = await auditLoggerReal.auditLogger.log('settings.updated' as 'security.rate_limit_exceeded', {})
+      const settingsEvent = await auditLoggerReal.auditLogger.log(
+        'settings.updated' as 'security.rate_limit_exceeded',
+        {}
+      )
       expect(settingsEvent.category).toBe('settings')
     })
 
@@ -433,9 +444,11 @@ describe('Audit Logger - Branch Coverage', () => {
         method: 'email',
         email: 'test@example.com',
       })
-      expect(event.details).toEqual(expect.objectContaining({
-        email: 't***t@example.com',
-      }))
+      expect(event.details).toEqual(
+        expect.objectContaining({
+          email: 't***t@example.com',
+        })
+      )
     })
 
     it('should mask email with 2 or fewer chars in local part', async () => {
@@ -443,9 +456,11 @@ describe('Audit Logger - Branch Coverage', () => {
         method: 'email',
         email: 'ab@example.com',
       })
-      expect(event.details).toEqual(expect.objectContaining({
-        email: '***@example.com',
-      }))
+      expect(event.details).toEqual(
+        expect.objectContaining({
+          email: '***@example.com',
+        })
+      )
     })
 
     it('should return *** for email without @ sign', async () => {
@@ -453,24 +468,28 @@ describe('Audit Logger - Branch Coverage', () => {
         method: 'email',
         email: 'nodomainemail',
       })
-      expect(event.details).toEqual(expect.objectContaining({
-        email: '***',
-      }))
+      expect(event.details).toEqual(
+        expect.objectContaining({
+          email: '***',
+        })
+      )
     })
 
     it('should handle undefined email', async () => {
       const event = await auditLoggerReal.auditLogger.logAuth('auth.signin', {
         method: 'google',
       })
-      expect(event.details).toEqual(expect.objectContaining({
-        email: undefined,
-      }))
+      expect(event.details).toEqual(
+        expect.objectContaining({
+          email: undefined,
+        })
+      )
     })
   })
 
   describe('debug mode', () => {
     it('should log to console when debug is enabled', async () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      const consoleSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
 
       auditLoggerReal.auditLogger.setDebug(true)
       await auditLoggerReal.auditLogger.log('policy.created', { test: true })
@@ -482,12 +501,14 @@ describe('Audit Logger - Branch Coverage', () => {
     })
 
     it('should log [AUDIT ERROR] prefix for failed events in debug mode', async () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
       auditLoggerReal.auditLogger.setDebug(true)
       await auditLoggerReal.auditLogger.log('auth.signin_failed', { reason: 'bad password' })
 
-      expect(consoleSpy).toHaveBeenCalledWith('[AUDIT ERROR]', 'auth.signin_failed', { reason: 'bad password' })
+      expect(consoleSpy).toHaveBeenCalledWith('[AUDIT ERROR]', 'auth.signin_failed', {
+        reason: 'bad password',
+      })
 
       auditLoggerReal.auditLogger.setDebug(false)
       consoleSpy.mockRestore()
@@ -510,7 +531,9 @@ describe('Audit Logger - Branch Coverage', () => {
     })
 
     it('should handle listener errors gracefully', async () => {
-      const failingListener = vi.fn(() => { throw new Error('listener crash') })
+      const failingListener = vi.fn(() => {
+        throw new Error('listener crash')
+      })
       const goodListener = vi.fn()
 
       const unsub1 = auditLoggerReal.auditLogger.onEvent(failingListener)
@@ -534,18 +557,18 @@ describe('Audit Logger - Branch Coverage', () => {
       await auditLoggerReal.auditLogger.log('auth.signin_failed', {}, { success: false })
 
       const successOnly = await auditLoggerReal.auditLogger.query({ success: true })
-      expect(successOnly.every(e => e.success)).toBe(true)
+      expect(successOnly.every((e) => e.success)).toBe(true)
 
       const failedOnly = await auditLoggerReal.auditLogger.query({ success: false })
-      expect(failedOnly.every(e => !e.success)).toBe(true)
+      expect(failedOnly.every((e) => !e.success)).toBe(true)
     })
 
     it('should filter by severity', async () => {
-      await auditLoggerReal.auditLogger.log('policy.created', {})  // info
-      await auditLoggerReal.auditLogger.log('security.rate_limit_exceeded', {})  // warning
+      await auditLoggerReal.auditLogger.log('policy.created', {}) // info
+      await auditLoggerReal.auditLogger.log('security.rate_limit_exceeded', {}) // warning
 
       const warnings = await auditLoggerReal.auditLogger.query({ severity: 'warning' })
-      expect(warnings.every(e => e.severity === 'warning')).toBe(true)
+      expect(warnings.every((e) => e.severity === 'warning')).toBe(true)
     })
 
     it('should filter by resourceId', async () => {
@@ -553,7 +576,7 @@ describe('Audit Logger - Branch Coverage', () => {
       await auditLoggerReal.auditLogger.log('policy.created', {}, { resourceId: 'pol-456' })
 
       const filtered = await auditLoggerReal.auditLogger.query({ resourceId: 'pol-123' })
-      expect(filtered.every(e => e.resourceId === 'pol-123')).toBe(true)
+      expect(filtered.every((e) => e.resourceId === 'pol-123')).toBe(true)
     })
 
     it('should filter by date range', async () => {
@@ -744,16 +767,20 @@ describe('Rate Limiter - Branch Coverage', () => {
       const result = rl.rateLimiter.consume('auth_password_reset', '1.2.3.4')
       expect(result.allowed).toBe(false)
       expect(result.retryAfter).toBeGreaterThan(0)
-      expect(listener).toHaveBeenCalledWith(expect.objectContaining({
-        operation: 'auth_password_reset',
-        limit: config.maxRequests,
-      }))
+      expect(listener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: 'auth_password_reset',
+          limit: config.maxRequests,
+        })
+      )
 
       unsub()
     })
 
     it('should handle violation listener errors gracefully', () => {
-      const failingListener = vi.fn(() => { throw new Error('oops') })
+      const failingListener = vi.fn(() => {
+        throw new Error('oops')
+      })
       const unsub = rl.rateLimiter.onViolation(failingListener)
 
       // Exhaust limit
@@ -804,7 +831,7 @@ describe('Rate Limiter - Branch Coverage', () => {
 
       // Set tiny window and wait for it to expire
       rl.rateLimiter.setConfig('policy_upload', { windowMs: 10 })
-      await new Promise(r => setTimeout(r, 20))
+      await new Promise((r) => setTimeout(r, 20))
 
       const result = rl.rateLimiter.check('policy_upload', 'user-1')
       expect(result.count).toBe(0)
@@ -819,7 +846,7 @@ describe('Rate Limiter - Branch Coverage', () => {
 
       // Set tiny window and wait for it to expire
       rl.rateLimiter.setConfig('policy_upload', { windowMs: 10 })
-      await new Promise(r => setTimeout(r, 20))
+      await new Promise((r) => setTimeout(r, 20))
 
       const usage = rl.rateLimiter.getUsage('policy_upload', 'user-1')
       expect(usage.used).toBe(0)
@@ -949,9 +976,15 @@ describe('Key Manager - Branch Coverage', () => {
     Object.defineProperty(globalThis, 'localStorage', {
       value: {
         getItem: vi.fn((key: string) => store[key] ?? null),
-        setItem: vi.fn((key: string, value: string) => { store[key] = value }),
-        removeItem: vi.fn((key: string) => { delete store[key] }),
-        clear: vi.fn(() => { Object.keys(store).forEach(k => delete store[k]) }),
+        setItem: vi.fn((key: string, value: string) => {
+          store[key] = value
+        }),
+        removeItem: vi.fn((key: string) => {
+          delete store[key]
+        }),
+        clear: vi.fn(() => {
+          Object.keys(store).forEach((k) => delete store[k])
+        }),
       },
       writable: true,
       configurable: true,
@@ -1142,7 +1175,7 @@ describe('Security Monitor - Branch Coverage', () => {
         logSecurity: vi.fn(),
         getCallbacks: () => cbs,
         triggerEvent: (event: unknown) => {
-          cbs.forEach(cb => cb(event))
+          cbs.forEach((cb) => cb(event))
         },
       },
     }
@@ -1249,7 +1282,9 @@ describe('Security Monitor - Branch Coverage', () => {
       }
 
       const alerts = sm.securityMonitor.getActiveAlerts()
-      const criticalAlert = alerts.find(a => a.severity === 'critical' && a.type === 'brute_force')
+      const criticalAlert = alerts.find(
+        (a) => a.severity === 'critical' && a.type === 'brute_force'
+      )
       expect(criticalAlert).toBeDefined()
     })
 
@@ -1287,7 +1322,7 @@ describe('Security Monitor - Branch Coverage', () => {
       }
 
       const alerts = sm.securityMonitor.getActiveAlerts()
-      const rateAlert = alerts.find(a => a.type === 'rate_abuse')
+      const rateAlert = alerts.find((a) => a.type === 'rate_abuse')
       expect(rateAlert).toBeDefined()
       expect(rateAlert!.severity).toBe('warning')
     })
@@ -1307,7 +1342,7 @@ describe('Security Monitor - Branch Coverage', () => {
       }
 
       const alerts = sm.securityMonitor.getActiveAlerts()
-      expect(alerts.some(a => a.type === 'rate_abuse')).toBe(true)
+      expect(alerts.some((a) => a.type === 'rate_abuse')).toBe(true)
     })
   })
 
@@ -1466,7 +1501,9 @@ describe('Security Monitor - Branch Coverage', () => {
       }
 
       const alerts = sm.securityMonitor.getActiveAlerts()
-      const bruteForceAlerts = alerts.filter(a => a.type === 'brute_force' && a.ipHash === 'dedup-ip')
+      const bruteForceAlerts = alerts.filter(
+        (a) => a.type === 'brute_force' && a.ipHash === 'dedup-ip'
+      )
       expect(bruteForceAlerts).toHaveLength(1)
     })
 
@@ -1485,7 +1522,7 @@ describe('Security Monitor - Branch Coverage', () => {
       }
 
       let alerts = sm.securityMonitor.getActiveAlerts()
-      let bruteForce = alerts.find(a => a.type === 'brute_force' && a.ipHash === 'upgrade-ip')
+      let bruteForce = alerts.find((a) => a.type === 'brute_force' && a.ipHash === 'upgrade-ip')
       expect(bruteForce!.severity).toBe('warning')
 
       // More attempts to trigger critical (4 = 2x threshold)
@@ -1499,7 +1536,7 @@ describe('Security Monitor - Branch Coverage', () => {
       }
 
       alerts = sm.securityMonitor.getActiveAlerts()
-      bruteForce = alerts.find(a => a.type === 'brute_force' && a.ipHash === 'upgrade-ip')
+      bruteForce = alerts.find((a) => a.type === 'brute_force' && a.ipHash === 'upgrade-ip')
       expect(bruteForce!.severity).toBe('critical')
     })
   })
@@ -1528,7 +1565,7 @@ describe('Security Monitor - Branch Coverage', () => {
       expect(result).toBe(true)
 
       const active = sm.securityMonitor.getActiveAlerts()
-      expect(active.find(a => a.id === alertId)).toBeUndefined()
+      expect(active.find((a) => a.id === alertId)).toBeUndefined()
     })
 
     it('getAllAlerts should return alerts in reverse order with limit', () => {
@@ -1563,15 +1600,19 @@ describe('Security Monitor - Branch Coverage', () => {
         timestamp: Date.now(),
       })
 
-      expect(listener).toHaveBeenCalledWith(expect.objectContaining({
-        type: 'brute_force',
-      }))
+      expect(listener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'brute_force',
+        })
+      )
 
       unsub()
     })
 
     it('onAlert should handle listener errors gracefully', () => {
-      const failingListener = vi.fn(() => { throw new Error('listener fail') })
+      const failingListener = vi.fn(() => {
+        throw new Error('listener fail')
+      })
       const unsub = sm.securityMonitor.onAlert(failingListener)
 
       sm.securityMonitor.initialize()
@@ -1719,7 +1760,7 @@ describe('Security Monitor - Branch Coverage', () => {
 
       const result = sm.inputSanitizer.sanitizeObject(input)
       expect(result.name).toContain('&lt;')
-      expect(result.nested.value).toContain('onclick')  // Still contains text, but escaped
+      expect(result.nested.value).toContain('onclick') // Still contains text, but escaped
       expect(result.number).toBe(42)
       expect(result.isActive).toBe(true)
     })
@@ -1746,7 +1787,11 @@ describe('Security Monitor - Branch Coverage', () => {
 
       expect(sm.isSecureContext()).toBe(false)
 
-      Object.defineProperty(globalThis, 'window', { value: originalWindow, writable: true, configurable: true })
+      Object.defineProperty(globalThis, 'window', {
+        value: originalWindow,
+        writable: true,
+        configurable: true,
+      })
     })
 
     it('should return window.isSecureContext when available', () => {
@@ -1754,7 +1799,11 @@ describe('Security Monitor - Branch Coverage', () => {
         isSecureContext: true,
         location: { protocol: 'http:' },
       }
-      Object.defineProperty(globalThis, 'window', { value: mockWin, writable: true, configurable: true })
+      Object.defineProperty(globalThis, 'window', {
+        value: mockWin,
+        writable: true,
+        configurable: true,
+      })
 
       expect(sm.isSecureContext()).toBe(true)
     })
@@ -1764,7 +1813,11 @@ describe('Security Monitor - Branch Coverage', () => {
         isSecureContext: undefined,
         location: { protocol: 'https:' },
       }
-      Object.defineProperty(globalThis, 'window', { value: mockWin, writable: true, configurable: true })
+      Object.defineProperty(globalThis, 'window', {
+        value: mockWin,
+        writable: true,
+        configurable: true,
+      })
 
       expect(sm.isSecureContext()).toBe(true)
     })
@@ -1774,7 +1827,11 @@ describe('Security Monitor - Branch Coverage', () => {
         isSecureContext: undefined,
         location: { protocol: 'http:' },
       }
-      Object.defineProperty(globalThis, 'window', { value: mockWin, writable: true, configurable: true })
+      Object.defineProperty(globalThis, 'window', {
+        value: mockWin,
+        writable: true,
+        configurable: true,
+      })
 
       expect(sm.isSecureContext()).toBe(false)
     })
@@ -1786,7 +1843,11 @@ describe('Security Monitor - Branch Coverage', () => {
         isSecureContext: false,
         location: { protocol: 'http:' },
       }
-      Object.defineProperty(globalThis, 'window', { value: mockWin, writable: true, configurable: true })
+      Object.defineProperty(globalThis, 'window', {
+        value: mockWin,
+        writable: true,
+        configurable: true,
+      })
 
       const report = await sm.generateSecurityReport()
       expect(report.secureContext).toBe(false)
@@ -1800,7 +1861,11 @@ describe('Security Monitor - Branch Coverage', () => {
         isSecureContext: true,
         location: { protocol: 'https:' },
       }
-      Object.defineProperty(globalThis, 'window', { value: mockWin, writable: true, configurable: true })
+      Object.defineProperty(globalThis, 'window', {
+        value: mockWin,
+        writable: true,
+        configurable: true,
+      })
 
       sm.securityMonitor.initialize()
       sm.securityMonitor.setThresholds({ failedLoginsThreshold: 1 })
@@ -1816,7 +1881,7 @@ describe('Security Monitor - Branch Coverage', () => {
       }
 
       const report = await sm.generateSecurityReport()
-      const criticalRec = report.recommendations.find(r => r.includes('critical security alert'))
+      const criticalRec = report.recommendations.find((r) => r.includes('critical security alert'))
       expect(criticalRec).toBeDefined()
     })
 
@@ -1825,7 +1890,11 @@ describe('Security Monitor - Branch Coverage', () => {
         isSecureContext: true,
         location: { protocol: 'https:' },
       }
-      Object.defineProperty(globalThis, 'window', { value: mockWin, writable: true, configurable: true })
+      Object.defineProperty(globalThis, 'window', {
+        value: mockWin,
+        writable: true,
+        configurable: true,
+      })
 
       sm.securityMonitor.initialize()
       sm.securityMonitor.setThresholds({ failedLoginsThreshold: 100 }) // High threshold to avoid alert
@@ -1841,7 +1910,7 @@ describe('Security Monitor - Branch Coverage', () => {
       }
 
       const report = await sm.generateSecurityReport()
-      const loginRec = report.recommendations.find(r => r.includes('failed login attempts'))
+      const loginRec = report.recommendations.find((r) => r.includes('failed login attempts'))
       expect(loginRec).toBeDefined()
     })
 
@@ -1850,7 +1919,11 @@ describe('Security Monitor - Branch Coverage', () => {
         isSecureContext: true,
         location: { protocol: 'https:' },
       }
-      Object.defineProperty(globalThis, 'window', { value: mockWin, writable: true, configurable: true })
+      Object.defineProperty(globalThis, 'window', {
+        value: mockWin,
+        writable: true,
+        configurable: true,
+      })
 
       sm.securityMonitor.initialize()
       sm.securityMonitor.setThresholds({ rateLimitViolationsThreshold: 100 })
@@ -1866,7 +1939,7 @@ describe('Security Monitor - Branch Coverage', () => {
       }
 
       const report = await sm.generateSecurityReport()
-      const rateRec = report.recommendations.find(r => r.includes('rate limit violations'))
+      const rateRec = report.recommendations.find((r) => r.includes('rate limit violations'))
       expect(rateRec).toBeDefined()
     })
 
@@ -1875,7 +1948,11 @@ describe('Security Monitor - Branch Coverage', () => {
         isSecureContext: true,
         location: { protocol: 'https:' },
       }
-      Object.defineProperty(globalThis, 'window', { value: mockWin, writable: true, configurable: true })
+      Object.defineProperty(globalThis, 'window', {
+        value: mockWin,
+        writable: true,
+        configurable: true,
+      })
 
       const report = await sm.generateSecurityReport()
       expect(typeof report.cryptoSupported).toBe('boolean')

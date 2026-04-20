@@ -1949,7 +1949,6 @@ async function convertToAnalyzedPolicy(
     insuredMissing,
     deductibleUncertain,
     extractionWarnings: extractionWarnings.length > 0 ? extractionWarnings : undefined,
-    discounts: data.discounts ?? undefined,
   }
 
   // Prepend AI generated evidence-based insights
