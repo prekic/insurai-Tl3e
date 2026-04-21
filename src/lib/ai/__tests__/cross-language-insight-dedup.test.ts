@@ -7,7 +7,7 @@
  * same canonical key, the dedup is guaranteed to collapse them.
  */
 import { describe, it, expect } from 'vitest'
-import { translateInsightToTr, translateInsightToEn } from '../policy-extractor'
+import { translateInsightToTr, translateInsightToEn } from '../insight-translator'
 
 describe('cross-language insight translation helpers', () => {
   // A pair known to exist in TR_TRANSLATIONS.insightTranslations

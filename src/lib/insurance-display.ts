@@ -163,22 +163,24 @@ export function getMainCoverageValue(policy: AnalyzedPolicy): number {
 
   if (coverageType === 'limit' && policy.coverages && policy.coverages.length > 0) {
     // For traffic insurance, find the highest limit (usually bodily injury per accident)
-    const relevantCoverages = policy.coverages.filter(c =>
-      c.included && c.limit > 0 &&
-      (c.nameTr?.toLowerCase().includes('ölüm') ||
-       c.nameTr?.toLowerCase().includes('sakatlık') ||
-       c.nameTr?.toLowerCase().includes('kaza başı') ||
-       c.name?.toLowerCase().includes('death') ||
-       c.name?.toLowerCase().includes('bodily') ||
-       c.name?.toLowerCase().includes('per accident'))
+    const relevantCoverages = policy.coverages.filter(
+      (c) =>
+        c.included &&
+        c.limit > 0 &&
+        (c.nameTr?.toLowerCase().includes('ölüm') ||
+          c.nameTr?.toLowerCase().includes('sakatlık') ||
+          c.nameTr?.toLowerCase().includes('kaza başı') ||
+          c.name?.toLowerCase().includes('death') ||
+          c.name?.toLowerCase().includes('bodily') ||
+          c.name?.toLowerCase().includes('per accident'))
     )
 
     if (relevantCoverages.length > 0) {
-      return Math.max(...relevantCoverages.map(c => c.limit))
+      return Math.max(...relevantCoverages.map((c) => c.limit))
     }
 
     // Fallback to highest limit overall
-    const maxLimit = Math.max(...policy.coverages.filter(c => c.included).map(c => c.limit))
+    const maxLimit = Math.max(...policy.coverages.filter((c) => c.included).map((c) => c.limit))
     return maxLimit > 0 ? maxLimit : policy.coverage
   }
 
@@ -191,15 +193,11 @@ export function getMainCoverageValue(policy: AnalyzedPolicy): number {
  * Returns plate number for auto, address for property, etc.
  */
 export function getInsuredSubject(policy: AnalyzedPolicy): string | null {
-  const rawData = (policy as unknown as { raw_data?: Record<string, unknown> }).raw_data || {}
-
   // Check for vehicle info (kasko, traffic)
   if (policy.type === 'kasko' || policy.type === 'traffic') {
     // Try to find plate number in various locations
     const plate =
-      (rawData.plateNumber as string) ||
-      (rawData.vehiclePlate as string) ||
-      (rawData.plaka as string) ||
+      policy.vehicleInfo?.plate ||
       extractPlateFromCoverages(policy.coverages) ||
       extractPlateFromConditions(policy.specialConditions)
 
@@ -207,9 +205,7 @@ export function getInsuredSubject(policy: AnalyzedPolicy): string | null {
 
     // Try vehicle info
     const vehicle =
-      (rawData.vehicleModel as string) ||
-      (rawData.vehicleBrand as string) ||
-      (rawData.aracModel as string)
+      [policy.vehicleInfo?.make, policy.vehicleInfo?.model].filter(Boolean).join(' ') || null
 
     if (vehicle) return vehicle
   }
@@ -217,13 +213,7 @@ export function getInsuredSubject(policy: AnalyzedPolicy): string | null {
   // Check for property address (home, dask, business)
   if (policy.type === 'home' || policy.type === 'dask' || policy.type === 'business') {
     if (policy.location) return policy.location
-
-    const address =
-      (rawData.propertyAddress as string) ||
-      (rawData.riskAddress as string) ||
-      (rawData.riziko_adresi as string)
-
-    if (address) return address
+    if (policy.insuredAddress) return policy.insuredAddress
   }
 
   // For health/life, return the insured person
@@ -267,7 +257,10 @@ function extractPlateFromConditions(conditions: string[]): string | null {
  * Get a descriptive subject label for the policy table
  * Returns both the label and value
  */
-export function getSubjectDisplay(policy: AnalyzedPolicy, locale: 'en' | 'tr' = 'en'): { label: string; value: string } | null {
+export function getSubjectDisplay(
+  policy: AnalyzedPolicy,
+  locale: 'en' | 'tr' = 'en'
+): { label: string; value: string } | null {
   const subject = getInsuredSubject(policy)
 
   if (!subject) {
@@ -275,7 +268,7 @@ export function getSubjectDisplay(policy: AnalyzedPolicy, locale: 'en' | 'tr' = 
     if (policy.insuredPerson) {
       return {
         label: locale === 'tr' ? 'Sigortalı' : 'Insured',
-        value: policy.insuredPerson
+        value: policy.insuredPerson,
       }
     }
     return null
@@ -286,28 +279,28 @@ export function getSubjectDisplay(policy: AnalyzedPolicy, locale: 'en' | 'tr' = 
     // Check if it looks like a plate number
     const isPlate = /^[0-9]{2}\s*[A-Z]{1,3}\s*[0-9]{2,4}$/i.test(subject.trim())
     return {
-      label: locale === 'tr' ? (isPlate ? 'Plaka' : 'Araç') : (isPlate ? 'Plate' : 'Vehicle'),
-      value: subject
+      label: locale === 'tr' ? (isPlate ? 'Plaka' : 'Araç') : isPlate ? 'Plate' : 'Vehicle',
+      value: subject,
     }
   }
 
   if (policy.type === 'home' || policy.type === 'dask') {
     return {
       label: locale === 'tr' ? 'Adres' : 'Address',
-      value: subject.length > 30 ? subject.substring(0, 30) + '...' : subject
+      value: subject.length > 30 ? subject.substring(0, 30) + '...' : subject,
     }
   }
 
   if (policy.type === 'business') {
     return {
       label: locale === 'tr' ? 'İşyeri' : 'Business',
-      value: subject.length > 30 ? subject.substring(0, 30) + '...' : subject
+      value: subject.length > 30 ? subject.substring(0, 30) + '...' : subject,
     }
   }
 
   // Default to insured person
   return {
     label: locale === 'tr' ? 'Sigortalı' : 'Insured',
-    value: subject
+    value: subject,
   }
 }
