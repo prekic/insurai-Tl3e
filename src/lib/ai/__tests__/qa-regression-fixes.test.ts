@@ -442,7 +442,7 @@ describe('P1-5: Unresolved relationship filtering', () => {
 
 describe('P2-7: Parts clause risk flag on older vehicles', () => {
   it('flags eşdeğer parça on ≥7yr vehicle', async () => {
-    const { derivePartsClauseInsight } = await import('../policy-extractor')
+    const { derivePartsClauseInsight } = await import('../insight-translator')
     const policy = {
       vehicleInfo: { year: 2015 },
       exclusions: ['Onarımda eşdeğer parça kullanılabilir'],
@@ -458,7 +458,7 @@ describe('P2-7: Parts clause risk flag on older vehicles', () => {
   })
 
   it('does not flag newer vehicle (<7yr)', async () => {
-    const { derivePartsClauseInsight } = await import('../policy-extractor')
+    const { derivePartsClauseInsight } = await import('../insight-translator')
     const policy = {
       vehicleInfo: { year: new Date().getFullYear() - 3 },
       exclusions: ['Onarımda eşdeğer parça kullanılabilir'],
@@ -470,7 +470,7 @@ describe('P2-7: Parts clause risk flag on older vehicles', () => {
   })
 
   it('does not flag older vehicle without parts clause', async () => {
-    const { derivePartsClauseInsight } = await import('../policy-extractor')
+    const { derivePartsClauseInsight } = await import('../insight-translator')
     const policy = {
       vehicleInfo: { year: 2010 },
       exclusions: ['Savaş hali hariçtir'],
@@ -482,7 +482,7 @@ describe('P2-7: Parts clause risk flag on older vehicles', () => {
   })
 
   it('flags çıkma parça in special conditions', async () => {
-    const { derivePartsClauseInsight } = await import('../policy-extractor')
+    const { derivePartsClauseInsight } = await import('../insight-translator')
     const policy = {
       vehicleInfo: { year: 2015 },
       exclusions: [],
@@ -503,7 +503,7 @@ describe('P2-7: Parts clause risk flag on older vehicles', () => {
 
 describe('P2-15: Locale mixing guard', () => {
   it('translates all known English insight originals to Turkish', async () => {
-    const { translateInsightToTr } = await import('../policy-extractor')
+    const { translateInsightToTr } = await import('../insight-translator')
     // These are the literal English strings emitted by generateGapsAsync,
     // generateStrengths, and generateRecommendationsAsync as of this session.
     // Adding a new generator string without a translation map entry MUST fail
@@ -524,7 +524,7 @@ describe('P2-15: Locale mixing guard', () => {
   })
 
   it('preserves emoji prefixes on translated insights', async () => {
-    const { translateInsightToTr } = await import('../policy-extractor')
+    const { translateInsightToTr } = await import('../insight-translator')
     const input = '⚠ Multiple exclusions may limit coverage in certain scenarios'
     const out = translateInsightToTr(input)
     expect(out.startsWith('⚠')).toBe(true)
@@ -538,7 +538,7 @@ describe('P2-15: Locale mixing guard', () => {
 
 describe('Bug #9: discounts on comprehensive extraction path', () => {
   it('derives ncdDiscount from noClaimsBonus.discountRate when data.discounts absent', async () => {
-    const { deriveDiscountsFromStructured } = await import('../policy-extractor')
+    const { deriveDiscountsFromStructured } = await import('../discount-deriver')
     const data = {
       premium: { totalPremium: 5000, currency: 'TRY' },
       noClaimsBonus: { discountRate: '40%', currentLevel: '4', protectionIncluded: false },
@@ -552,7 +552,7 @@ describe('Bug #9: discounts on comprehensive extraction path', () => {
   })
 
   it('parses percentage with comma decimal (Turkish) like "%40,5"', async () => {
-    const { deriveDiscountsFromStructured } = await import('../policy-extractor')
+    const { deriveDiscountsFromStructured } = await import('../discount-deriver')
     const data = {
       premium: { totalPremium: 5000, currency: 'TRY' },
       noClaimsBonus: { discountRate: '%40,5' },
@@ -563,7 +563,7 @@ describe('Bug #9: discounts on comprehensive extraction path', () => {
   })
 
   it('returns undefined when noClaimsBonus is missing', async () => {
-    const { deriveDiscountsFromStructured } = await import('../policy-extractor')
+    const { deriveDiscountsFromStructured } = await import('../discount-deriver')
     const result = deriveDiscountsFromStructured({
       premium: { totalPremium: 5000, currency: 'TRY' },
     } as never)
@@ -571,7 +571,7 @@ describe('Bug #9: discounts on comprehensive extraction path', () => {
   })
 
   it('returns undefined when discountRate is unparseable', async () => {
-    const { deriveDiscountsFromStructured } = await import('../policy-extractor')
+    const { deriveDiscountsFromStructured } = await import('../discount-deriver')
     const result = deriveDiscountsFromStructured({
       premium: { totalPremium: 5000, currency: 'TRY' },
       noClaimsBonus: { discountRate: 'unknown' },
@@ -580,7 +580,7 @@ describe('Bug #9: discounts on comprehensive extraction path', () => {
   })
 
   it('rejects out-of-range percentages (>100 or negative)', async () => {
-    const { deriveDiscountsFromStructured } = await import('../policy-extractor')
+    const { deriveDiscountsFromStructured } = await import('../discount-deriver')
     expect(
       deriveDiscountsFromStructured({
         premium: { totalPremium: 5000, currency: 'TRY' },

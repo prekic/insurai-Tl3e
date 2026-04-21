@@ -21,7 +21,7 @@ const __dirname = path.dirname(__filename)
 // Load environment variables first (before Sentry init)
 dotenv.config()
 
-import aiRoutes from './routes/ai.js'
+import aiRoutes from './routes/ai/index.js'
 import adminRoutes from './routes/admin/index.js'
 import pdfRoutes from './routes/pdf.js'
 import emailRoutes from './routes/email.js'

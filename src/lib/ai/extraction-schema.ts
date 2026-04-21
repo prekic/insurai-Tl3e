@@ -101,6 +101,26 @@ export interface ExtractedPolicyData {
     coverages: number
   }
 
+  // Extra vehicle/identity fields the AI may return beyond the prompted schema.
+  // Having these typed eliminates unsafe 'as unknown as Record<string, unknown>' casts.
+  tcKimlik?: string | null
+  vkn?: string | null
+  vehiclePlate?: string | null
+  vin?: string | null
+  vehicleYear?: string | number | null
+
+  // Fallback snake_case and localized keys the AI might return despite instructions
+  policy_type?: string | null
+  policy_number?: string | null
+  start_date?: string | null
+  end_date?: string | null
+  insured_address?: string | null
+  insured_name?: string | null
+  insuredPerson?: string | null
+  policyholder?: string | null
+  sigortalı?: string | null
+  sigortali?: string | null
+
   // Proxy metadata (set by provider, consumed by policy-extractor for logging)
   _proxyMeta?: {
     requestId?: string

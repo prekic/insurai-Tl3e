@@ -1,0 +1,1215 @@
+import { extractVehicleInfoFromText, parseTurkishCurrency, parseTurkishDate } from './turkish-utils'
+
+import { ExtractedCoverage, ExtractedPolicyData } from './extraction-schema'
+
+import type { AnalyzedPolicy, Coverage, CoverageImportance, PolicyType } from '@/types/policy'
+
+import { POLICY_TYPES } from '@/types/policy'
+
+import { generateAnalysisBundle } from '@/lib/analysis/engine'
+
+import { RiskAssessmentService } from '@/lib/ml'
+
+import { GapDetectionService } from '@/lib/gap-detection'
+
+import { lookupCoverageNameTr } from '@/lib/i18n/coverage-names'
+
+import { ensureExclusionsEn } from '@/lib/i18n/exclusion-translations'
+
+// ============================================================================
+// TWO-PASS COMPREHENSIVE EXTRACTION
+// Implements the enhanced extraction with structured output
+// ============================================================================
+
+// Modular imports:
+import {
+  derivePartsClauseInsight,
+  translateInsightsToTr,
+  translateInsightToEn,
+  translateInsightToTr,
+} from './insight-translator'
+
+import { generateAIInsightsAsync, generateMarketComparisonAsync } from './policy-extractor'
+
+/**
+ * Convert extracted data to AnalyzedPolicy format
+ * @param data - Extracted policy data from AI
+ * @param file - Original PDF file
+ * @param rawText - Raw extracted text from PDF/OCR (for reference)
+ * @param processedText - AI-processed text with OCR corrections (for display and chat)
+ */
+export async function convertToAnalyzedPolicy(
+  data: ExtractedPolicyData,
+  file: File,
+  rawText?: string,
+  processedText?: string,
+  safetyResult?: {
+    flags: Array<{ level: 'Safe' | 'Warning' | 'Error'; message: string; field?: string }>
+    isValid: boolean
+    blockReason?: string
+  }
+): Promise<AnalyzedPolicy> {
+  const now = new Date()
+
+  // Debug logging for production troubleshooting
+  console.warn('[convertToAnalyzedPolicy] Input data:', {
+    hasCoverages: !!data.coverages,
+    coveragesIsArray: Array.isArray(data.coverages),
+    coveragesLength: Array.isArray(data.coverages) ? data.coverages.length : 'N/A',
+    policyType: data.policyType,
+    hasExclusions: !!data.exclusions,
+    hasSpecialConditions: !!data.specialConditions,
+  })
+
+  // Ensure coverages is always an array (defensive check)
+  if (!data.coverages || !Array.isArray(data.coverages)) {
+    console.warn('[convertToAnalyzedPolicy] coverages missing or not array, defaulting to []')
+    data.coverages = []
+  }
+
+  // Ensure exclusions and specialConditions are arrays
+  if (!data.exclusions || !Array.isArray(data.exclusions)) {
+    data.exclusions = []
+  }
+  if (!data.specialConditions || !Array.isArray(data.specialConditions)) {
+    data.specialConditions = []
+  }
+
+  // Determine status based on dates
+  // Handle both camelCase (endDate) and snake_case (end_date) from AI
+  const rawEndDate =
+    data.endDate ?? ('end_date' in data ? (data.end_date as string | undefined) : undefined)
+  let status: 'active' | 'expiring' | 'expired' | 'pending' = 'active'
+  let expiryDateStr = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split('T')[0]
+
+  if (rawEndDate) {
+    // Use parseTurkishDate first to avoid V8 Date constructor silently swapping
+    // day/month on Turkish DD.MM.YYYY strings when day ≤ 12 (see gotcha #52)
+    const parsedEnd = parseTurkishDate(rawEndDate)
+    let endDate: Date | null = null
+
+    if (parsedEnd) {
+      expiryDateStr = parsedEnd
+      endDate = new Date(parsedEnd + 'T00:00:00Z')
+    } else {
+      // Fallback for ISO datetimes (e.g. "2024-12-15T00:00:00Z") that parseTurkishDate doesn't cover
+      const d = new Date(rawEndDate)
+      if (!isNaN(d.getTime())) {
+        expiryDateStr = d.toISOString().split('T')[0]
+        endDate = d
+      } else {
+        expiryDateStr = rawEndDate // totally unparseable — keep raw string
+      }
+    }
+
+    if (endDate && !isNaN(endDate.getTime())) {
+      const daysUntilExpiry = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+
+      if (daysUntilExpiry < 0) {
+        status = 'expired'
+      } else if (daysUntilExpiry <= 30) {
+        status = 'expiring'
+      }
+    }
+  }
+
+  // Convert coverages with Turkish names and enhanced metadata
+  // Handle cases where AI returns description instead of name, or both are missing
+  // Resolution order for nameTr:
+  //   1. AI-provided nameTr (if different from name)
+  //   2. Lookup in canonical coverage names map
+  //   3. Fall back to English name
+  const coverages: Coverage[] = data.coverages.map((c) => {
+    const coverageName = c.name || c.description || 'Unnamed Coverage'
+    const aiNameTr = c.nameTr && c.nameTr !== coverageName ? c.nameTr : null
+    const mappedNameTr = lookupCoverageNameTr(coverageName)
+    return {
+      name: coverageName,
+      nameTr: aiNameTr ?? mappedNameTr ?? coverageName,
+      limit: c.limit ?? 0,
+      deductible: c.deductible ?? 0,
+      included: c.included ?? true,
+      description: c.description ?? undefined,
+      isUnlimited: c.isUnlimited ?? false,
+      isMarketValue: c.isMarketValue ?? false,
+      category: c.category ?? 'other',
+      importance: determineCoverageImportance(c),
+    }
+  })
+
+  // Get policy type - handle both camelCase and snake_case
+  const rawPolicyType = data.policyType ?? data.policy_type
+  const policyType = (
+    rawPolicyType && rawPolicyType in POLICY_TYPES ? rawPolicyType : 'home'
+  ) as PolicyType
+  const typeInfo = POLICY_TYPES[policyType]
+
+  if (rawPolicyType && !(rawPolicyType in POLICY_TYPES)) {
+    console.warn(
+      `[convertToAnalyzedPolicy] Unknown policy type: ${rawPolicyType}, falling back to 'home'`
+    )
+  }
+
+  // Calculate total coverage based on policy type
+  // For kasko: use vehicle value (main coverage or market value), NOT sum of all limits
+  // For other types: use the main coverage or sum of main coverages
+  let totalCoverage = calculateMainCoverage(policyType, coverages)
+
+  // Sigorta Bedeli raw text fallback for kasko/nakliyat — the AI may miss the
+  // sum insured when it appears in free-text paragraphs rather than structured
+  // tables (e.g., "sigorta bedeli ... (16750 -TL) sigortalanır").
+  if ((policyType === 'kasko' || policyType === 'nakliyat') && totalCoverage < 1000 && rawText) {
+    const bedelPatterns = [
+      /s[iİ]gorta\s+bedel[iİ][\s:.]*([\d.,]+)\s*[-–]?\s*(?:TL|TRY|₺)/i,
+      /\((\d[\d.,]*)\s*[-–]?\s*TL\)/i, // Parenthesized amount: (16750 -TL)
+    ]
+    for (const pat of bedelPatterns) {
+      const m = rawText.match(pat)
+      if (m?.[1]) {
+        const parsed = parseTurkishCurrency(m[1])
+        if (parsed && parsed > totalCoverage && parsed < 50_000_000) {
+          totalCoverage = parsed
+          break
+        }
+      }
+    }
+  }
+
+  // Handle premium - AI might return a number or an object with 'amount' field
+  let premiumValue = 0
+  let premiumMissing = true
+  if (typeof data.premium === 'number' && data.premium > 0) {
+    premiumValue = data.premium
+    premiumMissing = false
+  } else if (data.premium && typeof data.premium === 'object' && 'amount' in data.premium) {
+    const amt = (data.premium as { amount: number }).amount
+    if (amt > 0) {
+      premiumValue = amt
+      premiumMissing = false
+    }
+    console.warn('[convertToAnalyzedPolicy] Extracted premium from object:', premiumValue)
+  }
+
+  // Turkish premium magnitude sanity check — fix 100× / 1000× errors caused by
+  // AI mis-parsing Turkish thousands/decimal separators (e.g., "1.659,72 TL"
+  // becoming 165972 instead of 1659.72). Look for "Brüt Prim" / "Net Prim"
+  // strings in the raw text and re-parse with the locale-aware utility.
+  if (premiumValue > 0 && rawText) {
+    try {
+      // Match premium labels in raw text. Turkish İ (U+0130) is NOT case-folded
+      // by JS /i flag, so we match both ASCII i and İ explicitly with [iİ].
+      // "TOPLAM NET PRİM" has an intervening word — allow optional "NET".
+      const premiumPatterns = [
+        /(?:br[uü]t\s*pr[iİ]m)[\s:.]*([\d.,]+)\s*(?:TL|TRY|₺)?/i,
+        /(?:toplam\s+(?:net\s+)?pr[iİ]m)[\s:.]*([\d.,]+)\s*(?:TL|TRY|₺)?/i,
+        /(?:[oö]denecek\s*pr[iİ]m)[\s:.]*([\d.,]+)\s*(?:TL|TRY|₺)?/i,
+        /(?:net\s*pr[iİ]m)[\s:.]*([\d.,]+)\s*(?:TL|TRY|₺)?/i,
+      ]
+      for (const pat of premiumPatterns) {
+        const m = rawText.match(pat)
+        if (m && m[1]) {
+          const reparsed = parseTurkishCurrency(m[1])
+          if (reparsed && reparsed > 0) {
+            // If our extracted premium differs from re-parsed by ≥50× and
+            // the re-parsed value is plausible (< 500K TL for kasko), trust it
+            const ratio = premiumValue / reparsed
+            const isLikelyMisparsed =
+              (ratio >= 50 || ratio <= 0.02) && reparsed < 500000 && reparsed > 50
+            if (isLikelyMisparsed) {
+              console.warn(
+                `[convertToAnalyzedPolicy] Premium magnitude correction: ${premiumValue} → ${reparsed} (raw: "${m[0]}")`
+              )
+              premiumValue = reparsed
+              break
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[convertToAnalyzedPolicy] Premium re-parse failed:', err)
+    }
+  }
+
+  // Handle policyNumber - AI might return camelCase or snake_case
+  const policyNumber = data.policyNumber ?? data.policy_number ?? `POL-${Date.now()}`
+
+  // Handle provider - AI might return camelCase or snake_case
+  const provider = data.provider ?? data.provider ?? 'Unknown Provider'
+
+  // Handle insured - check multiple AI response patterns
+  const insuredPerson =
+    data.insuredName ??
+    data.insured_name ??
+    data.insuredPerson ??
+    data.policyholder ??
+    data.sigortalı ??
+    data.sigortali ??
+    undefined
+  const insuredMissing =
+    !insuredPerson ||
+    insuredPerson.trim() === '' ||
+    insuredPerson.toLowerCase() === 'unknown' ||
+    insuredPerson.toLowerCase() === 'bilinmiyor'
+
+  // Determine deductible uncertainty for KASKO
+  // For KASKO, deductible=0 from first coverage is NOT proof of zero deductible —
+  // it may just mean the AI didn't extract a specific deductible
+  const rawPolicyTypeForDeductible = data.policyType ?? data.policy_type
+  const isKaskoForDeductible = rawPolicyTypeForDeductible?.toLowerCase().includes('kasko') ?? false
+  const topDeductible = coverages[0]?.deductible ?? 0
+  const hasExplicitDeductible = data.coverages.some(
+    (c) => c.deductible !== undefined && c.deductible !== null && c.deductible > 0
+  )
+  const deductibleUncertain = isKaskoForDeductible && topDeductible === 0 && !hasExplicitDeductible
+
+  // Build extraction warnings for reviewer mode (Turkish for language consistency)
+  const extractionWarnings: string[] = []
+  if (premiumMissing) {
+    extractionWarnings.push('Prim bilgisi belgeden çıkarılamadı')
+  }
+  if (insuredMissing) {
+    extractionWarnings.push('Sigortalı kişi adı belgeden çıkarılamadı')
+  }
+  if (deductibleUncertain) {
+    extractionWarnings.push('Muafiyet durumu doğrulanamadı — koşullu muafiyetler olabilir')
+  }
+
+  // Coverage-limit plausibility check: flag potential AI mis-mapping
+  // Assistance/service coverages typically have lower limits than legal protection
+  if (isKaskoForDeductible) {
+    const assistanceCov = coverages.find(
+      (c) =>
+        c.category === 'assistance' ||
+        /\b(asistans|assist|service|servis|yol\s*yard)/i.test(c.name + ' ' + (c.nameTr || ''))
+    )
+    const legalCov = coverages.find(
+      (c) =>
+        c.category === 'legal' ||
+        /\b(hukuk|legal|protection|koruma)/i.test(c.name + ' ' + (c.nameTr || ''))
+    )
+    if (assistanceCov && legalCov && assistanceCov.limit > 0 && legalCov.limit > 0) {
+      if (assistanceCov.limit > legalCov.limit * 5) {
+        // Use a clean generic Turkish warning — avoid raw AI-extracted names
+        // which may have broken casing (e.g. "ANAdolu Hizmet")
+        extractionWarnings.push('Bazı teminat-limit eşleşmeleri ek kontrol gerektiriyor')
+      }
+    }
+  }
+
+  // Build the base policy first for risk assessment
+  const basePolicy: AnalyzedPolicy = {
+    id: crypto.randomUUID(),
+    policyNumber,
+    type: policyType,
+    typeTr: typeInfo.labelTr,
+    provider,
+    logo: '', // Would need to be mapped from provider name
+    coverage: totalCoverage,
+    premium: premiumValue,
+    monthlyPremium: premiumValue / 12,
+    deductible: coverages.length > 0 ? Math.max(0, ...coverages.map((c) => c.deductible ?? 0)) : 0,
+    startDate: (() => {
+      const rawStartDate = data.startDate ?? data.start_date
+      if (!rawStartDate) return now.toISOString().split('T')[0]
+      // Use parseTurkishDate first to avoid V8 DD.MM.YYYY day/month swap (gotcha #52)
+      const parsed = parseTurkishDate(rawStartDate)
+      if (parsed) return parsed
+      // Fallback for ISO datetimes
+      const sd = new Date(rawStartDate)
+      return !isNaN(sd.getTime()) ? sd.toISOString().split('T')[0] : rawStartDate
+    })(),
+    expiryDate: expiryDateStr,
+    status,
+    uploadDate: now.toISOString().split('T')[0],
+    fileName: file.name,
+    documentType: 'PDF',
+    documentUrl: URL.createObjectURL(file),
+    insuredPerson: insuredMissing
+      ? undefined
+      : normalizeTurkishLegalEntityName(insuredPerson ?? ''),
+    location: data.insuredAddress ?? data.insured_address ?? undefined,
+    insuredAddress: data.insuredAddress ?? data.insured_address ?? undefined,
+    insuredEntityType: data.insuredEntityType ?? undefined,
+    discounts: data.discounts ?? undefined,
+    // Extract vehicle metadata from raw text for kasko/traffic policies.
+    // The standard ExtractedPolicyData schema does not request vehicle fields,
+    // so we recover them from the document text via regex patterns.
+    // Also inject schema-extracted vehicleUsage
+    vehicleInfo: (() => {
+      const baseInfo =
+        (policyType === 'kasko' || policyType === 'traffic') && rawText
+          ? extractVehicleInfoFromText(rawText)
+          : undefined
+
+      if (!baseInfo && !data.vehicleUsage) return undefined
+      return {
+        ...(baseInfo || {}),
+        ...(data.vehicleUsage ? { usage: data.vehicleUsage } : {}),
+      }
+    })(),
+    coverages,
+    exclusions: data.exclusions,
+    exclusionsEn: ensureExclusionsEn(data.exclusions, data.exclusionsEn),
+    specialConditions: data.specialConditions,
+    insuranceLine: typeInfo.label,
+    // Currency might be in data.currency, data.premium.currency, or snake_case
+    currency:
+      data.currency ??
+      (data.premium && typeof data.premium === 'object'
+        ? (data.premium as { currency?: string }).currency
+        : undefined) ??
+      'TRY',
+    // Confidence might be a number (0.95) or an object ({ overall: 0.95, ... })
+    aiConfidence: (() => {
+      let conf =
+        typeof data.confidence === 'number' ? data.confidence : (data.confidence?.overall ?? 0.7)
+      // Bug #14: Penalize confidence by 15% if clause graph has candidate/unresolved edges
+      if (data.clauseGraph?.edges?.some((e) => e.isCandidate || !e.targetId)) {
+        conf = Math.max(0, conf * 0.85)
+      }
+      return conf
+    })(),
+    aiInsights: [],
+    marketComparison: await generateMarketComparisonAsync(data),
+    extractedText: rawText,
+    processedText: processedText || rawText, // Use processed text if available, otherwise raw
+    evidenceData: (() => {
+      const insights: Record<string, string> = {}
+      const exclusions: Record<string, string> = {}
+      const quoteTranslations = {
+        insights: {} as Record<string, string>,
+        exclusions: {} as Record<string, string>,
+      }
+
+      if (data.evidence?.insights) {
+        data.evidence.insights.forEach((i) => {
+          const key = i.text.trim().toLowerCase()
+          insights[key] = i.quote
+          if ('quoteTr' in i && typeof i.quoteTr === 'string') {
+            quoteTranslations.insights[key] = i.quoteTr
+          }
+        })
+      }
+      if (data.evidence?.exclusions) {
+        data.evidence.exclusions.forEach((e) => {
+          const key = e.text.trim().toLowerCase()
+          exclusions[key] = e.quote
+          if ('quoteTr' in e && typeof e.quoteTr === 'string') {
+            quoteTranslations.exclusions[key] = e.quoteTr
+          }
+        })
+      }
+      return { insights, exclusions, quoteTranslations }
+    })(),
+    safetyFlags: safetyResult?.flags,
+    safetyBlockReason: safetyResult?.blockReason,
+    premiumMissing,
+    insuredMissing,
+    deductibleUncertain,
+    extractionWarnings: extractionWarnings.length > 0 ? extractionWarnings : undefined,
+  }
+
+  // Prepend AI generated evidence-based insights
+  // Filter out personalization leaks: insights that compare the insured name
+  // against user identity (e.g., "This policy owner is not Erdem")
+  const aiInsightsEn = [...(basePolicy.aiInsightsEn || [])]
+  if (data.evidence?.insights) {
+    const filteredInsights = data.evidence.insights.filter((i) => !isPersonalizationLeak(i.text))
+    basePolicy.aiInsights = [
+      ...filteredInsights.map((i) => i.text.trim()),
+      ...basePolicy.aiInsights,
+    ]
+    const prependEn = filteredInsights.map((i) => i.textEn?.trim() || i.text.trim())
+    basePolicy.aiInsightsEn = [...prependEn, ...aiInsightsEn]
+  }
+
+  // Generate base strings (Strengths, Gaps, Recs)
+  const generatedInsights = await generateAIInsightsAsync(data)
+
+  // ── Bug #7 — Parts clause flag for older vehicles ─────────────────────
+  // Non-OEM (eşdeğer) or salvage (çıkma parça) parts materially affect repair
+  // quality on older cars. If vehicle age ≥7yr AND the policy text mentions
+  // these terms in exclusions or special conditions, surface a Turkish warning.
+  const partsClauseInsight = derivePartsClauseInsight(basePolicy, data)
+  if (partsClauseInsight) {
+    generatedInsights.unshift(partsClauseInsight)
+  }
+
+  // ── Reviewer-mode prioritization ──────────────────────────────────────
+  // Prepend extraction-quality warnings BEFORE generic insights so reviewers
+  // see the most critical correction points first.
+  if (extractionWarnings.length > 0) {
+    const warningInsights = extractionWarnings.map((w) => `⚠ ${w}`)
+    basePolicy.aiInsights = [...warningInsights, ...basePolicy.aiInsights, ...generatedInsights]
+  } else {
+    basePolicy.aiInsights.push(...generatedInsights)
+  }
+
+  // Pad the English array with the same generated insights
+  // (The UI will translate "Missing common coverage: X" automatically)
+  if (basePolicy.aiInsightsEn) {
+    if (extractionWarnings.length > 0) {
+      const warningInsightsEn = extractionWarnings.map((w) => `⚠ ${w}`)
+      basePolicy.aiInsightsEn = [
+        ...warningInsightsEn,
+        ...basePolicy.aiInsightsEn,
+        ...generatedInsights,
+      ]
+    } else {
+      basePolicy.aiInsightsEn.push(...generatedInsights)
+    }
+  }
+
+  // ── Suppress unprovenanced market commentary ─────────────────────────
+  // Percentile and YoY claims lack benchmark provenance metadata.
+  // Until provenance is wired, suppress these universally (not just when
+  // extraction warnings exist) to avoid presenting unverified market claims.
+  // Matches both English originals and Turkish translations.
+  {
+    const marketCommentaryPatterns = [
+      /premium is above \d+th percentile/i,
+      /prim \d+\.\s*yüzdeliğin üzerinde/i,
+      /market premiums increased \d+%/i,
+      /piyasa primleri yıllık %\d+ arttı/i,
+      /review coverage limits annually/i,
+      /lock in rates early/i,
+      /oranları erkenden sabitleyin/i,
+    ]
+    const isMarketCommentary = (insight: string) =>
+      marketCommentaryPatterns.some((p) => p.test(insight))
+    basePolicy.aiInsights = basePolicy.aiInsights.filter((i) => !isMarketCommentary(i))
+    if (basePolicy.aiInsightsEn) {
+      basePolicy.aiInsightsEn = basePolicy.aiInsightsEn.filter((i) => !isMarketCommentary(i))
+    }
+  }
+
+  // ── Final personalization leak sweep ─────────────────────────────────
+  // The initial filter runs on evidence.insights, but AI-generated insights
+  // from generateStrengths/generateGapsAsync or the sense-check endpoint
+  // can also inject identity comparisons. Sweep the final merged array.
+  basePolicy.aiInsights = basePolicy.aiInsights.filter((i) => !isPersonalizationLeak(i))
+  if (basePolicy.aiInsightsEn) {
+    basePolicy.aiInsightsEn = basePolicy.aiInsightsEn.filter((i) => !isPersonalizationLeak(i))
+  }
+
+  // Merge AI generated evidence-based exclusions if they aren't already grouped
+  if (data.evidence?.exclusions) {
+    const existingExclusions = new Set(basePolicy.exclusions.map((e) => e.toLowerCase().trim()))
+    const existingExclusionsEn = new Set(
+      (basePolicy.exclusionsEn || []).map((e) => e.toLowerCase().trim())
+    )
+
+    basePolicy.exclusionsEn = basePolicy.exclusionsEn || []
+
+    for (const e of data.evidence.exclusions) {
+      if (!existingExclusions.has(e.text.toLowerCase().trim())) {
+        basePolicy.exclusions.push(e.text)
+      }
+      if (e.textEn && !existingExclusionsEn.has(e.textEn.toLowerCase().trim())) {
+        // Find if this specific exclusion text was already in the Turkish list, if so, put its translation in the same index
+        const trIndex = basePolicy.exclusions.findIndex(
+          (trEx) => trEx.toLowerCase().trim() === e.text.toLowerCase().trim()
+        )
+        if (trIndex !== -1) {
+          basePolicy.exclusionsEn[trIndex] = e.textEn
+        } else {
+          basePolicy.exclusionsEn.push(e.textEn)
+        }
+      }
+    }
+  }
+
+  // Final pass: ensure every exclusion has an English translation
+  basePolicy.exclusionsEn = ensureExclusionsEn(basePolicy.exclusions, basePolicy.exclusionsEn)
+
+  // ── Semantic exclusion deduplication ──────────────────────────────────
+  // AI extraction often produces overlapping exclusions that describe the
+  // same restriction differently (e.g. "key left in ignition → theft" and
+  // "vehicle left running → theft"). Collapse semantically similar pairs.
+  {
+    const dedupResult = deduplicateExclusions(basePolicy.exclusions)
+    if (dedupResult.length < basePolicy.exclusions.length) {
+      // Rebuild English array from the kept indices
+      const keptIndicesSet = new Set(
+        dedupResult.map((kept) => basePolicy.exclusions.findIndex((e) => e === kept))
+      )
+      basePolicy.exclusions = dedupResult
+      if (basePolicy.exclusionsEn && basePolicy.exclusionsEn.length > 0) {
+        basePolicy.exclusionsEn = basePolicy.exclusionsEn.filter((_, idx) =>
+          keptIndicesSet.has(idx)
+        )
+      }
+    }
+  }
+
+  // ── Classify exclusions vs conditional deductibles ──────────────────
+  // AI extraction (legacy path) dumps everything into exclusions[]. Items
+  // that describe scenario-based deductibles (e.g. "%35 tenzili muafiyet")
+  // or repair conditions belong in a separate conditionalDeductibles
+  // section. classifyExclusions() splits them post-hoc via regex.
+  //
+  // Newer schema (Apr 2026+): the LLM may populate a structured
+  // `conditionalDeductibles` array directly. When non-empty, prefer the
+  // structured data (it carries explicit trigger/rate/evidence triplets
+  // that the regex path cannot reconstruct). We still run classifyExclusions
+  // to split the exclusions array, but we do not overwrite the structured
+  // conditionalDeductibles. Precedent: same conditional-merge pattern used
+  // for exclusionsEn above.
+  {
+    const classified = classifyExclusions(basePolicy.exclusions)
+    basePolicy.exclusions = classified.trueExclusions
+    const llmProvided = Array.isArray(data.conditionalDeductibles)
+      ? data.conditionalDeductibles.filter((d) => d && typeof d === 'object')
+      : []
+    if (llmProvided.length > 0) {
+      // Keep LLM-structured entries as-is (plus any regex-derived strings as
+      // additional context). Store as stringified "trigger — rate — evidence"
+      // to match AnalyzedPolicy.conditionalDeductibles shape (string[]).
+      const fromLlm = llmProvided.map((d) =>
+        `${d.trigger || ''} — ${d.rate || ''}${d.evidence ? ` (${d.evidence})` : ''}`.trim()
+      )
+      basePolicy.conditionalDeductibles = [...fromLlm, ...classified.conditionalDeductibles]
+    } else {
+      basePolicy.conditionalDeductibles = classified.conditionalDeductibles
+    }
+    if (classified.maxDeductiblePercent > 0) {
+      basePolicy.deductiblePercent = classified.maxDeductiblePercent
+    }
+    // Rebuild English arrays if they exist
+    if (basePolicy.exclusionsEn && basePolicy.exclusionsEn.length > 0) {
+      const trueIndices = classified.trueExclusionIndices
+      basePolicy.exclusionsEn = basePolicy.exclusionsEn.filter((_, idx) => trueIndices.has(idx))
+    }
+  }
+
+  // ── Two-layer deductible reporting ─────────────────────────────────
+  // Once classifyExclusions has run, we know whether explicit conditional
+  // deductibles were detected. If so, deductible status is NOT uncertain —
+  // it is "explicit but conditional", which the UI handles with richer text.
+  // Clear the uncertainty flag and remove any "doğrulanamadı" extraction
+  // warning to avoid contradicting the deductible section users will see.
+  if (
+    basePolicy.conditionalDeductibles &&
+    basePolicy.conditionalDeductibles.length > 0 &&
+    basePolicy.deductibleUncertain
+  ) {
+    basePolicy.deductibleUncertain = false
+    if (basePolicy.extractionWarnings && basePolicy.extractionWarnings.length > 0) {
+      basePolicy.extractionWarnings = basePolicy.extractionWarnings.filter(
+        (w) => !/muafiyet.*do[ğg]rulanamad/i.test(w)
+      )
+      if (basePolicy.extractionWarnings.length === 0) {
+        basePolicy.extractionWarnings = undefined
+      }
+    }
+    // Also strip the warning insight from aiInsights so it doesn't render
+    if (basePolicy.aiInsights && basePolicy.aiInsights.length > 0) {
+      basePolicy.aiInsights = basePolicy.aiInsights.filter(
+        (i) => !/muafiyet.*do[ğg]rulanamad/i.test(i)
+      )
+    }
+    if (basePolicy.aiInsightsEn && basePolicy.aiInsightsEn.length > 0) {
+      basePolicy.aiInsightsEn = basePolicy.aiInsightsEn.filter(
+        (i) => !/deductible.*not\s*confirmed|deductible.*could\s*not/i.test(i)
+      )
+    }
+  }
+
+  // ── Mini repair confidence downgrade ───────────────────────────────
+  // Mini repair/onarım coverages with numeric limits may be AI mis-extractions.
+  // If the limit seems implausible for a service-type coverage, downgrade to
+  // a reviewer-safe label instead of presenting a possibly incorrect amount.
+  for (const c of basePolicy.coverages) {
+    const nameLower = (c.name + ' ' + (c.nameTr || '')).toLowerCase()
+    if (/mini\s*(onar[ıi]m|repair)/i.test(nameLower)) {
+      if (c.limit > 0 && !c.isMarketValue) {
+        // Service-type coverages rarely have explicit monetary limits.
+        // Downgrade to included-with-review unless the amount is very small
+        // (under 5000 TRY) which could be a legitimate mini repair cap.
+        if (c.limit > 5000) {
+          c.limit = 0
+          c.included = true
+          // nameTr will be set by the coverage-names map during rendering
+        }
+      }
+    }
+  }
+
+  // Calculate ML-based risk score
+  try {
+    const quickRisk = RiskAssessmentService.getQuickRiskScore(basePolicy)
+    const actionItems = RiskAssessmentService.getActionItems(basePolicy)
+
+    basePolicy.riskScore = {
+      overall: quickRisk.score,
+      level: quickRisk.level,
+      topIssue: quickRisk.topIssue,
+      confidence: data.confidence?.overall ?? 0.7,
+    }
+
+    basePolicy.riskActions = actionItems
+  } catch {
+    // Risk scoring is optional, continue without it
+  }
+
+  // Perform comprehensive gap analysis
+  try {
+    const gapAnalysis = await GapDetectionService.analyzePolicy(basePolicy)
+    const actionItems = await GapDetectionService.getActionItems(basePolicy)
+
+    basePolicy.gapAnalysis = {
+      overallScore: gapAnalysis.overallScore,
+      criticalCount: gapAnalysis.gapCount.critical,
+      highCount: gapAnalysis.gapCount.high,
+      totalCount: gapAnalysis.gapCount.total,
+      topIssue: gapAnalysis.prioritizedGaps[0]?.gap.title ?? null,
+      topIssueTr: gapAnalysis.prioritizedGaps[0]?.gap.titleTr ?? null,
+      financialExposure: gapAnalysis.financialSummary.totalExpectedLoss,
+      remediationCost: gapAnalysis.financialSummary.estimatedRemediationCost,
+    }
+
+    basePolicy.gapActions = actionItems
+  } catch {
+    // Gap analysis is optional, continue without it
+  }
+
+  // Phase 4: Unified Analysis Bundle Engine
+  try {
+    const defaultValidation = { isValid: true, flags: [] }
+    const validationRes = {
+      isValid: safetyResult?.isValid ?? defaultValidation.isValid,
+      flags: (safetyResult?.flags ?? defaultValidation.flags).map((f) => ({
+        ...f,
+        ruleId: 'MIGRATION_PLACEHOLDER',
+      })),
+      blockReason: safetyResult?.blockReason,
+    }
+
+    basePolicy.analysisBundle = generateAnalysisBundle(basePolicy.id, data, validationRes)
+  } catch (err) {
+    console.error('[PolicyExtractor] Failed to generate AnalysisBundle', err)
+  }
+
+  // ── Source-level deduplication ──────────────────────────────────────
+  // Evidence-based insights (Turkish) and generated insights (English) can
+  // express the same idea. Dedup BEFORE translation so parallel arrays
+  // (aiInsights, aiInsightsTr, aiInsightsEn) stay index-aligned.
+  //
+  // Cross-language dedup: an insight expressed in EN and an equivalent in TR
+  // would survive plain string dedup. We canonicalize each insight by trying
+  // BOTH translation directions (translateInsightToTr and translateInsightToEn)
+  // and using the lexicographically smallest variant as the dedup key, so any
+  // pair of {EN,TR} variants of the same insight collapse to one entry.
+  {
+    const seen = new Set<string>()
+    const keepIndices: number[] = []
+    const stripAndNormalize = (s: string) =>
+      s
+        // eslint-disable-next-line no-misleading-character-class
+        .replace(/^[✓✔☑⚠💡❌🔍\uFE0F]\s*/gu, '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+
+    for (let idx = 0; idx < basePolicy.aiInsights.length; idx++) {
+      const raw = basePolicy.aiInsights[idx]
+      const baseNorm = stripAndNormalize(raw)
+      // Cross-language canonicalization via translation map (best-effort)
+      const trVariant = stripAndNormalize(translateInsightToTr(raw))
+      const enVariant = stripAndNormalize(translateInsightToEn(raw))
+      // Pick the lexicographically smallest non-empty variant as the canonical key
+      const canonical =
+        [baseNorm, trVariant, enVariant].filter((s) => s.length > 0).sort()[0] || baseNorm
+
+      if (!seen.has(canonical)) {
+        seen.add(canonical)
+        keepIndices.push(idx)
+      }
+    }
+    if (keepIndices.length < basePolicy.aiInsights.length) {
+      basePolicy.aiInsights = keepIndices.map((idx) => basePolicy.aiInsights[idx])
+      const insightsEn = basePolicy.aiInsightsEn
+      if (insightsEn) {
+        basePolicy.aiInsightsEn = keepIndices.map((idx) => insightsEn[idx])
+      }
+    }
+  }
+
+  // ── Reviewer-mode insight sanitization ────────────────────────────────
+  // Runs on the final merged array BEFORE translation. Handles:
+  // - Promotional/sales wording removal (Excellent, advantage, etc.)
+  // - English→Turkish normalization for mixed-language bullets
+  // - Duplicated fragment cleanup (e.g. "unlimited...unlimited" assembly)
+  // - Evidence-first ordering
+  basePolicy.aiInsights = sanitizeReviewerInsights(basePolicy.aiInsights)
+  if (basePolicy.aiInsightsEn) {
+    // Keep English array aligned by length (may be shorter after sanitization)
+    basePolicy.aiInsightsEn = basePolicy.aiInsightsEn.slice(0, basePolicy.aiInsights.length)
+  }
+
+  // Translate final aiInsights to Turkish (after all modifications like validation warnings)
+  basePolicy.aiInsightsTr = translateInsightsToTr(basePolicy.aiInsights)
+
+  return basePolicy
+}
+
+/**
+ * Determine coverage importance based on category and characteristics
+ */
+export function determineCoverageImportance(coverage: ExtractedCoverage): CoverageImportance {
+  const nameLower = getCoverageName(coverage)
+
+  // Critical coverages - main coverage, high limits, or essential protections
+  if (coverage.category === 'main') return 'critical'
+  if (coverage.isMarketValue) return 'critical'
+  if (coverage.isUnlimited) return 'critical'
+
+  // Standard coverages - liability, legal, most supplementary
+  if (coverage.category === 'liability') return 'standard'
+  if (coverage.category === 'legal') return 'standard'
+  if (coverage.limit && coverage.limit >= 100000) return 'standard'
+
+  // Check for important coverage names
+  if (nameLower.includes('mali sorumluluk')) return 'standard'
+  if (nameLower.includes('hırsızlık')) return 'standard'
+  if (nameLower.includes('deprem')) return 'standard'
+  if (nameLower.includes('yangın')) return 'standard'
+
+  // Minor coverages - assistance, small limits
+  if (coverage.category === 'assistance') return 'minor'
+  if (coverage.limit && coverage.limit < 50000) return 'minor'
+
+  return 'standard'
+}
+
+/**
+ * Calculate the main coverage value based on policy type
+ * For kasko: use vehicle value (Rayiç Değer) or main coverage, NOT sum of all limits
+ * For other types: use sum of main coverages or highest coverage
+ */
+export function calculateMainCoverage(policyType: PolicyType, coverages: Coverage[]): number {
+  // For kasko and nakliyat: find the main/vehicle coverage
+  if (policyType === 'kasko' || policyType === 'nakliyat') {
+    // Look for market value coverage first
+    const marketValueCoverage = coverages.find((c) => c.isMarketValue)
+    if (marketValueCoverage) {
+      // Market value - use 0 as placeholder since actual value varies
+      // The display should show "Rayiç Değer" instead of a number
+      return 0
+    }
+
+    // Look for main category coverage
+    const mainCoverage = coverages.find((c) => c.category === 'main' && c.limit > 0)
+    if (mainCoverage) {
+      return mainCoverage.limit
+    }
+
+    // Look for coverage that looks like vehicle value
+    const vehicleValue = coverages.find((c) => {
+      const nameLower = getCoverageName(c)
+      return (
+        (nameLower.includes('araç bedeli') ||
+          nameLower.includes('araç değeri') ||
+          nameLower.includes('sigorta bedeli') ||
+          (nameLower.includes('kasko') && !nameLower.includes('mali'))) &&
+        c.limit > 0
+      )
+    })
+    if (vehicleValue) {
+      return vehicleValue.limit
+    }
+
+    // Fallback: find the highest non-liability coverage
+    const nonLiabilityCoverages = coverages.filter((c) => {
+      const nameLower = getCoverageName(c)
+      return (
+        c.category !== 'liability' &&
+        !nameLower.includes('mali sorumluluk') &&
+        !nameLower.includes('hukuki') &&
+        c.limit > 0
+      )
+    })
+    if (nonLiabilityCoverages.length > 0) {
+      return Math.max(...nonLiabilityCoverages.map((c) => c.limit))
+    }
+  }
+
+  // For traffic insurance: use the highest bodily injury limit
+  if (policyType === 'traffic') {
+    const bodilyInjury = coverages.find((c) => {
+      const nameLower = getCoverageName(c)
+      return nameLower.includes('bedeni') || nameLower.includes('ölüm')
+    })
+    if (bodilyInjury && bodilyInjury.limit > 0) {
+      return bodilyInjury.limit
+    }
+  }
+
+  // For other policy types: sum only main category coverages, or use highest
+  const mainCoverages = coverages.filter((c) => c.category === 'main' && c.limit > 0)
+  if (mainCoverages.length > 0) {
+    return mainCoverages.reduce((sum, c) => sum + c.limit, 0)
+  }
+
+  // Fallback: use the highest individual coverage limit
+  const validLimits = coverages.filter((c) => c.limit > 0).map((c) => c.limit)
+  if (validLimits.length > 0) {
+    return Math.max(...validLimits)
+  }
+
+  return 0
+}
+
+/**
+ * Detect personalization leaks in AI-generated insights.
+ * The AI sometimes injects identity comparisons like
+ * "This policy owner is not Erdem" which must never appear in output.
+ */
+function isPersonalizationLeak(text: string): boolean {
+  const lower = text.toLowerCase()
+  // "policy owner is not X" / "insured name: X" identity comparison patterns
+  if (/policy\s+owner\s+is\s+not\b/i.test(lower)) return true
+  if (/this\s+policy\s+.*\s+is\s+not\s+/i.test(lower)) return true
+  // "✗ ... not <Name> (insured name: ...)" pattern
+  if (/not\s+\w+\s*\(insured\s+name/i.test(lower)) return true
+  // Generic "insured.*is not <proper noun>" comparison
+  if (/insured\s+(?:person|name|party)\s+is\s+not\b/i.test(lower)) return true
+  // Turkish variants: "poliçe sahibi ... değil" identity comparison
+  if (/poli[çc]e\s+sahibi\b.*\bde[ğg]il/i.test(lower)) return true
+  // "owner is not" / "sahibi ... değil" with any prefix
+  if (/\bowner\s+is\s+not\b/i.test(lower)) return true
+  // Catch "is not <ProperName>." at end of sentence (the period-terminated form)
+  // Exclude common non-identity phrases: "is not included", "is not covered", "is not available"
+  if (/\bis\s+not\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+\.?\s*$/.test(text)) {
+    const trailingWord = text.match(/\bis\s+not\s+(\w+)\.?\s*$/)?.[1]?.toLowerCase()
+    const nonIdentityWords = [
+      'included',
+      'covered',
+      'available',
+      'applicable',
+      'recommended',
+      'required',
+      'specified',
+      'confirmed',
+    ]
+    if (trailingWord && !nonIdentityWords.includes(trailingWord)) return true
+  }
+  return false
+}
+
+/**
+ * Sanitize reviewer-mode insights: enforce Turkish, strip promotional wording,
+ * fix duplicated fragment assembly, reorder to evidence-first.
+ *
+ * Runs AFTER dedup, BEFORE translation. The primary aiInsights array is the
+ * canonical source; aiInsightsTr is derived from it.
+ */
+function sanitizeReviewerInsights(insights: string[]): string[] {
+  const result: string[] = []
+
+  for (const raw of insights) {
+    const line = raw
+
+    // ── Strip emoji prefix for analysis, re-add later ──
+    // eslint-disable-next-line no-misleading-character-class
+    const prefixMatch = line.match(/^([✓✔☑⚠💡❌🔍\uFE0F]\s*)/u)
+    const prefix = prefixMatch ? prefixMatch[1] : ''
+    let body = prefix ? line.slice(prefix.length).trim() : line.trim()
+
+    // ── BLOCK: Promotional / sales wording ──
+    // "Excellent", "advantage", "perfect", "best", "superior"
+    if (/\b(excellent|advantage|perfect|best|superior|outstanding)\b/i.test(body)) {
+      // Rewrite to neutral Turkish evidence phrasing
+      if (/comprehensive.*coverage|kasko.*coverage|market.*value/i.test(body)) {
+        body =
+          'Kasko ana teminatı araç piyasa değeri üzerinden tanımlanmış görünüyor; standart kapsam ayrıntıları poliçe şartlarıyla doğrulanmalı'
+      } else if (/glass|cam/i.test(body)) {
+        body = 'Cam teminatı koşulları özel şartlarla doğrulanmalı'
+      } else if (/excess.*liab|mali.*mesuliyet|ihtiyari/i.test(body)) {
+        body =
+          'İhtiyari mali mesuliyet teminatı mevcut görünüyor; kapsam üst sınırı ve istisnalar poliçe şartlarından doğrulanmalı'
+      } else {
+        // Generic neutralization
+        body = body
+          .replace(/\b(excellent|advantage|perfect|best|superior|outstanding)\b/gi, '')
+          .replace(/\s{2,}/g, ' ')
+          .trim()
+        if (!body) continue // empty after stripping
+      }
+    }
+
+    // ── FIX: Duplicated fragment assembly ──
+    // Detect patterns like "X - X protection for Y" where X repeats
+    // e.g. "Generally unlimited...sublimits...carve-outs excess liability - Generally unlimited...sublimits...carve-outs protection"
+    if (/generally unlimited.*generally unlimited/i.test(body)) {
+      body =
+        'İhtiyari mali mesuliyet teminatı mevcut görünüyor; kapsam üst sınırı genel olarak geniş olmakla birlikte alt limitler ve istisnalar poliçe şartlarından doğrulanmalı'
+    }
+
+    // ── FIX: Remaining English-only insights → Turkish ──
+    // Evidence insights from AI may be fully English. Translate known patterns.
+    if (/^[A-Za-z]/.test(body) && !/[çğıöşüÇĞİÖŞÜ]/.test(body)) {
+      // Fully English body — translate via the insight translator
+      const translated = translateInsightToTr(body)
+      if (translated !== body) {
+        body = translated
+      } else {
+        // No translation found — try applySafeWording to at least neutralize
+        body = applySafeWordingForInsight(body)
+      }
+    }
+
+    // ── FIX: Glass-related promotional patterns ──
+    if (/glass.*(?:bonus|advantage|doesn.?t affect)/i.test(body)) {
+      body = 'Cam teminatı koşulları özel şartlarla doğrulanmalı'
+    }
+    if (/first.*glass.*replacement.*(?:no.?claims|bonus)/i.test(body)) {
+      body = 'Cam teminatı koşulları özel şartlarla doğrulanmalı'
+    }
+
+    // ── Evidence-softening: replace overclaiming with hedged observation ──
+    // "X teminatı mevcut" → "X teminatı mevcut görünüyor; ... doğrulanmalı"
+    // "X teminat altında" → "X teminat altında olabilir; ... doğrulanmalı"
+    body = softenReviewerInsight(body)
+
+    result.push(prefix ? `${prefix}${body}` : body)
+  }
+
+  // ── Evidence-first ordering ──
+  // a) ⚠ review-required / uncertainty
+  // b) ✓ material coverage observations
+  // c) other (special conditions etc.)
+  // d) 💡 benchmark / recommendations (last)
+  const warnings = result.filter((i) => i.startsWith('⚠'))
+  const observations = result.filter((i) => i.startsWith('✓'))
+  const recommendations = result.filter((i) => i.startsWith('💡'))
+  const other = result.filter(
+    (i) => !i.startsWith('⚠') && !i.startsWith('✓') && !i.startsWith('💡')
+  )
+
+  return [...warnings, ...observations, ...other, ...recommendations]
+}
+
+/**
+ * Normalize Turkish legal entity name spacing.
+ * Handles OCR/AI artifacts like "LİMİTEDŞİRKETİ" → "LİMİTED ŞİRKETİ"
+ */
+function normalizeTurkishLegalEntityName(name: string): string {
+  if (!name) return name
+  let result = name
+  // Insert space before common Turkish legal suffixes that are merged
+  // LİMİTEDŞİRKETİ → LİMİTED ŞİRKETİ
+  result = result.replace(/LİMİTED(?=ŞİRKET)/g, 'LİMİTED ')
+  // ANONİMŞİRKETİ → ANONİM ŞİRKETİ
+  result = result.replace(/ANONİM(?=ŞİRKET)/g, 'ANONİM ')
+  // TİCARETLİMİTED → TİCARET LİMİTED
+  result = result.replace(/TİCARET(?=LİMİTED)/g, 'TİCARET ')
+  // SANAYİVE → SANAYİ VE
+  result = result.replace(/SANAYİ(?=VE\s)/g, 'SANAYİ ')
+  // Lowercase variants
+  result = result.replace(/limited(?=şirket)/gi, 'limited ')
+  result = result.replace(/anonim(?=şirket)/gi, 'anonim ')
+  result = result.replace(/ticaret(?=limited)/gi, 'ticaret ')
+  // Collapse any resulting double spaces
+  result = result.replace(/\s{2,}/g, ' ').trim()
+  return result
+}
+
+/**
+ * Deduplicate semantically overlapping exclusions.
+ * Groups exclusions by semantic key-phrase clusters. When two exclusions
+ * share a cluster, the longer (more informative) one is kept.
+ */
+/**
+ * Classify exclusions into true exclusions vs conditional deductibles.
+ * Items that describe percentage-based deductibles, repair conditions,
+ * or application-specific muafiyet rules are separated from true
+ * non-coverage exclusions (theft scenarios, licence requirements, etc.).
+ */
+function classifyExclusions(exclusions: string[]): {
+  trueExclusions: string[]
+  conditionalDeductibles: string[]
+  trueExclusionIndices: Set<number>
+  /** Highest percentage-based deductible found (e.g., 35 for "35% tenzili muafiyet") */
+  maxDeductiblePercent: number
+} {
+  const conditionalPatterns = [
+    /muafiyet/i, // "muafiyet" = deductible
+    /tenzil/i, // "tenzili muafiyet" = applied deductible
+    /%\s*\d+/i, // percentage like %35
+    /\d+\s*%/i, // percentage like 35%
+    /anlaşmalı olmayan.*servis/i, // non-contracted repair
+    /anlaşmasız.*servis/i, // same variant
+    /onarım.*muafiyet/i, // repair deductible
+    /pert.*muafiyet/i, // total loss deductible
+    /pert.*tenzil/i, // total loss applied deductible
+  ]
+
+  const trueExclusions: string[] = []
+  const conditionalDeductibles: string[] = []
+  const trueExclusionIndices = new Set<number>()
+  let maxDeductiblePercent = 0
+
+  for (let i = 0; i < exclusions.length; i++) {
+    const text = exclusions[i]
+    const isConditional = conditionalPatterns.some((p) => p.test(text))
+    if (isConditional) {
+      // Extract percentage value if present (e.g., "35%" or "%35")
+      const pctMatch = text.match(/(\d{1,3})\s*%/) || text.match(/%\s*(\d{1,3})/)
+      if (pctMatch) {
+        const pct = parseInt(pctMatch[1], 10)
+        if (pct > 0 && pct <= 100 && pct > maxDeductiblePercent) {
+          maxDeductiblePercent = pct
+        }
+      }
+      // Apply evidence-softened wording
+      conditionalDeductibles.push(softenConditionalDeductible(text))
+    } else {
+      trueExclusions.push(text)
+      trueExclusionIndices.add(i)
+    }
+  }
+
+  return { trueExclusions, conditionalDeductibles, trueExclusionIndices, maxDeductiblePercent }
+}
+
+function deduplicateExclusions(exclusions: string[]): string[] {
+  if (exclusions.length <= 1) return exclusions
+
+  // Semantic clusters: each array of keywords defines one concept.
+  // If two exclusions both match the same cluster, they are duplicates.
+  const clusters: string[][] = [
+    ['anahtar', 'kontak', 'çalın'], // key-in-ignition theft
+    ['çalışır', 'vaziyette', 'çalın'], // vehicle-left-running theft
+    ['ehliyet', 'sürücü belgesi', 'kullanım'], // no valid licence
+    ['özel tertibatlı', 'ruhsat', 'tescil'], // special vehicle registration
+  ]
+
+  // For each exclusion, find which clusters it matches
+  const exclusionClusters: Map<number, number[]> = new Map()
+  for (let i = 0; i < exclusions.length; i++) {
+    const lower = exclusions[i].toLowerCase()
+    const matched: number[] = []
+    for (let c = 0; c < clusters.length; c++) {
+      const hits = clusters[c].filter((kw) => lower.includes(kw))
+      if (hits.length >= 2) matched.push(c) // require 2+ keyword hits
+    }
+    exclusionClusters.set(i, matched)
+  }
+
+  // Group exclusions by cluster. For each cluster, keep the longest.
+  const keptIndices = new Set<number>()
+  const clusterWinner = new Map<number, number>() // cluster → winning exclusion index
+
+  for (let i = 0; i < exclusions.length; i++) {
+    const myClust = exclusionClusters.get(i) || []
+    if (myClust.length === 0) {
+      keptIndices.add(i) // no cluster match → always keep
+      continue
+    }
+    let dominated = false
+    for (const c of myClust) {
+      const existing = clusterWinner.get(c)
+      if (existing !== undefined) {
+        // This cluster already has a winner — keep the longer one
+        if (exclusions[i].length > exclusions[existing].length) {
+          keptIndices.delete(existing)
+          keptIndices.add(i)
+          clusterWinner.set(c, i)
+        }
+        dominated = true
+      } else {
+        clusterWinner.set(c, i)
+        keptIndices.add(i)
+      }
+    }
+    if (!dominated) keptIndices.add(i)
+  }
+
+  // Preserve original order
+  return exclusions.filter((_, idx) => keptIndices.has(idx))
+}
+
+/**
+ * Safely get lowercase name from coverage, handling undefined/null
+ */
+export function getCoverageName(
+  coverage: { name?: string | null; description?: string | null } | undefined | null
+): string {
+  if (!coverage) return ''
+  // Try name first, fall back to description
+  return (coverage.name || coverage.description || '').toLowerCase()
+}
+
+/**
+ * Lightweight safe-wording for insight strings that remain in English.
+ * Mirrors the key patterns from display-interpreter's applySafeWording
+ * without importing it (to avoid circular dependency).
+ */
+function applySafeWordingForInsight(text: string): string {
+  return text
+    .replace(/\bunlimited\b/gi, 'genel olarak geniş kapsamlı, alt limitler ve istisnalara tabi')
+    .replace(/\bfully covered\b/gi, 'poliçe koşullarına tabi kapsam')
+    .replace(/\bfull protection\b/gi, 'poliçe koşullarına tabi koruma')
+    .replace(/\bno deductible\b/gi, 'muafiyet durumu senaryoya bağlıdır')
+    .replace(/\bguaranteed\b/gi, 'poliçe şartlarına tabi')
+}
+
+/**
+ * Soften overclaiming Turkish insight phrasing to reviewer-safe evidence language.
+ * Transforms assertive claims into hedged observations.
+ */
+function softenReviewerInsight(text: string): string {
+  let s = text
+
+  // "X teminatı mevcut" → "X teminatı mevcut görünüyor; uygulama koşulları doğrulanmalı"
+  // but only if not already hedged
+  if (/teminat[ıi]\s+mevcut\b/i.test(s) && !/görünüyor|doğrulanmalı|olabilir/.test(s)) {
+    s = s.replace(
+      /teminat([ıi])\s+mevcut\b/gi,
+      'teminat$1 mevcut görünüyor; uygulama koşulları doğrulanmalı'
+    )
+  }
+
+  // "X teminat altında" → "X teminat altında olabilir; kapsam doğrulanmalı"
+  if (/teminat\s+altında\b/i.test(s) && !/olabilir|doğrulanmalı|görünüyor/.test(s)) {
+    s = s.replace(/teminat\s+altında\b/gi, 'teminat altında olabilir; kapsam ve limit doğrulanmalı')
+  }
+
+  // "da teminat altında" at end → soften
+  if (/da\s+teminat\s+altında\s*$/i.test(s) && !/olabilir|doğrulanmalı/.test(s)) {
+    s = s.replace(
+      /da\s+teminat\s+altında\s*$/i,
+      'ilişkin ek teminat kaydı bulunuyor olabilir; kapsam ve limit doğrulanmalı'
+    )
+  }
+
+  // "tespit edildi" without hedge → "tespit edilmiş görünüyor; ... doğrulanmalı"
+  // But only for ✓ style observations, not ⚠ warnings
+  if (/tespit edildi\b/i.test(s) && !/görünüyor|doğrulanmalı|gözden geçirilmeli/.test(s)) {
+    s = s.replace(/tespit edildi\b/gi, 'tespit edilmiş görünüyor; uygulama koşulları doğrulanmalı')
+  }
+
+  return s
+}
+
+/**
+ * Soften a conditional deductible statement to reviewer-safe evidence language.
+ * Replaces assertive phrasing with hedged observation language.
+ */
+function softenConditionalDeductible(text: string): string {
+  let softened = text
+  // "uygulanır" (is applied) → "uygulanabileceği görülüyor" (appears to be applicable)
+  softened = softened.replace(/uygulanır\b/gi, 'uygulanabileceği görülüyor')
+  // "uygulanması" (application of) → "uygulanabileceği görülüyor" if at end
+  if (/uygulanması\s*$/.test(softened)) {
+    softened = softened.replace(/uygulanması\s*$/, 'uygulanabileceği görülüyor')
+  }
+  // If no transformation happened, add a hedge
+  if (softened === text && !/görülüyor|görünüyor|anlaşılıyor|olabilir/.test(softened)) {
+    softened = softened + ' şartı bulunduğu anlaşılıyor'
+  }
+  return softened
+}
