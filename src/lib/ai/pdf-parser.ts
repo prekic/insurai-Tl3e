@@ -349,11 +349,11 @@ export async function extractTextFromPDF(
           .replace(/\s+/g, ' ')
           .trim()
 
-        textContent.push(pageText)
+        textContent.push(`[PAGE ${pageNum}]\n${pageText}`)
       } catch (pageError) {
         // Log but continue - partial extraction is better than complete failure
         console.warn(`[PDF.js] Failed to extract page ${pageNum}:`, pageError)
-        textContent.push('') // Add empty string to maintain page count
+        textContent.push(`[PAGE ${pageNum}]\n`) // Add empty string to maintain page count
       }
     }
 

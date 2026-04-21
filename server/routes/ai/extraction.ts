@@ -33,6 +33,8 @@ import * as adminNotificationService from '../../services/admin-notification-ser
 import { getAIConfig } from '../../services/config-service.js'
 import { sendExtractionCompleteNotification } from '../../services/notification-service.js'
 import { getExtractionPrompt } from '../../services/prompt-service.js'
+import { buildAnthropicSchemaPrompt, type ConfidenceWeights } from '../../lib/ai-prompts.js'
+import { recordExtractionEvent, recordOverviewMetrics } from './shared.js'
 
 const log = logger.child('AI')
 
@@ -1578,6 +1580,11 @@ router.post(
  * 2. API key in header (X-goog-api-key) - keeps key out of URLs/logs
  * 3. API key in query param (fallback) - less secure, visible in logs
  */
+interface DocumentAIResponse {
+  error?: { message: string }
+  document?: any
+}
+
 router.post('/ocr', validateJSON, ocrLimiter, validateOCR, async (req: Request, res: Response) => {
   try {
     // Only attempt OAuth if service account credentials exist (avoids wasted async call)
@@ -1917,7 +1924,7 @@ router.post(
           // Process header rows
           const headerRowCount = table.headerRows?.length || 0
           for (const row of table.headerRows || []) {
-            const cells = (row.cells || []).map((cell) => ({
+            const cells = (row.cells || []).map((cell: any) => ({
               text: cell.layout?.textAnchor?.content?.trim() || '',
               rowSpan: cell.rowSpan || 1,
               colSpan: cell.colSpan || 1,
@@ -1928,7 +1935,7 @@ router.post(
 
           // Process body rows
           for (const row of table.bodyRows || []) {
-            const cells = (row.cells || []).map((cell) => ({
+            const cells = (row.cells || []).map((cell: any) => ({
               text: cell.layout?.textAnchor?.content?.trim() || '',
               rowSpan: cell.rowSpan || 1,
               colSpan: cell.colSpan || 1,

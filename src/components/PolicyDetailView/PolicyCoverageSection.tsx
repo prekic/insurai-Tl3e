@@ -276,7 +276,7 @@ function CollapsibleCoverageCategory({
             limitDisplay === t.global.marketValue
           const infoText = getCoverageInfoText(coverage, locale, t, formatAmount)
           const isCoverageExpanded = expandedCoverageIndex === i
-          const hasInfo = !!infoText
+          const hasInfo = !!infoText || !!coverage.page || !!coverage.clause || !!coverage.quote
 
           return (
             <div key={i} className="rounded-lg bg-gray-50 overflow-hidden">
@@ -313,10 +313,46 @@ function CollapsibleCoverageCategory({
               </button>
 
               {/* Expanded info section */}
-              {isCoverageExpanded && infoText && (
+              {isCoverageExpanded && hasInfo && (
                 <div className="px-2.5 pb-2.5">
                   <div className="p-2 bg-blue-50 rounded-md border border-blue-100 ml-8">
-                    <p className="text-xs text-gray-600 leading-relaxed">{infoText}</p>
+                    {infoText && (
+                      <p className="text-xs text-gray-600 leading-relaxed">{infoText}</p>
+                    )}
+
+                    {(coverage.page || coverage.clause || coverage.quote) && (
+                      <div
+                        className={
+                          infoText ? 'mt-2 pt-2 border-t border-blue-200/60 font-mono' : 'font-mono'
+                        }
+                      >
+                        {(coverage.page || coverage.clause) && (
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            {coverage.page && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] bg-white text-blue-700 border-blue-200 py-0.5 leading-tight rounded"
+                              >
+                                {locale === 'tr' ? 'Sayfa' : 'Page'} {coverage.page}
+                              </Badge>
+                            )}
+                            {coverage.clause && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] bg-white text-blue-700 border-blue-200 py-0.5 leading-tight rounded"
+                              >
+                                § {coverage.clause}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                        {coverage.quote && (
+                          <div className="mt-1">
+                            <EvidenceQuote quote={coverage.quote} />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

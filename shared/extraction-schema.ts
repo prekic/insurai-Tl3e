@@ -65,6 +65,36 @@ export const EXTRACTION_JSON_SCHEMA = {
         type: ['string', 'null'],
         description: 'Policy end date in YYYY-MM-DD format',
       },
+      vehicleMake: {
+        type: ['string', 'null'],
+        description:
+          'Vehicle brand/make (e.g., VOLKSWAGEN, RENAULT, FIAT). Extract specifically the brand, not the model.',
+      },
+      vehicleModel: {
+        type: ['string', 'null'],
+        description:
+          'Vehicle model and sub-model (e.g., TIGUAN 1.4 TSI ACT BMT 150 DSG HIGHLINE). Extract separately from the make.',
+      },
+      vehicleYear: {
+        type: ['number', 'null'],
+        description: 'Vehicle model year (e.g., 2016)',
+      },
+      vehiclePlate: {
+        type: ['string', 'null'],
+        description: 'License plate number of the vehicle',
+      },
+      vin: {
+        type: ['string', 'null'],
+        description: 'Vehicle Identification Number (Şasi No)',
+      },
+      tcKimlik: {
+        type: ['string', 'null'],
+        description: '11-digit Turkish national ID number (TCKN/TC Kimlik No)',
+      },
+      vkn: {
+        type: ['string', 'null'],
+        description: '10-digit Turkish Tax ID number (VKN/Vergi No)',
+      },
       premium: {
         type: ['number', 'null'],
         description:
@@ -116,6 +146,26 @@ export const EXTRACTION_JSON_SCHEMA = {
               description:
                 'Set to true if coverage is DAHİL (included/active). Set to false if coverage is HARİÇ (excluded/not purchased). Turkish policies often have a DAHİL/HARİÇ column — use it. Include BOTH DAHİL and HARİÇ coverages in this array. Default to true if status is ambiguous.',
             },
+            limitType: {
+              type: ['string', 'null'],
+              enum: ['per_event', 'aggregate', 'combined', null],
+              description:
+                'Type of limit: per_event (Olay Başı), aggregate (Yıllık Toplam/Maktu), or combined.',
+            },
+            page: {
+              type: ['number', 'null'],
+              description:
+                'The source page number where this coverage limit/deductible is defined.',
+            },
+            clause: {
+              type: ['string', 'null'],
+              description: 'The section or clause heading under which this coverage is listed.',
+            },
+            quote: {
+              type: ['string', 'null'],
+              description:
+                'Verbatim quote of the coverage limit, deductible, or inclusion status as written in the text. Essential for grounding.',
+            },
           },
           // STRICT MODE: ALL properties must be in required (Issue #331).
           // limit, deductible, description, category are nullable types so the
@@ -130,6 +180,10 @@ export const EXTRACTION_JSON_SCHEMA = {
             'isMarketValue',
             'category',
             'included',
+            'limitType',
+            'page',
+            'clause',
+            'quote',
           ],
           additionalProperties: false,
         },
@@ -418,6 +472,13 @@ export const EXTRACTION_JSON_SCHEMA = {
       'vehicleUsage',
       'startDate',
       'endDate',
+      'vehicleMake',
+      'vehicleModel',
+      'vehicleYear',
+      'vehiclePlate',
+      'vin',
+      'tcKimlik',
+      'vkn',
       'premium',
       'currency',
       'paymentFrequency',

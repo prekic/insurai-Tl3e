@@ -547,7 +547,7 @@ export const AI_CONFIG = {
 
   // Anthropic models
   anthropic: {
-    extractionModel: 'claude-sonnet-4-20250514' as const,
+    extractionModel: 'claude-3-7-sonnet-20250219' as const,
     backupModel: 'claude-3-5-haiku-latest' as const,
   },
 

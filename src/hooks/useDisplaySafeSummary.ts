@@ -65,6 +65,21 @@ export function useDisplaySafeSummary(
           | Record<string, unknown>[]
           | undefined,
         clauseGraph: undefined,
+        vehicleMake: null,
+        vehicleModel: null,
+        vehicleYear: null,
+        vehiclePlate: null,
+        vin: null,
+        tcKimlik: null,
+        vkn: null,
+        insuredEntityType: null,
+        vehicleUsage: null,
+        discounts: {
+          ncdDiscount: null,
+          groupDiscount: null,
+          otherDiscountPct: null,
+          evidence: null,
+        },
         confidence: {
           overall: policy.aiConfidence || 0.85,
           policyNumber: 0.9,

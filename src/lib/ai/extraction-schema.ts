@@ -101,13 +101,16 @@ export interface ExtractedPolicyData {
     coverages: number
   }
 
-  // Extra vehicle/identity fields the AI may return beyond the prompted schema.
-  // Having these typed eliminates unsafe 'as unknown as Record<string, unknown>' casts.
-  tcKimlik?: string | null
-  vkn?: string | null
-  vehiclePlate?: string | null
-  vin?: string | null
-  vehicleYear?: string | number | null
+  // Vehicle Details
+  vehicleMake: string | null
+  vehicleModel: string | null
+  vehicleYear: number | null
+  vehiclePlate: string | null
+  vin: string | null
+
+  // Identity Details
+  tcKimlik: string | null
+  vkn: string | null
 
   // Fallback snake_case and localized keys the AI might return despite instructions
   policy_type?: string | null
@@ -157,6 +160,14 @@ export interface ExtractedCoverage {
   category?: 'main' | 'liability' | 'supplementary' | 'assistance' | 'legal' | 'other'
   /** True if DAHİL (included), false if HARİÇ (excluded). Defaults to true if ambiguous. */
   included?: boolean
+  /** Type of limit applied */
+  limitType?: 'per_event' | 'aggregate' | 'combined' | null
+  /** Source page where this limit was found */
+  page?: number | null
+  /** Section heading / clause where this was extracted */
+  clause?: string | null
+  /** Verbatim text describing this limit for audit/grounding */
+  quote?: string | null
 }
 
 // Re-export the canonical schema from the shared single source of truth.
@@ -241,8 +252,12 @@ Your task is to extract structured information from insurance policy documents.
    - ALL extracted text fields, property names, and coverage descriptions MUST remain in Turkish UNLESS explicitly asked for an English translation (e.g. in exclusionsEn or textEn). Do NOT use literal english placeholders or labels.
 
 6b. **Entity and Vehicle Specifics** (CRITICAL):
-   - 'insuredEntityType': Check identification numbers. TCKN (11 digits, usually starts with non-zero) means 'individual' (gerçek kişi). VKN (10 digits) means 'corporate' (tüzel kişi). If absent, use null.
+   - 'tcKimlik' / 'vkn': TCKN (11 digits, usually starts with non-zero) means 'individual' (gerçek kişi). VKN (10 digits) means 'corporate' (tüzel kişi). Extract exactly.
+   - 'insuredEntityType': If TCKN is present, use 'individual'. If VKN is present, use 'corporate'. If absent, use null.
    - 'vehicleUsage': Extract "KULLANIM TARZI". "Hususi" means 'private'. "Ticari", "Kamyonet", "Minibüs", "Kamyon" or others usually mean 'commercial'.
+   - 'vehicleMake': Extract ONLY the vehicle brand/Make (e.g. VOLKSWAGEN). DO NOT include the model here.
+   - 'vehicleModel': Extract the specific model and trim (e.g. TIGUAN 1.4 TSI ACT BMT 150 DSG HIGHLINE). Extract separately from Make.
+   - 'vehicleYear': Extract the model year as a number (e.g. 2016).
    - 'discounts': Specifically check for Hasarsızlık İndirimi (NCD/No Claim Discount), group/profession discounts (meslek, grup), and cash discounts (peşin). Include the exact 'rate' (e.g. "%30") if found.
 
 7. **Coverages**: List all coverage items found, including:
@@ -324,7 +339,7 @@ Your task is to extract structured information from insurance policy documents.
     **What counts as a conditional deductible (goes in conditionalDeductibles):**
     - Age-based: "Sürücü yaşı 25'ten küçük ise %20 tenzili muafiyet uygulanır"
     - License-tenure-based: "Ehliyetin 3 yıldan az olması durumunda %30 muafiyet"
-    - Non-contracted service: "Anlaşmalı olmayan servislerde %15 tenzili muafiyet"
+    - Non-contracted service: "Anlaşmalı olmayan servislerde %15 tenzili muafiyet" OR "Repair at your choice of shop with 35% deductible". If the policy allows repair anywhere but applies a deductible/penalty OR restricts parts to 'eşdeğer/yan sanayi', THIS MUST BE EXTRACTED HERE AS A DEDUCTIBLE. Do NOT interpret it as fully covered at user choice.
     - Repair-conditional: "Onarım muafiyeti %5"
     - Partial-loss deductible: "Kısmi hasarlarda %2 muafiyet"
     - Total-loss deductible: "Pert halinde %10 tenzil"
@@ -362,5 +377,13 @@ Your task is to extract structured information from insurance policy documents.
     If the policy restricts repair parts to 'eşdeğer' (equivalent/aftermarket) or
     'çıkma parça' (salvage), surface this as a special condition string verbatim so
     downstream logic can risk-flag older commercial vehicles.
+
+15. **CRITICAL - Retrieval Grounding & Anti-Leakage (SEPARATION OF CONCERNS)**:
+    - You must implement a strictly enforced separation between marketing brochure content (e.g. "Broşür", "Bilgilendirme Formu", "Özet", promotional text) and operative policy terms ("Poliçe", "Teminat Tablosu").
+    - ONLY extract coverages and limits from the official policy terms and coverage tables. IGNORE marketing promises that are not bound in the official table.
+    - If you are extracting a coverage, YOU MUST INCLUDE the 'page', 'clause', and verbatim 'quote' of the tabular row or clause where the limit is stated to ground the finding. Do NOT rely on ungrounded assumption.
+    - NEVER combine per-event (olay başı) and annual aggregate (yıllık) limits. If the policy states "Per event: 40,000, annual aggregate: 80,000", capture the per-event limit in 'limit' and set 'limitType' to 'per_event', or describe both clearly. Never put the aggregate limit where the per-event limit is expected.
+    - NEVER conflate separate coverages. (e.g., 'Anadolu Hizmet' and 'Kilit Mekanizmasının Değiştirilmesi' are separate coverages; do not combine their limits into one). Treat them as distinct items in the 'coverages' array.
+    - 'Make' vs 'Model': Be hyper-vigilant! Tabular structures can confuse simpler tools. Under "Markasi" (Make) you might see "VOLKSWAGEN". Do not extract "Motor" or tabular header noise as the Make. Extract the actual car brand. Under "Tipi" (Model) you might see the specific trim. Extract them accurately separated.
 
 Be thorough but accurate. It's better to return null than to guess incorrectly.`

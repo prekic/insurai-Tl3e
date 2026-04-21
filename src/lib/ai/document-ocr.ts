@@ -90,9 +90,7 @@ export interface DocumentOCRError {
   }
 }
 
-export type DocumentOCRResponse =
-  | { success: true; data: DocumentOCRResult }
-  | DocumentOCRError
+export type DocumentOCRResponse = { success: true; data: DocumentOCRResult } | DocumentOCRError
 
 // ============================================================================
 // PDF HASH COMPUTATION
@@ -104,7 +102,7 @@ export type DocumentOCRResponse =
 export async function computePdfHash(pdfBuffer: ArrayBuffer): Promise<string> {
   const hashBuffer = await crypto.subtle.digest('SHA-256', pdfBuffer)
   const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
 /**
@@ -149,7 +147,9 @@ export async function extractWithDocumentAI(file: File): Promise<DocumentOCRResp
 
     if (pageCount > DOCUMENT_AI_PAGE_LIMIT) {
       // Split and process in chunks
-      console.warn(`[Document AI] PDF exceeds ${DOCUMENT_AI_PAGE_LIMIT}-page limit, splitting into chunks...`)
+      console.warn(
+        `[Document AI] PDF exceeds ${DOCUMENT_AI_PAGE_LIMIT}-page limit, splitting into chunks...`
+      )
       return await extractWithDocumentAIChunked(file, startTime)
     }
 
@@ -281,7 +281,7 @@ async function extractSinglePdfWithDocumentAI(
     }
 
     // Transform form fields (with page offset)
-    const formFields: FormField[] = (ocrData.formFields || []).map(f => ({
+    const formFields: FormField[] = (ocrData.formFields || []).map((f) => ({
       name: f.name,
       value: f.value,
       confidence: f.confidence,
@@ -289,7 +289,7 @@ async function extractSinglePdfWithDocumentAI(
     }))
 
     // Transform tables (with page offset)
-    const tables: Table[] = (ocrData.tables || []).map(t => ({
+    const tables: Table[] = (ocrData.tables || []).map((t) => ({
       rows: t.rows,
       headerRows: t.headerRows || 0,
       confidence: t.confidence || ocrData.confidence,
@@ -297,14 +297,15 @@ async function extractSinglePdfWithDocumentAI(
     }))
 
     // Calculate overall confidence
-    const avgConfidence = pages.length > 0
-      ? pages.reduce((sum, p) => sum + p.confidence, 0) / pages.length
-      : ocrData.confidence
+    const avgConfidence =
+      pages.length > 0
+        ? pages.reduce((sum, p) => sum + p.confidence, 0) / pages.length
+        : ocrData.confidence
 
     return {
       success: true,
       data: {
-        text: ocrData.text,
+        text: pages.map((p) => `[PAGE ${p.pageNumber}]\n${p.text}`).join('\n\n'),
         pages,
         pageCount: ocrData.pageCount,
         confidence: avgConfidence,
@@ -363,7 +364,9 @@ async function extractWithDocumentAIChunked(
       const pageRange = splitResult.pageRanges[i]
       const pageOffset = pageRange[0] - 1 // Convert to 0-indexed offset
 
-      console.warn(`[Document AI] Processing chunk ${i + 1}/${splitResult.chunks.length} (pages ${pageRange[0]}-${pageRange[1]})`)
+      console.warn(
+        `[Document AI] Processing chunk ${i + 1}/${splitResult.chunks.length} (pages ${pageRange[0]}-${pageRange[1]})`
+      )
 
       // Convert chunk to File
       const chunkFile = chunkToFile(chunk, file.name, i, pageRange)
@@ -374,9 +377,13 @@ async function extractWithDocumentAIChunked(
 
       if (result.success) {
         chunkResults.push(result.data)
-        console.warn(`[Document AI] Chunk ${i + 1} completed: ${result.data.pages.length} pages, ${result.data.text.length} chars`)
+        console.warn(
+          `[Document AI] Chunk ${i + 1} completed: ${result.data.pages.length} pages, ${result.data.text.length} chars`
+        )
       } else {
-        errors.push(`Chunk ${i + 1} (pages ${pageRange[0]}-${pageRange[1]}): ${result.error.message}`)
+        errors.push(
+          `Chunk ${i + 1} (pages ${pageRange[0]}-${pageRange[1]}): ${result.error.message}`
+        )
         console.error(`[Document AI] Chunk ${i + 1} failed:`, result.error.message)
       }
     }
@@ -394,7 +401,12 @@ async function extractWithDocumentAIChunked(
     }
 
     // Combine results from all chunks
-    const combinedResult = combineChunkResults(chunkResults, pdfHash, splitResult.totalPages, startTime)
+    const combinedResult = combineChunkResults(
+      chunkResults,
+      pdfHash,
+      splitResult.totalPages,
+      startTime
+    )
 
     // Add warning if some chunks failed
     if (errors.length > 0) {
@@ -403,7 +415,9 @@ async function extractWithDocumentAIChunked(
       )
     }
 
-    console.warn(`[Document AI] Combined ${chunkResults.length} chunks: ${combinedResult.pageCount} pages, ${combinedResult.text.length} chars`)
+    console.warn(
+      `[Document AI] Combined ${chunkResults.length} chunks: ${combinedResult.pageCount} pages, ${combinedResult.text.length} chars`
+    )
 
     return {
       success: true,
@@ -448,13 +462,11 @@ function combineChunkResults(
   // Sort pages by page number
   allPages.sort((a, b) => a.pageNumber - b.pageNumber)
 
-  // Combine text in page order
-  const combinedText = allPages.map(p => p.text).join('\n\n')
+  // Combine text in page order with page markers for LLM grounding
+  const combinedText = allPages.map((p) => `[PAGE ${p.pageNumber}]\n${p.text}`).join('\n\n')
 
   // Calculate average confidence
-  const avgConfidence = allPages.length > 0
-    ? totalConfidence / allPages.length
-    : 0
+  const avgConfidence = allPages.length > 0 ? totalConfidence / allPages.length : 0
 
   const processingTimeMs = Math.round(performance.now() - startTime)
 
@@ -507,7 +519,7 @@ function splitTextByPages(text: string, pageCount: number): string[] {
   for (const pattern of pageBreakPatterns) {
     const parts = text.split(pattern)
     if (parts.length === pageCount) {
-      return parts.map(p => p.trim())
+      return parts.map((p) => p.trim())
     }
   }
 
