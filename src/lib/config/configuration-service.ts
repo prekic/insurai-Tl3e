@@ -326,6 +326,11 @@ export class ConfigurationService {
    * Reset instance (for testing)
    */
   static resetInstance(): void {
+    // Test-only: deliberately reset the non-nullable instance field to null.
+    // We'd declare the field as `ConfigurationService | null` to avoid this
+    // cast, but the rest of the class assumes it's non-null after construction
+    // and widening the type would cascade null-checks everywhere.
+    // eslint-disable-next-line no-restricted-syntax
     ConfigurationService.instance = null as unknown as ConfigurationService
     cache.clear()
   }

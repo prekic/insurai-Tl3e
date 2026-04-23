@@ -450,7 +450,7 @@ export function logPilotQARecord(record: PilotQARecord): string {
   // In Node.js environments, append to JSONL file
   if (
     typeof globalThis !== 'undefined' &&
-    typeof (globalThis as unknown as { process?: unknown }).process !== 'undefined'
+    typeof (globalThis as { process?: unknown }).process !== 'undefined'
   ) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports

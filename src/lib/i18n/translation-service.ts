@@ -264,8 +264,15 @@ function mergeTranslations(
   base: TranslationDictionary,
   override: TranslationDictionary
 ): TranslationDictionary {
+  // TranslationDictionary is a nominal type with named sections (`policy`,
+  // `global`, etc.). The merge operation treats it as a generic
+  // string-keyed record — a structural-type boundary, not a shape assertion.
+  // The unknown-middleman is required because TS refuses the named→Record
+  // conversion directly; both sides *are* structurally compatible at runtime.
   const result: Record<string, Record<string, string>> = {}
+  // eslint-disable-next-line no-restricted-syntax
   const baseRec = base as unknown as Record<string, Record<string, string>>
+  // eslint-disable-next-line no-restricted-syntax
   const overrideRec = override as unknown as Record<string, Record<string, string>>
 
   // Start with all base sections
@@ -287,6 +294,7 @@ function mergeTranslations(
     }
   }
 
+  // eslint-disable-next-line no-restricted-syntax
   return result as unknown as TranslationDictionary
 }
 

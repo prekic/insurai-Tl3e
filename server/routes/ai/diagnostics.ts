@@ -703,6 +703,9 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
 
   // Log diagnostic results for debugging (only in development)
   if (process.env.NODE_ENV !== 'production') {
+    // Variance adapter: log.debug accepts Record<string, unknown> metadata;
+    // diagnostics is a typed result object. Same pattern as audit-logger.ts.
+    // eslint-disable-next-line no-restricted-syntax
     log.debug('Diagnostic results', diagnostics as unknown as Record<string, unknown>)
   }
 
