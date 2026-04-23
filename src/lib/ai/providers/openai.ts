@@ -166,6 +166,10 @@ export async function extractWithOpenAI(
         throw proxyError
       }
 
+      // Sanctioned `as unknown as` — proxy boundary, same pattern as claude.ts
+      // (CLAUDE.md gotcha #84). The server validates the JSON via strict
+      // schema; the cast is the documented contract at this boundary.
+      // eslint-disable-next-line no-restricted-syntax
       result = proxyResult.data as unknown as ExtractedPolicyData
 
       // Attach proxy metadata for observability logging

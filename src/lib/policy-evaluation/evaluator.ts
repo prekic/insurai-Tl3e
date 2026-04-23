@@ -1414,6 +1414,7 @@ function generateMarketComparison(
   let coveragePercentile = 50
 
   if (!benchmark || benchmark.benchmarkStatus === 'untrusted') {
+    // eslint-disable-next-line no-restricted-syntax
     return {
       premiumPercentile: 50,
       coveragePercentile: 50,
@@ -1421,7 +1422,11 @@ function generateMarketComparison(
       competitivePosition: 'average', // Neutral
       // Additional flag to indicate this is an untrusted/missing comparison
       untrusted: true,
-    } as unknown as PolicyEvaluation['marketComparison'] // The UI might need to know to suppress numeric info. We will handle this in UI side.
+      // The `untrusted` flag is not in PolicyEvaluation['marketComparison'] —
+      // the UI narrows on it to suppress numeric info. This is a deliberate
+      // augmentation rather than a shape bug; future work: add an optional
+      // `untrusted?: boolean` to the type so the cast becomes unnecessary.
+    } as unknown as PolicyEvaluation['marketComparison']
   }
 
   if (benchmark) {

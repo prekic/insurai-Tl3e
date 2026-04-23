@@ -265,6 +265,11 @@ function CollapsibleCoverageCategory({
           }
 
           // Regular coverage - with click-to-expand info
+          // groupedCoverage is a narrowed shape from the aggregation step; it
+          // has Coverage's required fields at runtime but TS can't verify via
+          // the grouping predicate. Narrowing here is safe and local to this
+          // iterator.
+          // eslint-disable-next-line no-restricted-syntax
           const coverage = groupedCoverage as unknown as Coverage
           // Pass t in here eventually but we need to pipe it from CoveragesByCategory
           const limitDisplay = formatCoverageLimit(coverage, locale, t, formatAmount)

@@ -184,7 +184,8 @@ export async function processExpiredNotifications(): Promise<{
     const today = new Date().toISOString().split('T')[0]
     const { data: policies, error } = await client
       .from('policies')
-      .select(`
+      .select(
+        `
         id,
         policy_number,
         provider,
@@ -192,7 +193,8 @@ export async function processExpiredNotifications(): Promise<{
         expiry_date,
         user_id,
         users!inner(email)
-      `)
+      `
+      )
       .eq('expiry_date', today)
       .neq('status', 'expired')
 
@@ -210,6 +212,9 @@ export async function processExpiredNotifications(): Promise<{
 
     for (const policy of policies) {
       processed++
+      // Supabase-js types the joined `users` relation loosely; the runtime
+      // shape is always { email: string } from the policies→users FK join.
+      // eslint-disable-next-line no-restricted-syntax
       const userEmail = (policy.users as unknown as { email: string })?.email
 
       if (!userEmail) continue
@@ -225,10 +230,7 @@ export async function processExpiredNotifications(): Promise<{
         if (result.success) {
           sent++
           // Update policy status to expired
-          await client
-            .from('policies')
-            .update({ status: 'expired' })
-            .eq('id', policy.id)
+          await client.from('policies').update({ status: 'expired' }).eq('id', policy.id)
           log.info(`Sent expired notification: ${policy.policy_number}`)
         } else {
           errors++
@@ -260,7 +262,10 @@ export async function runScheduledEmailJobs(): Promise<void> {
   const expiredResults = await processExpiredNotifications()
 
   const duration = Date.now() - startTime
-  log.info(`All jobs completed in ${duration}ms`, { reminders: reminderResults, expired: expiredResults })
+  log.info(`All jobs completed in ${duration}ms`, {
+    reminders: reminderResults,
+    expired: expiredResults,
+  })
 }
 
 // =============================================================================
@@ -268,14 +273,17 @@ export async function runScheduledEmailJobs(): Promise<void> {
 // =============================================================================
 
 function groupByUser(policies: ExpiringPolicy[]): Record<string, ExpiringPolicy[]> {
-  return policies.reduce((acc, policy) => {
-    const email = policy.user_email
-    if (!acc[email]) {
-      acc[email] = []
-    }
-    acc[email].push(policy)
-    return acc
-  }, {} as Record<string, ExpiringPolicy[]>)
+  return policies.reduce(
+    (acc, policy) => {
+      const email = policy.user_email
+      if (!acc[email]) {
+        acc[email] = []
+      }
+      acc[email].push(policy)
+      return acc
+    },
+    {} as Record<string, ExpiringPolicy[]>
+  )
 }
 
 function formatDate(dateStr: string): string {

@@ -416,6 +416,9 @@ export async function getTranslationsForLocale(
   // Build nested dictionary
   const dict: TranslationDictionary = {}
   for (const row of data) {
+    // Supabase-js types row.translation_keys loosely as Json; the runtime
+    // shape is always { section, key } from the FK join.
+    // eslint-disable-next-line no-restricted-syntax
     const keyInfo = row.translation_keys as unknown as { section: string; key: string }
     const section = keyInfo.section
     const key = keyInfo.key
@@ -459,6 +462,8 @@ export async function getTranslationsFlat(locale: string): Promise<TranslationWi
   }
 
   return (data || []).map((row: Record<string, unknown>) => {
+    // Same Supabase join boundary as above.
+    // eslint-disable-next-line no-restricted-syntax
     const keyInfo = row.translation_keys as unknown as { section: string; key: string }
     return {
       id: row.id as string,
@@ -627,6 +632,8 @@ export async function getCoverage(locale: string): Promise<CoverageStats | null>
   const sectionTranslated: Record<string, number> = {}
   let reviewed = 0
   for (const t of translations || []) {
+    // Same Supabase join boundary.
+    // eslint-disable-next-line no-restricted-syntax
     const section = (t.translation_keys as unknown as { section: string }).section
     sectionTranslated[section] = (sectionTranslated[section] || 0) + 1
     if (t.is_reviewed) reviewed++

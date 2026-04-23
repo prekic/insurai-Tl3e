@@ -136,6 +136,11 @@ export async function convertToAnalyzedPolicy(
       isMarketValue: c.isMarketValue ?? false,
       category: c.category ?? 'other',
       importance: determineCoverageImportance(c),
+      // Evidence pointers — propagate from ExtractedCoverage so the reviewer
+      // UI can surface "Page N / § clause / quote" provenance.
+      page: c.page ?? null,
+      clause: c.clause ?? null,
+      quote: c.quote ?? null,
     }
   })
 
@@ -1036,7 +1041,7 @@ function classifyExclusions(exclusions: string[]): {
   maxDeductiblePercent: number
 } {
   const conditionalPatterns = [
-    /muafiyet/i, // "muafiyet" = deductible
+    /muaf[iİ]yet/i, // "muafiyet" = deductible (gotcha #62: [iİ] matches both i and İ)
     /tenzil/i, // "tenzili muafiyet" = applied deductible
     /%\s*\d+/i, // percentage like %35
     /\d+\s*%/i, // percentage like 35%

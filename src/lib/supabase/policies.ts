@@ -35,11 +35,7 @@ export async function fetchPolicy(id: string): Promise<PolicyRow | null> {
     return null
   }
 
-  const { data, error } = await supabase
-    .from('policies')
-    .select('*')
-    .eq('id', id)
-    .single()
+  const { data, error } = await supabase.from('policies').select('*').eq('id', id).single()
 
   if (error) {
     if (error.code === 'PGRST116') return null // Not found
@@ -56,11 +52,7 @@ export async function createPolicy(policy: PolicyInsert): Promise<PolicyRow> {
     throw new Error('Supabase is not configured')
   }
 
-  const { data, error } = await supabase
-    .from('policies')
-    .insert(policy)
-    .select()
-    .single()
+  const { data, error } = await supabase.from('policies').insert(policy).select().single()
 
   if (error) throw error
   return data as PolicyRow
@@ -93,10 +85,7 @@ export async function deletePolicy(id: string): Promise<void> {
     throw new Error('Supabase is not configured')
   }
 
-  const { error } = await supabase
-    .from('policies')
-    .delete()
-    .eq('id', id)
+  const { error } = await supabase.from('policies').delete().eq('id', id)
 
   if (error) throw error
 }
@@ -125,12 +114,10 @@ export async function uploadPolicyDocument(
   // Path format: policy-documents/{user_id}/{policy_id}/{timestamp}.{ext}
   const filePath = `policy-documents/${user.id}/${policyId}/${Date.now()}.${fileExt}`
 
-  const { error: uploadError } = await supabase.storage
-    .from('documents')
-    .upload(filePath, file, {
-      cacheControl: '3600',
-      upsert: false,
-    })
+  const { error: uploadError } = await supabase.storage.from('documents').upload(filePath, file, {
+    cacheControl: '3600',
+    upsert: false,
+  })
 
   if (uploadError) throw uploadError
 
@@ -150,9 +137,7 @@ export async function uploadPolicyDocument(
     mime_type: file.type,
   }
 
-  const { error: insertError } = await supabase
-    .from('policy_documents')
-    .insert(docInsert)
+  const { error: insertError } = await supabase.from('policy_documents').insert(docInsert)
 
   if (insertError) throw insertError
 
@@ -230,17 +215,12 @@ export async function deletePolicyDocument(documentId: string, filePath: string)
   }
 
   // Delete from storage
-  const { error: storageError } = await supabase.storage
-    .from('documents')
-    .remove([filePath])
+  const { error: storageError } = await supabase.storage.from('documents').remove([filePath])
 
   if (storageError) throw storageError
 
   // Delete from database
-  const { error: dbError } = await supabase
-    .from('policy_documents')
-    .delete()
-    .eq('id', documentId)
+  const { error: dbError } = await supabase.from('policy_documents').delete().eq('id', documentId)
 
   if (dbError) throw dbError
 }
@@ -277,10 +257,7 @@ export async function findExistingPolicyByIdentifier(
 
   // Build query - use ILIKE for case-insensitive matching
   // Note: We search for policy_number without spaces to match our normalization
-  let query = supabase
-    .from('policies')
-    .select('*')
-    .ilike('provider', `%${normalizedProvider}%`)
+  let query = supabase.from('policies').select('*').ilike('provider', `%${normalizedProvider}%`)
 
   // For policy number, we need to handle whitespace variations
   // Using ilike with the pattern to match regardless of internal spaces
@@ -302,10 +279,7 @@ export async function findExistingPolicyByIdentifier(
 
   return results.filter((policy) => {
     const policyNumMatch =
-      policy.policy_number
-        ?.trim()
-        .toLowerCase()
-        .replace(/\s+/g, '') === normalizedPolicyNumber
+      policy.policy_number?.trim().toLowerCase().replace(/\s+/g, '') === normalizedPolicyNumber
 
     const providerMatch = policy.provider?.trim().toLowerCase().includes(normalizedProvider)
 
@@ -401,10 +375,10 @@ async function searchPoliciesFallback(query: string): Promise<PolicyRow[]> {
     .select('*')
     .or(
       `policy_number.ilike.${searchTerm},` +
-      `provider.ilike.${searchTerm},` +
-      `insured_person.ilike.${searchTerm},` +
-      `type_tr.ilike.${searchTerm},` +
-      `location.ilike.${searchTerm}`
+        `provider.ilike.${searchTerm},` +
+        `insured_person.ilike.${searchTerm},` +
+        `type_tr.ilike.${searchTerm},` +
+        `location.ilike.${searchTerm}`
     )
     .order('created_at', { ascending: false })
 
@@ -518,6 +492,10 @@ export async function restorePolicyVersion(
   }
 
   // Extract policy data from version
+  // Boundary cast: version.new_data is the Supabase Json column holding a
+  // serialized PolicyRow snapshot. No schema validator is wired up yet
+  // (future work). Safe because the same code wrote the blob.
+  // eslint-disable-next-line no-restricted-syntax
   const versionData = version.new_data as unknown as PolicyRow
 
   // Update the current policy with version data

@@ -55,14 +55,14 @@ const TURKISH_COVERAGE_PATTERNS = {
   personalAccident: [/ki[sş]isel\s*kaza/i, /ferdi\s*kaza/i, /s[üu]r[üu]c[üu]/i],
   liability: [/mali\s*sorumluluk/i, /sorumluluk/i, /3\.\s*[sş]ah[ıi]s/i],
   legal: [/hukuki\s*koruma/i, /hukuk/i],
-  assistance: [/yard[ıi]m/i, /asist/i, /[çc]ekici/i, /ikame/i],
+  assistance: [/yard[ıi]m/i, /as[iİ]st/i, /[çc]ek[iİ]c[iİ]/i, /[iİ]kame/i],
   medical: [/sa[gğ]l[ıi]k/i, /tedavi/i, /hastane/i],
 
   // Kasko specific
   partialDamage: [/k[ıi]smi\s*hasar/i],
   totalLoss: [/tam\s*hasar/i, /pert/i],
-  replacementVehicle: [/ikame\s*ara[çc]/i],
-  towing: [/[çc]ekici/i, /[çc]eki[sş]/i],
+  replacementVehicle: [/[iİ]kame\s*ara[çc]/i],
+  towing: [/[çc]ek[iİ]c[iİ]/i, /[çc]ek[iİ][sş]/i],
   keyLoss: [/anahtar/i],
 
   // Traffic specific
@@ -81,9 +81,9 @@ const TURKISH_COVERAGE_PATTERNS = {
 const TURKISH_HEADER_PATTERNS = {
   coverageName: [/teminat/i, /kapsam/i, /koruma/i, /sigorta\s*konu/i],
   limit: [/limit/i, /teminat\s*tutar/i, /azami/i, /maksimum/i, /tutar/i],
-  deductible: [/muafiyet/i, /pay/i, /katk[ıi]/i],
-  included: [/dahil/i, /kapsam/i, /var/i, /evet/i],
-  premium: [/prim/i, /[üu]cret/i],
+  deductible: [/muaf[iİ]yet/i, /pay/i, /katk[ıi]/i],
+  included: [/dah[iİ]l/i, /kapsam/i, /var/i, /evet/i],
+  premium: [/pr[iİ]m/i, /[üu]cret/i],
   notes: [/not/i, /a[çc][ıi]klama/i, /detay/i],
 }
 
@@ -102,7 +102,7 @@ const MARKET_VALUE_PATTERNS = [/rayi[çc]/i, /piyasa\s*de[gğ]er/i, /g[üu]ncel\
  * Note: /x/i removed — too broad (matches "text", "next", etc.)
  * Note: dahi̇l variant added for Turkish İ→i̇ lowercasing (U+0130 → U+0069+U+0307)
  */
-const INCLUDED_PATTERNS = [/dahil/i, /dahi̇l/i, /\bvar\b/i, /evet/i, /✓/, /✔/, /^x$/i]
+const INCLUDED_PATTERNS = [/dah[iİ]l/i, /dahi̇l/i, /\bvar\b/i, /evet/i, /✓/, /✔/, /^x$/i]
 
 // ============================================================================
 // PARSING FUNCTIONS
@@ -426,10 +426,10 @@ function determineCoverageCategory(name: string): ExtractedCoverage['category'] 
   if (/hukuk|legal/i.test(lowerName)) {
     return 'legal'
   }
-  if (/yardım|asist|çekici|ikame/i.test(lowerName)) {
+  if (/yard[ıi]m|as[iİ]st|[çc]ek[iİ]c[iİ]|[iİ]kame/i.test(lowerName)) {
     return 'assistance'
   }
-  if (/çarpma|hırsızlık|yangın|deprem|kasko|bina|eşya/i.test(lowerName)) {
+  if (/çarpma|h[ıi]rs[ıi]zl[ıi]k|yang[ıi]n|deprem|kasko|bina|eşya/i.test(lowerName)) {
     return 'main'
   }
   if (/cam|anahtar|ferdi/i.test(lowerName)) {

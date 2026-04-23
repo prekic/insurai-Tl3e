@@ -33,7 +33,7 @@ import ocrSettings from '../../../config/ocr_settings.json'
 /**
  * Deep merge two objects, with child values overriding parent values
  */
-function deepMerge<T extends Record<string, unknown>>(parent: T, child: Partial<T>): T {
+function deepMerge<T extends object>(parent: T, child: Partial<T>): T {
   const result = { ...parent }
 
   for (const key of Object.keys(child) as Array<keyof T>) {
@@ -124,11 +124,19 @@ export class ConfigurationManager {
     }
 
     // Apply provider confidence thresholds
-    if (dbConfig.googleVisionConfidence !== undefined && settings.ocr_providers.available.google_vision) {
-      settings.ocr_providers.available.google_vision.confidence_threshold = dbConfig.googleVisionConfidence
+    if (
+      dbConfig.googleVisionConfidence !== undefined &&
+      settings.ocr_providers.available.google_vision
+    ) {
+      settings.ocr_providers.available.google_vision.confidence_threshold =
+        dbConfig.googleVisionConfidence
     }
-    if (dbConfig.documentAiConfidence !== undefined && settings.ocr_providers.available.google_document_ai) {
-      settings.ocr_providers.available.google_document_ai.confidence_threshold = dbConfig.documentAiConfidence
+    if (
+      dbConfig.documentAiConfidence !== undefined &&
+      settings.ocr_providers.available.google_document_ai
+    ) {
+      settings.ocr_providers.available.google_document_ai.confidence_threshold =
+        dbConfig.documentAiConfidence
     }
     if (dbConfig.tesseractConfidence !== undefined && settings.ocr_providers.available.tesseract) {
       settings.ocr_providers.available.tesseract.confidence_threshold = dbConfig.tesseractConfidence
@@ -230,8 +238,14 @@ export class ConfigurationManager {
    * Load all policy type configurations with parent inheritance
    */
   private loadPolicyTypes(): void {
-    // Load base configs first (use unknown first for safe casting)
-    const baseConfigs = [
+    // JSON imports are typed as their inferred literal shape, which has
+    // legitimate structural drift from PolicyTypeConfig (e.g., some JSON
+    // blocks use `{ tr, en, description }` where the type declares
+    // `Record<string, string[]>`). The canonical fix is runtime schema
+    // validation (Zod) — tracked as follow-up work. Until then these six
+    // casts are the documented boundary between "raw JSON" and "typed config".
+    /* eslint-disable no-restricted-syntax */
+    const baseConfigs: PolicyTypeConfig[] = [
       genericPolicy as unknown as PolicyTypeConfig,
       motorBasePolicy as unknown as PolicyTypeConfig,
     ]
@@ -241,12 +255,13 @@ export class ConfigurationManager {
     }
 
     // Load specific policy types with inheritance
-    const specificConfigs = [
+    const specificConfigs: PolicyTypeConfig[] = [
       kaskoPolicy as unknown as PolicyTypeConfig,
       trafficPolicy as unknown as PolicyTypeConfig,
       firePolicy as unknown as PolicyTypeConfig,
       healthPolicy as unknown as PolicyTypeConfig,
     ]
+    /* eslint-enable no-restricted-syntax */
 
     for (const config of specificConfigs) {
       let finalConfig = config
@@ -255,10 +270,7 @@ export class ConfigurationManager {
       if (config.parent_config) {
         const parent = this.policyTypes.get(config.parent_config)
         if (parent) {
-          finalConfig = deepMerge(
-            parent as unknown as Record<string, unknown>,
-            config as unknown as Record<string, unknown>
-          ) as unknown as PolicyTypeConfig
+          finalConfig = deepMerge<PolicyTypeConfig>(parent, config)
           // Ensure the child's ID is preserved
           finalConfig.policy_type_id = config.policy_type_id
           finalConfig.policy_type_name = config.policy_type_name
@@ -336,7 +348,7 @@ export class ConfigurationManager {
    * Get all available locale codes
    */
   getAvailableLocales(): string[] {
-    return Array.from(this.locales.keys()).filter(code => code !== '_universal')
+    return Array.from(this.locales.keys()).filter((code) => code !== '_universal')
   }
 
   /**
@@ -344,7 +356,7 @@ export class ConfigurationManager {
    */
   getAvailablePolicyTypes(): string[] {
     return Array.from(this.policyTypes.keys()).filter(
-      id => !id.startsWith('_') && !this.policyTypes.get(id)?.is_base_config
+      (id) => !id.startsWith('_') && !this.policyTypes.get(id)?.is_base_config
     )
   }
 
@@ -401,8 +413,8 @@ export class ConfigurationManager {
     policyConfig: PolicyTypeConfig,
     fieldName: string
   ): { locale: string; patterns: string[] }[] {
-    const fieldConfig = policyConfig.required_fields?.[fieldName] ||
-      policyConfig.optional_fields?.[fieldName]
+    const fieldConfig =
+      policyConfig.required_fields?.[fieldName] || policyConfig.optional_fields?.[fieldName]
 
     if (!fieldConfig || !fieldConfig.patterns) return []
 
@@ -415,12 +427,8 @@ export class ConfigurationManager {
   /**
    * Get field configuration
    */
-  getFieldConfig(
-    policyConfig: PolicyTypeConfig,
-    fieldName: string
-  ): FieldPattern | undefined {
-    return policyConfig.required_fields?.[fieldName] ||
-      policyConfig.optional_fields?.[fieldName]
+  getFieldConfig(policyConfig: PolicyTypeConfig, fieldName: string): FieldPattern | undefined {
+    return policyConfig.required_fields?.[fieldName] || policyConfig.optional_fields?.[fieldName]
   }
 
   /**
@@ -491,7 +499,11 @@ export class ConfigurationManager {
     const issues: string[] = []
     const diagnostics = {
       locales: [] as { code: string; sample_terms_count: number; special_chars_count: number }[],
-      policy_types: [] as { id: string; has_classification: boolean; detection_terms_locales: string[] }[],
+      policy_types: [] as {
+        id: string
+        has_classification: boolean
+        detection_terms_locales: string[]
+      }[],
       ocr_settings: {
         min_confidence: this.ocrSettings.language_detection.min_confidence,
         fallback_locale: this.ocrSettings.language_detection.fallback_locale,
@@ -554,10 +566,18 @@ export class ConfigurationManager {
 
     // Log diagnostics
     console.warn('[ConfigurationManager] === CONFIGURATION VERIFICATION ===')
-    console.warn(`[ConfigurationManager] Locales: ${diagnostics.locales.map(l => `${l.code}(${l.sample_terms_count} terms)`).join(', ')}`)
-    console.warn(`[ConfigurationManager] Policy types: ${diagnostics.policy_types.map(p => p.id).join(', ')}`)
-    console.warn(`[ConfigurationManager] Min confidence: ${diagnostics.ocr_settings.min_confidence}`)
-    console.warn(`[ConfigurationManager] Fallback locale: ${diagnostics.ocr_settings.fallback_locale}`)
+    console.warn(
+      `[ConfigurationManager] Locales: ${diagnostics.locales.map((l) => `${l.code}(${l.sample_terms_count} terms)`).join(', ')}`
+    )
+    console.warn(
+      `[ConfigurationManager] Policy types: ${diagnostics.policy_types.map((p) => p.id).join(', ')}`
+    )
+    console.warn(
+      `[ConfigurationManager] Min confidence: ${diagnostics.ocr_settings.min_confidence}`
+    )
+    console.warn(
+      `[ConfigurationManager] Fallback locale: ${diagnostics.ocr_settings.fallback_locale}`
+    )
     if (issues.length > 0) {
       console.warn(`[ConfigurationManager] Issues found: ${issues.length}`)
       for (const issue of issues) {
@@ -569,7 +589,7 @@ export class ConfigurationManager {
     console.warn('[ConfigurationManager] === END VERIFICATION ===')
 
     return {
-      success: issues.filter(i => i.startsWith('CRITICAL')).length === 0,
+      success: issues.filter((i) => i.startsWith('CRITICAL')).length === 0,
       issues,
       diagnostics,
     }

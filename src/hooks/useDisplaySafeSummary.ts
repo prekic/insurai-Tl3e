@@ -61,9 +61,7 @@ export function useDisplaySafeSummary(
           amendmentReason: null,
           premiumDifference: null,
         },
-        evidence: (policy as unknown as Record<string, unknown>).evidence as
-          | Record<string, unknown>[]
-          | undefined,
+        evidence: (policy as AnalyzedPolicy & { evidence?: Record<string, unknown>[] }).evidence,
         clauseGraph: undefined,
         vehicleMake: null,
         vehicleModel: null,

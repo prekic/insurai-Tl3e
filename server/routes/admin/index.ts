@@ -16,6 +16,7 @@ import operationsRouter from './operations.js'
 import promptsRouter from './prompts.js'
 import costRouter from './cost.js'
 import monitoringRouter from './monitoring.js'
+import calibrationDriftRouter from './calibration-drift.js'
 import contentRouter from './content.js'
 import actuarialRouter from './actuarial.js'
 import fxMonitoringRouter from './fx-monitoring.js'
@@ -31,6 +32,7 @@ router.use('/', operationsRouter)
 router.use('/', promptsRouter)
 router.use('/', costRouter)
 router.use('/', monitoringRouter)
+router.use('/', calibrationDriftRouter)
 router.use('/', contentRouter)
 router.use('/actuarial', actuarialRouter)
 router.use('/', fxMonitoringRouter)

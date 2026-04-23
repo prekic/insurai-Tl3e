@@ -219,6 +219,16 @@ class AuditLogger {
     return event
   }
 
+  // NOTE on the `as unknown as Record<string, unknown>` casts in the typed
+  // wrappers below (logAI/logPolicy/logAuth/logExport): these are variance
+  // adapters. The base `log()` accepts a generic Record; the wrappers accept
+  // nominal typed detail shapes (AIAuditDetails, etc.). TypeScript refuses
+  // the named→Record conversion directly because the typed interfaces lack
+  // an index signature. Adding `[key: string]: unknown` to each details
+  // interface would weaken its compile-time guarantees (any stringy field
+  // becomes allowed), so we keep the interfaces strict and accept the
+  // cast at the variance boundary instead.
+
   /**
    * Log AI-related events with typed details
    */
@@ -232,6 +242,7 @@ class AuditLogger {
       errorMessage?: string
     }
   ): Promise<AuditEvent> {
+    // eslint-disable-next-line no-restricted-syntax
     return this.log(type, details as unknown as Record<string, unknown>, {
       ...options,
       resourceType: 'ai_operation',
@@ -249,6 +260,7 @@ class AuditLogger {
       success?: boolean
     }
   ): Promise<AuditEvent> {
+    // eslint-disable-next-line no-restricted-syntax
     return this.log(type, details as unknown as Record<string, unknown>, {
       ...options,
       resourceId: details.policyId,
@@ -277,6 +289,7 @@ class AuditLogger {
       email: details.email ? this.maskEmail(details.email) : undefined,
     }
 
+    // eslint-disable-next-line no-restricted-syntax
     return this.log(type, safeDetails as unknown as Record<string, unknown>, {
       ...options,
       resourceType: 'auth',
@@ -294,6 +307,7 @@ class AuditLogger {
       success?: boolean
     }
   ): Promise<AuditEvent> {
+    // eslint-disable-next-line no-restricted-syntax
     return this.log(type, details as unknown as Record<string, unknown>, {
       ...options,
       resourceType: 'export',

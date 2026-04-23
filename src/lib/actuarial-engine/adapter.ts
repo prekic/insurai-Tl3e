@@ -133,7 +133,10 @@ export function mapAnalyzedToActuarialInput(policy: AnalyzedPolicy): ActuarialPo
 
   // Extract indemnity mechanics from raw data if present, otherwise stub as 'unknown' out-of-the-box defaults.
   // Real implementations populate raw_data.indemnity during extraction stage.
-  const rawDataField = (policy as unknown as Record<string, unknown>).raw_data
+  // AnalyzedPolicy does not model `raw_data` directly (it's a DB-shape field
+  // that may or may not be hydrated onto the client object). Use an intersection
+  // type to access it without pulling it into the public type surface.
+  const rawDataField = (policy as AnalyzedPolicy & { raw_data?: unknown }).raw_data
   const rawData = typeof rawDataField === 'object' && rawDataField !== null ? rawDataField : {}
   const parsedIndemnity = (rawData as Record<string, unknown>).indemnity as Record<
     string,

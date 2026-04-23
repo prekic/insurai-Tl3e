@@ -168,6 +168,9 @@ export class ConfigPerformanceMonitor {
 
   /** Reset for testing */
   static resetInstance(): void {
+    // Test-only: reset the non-nullable instance. Same justification as
+    // ConfigurationService.resetInstance().
+    // eslint-disable-next-line no-restricted-syntax
     ConfigPerformanceMonitor.instance = null as unknown as ConfigPerformanceMonitor
   }
 
@@ -209,9 +212,7 @@ export class ConfigPerformanceMonitor {
       overallLatency: this.computeLatencyStats(allLatencies),
       cache: this.computeCacheStats(events),
       categories: this.computeCategoryStats(events),
-      errorRate: events.length > 0
-        ? events.filter((e) => !e.success).length / events.length
-        : 0,
+      errorRate: events.length > 0 ? events.filter((e) => !e.success).length / events.length : 0,
       cacheTtlMs: this.cacheTtlMs,
       ttlRecommendation: this.computeTtlRecommendation(events, dbLatencies),
       recentEvents: events.slice(-20).reverse(),
@@ -270,39 +271,79 @@ export class ConfigPerformanceMonitor {
     const cacheStats = this.computeCacheStats(events)
     const dbEvents = events.filter((e) => !e.cacheHit && e.success)
     const dbLatencies = dbEvents.map((e) => e.latencyMs)
-    const avgDbLatency = dbLatencies.length > 0
-      ? dbLatencies.reduce((a, b) => a + b, 0) / dbLatencies.length
-      : 0
-    const errorRate = events.length > 0
-      ? events.filter((e) => !e.success).length / events.length
-      : 0
+    const avgDbLatency =
+      dbLatencies.length > 0 ? dbLatencies.reduce((a, b) => a + b, 0) / dbLatencies.length : 0
+    const errorRate =
+      events.length > 0 ? events.filter((e) => !e.success).length / events.length : 0
 
     // Cache hit rate alerts
     if (cacheStats.hitRate < thresholds.cacheHitRateCritical) {
-      const alert = this.createAlert('cache_hit_rate', 'critical', cacheStats.hitRate, thresholds.cacheHitRateCritical, now)
-      if (alert) alerts.push(alert); else suppressedCount++
+      const alert = this.createAlert(
+        'cache_hit_rate',
+        'critical',
+        cacheStats.hitRate,
+        thresholds.cacheHitRateCritical,
+        now
+      )
+      if (alert) alerts.push(alert)
+      else suppressedCount++
     } else if (cacheStats.hitRate < thresholds.cacheHitRateWarning) {
-      const alert = this.createAlert('cache_hit_rate', 'warning', cacheStats.hitRate, thresholds.cacheHitRateWarning, now)
-      if (alert) alerts.push(alert); else suppressedCount++
+      const alert = this.createAlert(
+        'cache_hit_rate',
+        'warning',
+        cacheStats.hitRate,
+        thresholds.cacheHitRateWarning,
+        now
+      )
+      if (alert) alerts.push(alert)
+      else suppressedCount++
     }
 
     // Error rate alerts
     if (errorRate > thresholds.errorRateCritical) {
-      const alert = this.createAlert('error_rate', 'critical', errorRate, thresholds.errorRateCritical, now)
-      if (alert) alerts.push(alert); else suppressedCount++
+      const alert = this.createAlert(
+        'error_rate',
+        'critical',
+        errorRate,
+        thresholds.errorRateCritical,
+        now
+      )
+      if (alert) alerts.push(alert)
+      else suppressedCount++
     } else if (errorRate > thresholds.errorRateWarning) {
-      const alert = this.createAlert('error_rate', 'warning', errorRate, thresholds.errorRateWarning, now)
-      if (alert) alerts.push(alert); else suppressedCount++
+      const alert = this.createAlert(
+        'error_rate',
+        'warning',
+        errorRate,
+        thresholds.errorRateWarning,
+        now
+      )
+      if (alert) alerts.push(alert)
+      else suppressedCount++
     }
 
     // DB latency alerts
     if (dbLatencies.length > 0) {
       if (avgDbLatency > thresholds.dbLatencyCritical) {
-        const alert = this.createAlert('db_latency', 'critical', avgDbLatency, thresholds.dbLatencyCritical, now)
-        if (alert) alerts.push(alert); else suppressedCount++
+        const alert = this.createAlert(
+          'db_latency',
+          'critical',
+          avgDbLatency,
+          thresholds.dbLatencyCritical,
+          now
+        )
+        if (alert) alerts.push(alert)
+        else suppressedCount++
       } else if (avgDbLatency > thresholds.dbLatencyWarning) {
-        const alert = this.createAlert('db_latency', 'warning', avgDbLatency, thresholds.dbLatencyWarning, now)
-        if (alert) alerts.push(alert); else suppressedCount++
+        const alert = this.createAlert(
+          'db_latency',
+          'warning',
+          avgDbLatency,
+          thresholds.dbLatencyWarning,
+          now
+        )
+        if (alert) alerts.push(alert)
+        else suppressedCount++
       }
     }
 
@@ -344,7 +385,10 @@ export class ConfigPerformanceMonitor {
 
     this.lastAlertTimes.set(alertKey, now)
 
-    const messages: Record<PerformanceAlert['type'], (s: AlertSeverity, v: number, t: number) => string> = {
+    const messages: Record<
+      PerformanceAlert['type'],
+      (s: AlertSeverity, v: number, t: number) => string
+    > = {
       cache_hit_rate: (s, v, t) =>
         `${s === 'critical' ? 'Critical' : 'Warning'}: Cache hit rate dropped to ${(v * 100).toFixed(1)}% (threshold: ${(t * 100).toFixed(0)}%)`,
       error_rate: (s, v, t) =>
@@ -428,17 +472,21 @@ export class ConfigPerformanceMonitor {
     return Array.from(byCategory.entries())
       .map(([category, catEvents]) => {
         const successEvents = catEvents.filter((e) => e.success)
-        const avgLatency = successEvents.length > 0
-          ? successEvents.reduce((sum, e) => sum + e.latencyMs, 0) / successEvents.length
-          : 0
+        const avgLatency =
+          successEvents.length > 0
+            ? successEvents.reduce((sum, e) => sum + e.latencyMs, 0) / successEvents.length
+            : 0
 
         return {
           category,
           fetchCount: catEvents.length,
           avgLatencyMs: Math.round(avgLatency * 100) / 100,
-          cacheHitRate: catEvents.length > 0
-            ? Math.round((catEvents.filter((e) => e.cacheHit).length / catEvents.length) * 10000) / 10000
-            : 0,
+          cacheHitRate:
+            catEvents.length > 0
+              ? Math.round(
+                  (catEvents.filter((e) => e.cacheHit).length / catEvents.length) * 10000
+                ) / 10000
+              : 0,
           errorCount: catEvents.filter((e) => !e.success).length,
         }
       })
@@ -462,13 +510,12 @@ export class ConfigPerformanceMonitor {
       }
     }
 
-    const avgDbLatency = dbLatencies.length > 0
-      ? dbLatencies.reduce((a, b) => a + b, 0) / dbLatencies.length
-      : 0
+    const avgDbLatency =
+      dbLatencies.length > 0 ? dbLatencies.reduce((a, b) => a + b, 0) / dbLatencies.length : 0
 
     // If cache hit rate is very high (>90%) and DB latency is low (<50ms),
     // TTL could be shorter for fresher data
-    if (cacheStats.hitRate > 0.90 && avgDbLatency < 50) {
+    if (cacheStats.hitRate > 0.9 && avgDbLatency < 50) {
       const suggested = Math.max(60000, Math.round(current * 0.5)) // At least 1 minute
       if (suggested < current) {
         return {
@@ -482,7 +529,7 @@ export class ConfigPerformanceMonitor {
 
     // If cache hit rate is low (<50%), settings are being fetched frequently
     // from the DB — increase TTL
-    if (cacheStats.hitRate < 0.50 && events.length > 20) {
+    if (cacheStats.hitRate < 0.5 && events.length > 20) {
       const suggested = Math.min(600000, Math.round(current * 2)) // Max 10 minutes
       return {
         currentTtlMs: current,
