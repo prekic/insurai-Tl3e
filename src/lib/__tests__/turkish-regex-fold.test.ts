@@ -136,31 +136,17 @@ describe('Turkish /i-flag case folding regression guard (gotcha #62)', () => {
   })
 
   /**
-   * Known pre-existing violations in production extraction code, captured
-   * 2026-04-23. These are real gotcha #62 bugs that predate this guard and
-   * should be fixed in a follow-up PR (they silently break premium extraction,
-   * DAHİL/HARİÇ detection, and coverage classification on all-caps Turkish
-   * OCR output). They are grandfathered here so the guard can be landed
-   * without mixing a scope-expanding production refactor into the same PR.
+   * Grandfathered violations — intentionally empty. All pre-existing gotcha
+   * #62 violations were remediated in the same series of commits that landed
+   * this guard; the production regexes in table-parser.ts and
+   * policy-converter.ts now use `[iİ]` / `[ıi]` / `[çc]` character classes
+   * to match Turkish uppercase directly.
    *
-   * Keyed by `file:line:regex-source`. To fix a violation: replace the
-   * bare `i` in the regex source with `[iİ]` (or use explicit char classes
-   * for other vowels — `[ıi]`, `[çc]`, `[gğ]`, `[şs]`, `[üu]`, `[öo]`),
-   * then remove the corresponding key from this set.
-   *
-   * New violations will fail the test immediately.
+   * If a new asymmetric regex lands, the "no NEW violations" test fails
+   * immediately. To ship a deliberately-asymmetric pattern (rare — only for
+   * a staged fix), add its `file:line:raw` key here with a tracking ticket.
    */
-  const GRANDFATHERED: ReadonlySet<string> = new Set([
-    'src/lib/ai/policy-converter.ts:1039:/muafiyet/i',
-    'src/lib/ai/table-parser.ts:64:/ikame\\s*ara[çc]/i',
-    'src/lib/ai/table-parser.ts:65:/[çc]ekici/i',
-    'src/lib/ai/table-parser.ts:84:/muafiyet/i',
-    'src/lib/ai/table-parser.ts:85:/dahil/i',
-    'src/lib/ai/table-parser.ts:86:/prim/i',
-    'src/lib/ai/table-parser.ts:105:/dahil/i',
-    'src/lib/ai/table-parser.ts:429:/yardım|asist|çekici|ikame/i',
-    'src/lib/ai/table-parser.ts:432:/çarpma|hırsızlık|yangın|deprem|kasko|bina|eşya/i',
-  ])
+  const GRANDFATHERED: ReadonlySet<string> = new Set([])
 
   it('no NEW Turkish case-folding asymmetries beyond the grandfathered baseline', () => {
     const freshViolations: string[] = []

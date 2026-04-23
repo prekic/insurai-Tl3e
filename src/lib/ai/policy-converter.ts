@@ -1036,7 +1036,7 @@ function classifyExclusions(exclusions: string[]): {
   maxDeductiblePercent: number
 } {
   const conditionalPatterns = [
-    /muafiyet/i, // "muafiyet" = deductible
+    /muaf[iİ]yet/i, // "muafiyet" = deductible (gotcha #62: [iİ] matches both i and İ)
     /tenzil/i, // "tenzili muafiyet" = applied deductible
     /%\s*\d+/i, // percentage like %35
     /\d+\s*%/i, // percentage like 35%
