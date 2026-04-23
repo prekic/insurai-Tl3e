@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, Quote } from 'lucide-react'
-import { useI18n } from '@/lib/i18n'
+import { useI18n, type TranslationDictionary } from '@/lib/i18n'
+import type { PolicyStatus } from '@/types/policy'
 
 export function EvidenceQuote({ quote, quoteTr }: { quote: string; quoteTr?: string }) {
   const { t } = useI18n()
@@ -87,4 +88,40 @@ export function TruncatableText({
       </button>
     </div>
   )
+}
+
+export function getStatusVariant(
+  status: PolicyStatus
+): 'default' | 'success' | 'warning' | 'destructive' | 'secondary' | 'outline' {
+  switch (status) {
+    case 'active':
+      return 'success'
+    case 'expiring':
+      return 'warning'
+    case 'expired':
+      return 'destructive'
+    case 'pending':
+      return 'secondary'
+    case 'draft':
+      return 'outline'
+    default:
+      return 'default'
+  }
+}
+
+export function getStatusLabel(status: PolicyStatus, t: TranslationDictionary): string {
+  switch (status) {
+    case 'active':
+      return t.policy.activeStatus
+    case 'expiring':
+      return t.policy.expiringSoonStatus
+    case 'expired':
+      return t.policy.expiredStatus
+    case 'pending':
+      return t.policy.pendingStatus
+    case 'draft':
+      return t.policy.draftStatus
+    default:
+      return status
+  }
 }
