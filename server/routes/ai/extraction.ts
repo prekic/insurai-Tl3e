@@ -1581,7 +1581,7 @@ router.post(
  * 3. API key in query param (fallback) - less secure, visible in logs
  */
 interface DocumentAIResponse {
-  error?: { message: string }
+  error?: { message: string; code?: string; status?: string }
   document?: any
 }
 

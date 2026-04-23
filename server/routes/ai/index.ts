@@ -1,7 +1,7 @@
 import { Router } from 'express'
-import extractionRouter from './extraction'
-import chatRouter from './chat'
-import diagnosticsRouter from './diagnostics'
+import extractionRouter from './extraction.js'
+import chatRouter from './chat.js'
+import diagnosticsRouter from './diagnostics.js'
 
 const router = Router()
 

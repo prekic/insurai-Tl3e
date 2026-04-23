@@ -1,4 +1,4 @@
-import { log } from '../../lib/logger.js'
+import log from '../../lib/logger.js'
 import {
   aiRequests,
   policyOperations,
