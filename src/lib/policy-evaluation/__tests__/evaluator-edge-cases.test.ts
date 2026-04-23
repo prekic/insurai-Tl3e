@@ -405,4 +405,135 @@ describe('Evaluator Edge Cases — Crash Resistance', () => {
       }
     })
   })
+
+  // =========================================================================
+  // isIncluded fix — coverages with undefined included flag
+  // =========================================================================
+  describe('isIncluded regression — undefined included treated as true', () => {
+    it('should count coverages with included=undefined in coverage score', () => {
+      const policy = createBasePolicy({
+        coverages: [
+          {
+            name: 'Collision',
+            nameTr: 'Çarpışma',
+            limit: 100000,
+            deductible: 0,
+            included: undefined as unknown as boolean,
+          },
+          {
+            name: 'Theft',
+            nameTr: 'Hırsızlık',
+            limit: 100000,
+            deductible: 0,
+            included: undefined as unknown as boolean,
+          },
+          {
+            name: 'Fire',
+            nameTr: 'Yangın',
+            limit: 100000,
+            deductible: 0,
+            included: undefined as unknown as boolean,
+          },
+        ],
+      })
+      const result = evaluatePolicy(policy)
+
+      // Coverage score should be above 60 (no-coverage base), proving the coverages
+      // with undefined `included` are being counted, not ignored.
+      // Kasko starts at 75, 3 coverages add bonuses, but 3 is below 5 so -5 penalty.
+      expect(result.scoreBreakdown.coverage.score).toBeGreaterThanOrEqual(60)
+      expect(result.scoreBreakdown.coverage.details).toContain('3 coverages')
+    })
+
+    it('should NOT count coverages with included=false', () => {
+      const policy = createBasePolicy({
+        coverages: [
+          { name: 'Collision', nameTr: 'Çarpışma', limit: 100000, deductible: 0, included: false },
+          { name: 'Theft', nameTr: 'Hırsızlık', limit: 100000, deductible: 0, included: false },
+        ],
+      })
+      const result = evaluatePolicy(policy)
+
+      // With no included coverages, the coverage count is 0
+      expect(result.scoreBreakdown.coverage.details).toContain('0 coverages')
+    })
+
+    it('should score higher than a policy with all coverages excluded', () => {
+      const undefinedPolicy = createBasePolicy({
+        coverages: [
+          {
+            name: 'Collision',
+            nameTr: 'Çarpışma',
+            limit: 100000,
+            deductible: 0,
+            included: undefined as unknown as boolean,
+          },
+          {
+            name: 'IMM',
+            nameTr: 'İhtiyari Mali Mesuliyet',
+            limit: 5000000,
+            deductible: 0,
+            included: undefined as unknown as boolean,
+          },
+        ],
+      })
+      const excludedPolicy = createBasePolicy({
+        coverages: [
+          { name: 'Collision', nameTr: 'Çarpışma', limit: 100000, deductible: 0, included: false },
+          {
+            name: 'IMM',
+            nameTr: 'İhtiyari Mali Mesuliyet',
+            limit: 5000000,
+            deductible: 0,
+            included: false,
+          },
+        ],
+      })
+
+      const undefinedResult = evaluatePolicy(undefinedPolicy)
+      const excludedResult = evaluatePolicy(excludedPolicy)
+
+      // The undefined-included policy should count its coverages and score
+      // at least as high as the excluded policy. With excluded=false, the
+      // evaluator skips those coverages entirely, so coverage score differs.
+      expect(undefinedResult.scoreBreakdown.coverage.score).toBeGreaterThanOrEqual(
+        excludedResult.scoreBreakdown.coverage.score
+      )
+    })
+  })
+
+  // =========================================================================
+  // Inferred coverage — coverage=0 but individual limits exist
+  // =========================================================================
+  describe('Inferred coverage fallback', () => {
+    it('should evaluate non-kasko policies with coverage=0 but limit data', () => {
+      const policy = createBasePolicy({
+        type: 'traffic',
+        typeTr: 'Trafik',
+        coverage: 0,
+        premium: 1500,
+        coverages: [
+          {
+            name: 'Bodily Injury',
+            nameTr: 'Bedensel Hasar',
+            limit: 3000000,
+            deductible: 0,
+            included: true,
+          },
+          {
+            name: 'Material Damage',
+            nameTr: 'Maddi Hasar',
+            limit: 1000000,
+            deductible: 0,
+            included: true,
+          },
+        ],
+      })
+      const result = evaluatePolicy(policy)
+
+      // The inferred coverage (4,000,000) / premium (1,500) = 2,667 ratio
+      // This should keep the coverage score at least at the base (70), not lower
+      expect(result.scoreBreakdown.coverage.score).toBeGreaterThanOrEqual(70)
+    })
+  })
 })

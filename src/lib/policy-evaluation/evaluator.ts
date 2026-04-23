@@ -50,6 +50,32 @@ function formatTRY(value: number | undefined | null): string {
   return value.toLocaleString('tr-TR')
 }
 
+/**
+ * Check whether a coverage is included in the policy.
+ *
+ * Insurance documents list coverages that ARE included. The AI extraction
+ * often omits the `included` flag (leaving it `undefined` or `null`) rather
+ * than explicitly setting it to `true`. Only an explicit `false` means the
+ * coverage is excluded. Treating undefined as excluded was the root cause
+ * of 21 policies scoring a flat 60 (D-grade).
+ */
+function isIncluded(c: { included?: boolean }): boolean {
+  return c.included !== false
+}
+
+/**
+ * Compute an inferred total coverage from individual coverage limits.
+ * Used as a fallback when `policy.coverage` is 0 or missing but the
+ * AI extraction did populate per-coverage limits.
+ */
+function inferTotalCoverage(
+  coverages: Array<{ limit?: number | null; included?: boolean }>
+): number {
+  return coverages
+    .filter(isIncluded)
+    .reduce((sum, c) => sum + (typeof c.limit === 'number' && isFinite(c.limit) ? c.limit : 0), 0)
+}
+
 // =============================================================================
 // BENCHMARK CONFIDENCE ASSESSMENT
 // =============================================================================
@@ -364,12 +390,21 @@ export function evaluatePolicy(
   const hasCriticalComplianceIssues = complianceResult.complianceIssues.some(
     (i) => i.severity === 'critical'
   )
-  // Safest implementation: apply the same 60 max cap to ALL untrusted benchmark states, including fallback and missing.
   const hasUntrustedBenchmark =
     !benchmarkForDate || benchmarkForDate?.benchmarkStatus === 'untrusted'
 
-  if (hasCriticalComplianceIssues || hasUntrustedBenchmark) {
+  // Critical compliance issues (e.g., expired policy) warrant a hard cap.
+  if (hasCriticalComplianceIssues) {
     overallScore = Math.min(overallScore, 60)
+  }
+
+  // For untrusted benchmarks: the premium evaluator already returns neutral (70)
+  // or sentinel (-1) scores, so the weighted average self-corrects. We mark the
+  // evaluation as provisional instead of capping to 60, which was causing 21
+  // policies with valid coverage/deductible/compliance data to score D-grade.
+  // A softer cap of 85 prevents inflated A-grades without crushing good policies.
+  if (hasUntrustedBenchmark && !hasCriticalComplianceIssues) {
+    overallScore = Math.min(overallScore, 85)
   }
 
   // Generate market comparison
@@ -728,10 +763,13 @@ function evaluateCoverage(policy: Policy, config: EvaluationConfig): ScoreBreakd
     }
   } else {
     // Non-kasko: Check total coverage amount
-    const coveragePerPremium = policy.coverage / policy.premium
+    // Use inferred coverage when the extraction didn't set a top-level total
+    const effectiveCoverage =
+      policy.coverage > 0 ? policy.coverage : inferTotalCoverage(policy.coverages)
+    const coveragePerPremium = policy.premium > 0 ? effectiveCoverage / policy.premium : 0
     if (coveragePerPremium > 20) {
       score += 15
-    } else if (coveragePerPremium < 10) {
+    } else if (coveragePerPremium < 10 && policy.premium > 0) {
       score -= 10
       issues.push('Coverage amount is low relative to premium paid')
       issuesTR.push('Teminat tutarı ödenen prime göre düşük')
@@ -811,7 +849,7 @@ function evaluateCoverage(policy: Policy, config: EvaluationConfig): ScoreBreakd
 
 function checkMissingEssentialCoverages(policy: Policy): { en: string; tr: string }[] {
   const missing: { en: string; tr: string }[] = []
-  const coverageNames = policy.coverages.filter((c) => c.included).map((c) => c.name.toLowerCase())
+  const coverageNames = policy.coverages.filter(isIncluded).map((c) => c.name.toLowerCase())
 
   // IMPORTANT: For kasko, Collision, Theft, Fire, Natural Disasters are IMPLICIT
   // They are included in the base kasko premium - don't flag them as missing!
@@ -969,7 +1007,7 @@ function evaluateDeductible(policy: Policy, config: EvaluationConfig): ScoreBrea
 
   // Check individual coverage deductibles
   const highDeductibleCoverages = policy.coverages.filter(
-    (c) => c.included && c.deductible > 0 && c.limit > 0 && c.deductible / c.limit > 0.1
+    (c) => isIncluded(c) && c.deductible > 0 && c.limit > 0 && c.deductible / c.limit > 0.1
   )
 
   if (highDeductibleCoverages.length > 0) {
@@ -1111,7 +1149,7 @@ function evaluateCompliance(policy: Policy, config: EvaluationConfig): Complianc
   // Check for IMM Sublimits (Limited IMM) - Kasko typically
   const hasImmSublimits = policy.coverages.some(
     (c) =>
-      c.included &&
+      isIncluded(c) &&
       (c.name.toLowerCase().includes('mali mesuliyet') ||
         c.name.toLowerCase().includes('mali sorumluluk') ||
         c.name.toLowerCase().includes('imm')) &&
@@ -1283,7 +1321,7 @@ function evaluateValue(
       'glass',
     ]
     const valueAddedCount = policy.coverages.filter(
-      (c) => c.included && valueCoverages.some((vc) => c.name.toLowerCase().includes(vc))
+      (c) => isIncluded(c) && valueCoverages.some((vc) => c.name.toLowerCase().includes(vc))
     ).length
 
     if (valueAddedCount >= 3) {
@@ -1316,7 +1354,10 @@ function evaluateValue(
   }
 
   // Standard evaluation: Value is a combination of coverage quality vs premium paid
-  const coverageToPremiumRatio = policy.premium > 0 ? policy.coverage / policy.premium : 0
+  // Use inferred coverage when the extraction didn't set a top-level total
+  const effectiveCoverage =
+    policy.coverage > 0 ? policy.coverage : inferTotalCoverage(policy.coverages)
+  const coverageToPremiumRatio = policy.premium > 0 ? effectiveCoverage / policy.premium : 0
 
   // Adjust for coverage to premium ratio
   if (coverageToPremiumRatio > 50) {
@@ -1341,7 +1382,7 @@ function evaluateValue(
     'hukuki koruma',
   ]
   const hasValueAdded = policy.coverages.some(
-    (c) => c.included && valueCoverages.some((vc) => c.name.toLowerCase().includes(vc))
+    (c) => isIncluded(c) && valueCoverages.some((vc) => c.name.toLowerCase().includes(vc))
   )
 
   if (hasValueAdded) {
@@ -1725,7 +1766,7 @@ function generateScenarioCards(
     return IMM_NAME_PATTERNS.some((pat) => lower.includes(pat))
   }
   const immCoverage = policy.coverages.find(
-    (c) => (matchesIMM(c.name) || matchesIMM(c.nameTr)) && c.included
+    (c) => (matchesIMM(c.name) || matchesIMM(c.nameTr)) && isIncluded(c)
   )
 
   if (immCoverage) {
@@ -1847,7 +1888,7 @@ function generateScenarioCards(
 
   // 3. Total Loss Scenario
   const newValueClause = policy.coverages.find(
-    (c) => c.name.toLowerCase().includes('yeni değer') && c.included
+    (c) => c.name.toLowerCase().includes('yeni değer') && isIncluded(c)
   )
   if (policy.type === 'kasko') {
     cards.push({

@@ -41,7 +41,7 @@ describe('Sprint 1: Trustworthiness Hardening Evaluator Tests', () => {
     expect(result.overallScore).toBeLessThanOrEqual(60)
   })
 
-  it('Untrusted or fallback benchmark caps score at 60', () => {
+  it('Untrusted or fallback benchmark applies soft cap at 85', () => {
     // Stub the benchmark response to be a fallback
     vi.spyOn(benchmarkService, 'getPremiumBenchmarkWithFallback').mockReturnValue({
       benchmarkStatus: 'untrusted',
@@ -52,8 +52,12 @@ describe('Sprint 1: Trustworthiness Hardening Evaluator Tests', () => {
     const mockPolicy = { ...basePolicy }
     const result = evaluatePolicy(mockPolicy)
 
-    // Proves: untrusted fallback benchmark caps score at 60
-    expect(result.overallScore).toBeLessThanOrEqual(60)
+    // Proves: untrusted fallback benchmark applies a soft cap at 85
+    // (the premium evaluator already returns neutral scores for untrusted data,
+    // so a hard 60 cap was double-penalizing and inflating D-grade counts)
+    expect(result.overallScore).toBeLessThanOrEqual(85)
+    // Should still be marked as provisional
+    expect(result.isProvisional).toBe(true)
 
     vi.restoreAllMocks()
   })
