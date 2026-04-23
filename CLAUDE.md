@@ -189,6 +189,8 @@
 
 87. **Grade Calibration Minimum Sample Restored to 50 (Added April 23, 2026)**: The `calibrate-grade-thresholds.ts` script and `isSampleSufficient` check were previously lowered to 5 (gotcha #57) to unblock early pilots. With 70 policies now ingested, the minimum is effectively met. The calibrated thresholds (A: 89, B: 85, C: 39, D: 2) are now statistically grounded on a 64-policy sample. Future recalibrations should maintain n ≥ 50. Thresholds are stored in `app_settings` under `evaluation/grade_*_threshold` and cached with 5-minute TTL.
 
+88. **Backfill Script Date Normalization (Added April 23, 2026)**: The `scripts/backfill-evaluation-scores.ts` file's `reconstructPolicySafely()` function silently shifts expired policy dates forward to the current year during calibration runs. This prevents the evaluator's compliance checker from penalizing historical/expired policies during threshold calibration. This normalization ONLY applies in the backfill context — it does NOT affect production extraction or the evaluator itself. If you see artificially "current" dates on old policies during a backfill, this is intentional.
+
 ## Project Overview
 
 144. **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.

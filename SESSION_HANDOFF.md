@@ -7,7 +7,7 @@
 ### Priority 1: Merge PR #362
 - **Branch**: `insuraigemini20260423` → `main`
 - **PR**: [`fix(evaluator): resolve D-grade inflation and harden extraction robustness`](https://github.com/prekic/insurai/pull/362)
-- **Status**: Ready to merge. Contains all evaluator fixes (4 commits).
+- **Status**: Ready to merge. Contains all evaluator + UI decomposition fixes (5 code commits + 1 docs commit).
 - **Action**: Review and merge.
 
 ### Priority 2: Fix Pre-Existing Test Failure
@@ -17,7 +17,7 @@
 
 ### Priority 3: Resume UI Decomposition
 - **File**: `src/components/PolicyDetailView.tsx` (originally 2,881 lines)
-- **Status**: Partially extracted into `src/components/PolicyDetailView/` (MarketComparisonCard, PolicyOverviewCard, SidebarStatusCard, DesktopInsightsCard)
+- **Status**: Partially extracted into `src/components/PolicyDetailView/` (MarketComparisonCard, PolicyOverviewCard, SidebarStatusCard, ActuarialInsightsCard, FinancialWarningsCard + shared.tsx helpers)
 - **Action**: Continue decomposing remaining monolithic sections
 
 ### Priority 4: Phase E Production Monitoring
@@ -65,6 +65,16 @@
 - Added division-by-zero protection
 - 16 new edge-case tests in `evaluator-edge-cases.test.ts`
 
+### 4a. Backfill Script Hardening (`scripts/backfill-evaluation-scores.ts`)
+- Added `logo: ''` field to `reconstructPolicySafely()` to satisfy type requirements
+- Added coverage inference from subcoverages (same logic as evaluator's `inferTotalCoverage`)
+- Added date normalization: expired policies get dates shifted forward so calibration evaluates coverage quality, not renewal status
+- Added `included` field normalization: raw `included` values now default to `true` for consistency with gotcha #85
+
+### 4b. Test Assertion Fixes
+- `src/lib/ai/__tests__/qa-regression-fixes.test.ts`: Updated coverage property count assertion from 9 → 13 (schema expanded in prior sessions)
+- `src/lib/ai/config.test.ts`: Updated Anthropic extraction model assertion from `claude-sonnet-4-20250514` → `claude-3-7-sonnet-20250219` (model reference was stale)
+
 ### 5. Data Integrity
 - Cleaned ~7 duplicate "UNKNOWN" provider entries from Supabase
 - Established pristine 19-policy baseline before bulk ingestion
@@ -78,6 +88,22 @@
 - Ran `calibrate-grade-thresholds.ts --apply` on 64-policy sample
 - New thresholds: A ≥ 89, B ≥ 85, C ≥ 39, D ≥ 2, F < 2
 - Previous thresholds: A ≥ 93, B ≥ 85, C ≥ 60, D ≥ 60
+
+### 8. UI Decomposition (`src/components/PolicyDetailView/`)
+- Extracted 5 new sub-components from the PolicyDetailView monolith:
+  - `ActuarialInsightsCard.tsx` [NEW] — EOOP breakdown and actuarial insights display
+  - `FinancialWarningsCard.tsx` [NEW] — Financial warning and risk summary
+  - `MarketComparisonCard.tsx` [NEW] — Market benchmark comparison UI (288 lines)
+  - `PolicyOverviewCard.tsx` [NEW] — Policy overview summary card
+  - `SidebarStatusCard.tsx` [NEW] — Sidebar status indicators
+- Modified `shared.tsx` with updated shared helpers/types for the decomposed components
+- Modified `PolicyDetailView.tsx` to import from new sub-components
+
+### 9. Infrastructure Changes
+- `.gitignore`: Added `out.json` (debug artifact from batch processing)
+- `server/routes/admin/monitoring.ts`: Updated import from `../ai.js` to `../ai/shared.js` (required after AI route modularization in prior session)
+- `e2e/real-policies.spec.ts` [NEW]: Playwright E2E test for real policy batch extraction (reads up to 10 PDFs from `policies/` dir)
+- `pilot-batch-results.json` [NEW]: 246-line JSON artifact containing batch ingestion results for 51 policies (provider names, coverage counts, admission statuses)
 
 ## Environment / Configuration
 
@@ -96,6 +122,9 @@
 1. **`NEXT_PUBLIC_SUPABASE_URL` vs `SUPABASE_URL`**: The `.env` file uses `SUPABASE_URL` (not `NEXT_PUBLIC_SUPABASE_URL`). Standalone scripts must reference `process.env.SUPABASE_URL`.
 2. **Top-level `await` in `tsx -e`**: The `tsx` CLI does not support top-level await in eval mode. Wrap in `async function main() {} main();` pattern.
 3. **AXA Sigorta font corruption**: All ERDEMİR KASKO AXA policies fail `pdfjs` extraction with garbled text. The pipeline correctly falls back to GCP Document AI OCR for these.
+4. **Anthropic model reference stale**: The test suite had `claude-sonnet-4-20250514` but the actual config uses `claude-3-7-sonnet-20250219`. This was corrected in this session. If the Anthropic model is upgraded again, remember to update `src/lib/ai/config.test.ts`.
+5. **Coverage schema property count changed**: The extraction schema now has 13 coverage item properties (was 9). Any test asserting on the coverage property count must be updated if schema fields are added/removed.
+6. **`pilot-batch-results.json` committed**: This is a data artifact, not a code file. It contains the raw output from the 51-policy batch ingestion. It should be reviewed if batch results need re-auditing but is NOT required for production.
 
 ## Architecture Check
 
