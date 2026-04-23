@@ -266,8 +266,8 @@ describe('P0-4: DAHİL/HARİÇ extraction schema', () => {
     expect(coverageItems.required).toContain('included')
   })
 
-  it('has 9 total coverage properties', () => {
-    expect(Object.keys(coverageItems.properties)).toHaveLength(9)
+  it('has 13 total coverage properties', () => {
+    expect(Object.keys(coverageItems.properties)).toHaveLength(13)
   })
 
   it('included field description mentions DAHİL/HARİÇ', () => {

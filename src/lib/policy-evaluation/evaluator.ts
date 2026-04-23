@@ -193,7 +193,7 @@ function assessBenchmarkConfidence(
       factor: 'Coverage level',
       factorTr: 'Teminat tutarı',
       present: policy.coverage > 0,
-      value: policy.coverage > 0 ? `${policy.coverage.toLocaleString('tr-TR')} TL` : undefined,
+      value: policy.coverage > 0 ? `${formatTRY(policy.coverage)} TL` : undefined,
     },
   ]
 
@@ -526,16 +526,16 @@ function evaluatePremium(
       categoryTR: 'Prim',
       score: 70, // Neutral — no comparison possible
       weight: config.weights.premium,
-      details: `Premium of ${policy.premium.toLocaleString('tr-TR')} TL — comparison suppressed (missing: ${missingNames})`,
-      detailsTR: `${policy.premium.toLocaleString('tr-TR')} TL prim — karşılaştırma yapılamıyor (eksik: ${missingNamesTr})`,
+      details: `Premium of ${formatTRY(policy.premium)} TL — comparison suppressed (missing: ${missingNames})`,
+      detailsTR: `${formatTRY(policy.premium)} TL prim — karşılaştırma yapılamıyor (eksik: ${missingNamesTr})`,
       issues: ['Market comparison suppressed due to insufficient context data'],
       issuesTR: ['Yetersiz bağlam verisi nedeniyle piyasa karşılaştırması yapılamıyor'],
     }
   }
 
   let score = 70 // Default score
-  let details = `Premium of ${policy.premium.toLocaleString('tr-TR')} TL compared to market estimate`
-  let detailsTR = `${policy.premium.toLocaleString('tr-TR')} TL prim, piyasa tahmini ile karşılaştırıldı`
+  let details = `Premium of ${formatTRY(policy.premium)} TL compared to market estimate`
+  let detailsTR = `${formatTRY(policy.premium)} TL prim, piyasa tahmini ile karşılaştırıldı`
 
   if (benchmark?.benchmarkStatus === 'untrusted' || !benchmark) {
     return {
@@ -543,8 +543,8 @@ function evaluatePremium(
       categoryTR: 'Prim',
       score: 70, // Neutral — no comparison possible
       weight: config.weights.premium,
-      details: `Premium of ${policy.premium.toLocaleString('tr-TR')} TL — Market benchmark unavailable.`,
-      detailsTR: `${policy.premium.toLocaleString('tr-TR')} TL prim — Piyasa karşılaştırması kullanılamıyor.`,
+      details: `Premium of ${formatTRY(policy.premium)} TL — Market benchmark unavailable.`,
+      detailsTR: `${formatTRY(policy.premium)} TL prim — Piyasa karşılaştırması kullanılamıyor.`,
       issues: ['Benchmark confidence too low for numeric market comparison'],
       issuesTR: ['Sayısal piyasa karşılaştırması için karşılaştırma güveni çok düşük'],
     }
@@ -793,8 +793,8 @@ function evaluateCoverage(policy: Policy, config: EvaluationConfig): ScoreBreakd
     details = `${coverageCount} coverages included, vehicle covered at market value`
     detailsTR = `${coverageCount} teminat dahil, araç rayiç değer üzerinden teminatlı`
   } else {
-    details = `${coverageCount} coverages included with total coverage of ${policy.coverage.toLocaleString('tr-TR')} TL`
-    detailsTR = `${coverageCount} teminat dahil, toplam ${policy.coverage.toLocaleString('tr-TR')} TL teminat`
+    details = `${coverageCount} coverages included with total coverage of ${formatTRY(policy.coverage)} TL`
+    detailsTR = `${coverageCount} teminat dahil, toplam ${formatTRY(policy.coverage)} TL teminat`
   }
 
   return {
@@ -939,8 +939,8 @@ function evaluateDeductible(policy: Policy, config: EvaluationConfig): ScoreBrea
       categoryTR: 'Muafiyet',
       score,
       weight: config.weights.deductible,
-      details: `Deductible of ${policy.deductible.toLocaleString('tr-TR')} TL`,
-      detailsTR: `${policy.deductible.toLocaleString('tr-TR')} TL muafiyet`,
+      details: `Deductible of ${formatTRY(policy.deductible)} TL`,
+      detailsTR: `${formatTRY(policy.deductible)} TL muafiyet`,
       issues,
       issuesTR,
     }
@@ -995,8 +995,8 @@ function evaluateDeductible(policy: Policy, config: EvaluationConfig): ScoreBrea
     categoryTR: 'Muafiyet',
     score,
     weight: config.weights.deductible,
-    details: `Deductible of ${policy.deductible.toLocaleString('tr-TR')} TL (${(deductibleRatio * 100).toFixed(1)}% of coverage)`,
-    detailsTR: `${policy.deductible.toLocaleString('tr-TR')} TL muafiyet (teminatın %${(deductibleRatio * 100).toFixed(1)}'i)`,
+    details: `Deductible of ${formatTRY(policy.deductible)} TL (${(deductibleRatio * 100).toFixed(1)}% of coverage)`,
+    detailsTR: `${formatTRY(policy.deductible)} TL muafiyet (teminatın %${(deductibleRatio * 100).toFixed(1)}'i)`,
     issues,
     issuesTR,
   }
@@ -1576,7 +1576,7 @@ function generateRecommendations(
   // Deductible optimization - only if deductible is actually high (not 0)
   // Note: When deductible is 0, the score should be 95 (handled in evaluateDeductible)
   if (scores.deductible.score < 60 && policy.deductible > 0) {
-    const deductibleAmount = policy.deductible.toLocaleString('tr-TR')
+    const deductibleAmount = formatTRY(policy.deductible)
     // Handle market value policies where coverage is 0
     const hasMarketValueCoverage =
       policy.coverage === 0 || policy.coverages.some((c) => c.isMarketValue)
@@ -1607,7 +1607,7 @@ function generateRecommendations(
   const isComprehensivePolicy = scores.coverage.score >= 80 || policy.coverages.length >= 8
 
   if (scores.premium.score < 60 && hasPremiumIssues && !isComprehensivePolicy) {
-    const premiumAmount = policy.premium.toLocaleString('tr-TR')
+    const premiumAmount = formatTRY(policy.premium)
 
     recommendations.push({
       priority: 'medium',
@@ -1884,24 +1884,20 @@ function generateScenarioCards(
       titleTR: 'Genel Hasar Durumu',
       description:
         policy.deductible > 0
-          ? `You will pay the first ${policy.deductible.toLocaleString('tr-TR')} TL out of pocket for any claimed loss.`
+          ? `You will pay the first ${formatTRY(policy.deductible)} TL out of pocket for any claimed loss.`
           : 'You have no fixed deductible. The insurer will cover verified claims directly, subject to limits.',
       descriptionTR:
         policy.deductible > 0
-          ? `Herhangi bir hasar talebinde ilk ${policy.deductible.toLocaleString('tr-TR')} TL'yi cepten ödeyeceksiniz.`
+          ? `Herhangi bir hasar talebinde ilk ${formatTRY(policy.deductible)} TL'yi cepten ödeyeceksiniz.`
           : 'Sabit bir muafiyetiniz yok. Sigortacı onaylanan hasarları doğrudan teminat limitleri dahilinde öder.',
       financialStatus: policy.deductible > 0 ? 'partially_covered' : 'covered',
-      riskAmount:
-        policy.deductible > 0 ? `Up to ${policy.deductible.toLocaleString('tr-TR')} TL` : undefined,
+      riskAmount: policy.deductible > 0 ? `Up to ${formatTRY(policy.deductible)} TL` : undefined,
       riskAmountTR:
-        policy.deductible > 0
-          ? `${policy.deductible.toLocaleString('tr-TR')} TL'ye kadar`
-          : undefined,
+        policy.deductible > 0 ? `${formatTRY(policy.deductible)} TL'ye kadar` : undefined,
       insurerPays: policy.deductible > 0 ? 'Claim minus deductible' : 'Full verified claim',
       insurerPaysTR: policy.deductible > 0 ? 'Hasar eksi muafiyet' : 'Doğrulanmış hasarın tamamı',
-      userPays: policy.deductible > 0 ? `${policy.deductible.toLocaleString('tr-TR')} TL` : '0 TL',
-      userPaysTR:
-        policy.deductible > 0 ? `${policy.deductible.toLocaleString('tr-TR')} TL` : '0 TL',
+      userPays: policy.deductible > 0 ? `${formatTRY(policy.deductible)} TL` : '0 TL',
+      userPaysTR: policy.deductible > 0 ? `${formatTRY(policy.deductible)} TL` : '0 TL',
       trigger: 'Any eligible claim occurs.',
       triggerTR: 'Uygun bir hasar talebinin oluşması.',
       whyItMatters: 'Shows your guaranteed out-of-pocket minimum for any claim.',

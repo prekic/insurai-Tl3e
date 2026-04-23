@@ -16,7 +16,7 @@ import {
   logger,
 } from './shared.js'
 import type { AuthenticatedRequest } from './shared.js'
-import { getExtractionHealthSnapshot } from '../ai.js'
+import { getExtractionHealthSnapshot } from '../ai/shared.js'
 import { getAlertState } from '../../services/extraction-alert-service.js'
 
 const log = logger.child('AdminMonitoring')
