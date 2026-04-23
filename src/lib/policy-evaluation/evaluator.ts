@@ -41,6 +41,15 @@ import {
 
 import { KASKO_COMMERCIAL_BENCHMARKS } from '@/data/market-data/benchmarks'
 
+/**
+ * Safely format a numeric value as Turkish Lira string.
+ * Returns '0' for undefined, null, or NaN values instead of crashing.
+ */
+function formatTRY(value: number | undefined | null): string {
+  if (value == null || isNaN(value)) return '0'
+  return value.toLocaleString('tr-TR')
+}
+
 // =============================================================================
 // BENCHMARK CONFIDENCE ASSESSMENT
 // =============================================================================
@@ -1742,17 +1751,18 @@ function generateScenarioCards(
           'İMM, zorunlu trafik sigortası limitiniz tükendiğinde sizi davalardan korur.',
       })
     } else {
+      const limitStr = formatTRY(immCoverage.limit)
       cards.push({
         id: 'imm-scenario',
         title: 'At-Fault Major Accident',
         titleTR: 'Kusurlu Büyük Kazada',
-        description: `Your policy caps liability at ${immCoverage.limit.toLocaleString('tr-TR')} TL. Damages exceeding this limit must be paid out-of-pocket, creating significant financial exposure.`,
-        descriptionTR: `Poliçeniz mali sorumluluğu ${immCoverage.limit.toLocaleString('tr-TR')} TL ile sınırlar. Bu limiti aşan hasarlar trafik sigortası olsa bile cebinizden ödenmelidir, bu da yüksek mali yükümlülük yaratabilir.`,
+        description: `Your policy caps liability at ${limitStr} TL. Damages exceeding this limit must be paid out-of-pocket, creating significant financial exposure.`,
+        descriptionTR: `Poliçeniz mali sorumluluğu ${limitStr} TL ile sınırlar. Bu limiti aşan hasarlar trafik sigortası olsa bile cebinizden ödenmelidir, bu da yüksek mali yükümlülük yaratabilir.`,
         financialStatus: 'risk',
-        riskAmount: `Over ${immCoverage.limit.toLocaleString('tr-TR')} TL`,
-        riskAmountTR: `${immCoverage.limit.toLocaleString('tr-TR')} TL Üzeri`,
-        insurerPays: `Up to ${immCoverage.limit.toLocaleString('tr-TR')} TL`,
-        insurerPaysTR: `Maksimum ${immCoverage.limit.toLocaleString('tr-TR')} TL`,
+        riskAmount: `Over ${limitStr} TL`,
+        riskAmountTR: `${limitStr} TL Üzeri`,
+        insurerPays: `Up to ${limitStr} TL`,
+        insurerPaysTR: `Maksimum ${limitStr} TL`,
         userPays: 'unknown (out of pocket)',
         userPaysTR: 'bilinmiyor (cepten)',
         trigger: 'Third-party damages exceeding the policy IMM limits.',

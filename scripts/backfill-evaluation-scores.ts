@@ -53,7 +53,8 @@ export function reconstructPolicySafely(row: any): { policy?: Policy; skipReason
     vehicleInfo: raw.vehicleInfo,
 
     // Extraction states for the evaluator
-    premiumMissing: raw.premiumMissing === true,
+    // Flag premium as missing if raw_data says so OR if premium is 0 without explicit data
+    premiumMissing: raw.premiumMissing === true || row.premium === 0,
     deductibleUncertain: raw.deductibleUncertain === true,
     aiConfidence: raw.aiConfidence,
     isDraft: row.is_draft === true,

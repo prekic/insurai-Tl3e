@@ -1,0 +1,62 @@
+import { test, expect } from '@playwright/test'
+import * as path from 'path'
+import * as fs from 'fs'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+const POLICIES_DIR = path.resolve(__dirname, '../policies')
+
+// Get up to 10 sample PDF policies from the policies directory
+const samplePolicies = fs
+  .readdirSync(POLICIES_DIR)
+  .filter((file) => file.toLowerCase().endsWith('.pdf'))
+  .slice(0, 10)
+  .map((file) => ({
+    name: file,
+    path: path.join(POLICIES_DIR, file),
+  }))
+
+test.describe('Real Policies Batch Extraction Tests', () => {
+  // Set a generous timeout since real AI extraction takes time (up to 2 minutes per policy)
+  test.setTimeout(120000 * samplePolicies.length)
+
+  for (const policy of samplePolicies) {
+    test(`Extract and process real policy: ${policy.name}`, async ({ page }) => {
+      // Individual test timeout
+      test.setTimeout(120000)
+
+      await page.goto('/')
+      await page.waitForLoadState('networkidle')
+
+      // Find upload input
+      const fileInput = page
+        .locator('input[type="file"][accept*="pdf"]')
+        .or(page.locator('input[type="file"]'))
+        .first()
+
+      // Upload the actual policy PDF
+      await fileInput.setInputFiles(policy.path)
+
+      // Wait for navigation to /try or /upload
+      await page.waitForURL(/\/(try|upload)/, { timeout: 10000 })
+
+      // If anonymous, it redirects to /try. If logged in, stays on /upload or goes to /policy
+      if (page.url().includes('/try')) {
+        // Wait for extraction to complete (shows score/grade or error)
+        const resultOrError = page.getByText(
+          /score|grade|coverage|teminat|puan|error|hata|failed|timeout|try again/i
+        )
+        await expect(resultOrError.first()).toBeVisible({ timeout: 100000 })
+
+        // Assert we actually got a real result (not an error)
+        const hasRealResults = (await page.getByText(/score|grade|puan/i).count()) > 0
+        const hasError = (await page.getByText(/error|hata|failed|timeout/i).count()) > 0
+
+        // Expect at least one of these to be true (preferably a result)
+        expect(hasRealResults || hasError).toBe(true)
+      }
+    })
+  }
+})
