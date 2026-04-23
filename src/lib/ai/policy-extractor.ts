@@ -1551,6 +1551,7 @@ import {
   type StructuredPolicyData,
 } from './kasko-parser-prompts'
 import { addSectionMarkers, applyComprehensivePreprocessing } from './text-processor'
+import { parseTurkishCurrency } from './turkish-utils'
 
 // Modular imports:
 import { translateInsightsToTr } from './insight-translator'
@@ -1623,6 +1624,25 @@ export async function extractPolicyComprehensive(
     }
   }
 
+  // Pre-inject Regex Premium extraction to prevent LLM inflation errors
+  let regexPremiumHint = ''
+  const premiumPatterns = [
+    /(?:br[uü]t\s*pr[iİ]m)[\s:.]*([\d.,]+)\s*(?:TL|TRY|₺)?/i,
+    /(?:toplam\s+(?:net\s+)?pr[iİ]m)[\s:.]*([\d.,]+)\s*(?:TL|TRY|₺)?/i,
+    /(?:[oö]denecek\s*pr[iİ]m)[\s:.]*([\d.,]+)\s*(?:TL|TRY|₺)?/i,
+    /(?:net\s*pr[iİ]m)[\s:.]*([\d.,]+)\s*(?:TL|TRY|₺)?/i,
+  ]
+  for (const pat of premiumPatterns) {
+    const m = preprocessed.match(pat)
+    if (m && m[1]) {
+      const reparsed = parseTurkishCurrency(m[1])
+      if (reparsed && reparsed > 0) {
+        regexPremiumHint = `\n\n[SYSTEM HINT]: Based on strict OCR pre-processing, the total premium for this policy is explicitly listed as ${m[1]} TL (Parsed as ${reparsed}). You MUST use this exact value for the totalPremium field. Do not misinterpret the decimal or thousands separators.`
+        break
+      }
+    }
+  }
+
   // Pass 2: AI extraction with structured output
   let attempts = 0
   let bestResult: { response: string; qualityScore: number } | null = null
@@ -1631,10 +1651,14 @@ export async function extractPolicyComprehensive(
     attempts++
 
     try {
-      const userPrompt = EXTRACTION_USER_PROMPT_TEMPLATE.replace(
+      let userPrompt = EXTRACTION_USER_PROMPT_TEMPLATE.replace(
         '{PROCESSED_TEXT}',
         preprocessed.slice(0, 25000)
       )
+
+      if (regexPremiumHint) {
+        userPrompt += regexPremiumHint
+      }
 
       const response = await fetch(`${API_URL}/api/ai/extract/${provider}`, {
         method: 'POST',

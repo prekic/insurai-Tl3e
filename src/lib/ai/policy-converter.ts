@@ -218,10 +218,10 @@ export async function convertToAnalyzedPolicy(
           const reparsed = parseTurkishCurrency(m[1])
           if (reparsed && reparsed > 0) {
             // If our extracted premium differs from re-parsed by ≥50× and
-            // the re-parsed value is plausible (< 500K TL for kasko), trust it
+            // the re-parsed value is plausible (< 50,000,000 TL for high inflation), trust it
             const ratio = premiumValue / reparsed
             const isLikelyMisparsed =
-              (ratio >= 5 || ratio <= 0.2) && reparsed < 500000 && reparsed > 50
+              (ratio >= 5 || ratio <= 0.2) && reparsed < 50000000 && reparsed > 50
             if (isLikelyMisparsed) {
               console.warn(
                 `[convertToAnalyzedPolicy] Premium magnitude correction: ${premiumValue} → ${reparsed} (raw: "${m[0]}")`
