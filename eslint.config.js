@@ -68,6 +68,23 @@ export default tseslint.config(
       '@typescript-eslint/explicit-module-boundary-types': 'off',
       '@typescript-eslint/no-non-null-assertion': 'warn',
 
+      // Flag `as unknown as X` double-casts. They bypass TypeScript's structural
+      // checks and have hidden contract bugs (see CLAUDE.md gotchas #48, #84).
+      // Set to 'warn' because the codebase has pre-existing occurrences in
+      // ~17 production files; new code should avoid the pattern, existing
+      // call sites are tracked as remediation debt. The sanctioned exception
+      // at src/lib/ai/providers/claude.ts (proxy boundary, gotcha #84) is
+      // disabled inline at the call site.
+      'no-restricted-syntax': [
+        'warn',
+        {
+          selector:
+            "TSAsExpression[expression.type='TSAsExpression'][expression.typeAnnotation.type='TSUnknownKeyword']",
+          message:
+            "'as unknown as X' is a code smell — construct a complete safe-default (see createSafeDefaultBundle in src/lib/analysis/engine.ts) or use schema validation. CLAUDE.md gotchas #48 and #84.",
+        },
+      ],
+
       // General rules
       'no-console': ['warn', { allow: ['warn', 'error', 'group', 'groupEnd'] }],
       'no-debugger': 'warn',
@@ -84,6 +101,9 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
       'no-console': 'off',
+      // Tests legitimately need `as unknown as` for mock construction —
+      // e.g. casting partial Supabase mocks to the full client type.
+      'no-restricted-syntax': 'off',
     },
   },
 

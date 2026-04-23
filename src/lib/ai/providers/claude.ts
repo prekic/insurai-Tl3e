@@ -188,6 +188,10 @@ export async function extractWithClaude(
         throw proxyError
       }
 
+      // Sanctioned `as unknown as` — see CLAUDE.md gotcha #84. The proxy
+      // boundary returns `unknown`-typed JSON validated by the server's strict
+      // schema, so the structural cast is the documented contract here.
+      // eslint-disable-next-line no-restricted-syntax
       result = proxyResult.data as unknown as ExtractedPolicyData
 
       // Attach proxy metadata for observability logging
