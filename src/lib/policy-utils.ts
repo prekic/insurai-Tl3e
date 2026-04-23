@@ -281,8 +281,18 @@ export function normalizeOCRTextForExtraction(text: string): string {
   }
 
   // Normalize Turkish currency amounts (ensure consistent format)
-  // "1.234.567,89 TL" or "1,234,567.89 TL" -> consistent format
-  normalized = normalized.replace(/(\d{1,3})\.(\d{3})\.(\d{3}),(\d{2})/g, '$1$2$3.$4')
+  // Handles ALL Turkish number formats with dot-thousands and comma-decimal:
+  //   "10.805,80"         (XX.XXX,XX)     -> "10805.80"
+  //   "875.674,88"        (XXX.XXX,XX)    -> "875674.88"
+  //   "1.234.567,89"      (X.XXX.XXX,XX)  -> "1234567.89"
+  //   "3.000.000,00"      (X.XXX.XXX,XX)  -> "3000000.00"
+  //   "12.345.678.901,23" (multi-group)   -> "12345678901.23"
+  // The regex matches: digit groups separated by dots, ending with comma + 2 digits.
+  // It captures the integer part (with dots) and the decimal part separately.
+  normalized = normalized.replace(
+    /(\d{1,3}(?:\.\d{3})+),(\d{2})(?!\d)/g,
+    (_match, intPart: string, decPart: string) => intPart.replace(/\./g, '') + '.' + decPart
+  )
 
   // Normalize dates to ISO-like format for consistency
   // "15.01.2026" -> "15.01.2026" (keep as-is, just ensure consistency)

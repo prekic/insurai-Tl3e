@@ -94,7 +94,7 @@ Extract these additional vehicle-specific fields:
 - **Vehicle Information**:
   - vehicleMake (Marka): e.g., Toyota, Ford, Volkswagen
   - vehicleModel (Model): e.g., Corolla, Focus, Golf
-  - vehicleYear (Model Yılı): Manufacturing year (e.g., 2022)
+  - vehicleYear (Model Yılı / Model Bilgisi): Manufacturing year (e.g., 2022)
   - plateNumber (Plaka): Turkish format (e.g., 34 ABC 123)
   - chassisNumber (Şasi No): 17-character VIN
   - engineNumber (Motor No): Engine identification

@@ -94,7 +94,7 @@ OUTPUT FORMAT (MUST FOLLOW EXACTLY):
 | Şasi No | [chassis] |
 | Motor No | [engine] |
 | Marka/Model | [make/model] |
-| Model Yılı | [year] |
+| Model Yılı / Model Bilgisi | [year] |
 | Kullanım Şekli | [private/commercial] |
 
 ### 3. Dahil Teminatlar
@@ -282,7 +282,7 @@ PARSING ANCHORS - explicitly search for these phrases:
 - "Poliçe No", "Poliçe Vadesi", "Düzenleme Tarihi", "SBM Poliçe No"
 
 **Vehicle:**
-- "Plaka No", "Şasi No", "Motor No", "Marka", "Tip", "Aracın Markası", "Model Yılı", "Kullanım Şekli"
+- "Plaka No", "Şasi No", "Motor No", "Marka", "Tip", "Aracın Markası", "Model Yılı", "Model Bilgisi", "Kullanım Şekli"
 
 **Premium:**
 - "Vergi Öncesi Prim", "BSMV", "Ödenecek Tutar", "Ödeme Planı"
@@ -302,6 +302,8 @@ PARSING ANCHORS - explicitly search for these phrases:
 
 **Special clauses:**
 - "Hatalı Akaryakıt", "LPG Kullanan Araçlar", "Yaptırım Klozu", "Siber Saldırı İstisna"
+- "POLİÇE ADET KONTROL", "filo adet", "araç sayısı altı", "farkı zeyl" (fleet count trap)
+- "Manevi Tazminat" (moral damages inclusion — positive coverage feature)
 
 HARD BAN: Do not output the original raw policy text except for short quoted excerpts (max 2 lines) to justify an extracted item.`
 

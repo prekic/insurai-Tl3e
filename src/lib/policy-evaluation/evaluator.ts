@@ -51,6 +51,42 @@ function formatTRY(value: number | undefined | null): string {
 }
 
 /**
+ * Shared IMM (İhtiyari Mali Mesuliyet / Voluntary Liability) coverage
+ * name patterns. Used by both the compliance evaluator (sublimit check)
+ * and the scenario card generator so they never diverge.
+ *
+ * Matches against lowercased coverage name/nameTr. Covers:
+ * - Turkish labels: Mali Mesuliyet, Mali Sorumluluk, İMM, İhtiyari, etc.
+ * - English labels: Voluntary Liability, Excess Liability, Third-Party
+ * - Sub-labels: Bedeni ve Maddi, Artan Mali
+ */
+const IMM_COVERAGE_PATTERNS: string[] = [
+  'mali mesuliyet',
+  'mali sorumluluk',
+  'i\u0307mm', // İMM (with combining dot above)
+  ' imm',
+  'imm ',
+  'i\u0307htiyari',
+  'ihtiyari',
+  'voluntary liability',
+  'excess liability',
+  'third.party liability',
+  'üçüncü şahıs',
+  'ucuncu sahis',
+  'bedeni ve maddi',
+  'artan mali',
+]
+
+/**
+ * Test whether a coverage name matches any known IMM label pattern.
+ */
+function matchesIMMPattern(text: string | undefined | null): boolean {
+  if (!text) return false
+  const lower = text.toLowerCase()
+  return IMM_COVERAGE_PATTERNS.some((pat) => lower.includes(pat))
+}
+
+/**
  * Check whether a coverage is included in the policy.
  *
  * Insurance documents list coverages that ARE included. The AI extraction
@@ -938,7 +974,35 @@ function evaluateDeductible(policy: Policy, config: EvaluationConfig): ScoreBrea
         issuesTR: ['Muafiyet bilgisi güvenilir şekilde çıkarılamadı'],
       }
     }
-    // Explicitly confirmed zero deductible
+
+    // Bug #4 fix: Even if flat deductible is 0, check for conditional deductibles.
+    // A policy with conditional deductibles (e.g., 20% on glass repairs outside
+    // network) should NOT score 95 — cap at 80 and surface the conditionals.
+    const conditionals = analyzedPolicyDed.conditionalDeductibles
+    const hasConditionals = Array.isArray(conditionals) && conditionals.length > 0
+
+    if (hasConditionals) {
+      score = 80
+      const condCount = conditionals.length
+      issues.push(
+        `No flat deductible, but ${condCount} conditional deductible${condCount > 1 ? 's' : ''} apply (e.g., network/glass/age penalties)`
+      )
+      issuesTR.push(
+        `Sabit muafiyet yok, ancak ${condCount} koşullu muafiyet uygulanıyor (ör. servis ağı/cam/yaş cezaları)`
+      )
+      return {
+        category: 'Deductible',
+        categoryTR: 'Muafiyet',
+        score,
+        weight: config.weights.deductible,
+        details: `No flat deductible, but ${condCount} conditional deductible${condCount > 1 ? 's' : ''} detected`,
+        detailsTR: `Sabit muafiyet yok, ancak ${condCount} koşullu muafiyet tespit edildi`,
+        issues,
+        issuesTR,
+      }
+    }
+
+    // Explicitly confirmed zero deductible with no conditionals
     score = 95
     return {
       category: 'Deductible',
@@ -1147,12 +1211,12 @@ function evaluateCompliance(policy: Policy, config: EvaluationConfig): Complianc
     analyzedPolicy.conditionalDeductibles && analyzedPolicy.conditionalDeductibles.length > 0
 
   // Check for IMM Sublimits (Limited IMM) - Kasko typically
+  // Uses the shared IMM_COVERAGE_PATTERNS constant to stay in sync with
+  // scenario card generation (Bug #2 fix).
   const hasImmSublimits = policy.coverages.some(
     (c) =>
       isIncluded(c) &&
-      (c.name.toLowerCase().includes('mali mesuliyet') ||
-        c.name.toLowerCase().includes('mali sorumluluk') ||
-        c.name.toLowerCase().includes('imm')) &&
+      (matchesIMMPattern(c.name) || matchesIMMPattern((c as { nameTr?: string }).nameTr)) &&
       !c.isUnlimited &&
       c.limit > 0 &&
       c.limit < 100000000 // Sublimit threshold
@@ -1387,6 +1451,42 @@ function evaluateValue(
 
   if (hasValueAdded) {
     score += 5
+  }
+
+  // Bug #8 fix: Assistance package bonus — comprehensive roadside/towing/hotel
+  // services add real monetary value that was previously ignored.
+  const ASSISTANCE_PATTERNS = [
+    'yol yardım',
+    'roadside',
+    'çekici',
+    'towing',
+    'vinç',
+    'crane',
+    'otel',
+    'hotel',
+    'konaklama',
+    'accommodation',
+    'sağlık nakil',
+    'medical transport',
+    'ambulans',
+    'ambulance',
+    'ikame araç',
+    'replacement vehicle',
+    'rent a car',
+    'anahtar',
+    'key',
+    'lastik',
+    'tire',
+    'yakıt',
+    'fuel',
+  ]
+  const assistanceCount = policy.coverages.filter(
+    (c) => isIncluded(c) && ASSISTANCE_PATTERNS.some((p) => c.name.toLowerCase().includes(p))
+  ).length
+  if (assistanceCount >= 6) {
+    score += 5
+  } else if (assistanceCount >= 3) {
+    score += 3
   }
 
   // Check number of exclusions
@@ -1743,30 +1843,10 @@ function generateScenarioCards(
   const cards: import('./types').ScenarioCard[] = []
 
   // 1. IMM (Limits of liability) Scenario for vehicles
-  // Match against both English and Turkish coverage names. The AI may return
-  // the coverage as "Excess Liability", "Voluntary Liability Coverage",
-  // "İhtiyari Mali Mesuliyet", "İMM", etc. — check all common variants on
-  // BOTH name and nameTr to avoid scenario engine vs coverage extractor drift.
-  const IMM_NAME_PATTERNS = [
-    'mali mesuliyet',
-    'i̇mm',
-    ' imm',
-    'imm ',
-    'i̇htiyari',
-    'ihtiyari',
-    'voluntary liability',
-    'excess liability',
-    'third.party liability',
-    'üçüncü şahıs',
-    'ucuncu sahis',
-  ]
-  const matchesIMM = (text: string | undefined | null): boolean => {
-    if (!text) return false
-    const lower = text.toLowerCase()
-    return IMM_NAME_PATTERNS.some((pat) => lower.includes(pat))
-  }
+  // Uses the shared IMM_COVERAGE_PATTERNS constant (defined at module top)
+  // to stay in sync with the compliance evaluator. Bug #2 fix.
   const immCoverage = policy.coverages.find(
-    (c) => (matchesIMM(c.name) || matchesIMM(c.nameTr)) && isIncluded(c)
+    (c) => (matchesIMMPattern(c.name) || matchesIMMPattern(c.nameTr)) && isIncluded(c)
   )
 
   if (immCoverage) {
@@ -1914,6 +1994,80 @@ function generateScenarioCards(
       whyItMattersTR: newValueClause
         ? 'Değer kaybına karşı korur.'
         : 'Aynı aracı tekrar alabilmek için yeterli ödeme almayabilirsiniz.',
+    })
+  }
+
+  // 4. Fleet Count Trap Scenario (Bug #5)
+  // Detect POLİÇE ADET KONTROL clauses: if fleet drops below N vehicles,
+  // premium surcharge applies (typically +50%).
+  const fleetClauseTexts = [
+    ...(policy.exclusions || []),
+    ...((policy as { specialConditions?: string[] }).specialConditions || []),
+  ]
+  const hasFleetClause = fleetClauseTexts.some((text) => {
+    if (typeof text !== 'string') return false
+    const lower = text.toLowerCase()
+    return (
+      lower.includes('adet kontrol') ||
+      lower.includes('adet altı') ||
+      lower.includes('filo asgari') ||
+      lower.includes('araç sayısı') ||
+      (lower.includes('filo') && lower.includes('düşüş'))
+    )
+  })
+  if (hasFleetClause) {
+    cards.push({
+      id: 'fleet-risk',
+      title: 'Fleet Size Drop Risk',
+      titleTR: 'Filo Adet Düşüş Riski',
+      description:
+        'Your policy contains a fleet count control clause (Poliçe Adet Kontrol Klozu). If the number of vehicles in the fleet falls below the minimum threshold, a significant premium surcharge (often +50%) may be applied retroactively.',
+      descriptionTR:
+        'Poliçenizde Poliçe Adet Kontrol Klozu bulunmaktadır. Filodaki araç sayısı minimum eşiğin altına düşerse, geriye dönük ciddi bir prim zammı (genellikle +%50) uygulanabilir.',
+      financialStatus: 'risk',
+      insurerPays: 'Standard coverage continues',
+      insurerPaysTR: 'Standart teminat devam eder',
+      userPays: 'Up to +50% premium surcharge',
+      userPaysTR: "+%50'ye kadar prim zammı",
+      trigger: 'Fleet vehicle count drops below the policy-specified minimum.',
+      triggerTR: 'Filo araç sayısı poliçede belirtilen asgari seviyenin altına düşmesi.',
+      whyItMatters:
+        'Selling or decommissioning vehicles could trigger a massive retroactive surcharge.',
+      whyItMattersTR:
+        'Araç satışı veya çıkarılması, geriye dönük büyük prim zammını tetikleyebilir.',
+    })
+  }
+
+  // 5. Manevi Tazminat (Moral Damages) Positive Finding (Bug #9)
+  const allTexts = [
+    ...policy.coverages.map(
+      (c) => `${c.name || ''} ${c.description || ''} ${(c as { nameTr?: string }).nameTr || ''}`
+    ),
+    ...(policy.exclusions || []),
+    ...((policy as { specialConditions?: string[] }).specialConditions || []),
+  ]
+  const hasManevi = allTexts.some(
+    (t) => typeof t === 'string' && t.toLowerCase().includes('manevi tazminat')
+  )
+  if (hasManevi && (policy.type === 'kasko' || policy.type === 'traffic')) {
+    cards.push({
+      id: 'manevi-tazminat',
+      title: 'Moral Damages Coverage',
+      titleTR: 'Manevi Tazminat Teminatı',
+      description:
+        'Your policy includes moral damages (Manevi Tazminat) coverage within the bodily injury limits. This protects against non-economic compensation claims by accident victims.',
+      descriptionTR:
+        'Poliçeniz bedeni zarar limitleri dahilinde manevi tazminat teminatı içermektedir. Bu, kaza mağdurlarının manevi tazminat taleplerinden sizi korur.',
+      financialStatus: 'covered',
+      insurerPays: 'Moral damages claims (within bodily injury limits)',
+      insurerPaysTR: 'Manevi tazminat talepleri (bedeni zarar limitleri dahilinde)',
+      userPays: '0 TL',
+      userPaysTR: '0 TL',
+      trigger: 'Third-party moral damages claim after an at-fault accident.',
+      triggerTR: 'Kusurlu kazada üçüncü şahıs manevi tazminat talebi.',
+      whyItMatters: 'Moral damages can add significant liability beyond physical damage costs.',
+      whyItMattersTR:
+        'Manevi tazminat, fiziksel hasar maliyetlerinin ötesinde ciddi yükümlülük ekleyebilir.',
     })
   }
 

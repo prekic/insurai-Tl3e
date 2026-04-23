@@ -20,6 +20,8 @@ import type { ExtractedPolicyData } from './extraction-schema'
 export function normalizeBranchExtraction(data: ExtractedPolicyData): ExtractedPolicyData {
   const branch = data.policyType
   switch (branch) {
+    case 'kasko':
+      return normalizeKasko(data)
     case 'traffic':
       return normalizeTraffic(data)
     case 'home':
@@ -51,6 +53,95 @@ function addDescTag(cov: { description?: string | null }, tag: string): void {
   if (!cov.description.includes(tag)) {
     cov.description = `${cov.description} ${tag}`.trim()
   }
+}
+
+// ==== KASKO ====
+function normalizeKasko(data: ExtractedPolicyData): ExtractedPolicyData {
+  const covs = data.coverages || []
+
+  // Bug #3 fix: Infer vehicleUsage='commercial' from vehicle model/make keywords.
+  // If the extracted vehicle model contains KAMYON, TIR, OTOBÜS, etc., the policy
+  // is for a commercial vehicle even if usage wasn't explicitly set.
+  const COMMERCIAL_KEYWORDS = [
+    'kamyon',
+    'kamyonet',
+    'tır',
+    'tir',
+    'otobüs',
+    'otobus',
+    'minibüs',
+    'minibus',
+    'midibüs',
+    'midibus',
+    'iş makinesi',
+    'is makinesi',
+    'tarım',
+    'tarim',
+    'çekici',
+    'cekici',
+    'dorse',
+  ]
+  if (!data.vehicleUsage || data.vehicleUsage !== 'commercial') {
+    const vehicleTexts = covs.map((c) => (c.name || '').toLowerCase()).join(' ')
+    const modelText = (
+      (data as { vehicleMake?: string }).vehicleMake ||
+      '' + ' ' + (data as { vehicleModel?: string }).vehicleModel ||
+      ''
+    ).toLowerCase()
+    const combinedText = `${vehicleTexts} ${modelText}`
+    if (COMMERCIAL_KEYWORDS.some((kw) => combinedText.includes(kw))) {
+      data.vehicleUsage = 'commercial'
+    }
+  }
+
+  // Classify liability coverages
+  for (const c of covs) {
+    const name = (c.name || '').toLowerCase()
+    const nameTr = (c.nameTr || '').toLowerCase()
+
+    if (
+      name.includes('mali sorumluluk') ||
+      name.includes('mali mesuliyet') ||
+      name.includes('imm') ||
+      name.includes('ihtiyari') ||
+      name.includes('liability') ||
+      nameTr.includes('mali sorumluluk') ||
+      nameTr.includes('ihtiyari')
+    ) {
+      if (!c.category) c.category = 'liability'
+      addDescTag(c, '[imm]')
+    }
+
+    // Tag assistance coverages
+    if (
+      name.includes('yol yardım') ||
+      name.includes('roadside') ||
+      name.includes('çekici') ||
+      name.includes('towing') ||
+      name.includes('ikame araç') ||
+      name.includes('replacement') ||
+      name.includes('otel') ||
+      name.includes('hotel')
+    ) {
+      addDescTag(c, '[assistance]')
+    }
+  }
+
+  // Detect manevi tazminat as positive feature
+  const conditions = ensureConditions(data)
+  const allTexts = [
+    ...covs.map((c) => `${c.name || ''} ${c.description || ''} ${c.nameTr || ''}`),
+    ...(data.exclusions || []),
+    ...conditions,
+  ]
+  const hasManevi = allTexts.some((t) => t.toLowerCase().includes('manevi tazminat'))
+  if (hasManevi && !conditions.some((c) => c.includes('[manevi_tazminat]'))) {
+    conditions.push(
+      '[manevi_tazminat] Manevi Tazminat coverage included within bodily injury limits.'
+    )
+  }
+
+  return data
 }
 
 // ==== TRAFFIC ====

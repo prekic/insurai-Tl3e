@@ -424,9 +424,9 @@ export function extractVehicleInfoFromText(rawText: string):
     }
   }
 
-  // Model year — "Model Yılı : 2010" or standalone "MODEL: 1997"
+  // Model year — "Model Yılı : 2010", "Model Bilgisi: 2016", or standalone "MODEL: 1997"
   // (handle dotless İ + various separators + wide spacing)
-  const yearMatch = rawText.match(/Model\s*(?:Y[ıi]l[ıi]?)?\s*[:.]?\s{0,50}(\d{4})/i)
+  const yearMatch = rawText.match(/Model\s*(?:Bilgisi|Y[ıi]l[ıi]?)?\s*[:.]?\s{0,50}(\d{4})/i)
   if (yearMatch) {
     const yr = parseInt(yearMatch[1], 10)
     if (yr >= 1950 && yr <= new Date().getFullYear() + 1) {
