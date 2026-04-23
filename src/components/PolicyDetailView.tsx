@@ -3,19 +3,15 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   Shield,
-  ShieldAlert,
   AlertTriangle,
-  Check,
   Sparkles,
   TrendingUp,
   TrendingDown,
   BarChart3,
   Loader2,
-  Car,
   Users,
   Briefcase,
   Info,
-  BadgePercent,
   ChevronDown,
 } from 'lucide-react'
 import { Button } from './ui/button'
@@ -40,6 +36,9 @@ import { PolicyActuarialHistoryChart } from './actuarial/PolicyActuarialHistoryC
 import { CoveragesByCategory, ExclusionsSection } from './PolicyDetailView/PolicyCoverageSection'
 import { PolicyMetadataHeader } from './PolicyDetailView/PolicyMetadataHeader'
 import { PolicyExportMenu } from './PolicyDetailView/PolicyExportMenu'
+import { VehicleInfoCard } from './PolicyDetailView/VehicleInfoCard'
+import { PolicyKeyMetricsAndDiscounts } from './PolicyDetailView/PolicyKeyMetricsAndDiscounts'
+import { PolicyScenariosSection } from './PolicyDetailView/PolicyScenariosSection'
 import {
   MobileEvaluationCard,
   MobileInsightsCard,
@@ -412,104 +411,7 @@ export function PolicyDetailView() {
                     )}
                   </div>
 
-                  {/* Premium & Deductible row */}
-                  <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
-                    <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">
-                      {t.policy.premiumLabel}
-                    </p>
-                    <p
-                      className={`text-sm font-semibold truncate ${policy.premiumMissing ? 'text-amber-600' : 'text-gray-900'}`}
-                    >
-                      {policy.premiumMissing
-                        ? t.policy.notSpecified
-                        : policy.premium > 0
-                          ? formatConverted(policy.premium)
-                          : t.policy.notSpecified}
-                    </p>
-                  </div>
-                  <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
-                    <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">
-                      {t.policy.deductibleLabel}
-                    </p>
-                    <p
-                      className={`text-sm font-semibold truncate ${
-                        policy.deductibleUncertain ||
-                        (policy.type === 'kasko' && policy.deductible === 0)
-                          ? 'text-amber-600'
-                          : 'text-gray-900'
-                      }`}
-                    >
-                      {policy.deductiblePercent && policy.deductiblePercent > 0
-                        ? locale === 'tr'
-                          ? `%${policy.deductiblePercent} tenzili muafiyet`
-                          : `${policy.deductiblePercent}% proportional deductible`
-                        : policy.deductibleUncertain ||
-                            (policy.type === 'kasko' && policy.deductible === 0)
-                          ? locale === 'tr'
-                            ? 'Koşullu / inceleme gerekli'
-                            : 'Conditional / requires review'
-                          : policy.deductible > 0
-                            ? formatConverted(policy.deductible)
-                            : t.global.none}
-                    </p>
-                  </div>
-
-                  {/* Discounts Section */}
-                  {(() => {
-                    if (!policy.discounts) return null
-                    const discountList = []
-                    if (policy.discounts.ncdDiscount) {
-                      discountList.push({
-                        type: locale === 'tr' ? 'Hasarsızlık İndirimi' : 'No Claims Discount',
-                        rate: '%' + policy.discounts.ncdDiscount,
-                      })
-                    }
-                    if (policy.discounts.groupDiscount) {
-                      discountList.push({
-                        type: locale === 'tr' ? 'Grup/Kurum İndirimi' : 'Group/Corporate Discount',
-                        rate: '%' + policy.discounts.groupDiscount,
-                      })
-                    }
-                    if (policy.discounts.otherDiscountPct) {
-                      discountList.push({
-                        type: locale === 'tr' ? 'Diğer İndirimler' : 'Other Discounts',
-                        rate: '%' + policy.discounts.otherDiscountPct,
-                      })
-                    }
-                    if (discountList.length === 0) return null
-
-                    return (
-                      <div className="col-span-2 bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent rounded-xl border border-emerald-500/20 overflow-hidden shadow-sm relative group transition-all duration-300 hover:shadow-md hover:border-emerald-500/30">
-                        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-teal-500/5 to-emerald-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl"></div>
-                        <div className="relative p-3 sm:p-4">
-                          <p className="text-[10px] sm:text-xs text-emerald-800 font-semibold mb-2.5 flex items-center gap-1.5 tracking-wide uppercase">
-                            <BadgePercent size={15} className="text-emerald-600" />
-                            {locale === 'tr'
-                              ? 'İndirimler / Ek Avantajlar'
-                              : 'Discounts / Extra Benefits'}
-                          </p>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {discountList.map((discount, idx) => (
-                              <div
-                                key={idx}
-                                className="flex justify-between items-center text-xs sm:text-sm bg-white/80 backdrop-blur-sm px-3 py-2 rounded-lg border border-emerald-100/50 hover:bg-white hover:-translate-y-0.5 transition-all duration-200 shadow-sm"
-                              >
-                                <span
-                                  className="text-emerald-900 font-medium truncate"
-                                  title={discount.type}
-                                >
-                                  {discount.type}
-                                </span>
-                                <span className="font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent whitespace-nowrap ml-2 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-100 shadow-inner">
-                                  {discount.rate}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })()}
+                  <PolicyKeyMetricsAndDiscounts policy={policy} />
 
                   {/* Insured - full width for long names */}
                   <div className="col-span-2 p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
@@ -621,125 +523,7 @@ export function PolicyDetailView() {
             )}
 
             {/* Plain-Language Scenario Explainability Layer */}
-            {/* Partitioned into Risk (uncovered/partial) and Covered groups so positive
-                scenarios are not visually conflated with critical risks. */}
-            {evaluation?.scenarioCards &&
-              evaluation.scenarioCards.length > 0 &&
-              (() => {
-                const allScenarios = evaluation.scenarioCards
-                const coveredScenarios = allScenarios.filter((s) => s.financialStatus === 'covered')
-                const riskScenarios = allScenarios.filter((s) => s.financialStatus !== 'covered')
-
-                const renderScenarioCard = (scenario: (typeof allScenarios)[number]) => (
-                  <div
-                    key={scenario.id}
-                    className="border rounded-lg p-4 bg-white shadow-sm flex flex-col h-full"
-                  >
-                    <div className="flex items-start justify-between mb-2 gap-2">
-                      <h4 className="font-semibold text-sm text-gray-900 line-clamp-2">
-                        {locale === 'tr' ? scenario.titleTR : scenario.title}
-                      </h4>
-                      <div
-                        className={`flex-shrink-0 w-3 h-3 rounded-full mt-1 ${
-                          scenario.financialStatus === 'covered'
-                            ? 'bg-green-500'
-                            : scenario.financialStatus === 'partially_covered'
-                              ? 'bg-amber-500'
-                              : 'bg-red-500'
-                        }`}
-                      />
-                    </div>
-                    <p className="text-xs text-gray-600 mb-3 flex-grow">
-                      {locale === 'tr' ? scenario.descriptionTR : scenario.description}
-                    </p>
-
-                    <div className="space-y-2 text-[11px] leading-relaxed mb-3 border-t border-gray-100 pt-3">
-                      {((locale === 'tr' ? scenario.insurerPaysTR : scenario.insurerPays) ||
-                        scenario.insurerPays) && (
-                        <div className="flex justify-between border-b border-gray-50 pb-1">
-                          <span className="text-gray-500">
-                            {locale === 'tr' ? 'Sigortacı Öder:' : 'Insurer Pays:'}
-                          </span>
-                          <span className="font-medium text-green-700 max-w-[60%] text-right">
-                            {locale === 'tr'
-                              ? scenario.insurerPaysTR || scenario.insurerPays
-                              : scenario.insurerPays}
-                          </span>
-                        </div>
-                      )}
-                      {((locale === 'tr' ? scenario.userPaysTR : scenario.userPays) ||
-                        scenario.userPays) && (
-                        <div className="flex justify-between border-b border-gray-50 pb-1">
-                          <span className="text-gray-500">
-                            {locale === 'tr' ? 'Kullanıcı Öder:' : 'User Pays:'}
-                          </span>
-                          <span className="font-medium text-amber-700 max-w-[60%] text-right">
-                            {locale === 'tr'
-                              ? scenario.userPaysTR || scenario.userPays
-                              : scenario.userPays}
-                          </span>
-                        </div>
-                      )}
-                      {((locale === 'tr' ? scenario.triggerTR : scenario.trigger) ||
-                        scenario.trigger) && (
-                        <div className="flex justify-between border-b border-gray-50 pb-1">
-                          <span className="text-gray-500">
-                            {locale === 'tr' ? 'Örnek Olay:' : 'Trigger:'}
-                          </span>
-                          <span className="font-medium text-gray-800 max-w-[60%] text-right">
-                            {locale === 'tr'
-                              ? scenario.triggerTR || scenario.trigger
-                              : scenario.trigger}
-                          </span>
-                        </div>
-                      )}
-                      {((locale === 'tr' ? scenario.whyItMattersTR : scenario.whyItMatters) ||
-                        scenario.whyItMatters) && (
-                        <div className="pt-1 mt-2 bg-blue-50/50 p-2 border border-blue-100/50 rounded text-blue-800 italic font-medium">
-                          {locale === 'tr'
-                            ? scenario.whyItMattersTR || scenario.whyItMatters
-                            : scenario.whyItMatters}
-                        </div>
-                      )}
-                    </div>
-
-                    {(scenario.riskAmount || scenario.riskAmountTR) && (
-                      <div className="mt-auto bg-gray-50 rounded p-2 text-xs font-medium text-gray-800 border-l-2 border-gray-300">
-                        {locale === 'tr'
-                          ? scenario.riskAmountTR || scenario.riskAmount
-                          : scenario.riskAmount}
-                      </div>
-                    )}
-                  </div>
-                )
-
-                return (
-                  <>
-                    {riskScenarios.length > 0 && (
-                      <div className="space-y-4 pt-2">
-                        <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                          <ShieldAlert className="text-blue-600" size={20} />
-                          {locale === 'tr' ? 'Senaryo Risk Analizi' : 'Scenario Risk Analysis'}
-                        </h3>
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                          {riskScenarios.map(renderScenarioCard)}
-                        </div>
-                      </div>
-                    )}
-                    {coveredScenarios.length > 0 && (
-                      <div className="space-y-4 pt-2">
-                        <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                          <Check className="text-green-600" size={20} />
-                          {t.policy.coveredScenariosTitle}
-                        </h3>
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                          {coveredScenarios.map(renderScenarioCard)}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )
-              })()}
+            <PolicyScenariosSection scenarios={evaluation?.scenarioCards} />
 
             {/* Policy Evaluation - Mobile only (high priority) */}
             <MobileEvaluationCard
@@ -897,73 +681,7 @@ export function PolicyDetailView() {
               )}
 
             {/* Vehicle Information (Kasko Only) */}
-            {policy.type === 'kasko' && policy.vehicleInfo && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Car className="text-blue-600" size={20} />
-                    {t.policy.vehicleInfoTitle}
-                  </CardTitle>
-                  {policy.vehicleInfo.usage?.toLowerCase() === 'commercial' && (
-                    <div className="mt-2 text-[10px] sm:text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded p-2 flex items-start gap-1.5">
-                      <Briefcase size={14} className="flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-medium">
-                          {locale === 'tr' ? 'Ticari Araç Politikası' : 'Commercial Vehicle Policy'}
-                        </p>
-                        <p className="text-blue-600 mt-0.5 opacity-90 leading-tight">
-                          {locale === 'tr'
-                            ? 'Bu araç ticari kullanım amaçlı olduğundan, pazar benchmark ve fiyat analizleri yanıltıcı olmaması adına devre dışı bırakılmıştır.'
-                            : 'As this is a commercial vehicle, market benchmark and price analyses are disabled to avoid misleading representations.'}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </CardHeader>
-                <CardContent>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    {policy.vehicleInfo.plate && (
-                      <div>
-                        <p className="text-sm text-gray-500">{t.policy.plate}</p>
-                        <p className="font-semibold text-gray-900">{policy.vehicleInfo.plate}</p>
-                      </div>
-                    )}
-                    {policy.vehicleInfo.make && (
-                      <div>
-                        <p className="text-sm text-gray-500">{t.policy.make}</p>
-                        <p className="font-semibold text-gray-900">{policy.vehicleInfo.make}</p>
-                      </div>
-                    )}
-                    {policy.vehicleInfo.model && (
-                      <div>
-                        <p className="text-sm text-gray-500">{t.policy.model}</p>
-                        <p className="font-semibold text-gray-900">{policy.vehicleInfo.model}</p>
-                      </div>
-                    )}
-                    {policy.vehicleInfo.year && (
-                      <div>
-                        <p className="text-sm text-gray-500">{t.policy.modelYear}</p>
-                        <p className="font-semibold text-gray-900">{policy.vehicleInfo.year}</p>
-                      </div>
-                    )}
-                    {policy.vehicleInfo.usage && (
-                      <div>
-                        <p className="text-sm text-gray-500">{t.policy.usageType}</p>
-                        <p className="font-semibold text-gray-900">{policy.vehicleInfo.usage}</p>
-                      </div>
-                    )}
-                    {policy.vehicleInfo.vehicleClass && (
-                      <div>
-                        <p className="text-sm text-gray-500">{t.policy.vehicleClass}</p>
-                        <p className="font-semibold text-gray-900">
-                          {policy.vehicleInfo.vehicleClass}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            <VehicleInfoCard policy={policy} />
 
             {/* Coverages - Grouped by Category - Expandable */}
             <Card className="overflow-hidden">
