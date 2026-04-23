@@ -26,6 +26,7 @@ All five must hold before starting Phase E.
 | 1.3 | Bugs #9, #13, #14 shipped to production | `git log main --oneline | grep -E "discounts|niche|confidence-penalty"` — all three should appear |
 | 1.4 | MIN_SAMPLE_SIZE reverted to 50 in `src/lib/policy-evaluation/calibration.ts` | `grep -n MIN_SAMPLE_SIZE src/lib/policy-evaluation/calibration.ts` → must be `50` |
 | 1.5 | Production-mode calibration applied | `npx tsx scripts/calibrate-grade-thresholds.ts --production --apply` ran successfully and wrote an audit row (see `app_settings.evaluation.grade_thresholds_last_calibrated`) |
+| 1.6 | Calibration drift within ±5 | `GET /api/admin/monitoring/calibration-drift` returns `{ driftExceedsTolerance: false }` for two consecutive daily checks. The endpoint compares the current grade_*_threshold values in `app_settings` against empirical p90/p75/p50/p25 from `policies.raw_data.evaluation.overallScore` over the last 7 days. If `sampleCount == 0`, the evaluation engine has not yet populated `raw_data.evaluation` — run `scripts/backfill-evaluation-scores.ts` first. |
 
 If any row is `—`, **do not advance**. Investigate, remediate, wait for the monitor to re-clear, then re-check.
 
@@ -75,6 +76,18 @@ Assert:
 - `.triggers` is an empty array
 - `.metricsRecords` is trending up (sample is growing)
 - `.calibration.sampleCount >= 50` (must remain true)
+
+Then verify calibration drift stays within ±5:
+
+```bash
+curl -sH "Authorization: Bearer $ADMIN_TOKEN" \
+  "$FRONTEND_URL/api/admin/monitoring/calibration-drift" | jq '.data'
+```
+
+Assert:
+- `.driftExceedsTolerance == false`
+- `.sampleCount >= 50`
+- Each value in `.drifts` stays within ±5 of zero. If any grade drifts past that band for two consecutive days during the soak window, halt and re-run `scripts/calibrate-grade-thresholds.ts --production --apply` before re-entering the soak.
 
 Also check the admin Monitoring → Pilot Rollback Status tile (D1) which surfaces the same data plus the last calibration audit record.
 
