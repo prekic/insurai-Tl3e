@@ -31,6 +31,7 @@ export function reconstructPolicySafely(row: any): { policy?: Policy; skipReason
     id: row.id,
     policyNumber: row.policy_number || 'UNKNOWN',
     provider: row.provider || 'UNKNOWN',
+    logo: '',
     type: row.type || 'unknown',
     typeTr: row.type_tr || '',
     coverage: typeof row.coverage === 'number' ? row.coverage : 0,

@@ -1316,7 +1316,7 @@ function evaluateValue(
   }
 
   // Standard evaluation: Value is a combination of coverage quality vs premium paid
-  const coverageToPremiumRatio = policy.coverage / policy.premium
+  const coverageToPremiumRatio = policy.premium > 0 ? policy.coverage / policy.premium : 0
 
   // Adjust for coverage to premium ratio
   if (coverageToPremiumRatio > 50) {
@@ -1362,8 +1362,8 @@ function evaluateValue(
     categoryTR: 'Değer',
     score,
     weight: config.weights.value,
-    details: `Coverage-to-premium ratio: ${coverageToPremiumRatio.toFixed(1)}x`,
-    detailsTR: `Teminat/prim oranı: ${coverageToPremiumRatio.toFixed(1)}x`,
+    details: `Coverage-to-premium ratio: ${isFinite(coverageToPremiumRatio) ? coverageToPremiumRatio.toFixed(1) : '0.0'}x`,
+    detailsTR: `Teminat/prim oranı: ${isFinite(coverageToPremiumRatio) ? coverageToPremiumRatio.toFixed(1) : '0,0'}x`,
     issues,
     issuesTR,
   }
