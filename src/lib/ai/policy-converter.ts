@@ -221,7 +221,7 @@ export async function convertToAnalyzedPolicy(
             // the re-parsed value is plausible (< 500K TL for kasko), trust it
             const ratio = premiumValue / reparsed
             const isLikelyMisparsed =
-              (ratio >= 50 || ratio <= 0.02) && reparsed < 500000 && reparsed > 50
+              (ratio >= 5 || ratio <= 0.2) && reparsed < 500000 && reparsed > 50
             if (isLikelyMisparsed) {
               console.warn(
                 `[convertToAnalyzedPolicy] Premium magnitude correction: ${premiumValue} → ${reparsed} (raw: "${m[0]}")`

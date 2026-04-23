@@ -7,7 +7,7 @@
 ### Priority 1: Merge PR #362
 - **Branch**: `insuraigemini20260423` → `main`
 - **PR**: [`fix(evaluator): resolve D-grade inflation and harden extraction robustness`](https://github.com/prekic/insurai/pull/362)
-- **Status**: Ready to merge. Contains all evaluator + UI decomposition fixes (5 code commits + 1 docs commit).
+- **Status**: Ready to merge. Contains all evaluator + UI decomposition fixes, plus the critical P0 Premium parser 10x bug fix and the IMM detection hardening.
 - **Action**: Review and merge.
 
 ### Priority 2: Fix Pre-Existing Test Failure

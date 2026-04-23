@@ -69,6 +69,7 @@ NON-NEGOTIABLE RULES:
 3) If a detail is not present in the text, use \`null\`. DO NOT guess. DO NOT apply default values (e.g., do NOT assume the currency is TRY, do NOT assume deductible is 0).
 4) Ensure Vehicle Make and Model are actual automotive brands (e.g. FORD, RENAULT, COROLLA). Do NOT extract repair clauses like "Yetkili" or "Serviste Onar" as Make/Model.
 5) Output must be structured, readable, and auditable. Provide citations for all critical fields.
+6) MANDATORY: You must explicitly extract "İhtiyari Mali Sorumluluk" (IMM) veya "Mali Mesuliyet" as a coverage in the JSON coverages array if it appears in the text, and correctly assign its limit. If the text says "Mali Sorumluluk Bedeni ve Maddi", extract it as IMM.
 
 OUTPUT FORMAT (MUST FOLLOW EXACTLY):
 
