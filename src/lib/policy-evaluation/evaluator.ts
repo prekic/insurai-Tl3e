@@ -40,6 +40,7 @@ import {
 } from './benchmark-service'
 
 import { KASKO_COMMERCIAL_BENCHMARKS } from '@/data/market-data/benchmarks'
+import { inferIndustryFromInsuredName } from '../ai/turkish-utils'
 
 /**
  * Safely format a numeric value as Turkish Lira string.
@@ -2069,6 +2070,44 @@ function generateScenarioCards(
       whyItMattersTR:
         'Manevi tazminat, fiziksel hasar maliyetlerinin ötesinde ciddi yükümlülük ekleyebilir.',
     })
+  }
+
+  // 6. Contextual Risk Linking (Bug #6)
+  // Infer industry from insured name and check for high-risk exclusions
+  const industry = inferIndustryFromInsuredName(policy.insuredPerson)
+  if (industry === 'mining' || industry === 'construction') {
+    const hasQuarryExclusion = allTexts.some((text) => {
+      if (typeof text !== 'string') return false
+      const lower = text.toLowerCase()
+      return (
+        lower.includes('maden ocakları') ||
+        lower.includes('şantiye') ||
+        lower.includes('santiye') ||
+        lower.includes('hafriyat sahası') ||
+        lower.includes('maden sahası')
+      )
+    })
+
+    if (hasQuarryExclusion) {
+      cards.push({
+        id: 'contextual-risk',
+        title: 'Industry-Specific Exclusion Risk',
+        titleTR: 'Sektöre Özel İstisna Riski',
+        description: `Your policy excludes damages occurring in high-risk areas like quarries or construction sites, but your insured entity (${policy.insuredPerson}) indicates operations in the ${industry} industry.`,
+        descriptionTR: `Poliçeniz maden ocakları veya şantiye sahaları gibi yüksek riskli alanlarda meydana gelen hasarları kapsam dışında tutmaktadır. Ancak sigortalı şirketiniz (${policy.insuredPerson}) bu sektörde faaliyet göstermektedir.`,
+        financialStatus: 'risk',
+        insurerPays: '0 TL (Claims denied in work zones)',
+        insurerPaysTR: '0 TL (Çalışma sahalarındaki hasarlar reddedilir)',
+        userPays: 'Full cost of damage',
+        userPaysTR: 'Hasarın tamamı',
+        trigger:
+          'An accident occurs while the vehicle is operating in a quarry or construction site.',
+        triggerTR: 'Aracın şantiye veya maden sahasında çalışırken hasar görmesi.',
+        whyItMatters:
+          'Major operations gap. Your primary business activity locations are explicitly excluded from coverage.',
+        whyItMattersTR: 'Büyük operasyonel risk. Ana faaliyet alanlarınız teminat dışı bırakılmış.',
+      })
+    }
   }
 
   // Fallback for non-auto

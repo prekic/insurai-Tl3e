@@ -444,6 +444,59 @@ export function extractVehicleInfoFromText(rawText: string):
 }
 
 // =============================================================================
+// INDUSTRY CLASSIFICATION
+// =============================================================================
+
+export type HighRiskIndustry = 'mining' | 'construction' | 'transport' | 'manufacturing'
+
+/**
+ * Infer the industry from the insured entity name.
+ * Used for contextual risk linking (e.g., checking if a mining company
+ * has quarry exclusions).
+ */
+export function inferIndustryFromInsuredName(
+  name: string | null | undefined
+): HighRiskIndustry | null {
+  if (!name) return null
+  const lowerName = normalizeTurkishChars(name).toLowerCase()
+
+  if (lowerName.includes('maden') || lowerName.includes('mermer')) {
+    return 'mining'
+  }
+
+  if (
+    lowerName.includes('insaat') ||
+    lowerName.includes('hafriyat') ||
+    lowerName.includes('yapi') ||
+    lowerName.includes('mimarlik') ||
+    lowerName.includes('muhendislik')
+  ) {
+    return 'construction'
+  }
+
+  if (
+    lowerName.includes('nakliyat') ||
+    lowerName.includes('lojistik') ||
+    lowerName.includes('tasimacilik') ||
+    lowerName.includes('kargo')
+  ) {
+    return 'transport'
+  }
+
+  if (
+    lowerName.includes('uretim') ||
+    lowerName.includes('imalat') ||
+    lowerName.includes('sanayi') ||
+    lowerName.includes('fabrika') ||
+    lowerName.includes('tekstil')
+  ) {
+    return 'manufacturing'
+  }
+
+  return null
+}
+
+// =============================================================================
 // TC KIMLIK (NATIONAL ID) VALIDATION
 // =============================================================================
 

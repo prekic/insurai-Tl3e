@@ -315,3 +315,73 @@ describe('Bug #9: Manevi Tazminat positive finding', () => {
     expect(maneviCard?.financialStatus).toBe('covered')
   })
 })
+
+// ============================================================================
+// Bug #6: Contextual risk linking (Industry classifier)
+// ============================================================================
+
+describe('Bug #6: Contextual risk linking', () => {
+  function makePolicy(insuredPerson: string, exclusions: string[]): AnalyzedPolicy {
+    return {
+      id: 'test-context',
+      policyNumber: 'CTX-TEST',
+      provider: 'Test',
+      type: 'kasko',
+      startDate: '2026-01-01',
+      endDate: '2027-01-01',
+      premium: 10000,
+      currency: 'TRY',
+      coverage: 500000,
+      coverages: [
+        {
+          name: 'Kasko',
+          limit: 500000,
+          included: true,
+          isUnlimited: false,
+          isMarketValue: false,
+          category: 'main',
+        },
+      ],
+      deductible: 0,
+      exclusions,
+      status: 'active',
+      insuredPerson,
+    } as unknown as AnalyzedPolicy
+  }
+
+  it('generates contextual-risk card for mining company with quarry exclusion', () => {
+    const policy = makePolicy('ÖRNEK MADENCİLİK A.Ş.', [
+      'Maden ocakları ve şantiye sahasında meydana gelen zararlar teminat dışıdır.',
+    ])
+    const result = evaluatePolicy(policy)
+    const riskCard = result.scenarioCards?.find((c) => c.id === 'contextual-risk')
+    expect(riskCard).toBeDefined()
+    expect(riskCard?.financialStatus).toBe('risk')
+    expect(riskCard?.description).toContain('mining')
+  })
+
+  it('generates contextual-risk card for construction company with site exclusion', () => {
+    const policy = makePolicy('ÖZKAN HAFRİYAT İNŞAAT LTD', ['Santiye sahaları kapsam dışıdır.'])
+    const result = evaluatePolicy(policy)
+    const riskCard = result.scenarioCards?.find((c) => c.id === 'contextual-risk')
+    expect(riskCard).toBeDefined()
+    expect(riskCard?.financialStatus).toBe('risk')
+    expect(riskCard?.description).toContain('construction')
+  })
+
+  it('does not generate risk card if no exclusions match', () => {
+    const policy = makePolicy('ÖRNEK MADENCİLİK A.Ş.', ['Alkol kullanımı teminat dışıdır.'])
+    const result = evaluatePolicy(policy)
+    const riskCard = result.scenarioCards?.find((c) => c.id === 'contextual-risk')
+    expect(riskCard).toBeUndefined()
+  })
+
+  it('does not generate risk card for generic company even with quarry exclusion', () => {
+    const policy = makePolicy('ÖRNEK YAZILIM A.Ş.', [
+      'Şantiye sahasında meydana gelen zararlar teminat dışıdır.',
+    ])
+    const result = evaluatePolicy(policy)
+    const riskCard = result.scenarioCards?.find((c) => c.id === 'contextual-risk')
+    expect(riskCard).toBeUndefined()
+  })
+})
