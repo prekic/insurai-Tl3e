@@ -136,6 +136,11 @@ export async function convertToAnalyzedPolicy(
       isMarketValue: c.isMarketValue ?? false,
       category: c.category ?? 'other',
       importance: determineCoverageImportance(c),
+      // Evidence pointers — propagate from ExtractedCoverage so the reviewer
+      // UI can surface "Page N / § clause / quote" provenance.
+      page: c.page ?? null,
+      clause: c.clause ?? null,
+      quote: c.quote ?? null,
     }
   })
 

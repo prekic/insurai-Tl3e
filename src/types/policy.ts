@@ -119,6 +119,18 @@ export interface Coverage {
   category?: CoverageCategory
   /** Visual importance level */
   importance?: CoverageImportance
+  /**
+   * Evidence-pointer fields mirrored from ExtractedCoverage for audit and
+   * grounding. The reviewer UI (PolicyCoverageSection) renders a "Page N",
+   * "§ clause", and a verbatim quote block when any of these are present.
+   * Populated by convertToAnalyzedPolicy() when the AI returns them.
+   */
+  /** Source page where this limit was found */
+  page?: number | null
+  /** Section heading / clause where this was extracted */
+  clause?: string | null
+  /** Verbatim text describing this limit */
+  quote?: string | null
 }
 
 /** Exclusion with severity information */
