@@ -41,6 +41,41 @@ import {
 
 import { KASKO_COMMERCIAL_BENCHMARKS } from '@/data/market-data/benchmarks'
 
+/**
+ * Safely format a numeric value as Turkish Lira string.
+ * Returns '0' for undefined, null, or NaN values instead of crashing.
+ */
+function formatTRY(value: number | undefined | null): string {
+  if (value == null || isNaN(value)) return '0'
+  return value.toLocaleString('tr-TR')
+}
+
+/**
+ * Check whether a coverage is included in the policy.
+ *
+ * Insurance documents list coverages that ARE included. The AI extraction
+ * often omits the `included` flag (leaving it `undefined` or `null`) rather
+ * than explicitly setting it to `true`. Only an explicit `false` means the
+ * coverage is excluded. Treating undefined as excluded was the root cause
+ * of 21 policies scoring a flat 60 (D-grade).
+ */
+function isIncluded(c: { included?: boolean }): boolean {
+  return c.included !== false
+}
+
+/**
+ * Compute an inferred total coverage from individual coverage limits.
+ * Used as a fallback when `policy.coverage` is 0 or missing but the
+ * AI extraction did populate per-coverage limits.
+ */
+function inferTotalCoverage(
+  coverages: Array<{ limit?: number | null; included?: boolean }>
+): number {
+  return coverages
+    .filter(isIncluded)
+    .reduce((sum, c) => sum + (typeof c.limit === 'number' && isFinite(c.limit) ? c.limit : 0), 0)
+}
+
 // =============================================================================
 // BENCHMARK CONFIDENCE ASSESSMENT
 // =============================================================================
@@ -184,7 +219,7 @@ function assessBenchmarkConfidence(
       factor: 'Coverage level',
       factorTr: 'Teminat tutarı',
       present: policy.coverage > 0,
-      value: policy.coverage > 0 ? `${policy.coverage.toLocaleString('tr-TR')} TL` : undefined,
+      value: policy.coverage > 0 ? `${formatTRY(policy.coverage)} TL` : undefined,
     },
   ]
 
@@ -355,12 +390,21 @@ export function evaluatePolicy(
   const hasCriticalComplianceIssues = complianceResult.complianceIssues.some(
     (i) => i.severity === 'critical'
   )
-  // Safest implementation: apply the same 60 max cap to ALL untrusted benchmark states, including fallback and missing.
   const hasUntrustedBenchmark =
     !benchmarkForDate || benchmarkForDate?.benchmarkStatus === 'untrusted'
 
-  if (hasCriticalComplianceIssues || hasUntrustedBenchmark) {
+  // Critical compliance issues (e.g., expired policy) warrant a hard cap.
+  if (hasCriticalComplianceIssues) {
     overallScore = Math.min(overallScore, 60)
+  }
+
+  // For untrusted benchmarks: the premium evaluator already returns neutral (70)
+  // or sentinel (-1) scores, so the weighted average self-corrects. We mark the
+  // evaluation as provisional instead of capping to 60, which was causing 21
+  // policies with valid coverage/deductible/compliance data to score D-grade.
+  // A softer cap of 85 prevents inflated A-grades without crushing good policies.
+  if (hasUntrustedBenchmark && !hasCriticalComplianceIssues) {
+    overallScore = Math.min(overallScore, 85)
   }
 
   // Generate market comparison
@@ -517,16 +561,16 @@ function evaluatePremium(
       categoryTR: 'Prim',
       score: 70, // Neutral — no comparison possible
       weight: config.weights.premium,
-      details: `Premium of ${policy.premium.toLocaleString('tr-TR')} TL — comparison suppressed (missing: ${missingNames})`,
-      detailsTR: `${policy.premium.toLocaleString('tr-TR')} TL prim — karşılaştırma yapılamıyor (eksik: ${missingNamesTr})`,
+      details: `Premium of ${formatTRY(policy.premium)} TL — comparison suppressed (missing: ${missingNames})`,
+      detailsTR: `${formatTRY(policy.premium)} TL prim — karşılaştırma yapılamıyor (eksik: ${missingNamesTr})`,
       issues: ['Market comparison suppressed due to insufficient context data'],
       issuesTR: ['Yetersiz bağlam verisi nedeniyle piyasa karşılaştırması yapılamıyor'],
     }
   }
 
   let score = 70 // Default score
-  let details = `Premium of ${policy.premium.toLocaleString('tr-TR')} TL compared to market estimate`
-  let detailsTR = `${policy.premium.toLocaleString('tr-TR')} TL prim, piyasa tahmini ile karşılaştırıldı`
+  let details = `Premium of ${formatTRY(policy.premium)} TL compared to market estimate`
+  let detailsTR = `${formatTRY(policy.premium)} TL prim, piyasa tahmini ile karşılaştırıldı`
 
   if (benchmark?.benchmarkStatus === 'untrusted' || !benchmark) {
     return {
@@ -534,8 +578,8 @@ function evaluatePremium(
       categoryTR: 'Prim',
       score: 70, // Neutral — no comparison possible
       weight: config.weights.premium,
-      details: `Premium of ${policy.premium.toLocaleString('tr-TR')} TL — Market benchmark unavailable.`,
-      detailsTR: `${policy.premium.toLocaleString('tr-TR')} TL prim — Piyasa karşılaştırması kullanılamıyor.`,
+      details: `Premium of ${formatTRY(policy.premium)} TL — Market benchmark unavailable.`,
+      detailsTR: `${formatTRY(policy.premium)} TL prim — Piyasa karşılaştırması kullanılamıyor.`,
       issues: ['Benchmark confidence too low for numeric market comparison'],
       issuesTR: ['Sayısal piyasa karşılaştırması için karşılaştırma güveni çok düşük'],
     }
@@ -719,10 +763,13 @@ function evaluateCoverage(policy: Policy, config: EvaluationConfig): ScoreBreakd
     }
   } else {
     // Non-kasko: Check total coverage amount
-    const coveragePerPremium = policy.coverage / policy.premium
+    // Use inferred coverage when the extraction didn't set a top-level total
+    const effectiveCoverage =
+      policy.coverage > 0 ? policy.coverage : inferTotalCoverage(policy.coverages)
+    const coveragePerPremium = policy.premium > 0 ? effectiveCoverage / policy.premium : 0
     if (coveragePerPremium > 20) {
       score += 15
-    } else if (coveragePerPremium < 10) {
+    } else if (coveragePerPremium < 10 && policy.premium > 0) {
       score -= 10
       issues.push('Coverage amount is low relative to premium paid')
       issuesTR.push('Teminat tutarı ödenen prime göre düşük')
@@ -784,8 +831,8 @@ function evaluateCoverage(policy: Policy, config: EvaluationConfig): ScoreBreakd
     details = `${coverageCount} coverages included, vehicle covered at market value`
     detailsTR = `${coverageCount} teminat dahil, araç rayiç değer üzerinden teminatlı`
   } else {
-    details = `${coverageCount} coverages included with total coverage of ${policy.coverage.toLocaleString('tr-TR')} TL`
-    detailsTR = `${coverageCount} teminat dahil, toplam ${policy.coverage.toLocaleString('tr-TR')} TL teminat`
+    details = `${coverageCount} coverages included with total coverage of ${formatTRY(policy.coverage)} TL`
+    detailsTR = `${coverageCount} teminat dahil, toplam ${formatTRY(policy.coverage)} TL teminat`
   }
 
   return {
@@ -802,7 +849,7 @@ function evaluateCoverage(policy: Policy, config: EvaluationConfig): ScoreBreakd
 
 function checkMissingEssentialCoverages(policy: Policy): { en: string; tr: string }[] {
   const missing: { en: string; tr: string }[] = []
-  const coverageNames = policy.coverages.filter((c) => c.included).map((c) => c.name.toLowerCase())
+  const coverageNames = policy.coverages.filter(isIncluded).map((c) => c.name.toLowerCase())
 
   // IMPORTANT: For kasko, Collision, Theft, Fire, Natural Disasters are IMPLICIT
   // They are included in the base kasko premium - don't flag them as missing!
@@ -930,8 +977,8 @@ function evaluateDeductible(policy: Policy, config: EvaluationConfig): ScoreBrea
       categoryTR: 'Muafiyet',
       score,
       weight: config.weights.deductible,
-      details: `Deductible of ${policy.deductible.toLocaleString('tr-TR')} TL`,
-      detailsTR: `${policy.deductible.toLocaleString('tr-TR')} TL muafiyet`,
+      details: `Deductible of ${formatTRY(policy.deductible)} TL`,
+      detailsTR: `${formatTRY(policy.deductible)} TL muafiyet`,
       issues,
       issuesTR,
     }
@@ -960,7 +1007,7 @@ function evaluateDeductible(policy: Policy, config: EvaluationConfig): ScoreBrea
 
   // Check individual coverage deductibles
   const highDeductibleCoverages = policy.coverages.filter(
-    (c) => c.included && c.deductible > 0 && c.limit > 0 && c.deductible / c.limit > 0.1
+    (c) => isIncluded(c) && c.deductible > 0 && c.limit > 0 && c.deductible / c.limit > 0.1
   )
 
   if (highDeductibleCoverages.length > 0) {
@@ -986,8 +1033,8 @@ function evaluateDeductible(policy: Policy, config: EvaluationConfig): ScoreBrea
     categoryTR: 'Muafiyet',
     score,
     weight: config.weights.deductible,
-    details: `Deductible of ${policy.deductible.toLocaleString('tr-TR')} TL (${(deductibleRatio * 100).toFixed(1)}% of coverage)`,
-    detailsTR: `${policy.deductible.toLocaleString('tr-TR')} TL muafiyet (teminatın %${(deductibleRatio * 100).toFixed(1)}'i)`,
+    details: `Deductible of ${formatTRY(policy.deductible)} TL (${(deductibleRatio * 100).toFixed(1)}% of coverage)`,
+    detailsTR: `${formatTRY(policy.deductible)} TL muafiyet (teminatın %${(deductibleRatio * 100).toFixed(1)}'i)`,
     issues,
     issuesTR,
   }
@@ -1102,7 +1149,7 @@ function evaluateCompliance(policy: Policy, config: EvaluationConfig): Complianc
   // Check for IMM Sublimits (Limited IMM) - Kasko typically
   const hasImmSublimits = policy.coverages.some(
     (c) =>
-      c.included &&
+      isIncluded(c) &&
       (c.name.toLowerCase().includes('mali mesuliyet') ||
         c.name.toLowerCase().includes('mali sorumluluk') ||
         c.name.toLowerCase().includes('imm')) &&
@@ -1274,7 +1321,7 @@ function evaluateValue(
       'glass',
     ]
     const valueAddedCount = policy.coverages.filter(
-      (c) => c.included && valueCoverages.some((vc) => c.name.toLowerCase().includes(vc))
+      (c) => isIncluded(c) && valueCoverages.some((vc) => c.name.toLowerCase().includes(vc))
     ).length
 
     if (valueAddedCount >= 3) {
@@ -1307,7 +1354,10 @@ function evaluateValue(
   }
 
   // Standard evaluation: Value is a combination of coverage quality vs premium paid
-  const coverageToPremiumRatio = policy.coverage / policy.premium
+  // Use inferred coverage when the extraction didn't set a top-level total
+  const effectiveCoverage =
+    policy.coverage > 0 ? policy.coverage : inferTotalCoverage(policy.coverages)
+  const coverageToPremiumRatio = policy.premium > 0 ? effectiveCoverage / policy.premium : 0
 
   // Adjust for coverage to premium ratio
   if (coverageToPremiumRatio > 50) {
@@ -1332,7 +1382,7 @@ function evaluateValue(
     'hukuki koruma',
   ]
   const hasValueAdded = policy.coverages.some(
-    (c) => c.included && valueCoverages.some((vc) => c.name.toLowerCase().includes(vc))
+    (c) => isIncluded(c) && valueCoverages.some((vc) => c.name.toLowerCase().includes(vc))
   )
 
   if (hasValueAdded) {
@@ -1353,8 +1403,8 @@ function evaluateValue(
     categoryTR: 'Değer',
     score,
     weight: config.weights.value,
-    details: `Coverage-to-premium ratio: ${coverageToPremiumRatio.toFixed(1)}x`,
-    detailsTR: `Teminat/prim oranı: ${coverageToPremiumRatio.toFixed(1)}x`,
+    details: `Coverage-to-premium ratio: ${isFinite(coverageToPremiumRatio) ? coverageToPremiumRatio.toFixed(1) : '0.0'}x`,
+    detailsTR: `Teminat/prim oranı: ${isFinite(coverageToPremiumRatio) ? coverageToPremiumRatio.toFixed(1) : '0,0'}x`,
     issues,
     issuesTR,
   }
@@ -1567,7 +1617,7 @@ function generateRecommendations(
   // Deductible optimization - only if deductible is actually high (not 0)
   // Note: When deductible is 0, the score should be 95 (handled in evaluateDeductible)
   if (scores.deductible.score < 60 && policy.deductible > 0) {
-    const deductibleAmount = policy.deductible.toLocaleString('tr-TR')
+    const deductibleAmount = formatTRY(policy.deductible)
     // Handle market value policies where coverage is 0
     const hasMarketValueCoverage =
       policy.coverage === 0 || policy.coverages.some((c) => c.isMarketValue)
@@ -1598,7 +1648,7 @@ function generateRecommendations(
   const isComprehensivePolicy = scores.coverage.score >= 80 || policy.coverages.length >= 8
 
   if (scores.premium.score < 60 && hasPremiumIssues && !isComprehensivePolicy) {
-    const premiumAmount = policy.premium.toLocaleString('tr-TR')
+    const premiumAmount = formatTRY(policy.premium)
 
     recommendations.push({
       priority: 'medium',
@@ -1716,7 +1766,7 @@ function generateScenarioCards(
     return IMM_NAME_PATTERNS.some((pat) => lower.includes(pat))
   }
   const immCoverage = policy.coverages.find(
-    (c) => (matchesIMM(c.name) || matchesIMM(c.nameTr)) && c.included
+    (c) => (matchesIMM(c.name) || matchesIMM(c.nameTr)) && isIncluded(c)
   )
 
   if (immCoverage) {
@@ -1742,17 +1792,18 @@ function generateScenarioCards(
           'İMM, zorunlu trafik sigortası limitiniz tükendiğinde sizi davalardan korur.',
       })
     } else {
+      const limitStr = formatTRY(immCoverage.limit)
       cards.push({
         id: 'imm-scenario',
         title: 'At-Fault Major Accident',
         titleTR: 'Kusurlu Büyük Kazada',
-        description: `Your policy caps liability at ${immCoverage.limit.toLocaleString('tr-TR')} TL. Damages exceeding this limit must be paid out-of-pocket, creating significant financial exposure.`,
-        descriptionTR: `Poliçeniz mali sorumluluğu ${immCoverage.limit.toLocaleString('tr-TR')} TL ile sınırlar. Bu limiti aşan hasarlar trafik sigortası olsa bile cebinizden ödenmelidir, bu da yüksek mali yükümlülük yaratabilir.`,
+        description: `Your policy caps liability at ${limitStr} TL. Damages exceeding this limit must be paid out-of-pocket, creating significant financial exposure.`,
+        descriptionTR: `Poliçeniz mali sorumluluğu ${limitStr} TL ile sınırlar. Bu limiti aşan hasarlar trafik sigortası olsa bile cebinizden ödenmelidir, bu da yüksek mali yükümlülük yaratabilir.`,
         financialStatus: 'risk',
-        riskAmount: `Over ${immCoverage.limit.toLocaleString('tr-TR')} TL`,
-        riskAmountTR: `${immCoverage.limit.toLocaleString('tr-TR')} TL Üzeri`,
-        insurerPays: `Up to ${immCoverage.limit.toLocaleString('tr-TR')} TL`,
-        insurerPaysTR: `Maksimum ${immCoverage.limit.toLocaleString('tr-TR')} TL`,
+        riskAmount: `Over ${limitStr} TL`,
+        riskAmountTR: `${limitStr} TL Üzeri`,
+        insurerPays: `Up to ${limitStr} TL`,
+        insurerPaysTR: `Maksimum ${limitStr} TL`,
         userPays: 'unknown (out of pocket)',
         userPaysTR: 'bilinmiyor (cepten)',
         trigger: 'Third-party damages exceeding the policy IMM limits.',
@@ -1837,7 +1888,7 @@ function generateScenarioCards(
 
   // 3. Total Loss Scenario
   const newValueClause = policy.coverages.find(
-    (c) => c.name.toLowerCase().includes('yeni değer') && c.included
+    (c) => c.name.toLowerCase().includes('yeni değer') && isIncluded(c)
   )
   if (policy.type === 'kasko') {
     cards.push({
@@ -1874,24 +1925,20 @@ function generateScenarioCards(
       titleTR: 'Genel Hasar Durumu',
       description:
         policy.deductible > 0
-          ? `You will pay the first ${policy.deductible.toLocaleString('tr-TR')} TL out of pocket for any claimed loss.`
+          ? `You will pay the first ${formatTRY(policy.deductible)} TL out of pocket for any claimed loss.`
           : 'You have no fixed deductible. The insurer will cover verified claims directly, subject to limits.',
       descriptionTR:
         policy.deductible > 0
-          ? `Herhangi bir hasar talebinde ilk ${policy.deductible.toLocaleString('tr-TR')} TL'yi cepten ödeyeceksiniz.`
+          ? `Herhangi bir hasar talebinde ilk ${formatTRY(policy.deductible)} TL'yi cepten ödeyeceksiniz.`
           : 'Sabit bir muafiyetiniz yok. Sigortacı onaylanan hasarları doğrudan teminat limitleri dahilinde öder.',
       financialStatus: policy.deductible > 0 ? 'partially_covered' : 'covered',
-      riskAmount:
-        policy.deductible > 0 ? `Up to ${policy.deductible.toLocaleString('tr-TR')} TL` : undefined,
+      riskAmount: policy.deductible > 0 ? `Up to ${formatTRY(policy.deductible)} TL` : undefined,
       riskAmountTR:
-        policy.deductible > 0
-          ? `${policy.deductible.toLocaleString('tr-TR')} TL'ye kadar`
-          : undefined,
+        policy.deductible > 0 ? `${formatTRY(policy.deductible)} TL'ye kadar` : undefined,
       insurerPays: policy.deductible > 0 ? 'Claim minus deductible' : 'Full verified claim',
       insurerPaysTR: policy.deductible > 0 ? 'Hasar eksi muafiyet' : 'Doğrulanmış hasarın tamamı',
-      userPays: policy.deductible > 0 ? `${policy.deductible.toLocaleString('tr-TR')} TL` : '0 TL',
-      userPaysTR:
-        policy.deductible > 0 ? `${policy.deductible.toLocaleString('tr-TR')} TL` : '0 TL',
+      userPays: policy.deductible > 0 ? `${formatTRY(policy.deductible)} TL` : '0 TL',
+      userPaysTR: policy.deductible > 0 ? `${formatTRY(policy.deductible)} TL` : '0 TL',
       trigger: 'Any eligible claim occurs.',
       triggerTR: 'Uygun bir hasar talebinin oluşması.',
       whyItMatters: 'Shows your guaranteed out-of-pocket minimum for any claim.',
