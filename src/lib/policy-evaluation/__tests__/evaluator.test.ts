@@ -9,11 +9,11 @@ import type { Policy } from '@/types/policy'
 vi.mock('../benchmark-service', async (importOriginal) => {
   const actual = await importOriginal()
   return {
-    ...actual as any,
+    ...(actual as any),
     getPremiumBenchmarkWithFallback: vi.fn().mockImplementation((...args) => {
       const result = (actual as any).getPremiumBenchmarkWithFallback(...args)
       return { ...result, benchmarkStatus: 'trusted', source: 'database' }
-    })
+    }),
   }
 })
 
@@ -44,7 +44,13 @@ function createMockPolicy(overrides: Partial<Policy> = {}): Policy {
       { name: 'Collision', nameTr: 'Çarpışma', limit: 200000, deductible: 2000, included: true },
       { name: 'Theft', nameTr: 'Hırsızlık', limit: 200000, deductible: 1000, included: true },
       { name: 'Fire', nameTr: 'Yangın', limit: 200000, deductible: 500, included: true },
-      { name: 'Natural Disasters', nameTr: 'Doğal Afetler', limit: 150000, deductible: 2500, included: true },
+      {
+        name: 'Natural Disasters',
+        nameTr: 'Doğal Afetler',
+        limit: 150000,
+        deductible: 2500,
+        included: true,
+      },
       { name: 'Glass', nameTr: 'Cam', limit: 10000, deductible: 0, included: true },
     ],
     exclusions: ['Racing', 'War'],
@@ -64,11 +70,35 @@ function createExcellentPolicy(): Policy {
       { name: 'Collision', nameTr: 'Çarpışma', limit: 400000, deductible: 500, included: true },
       { name: 'Theft', nameTr: 'Hırsızlık', limit: 400000, deductible: 500, included: true },
       { name: 'Fire', nameTr: 'Yangın', limit: 400000, deductible: 0, included: true },
-      { name: 'Natural Disasters', nameTr: 'Doğal Afetler', limit: 300000, deductible: 1000, included: true },
+      {
+        name: 'Natural Disasters',
+        nameTr: 'Doğal Afetler',
+        limit: 300000,
+        deductible: 1000,
+        included: true,
+      },
       { name: 'Glass', nameTr: 'Cam', limit: 20000, deductible: 0, included: true },
-      { name: 'Roadside Assistance', nameTr: 'Yol Yardım', limit: 5000, deductible: 0, included: true },
-      { name: 'Replacement Vehicle', nameTr: 'İkame Araç', limit: 10000, deductible: 0, included: true },
-      { name: 'Legal Protection', nameTr: 'Hukuki Koruma', limit: 50000, deductible: 0, included: true },
+      {
+        name: 'Roadside Assistance',
+        nameTr: 'Yol Yardım',
+        limit: 5000,
+        deductible: 0,
+        included: true,
+      },
+      {
+        name: 'Replacement Vehicle',
+        nameTr: 'İkame Araç',
+        limit: 10000,
+        deductible: 0,
+        included: true,
+      },
+      {
+        name: 'Legal Protection',
+        nameTr: 'Hukuki Koruma',
+        limit: 50000,
+        deductible: 0,
+        included: true,
+      },
     ],
     exclusions: [],
   })
@@ -86,8 +116,17 @@ function createPoorPolicy(): Policy {
       { name: 'Fire', nameTr: 'Yangın', limit: 50000, deductible: 10000, included: true },
     ],
     exclusions: [
-      'Theft', 'Natural disasters', 'Glass', 'Vandalism', 'Flooding',
-      'Hail', 'Tree damage', 'Animal damage', 'Parking damage', 'Key loss', 'Personal effects'
+      'Theft',
+      'Natural disasters',
+      'Glass',
+      'Vandalism',
+      'Flooding',
+      'Hail',
+      'Tree damage',
+      'Animal damage',
+      'Parking damage',
+      'Key loss',
+      'Personal effects',
     ],
   })
 }
@@ -142,8 +181,20 @@ function createTrafficPolicy(): Policy {
     documentType: 'policy',
     insuranceLine: 'Auto Liability',
     coverages: [
-      { name: 'Bodily Injury', nameTr: 'Bedensel Hasar', limit: 1000000, deductible: 0, included: true },
-      { name: 'Material Damage', nameTr: 'Maddi Hasar', limit: 500000, deductible: 0, included: true },
+      {
+        name: 'Bodily Injury',
+        nameTr: 'Bedensel Hasar',
+        limit: 1000000,
+        deductible: 0,
+        included: true,
+      },
+      {
+        name: 'Material Damage',
+        nameTr: 'Maddi Hasar',
+        limit: 500000,
+        deductible: 0,
+        included: true,
+      },
     ],
     exclusions: ['Racing', 'Intentional acts'],
     specialConditions: [],
@@ -310,7 +361,7 @@ describe('Policy Evaluator', () => {
         const policy = createMockPolicy()
         const evaluation = evaluatePolicy(policy)
 
-        Object.values(evaluation.scoreBreakdown).forEach(breakdown => {
+        Object.values(evaluation.scoreBreakdown).forEach((breakdown) => {
           expect(breakdown.details).toBeTruthy()
           expect(breakdown.detailsTR).toBeTruthy()
         })
@@ -320,7 +371,7 @@ describe('Policy Evaluator', () => {
         const policy = createMockPolicy()
         const evaluation = evaluatePolicy(policy)
 
-        Object.values(evaluation.scoreBreakdown).forEach(breakdown => {
+        Object.values(evaluation.scoreBreakdown).forEach((breakdown) => {
           expect(Array.isArray(breakdown.issues)).toBe(true)
           expect(Array.isArray(breakdown.issuesTR)).toBe(true)
         })
@@ -359,7 +410,7 @@ describe('Policy Evaluator', () => {
         const evaluation = evaluatePolicy(policy)
 
         expect(evaluation.compliance.isCompliant).toBe(true)
-        const criticalIssues = evaluation.compliance.issues.filter(i => i.severity === 'critical')
+        const criticalIssues = evaluation.compliance.issues.filter((i) => i.severity === 'critical')
         expect(criticalIssues.length).toBe(0)
       })
 
@@ -415,9 +466,9 @@ describe('Policy Evaluator', () => {
         const evaluation = evaluatePolicy(policy)
 
         // 11 exclusions - should affect value score
-        expect(evaluation.scoreBreakdown.value.issues.some(i =>
-          i.toLowerCase().includes('exclusion')
-        )).toBe(true)
+        expect(
+          evaluation.scoreBreakdown.value.issues.some((i) => i.toLowerCase().includes('exclusion'))
+        ).toBe(true)
       })
 
       it('should generate recommendations for improvements', () => {
@@ -445,7 +496,7 @@ describe('Policy Evaluator', () => {
         const evaluation = evaluatePolicy(policy)
 
         expect(evaluation.compliance.isCompliant).toBe(false)
-        const expiredIssue = evaluation.compliance.issues.find(i => i.type === 'expired')
+        const expiredIssue = evaluation.compliance.issues.find((i) => i.type === 'expired')
         expect(expiredIssue).toBeDefined()
         expect(expiredIssue?.severity).toBe('critical')
       })
@@ -454,7 +505,7 @@ describe('Policy Evaluator', () => {
         const policy = createExpiringSoonPolicy()
         const evaluation = evaluatePolicy(policy)
 
-        const expiringIssue = evaluation.compliance.issues.find(i => i.type === 'expired')
+        const expiringIssue = evaluation.compliance.issues.find((i) => i.type === 'expired')
         expect(expiringIssue).toBeDefined()
         expect(expiringIssue?.severity).toBe('high')
       })
@@ -527,7 +578,7 @@ describe('Policy Evaluator', () => {
         const policy = createExpiredPolicy()
         const evaluation = evaluatePolicy(policy)
 
-        const complianceRecs = evaluation.recommendations.filter(r => r.type === 'compliance')
+        const complianceRecs = evaluation.recommendations.filter((r) => r.type === 'compliance')
         expect(complianceRecs.length).toBeGreaterThan(0)
         expect(complianceRecs[0].priority).toBe('critical')
       })
@@ -536,7 +587,7 @@ describe('Policy Evaluator', () => {
         const policy = createPoorPolicy()
         const evaluation = evaluatePolicy(policy)
 
-        const coverageRecs = evaluation.recommendations.filter(r => r.type === 'add_coverage')
+        const coverageRecs = evaluation.recommendations.filter((r) => r.type === 'add_coverage')
         expect(coverageRecs.length).toBeGreaterThan(0)
       })
 
@@ -544,7 +595,9 @@ describe('Policy Evaluator', () => {
         const policy = createPoorPolicy()
         const evaluation = evaluatePolicy(policy)
 
-        const deductibleRecs = evaluation.recommendations.filter(r => r.type === 'reduce_deductible')
+        const deductibleRecs = evaluation.recommendations.filter(
+          (r) => r.type === 'reduce_deductible'
+        )
         expect(deductibleRecs.length).toBeGreaterThan(0)
       })
 
@@ -552,7 +605,7 @@ describe('Policy Evaluator', () => {
         const policy = createPoorPolicy()
         const evaluation = evaluatePolicy(policy)
 
-        evaluation.recommendations.forEach(rec => {
+        evaluation.recommendations.forEach((rec) => {
           expect(rec.title).toBeTruthy()
           expect(rec.titleTR).toBeTruthy()
           expect(rec.description).toBeTruthy()
@@ -565,7 +618,7 @@ describe('Policy Evaluator', () => {
         const evaluation = evaluatePolicy(policy)
 
         // Critical issues should come first
-        const priorities = evaluation.recommendations.map(r => r.priority)
+        const priorities = evaluation.recommendations.map((r) => r.priority)
         const criticalIndex = priorities.indexOf('critical')
         const lowIndex = priorities.indexOf('low')
 
@@ -639,9 +692,64 @@ describe('Policy Evaluator', () => {
         const policy = createMockPolicy({ exclusions: manyExclusions })
         const evaluation = evaluatePolicy(policy)
 
-        expect(evaluation.scoreBreakdown.value.issues.some(i =>
-          i.toLowerCase().includes('exclusion')
-        )).toBe(true)
+        expect(
+          evaluation.scoreBreakdown.value.issues.some((i) => i.toLowerCase().includes('exclusion'))
+        ).toBe(true)
+      })
+    })
+
+    // =========================================================================
+    // DISPLAYED AI CONFIDENCE CAP (April 24 review — trust-damage fix)
+    // =========================================================================
+
+    describe('Displayed AI Confidence', () => {
+      // Reviewer flagged "98% confidence next to Incomplete extraction" as the
+      // worst calibration bug. The evaluator now derives displayedAiConfidence
+      // from raw aiConfidence, capped at 0.65 whenever extractionIncomplete fires.
+      it('caps displayedAiConfidence to 0.65 when vehicle make is missing (gate fires)', () => {
+        const policy = createMockPolicy({
+          type: 'kasko',
+          vehicleInfo: { model: 'Corolla', year: 2022 }, // make MISSING → triggers gate
+          aiConfidence: 0.98,
+        } as Partial<Policy>)
+        const evaluation = evaluatePolicy(policy)
+
+        expect(evaluation.extractionIncomplete).toBe(true)
+        expect(evaluation.displayedAiConfidence).toBeLessThanOrEqual(0.65)
+        expect(evaluation.displayedAiConfidence).toBe(0.65)
+      })
+
+      it('passes raw aiConfidence through unchanged when gate does not fire', () => {
+        const policy = createMockPolicy({
+          type: 'kasko',
+          vehicleInfo: { make: 'Toyota', model: 'Corolla', year: 2022 },
+          aiConfidence: 0.92,
+        } as Partial<Policy>)
+        const evaluation = evaluatePolicy(policy)
+
+        expect(evaluation.extractionIncomplete).toBeUndefined()
+        expect(evaluation.displayedAiConfidence).toBe(0.92)
+      })
+
+      it('does not inflate confidence — raw 0.40 with gate active stays 0.40 (min of raw, cap)', () => {
+        const policy = createMockPolicy({
+          type: 'kasko',
+          vehicleInfo: {}, // all headline fields missing
+          aiConfidence: 0.4,
+        } as Partial<Policy>)
+        const evaluation = evaluatePolicy(policy)
+
+        expect(evaluation.extractionIncomplete).toBe(true)
+        // Cap is a ceiling, not a floor — already-low raw confidence passes through.
+        expect(evaluation.displayedAiConfidence).toBe(0.4)
+      })
+
+      it('returns undefined displayedAiConfidence when raw aiConfidence is absent', () => {
+        const policy = createMockPolicy({ type: 'kasko' } as Partial<Policy>)
+        delete (policy as { aiConfidence?: number }).aiConfidence
+        const evaluation = evaluatePolicy(policy)
+
+        expect(evaluation.displayedAiConfidence).toBeUndefined()
       })
     })
   })

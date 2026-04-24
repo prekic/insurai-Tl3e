@@ -7,11 +7,23 @@ import type { AnalyzedPolicy } from '@/types/policy'
 interface MarketComparisonCardProps {
   policy: AnalyzedPolicy
   evaluation: any
+  /** Suppresses market comparison entirely when the extraction gate is active.
+   *  A benchmark comparison on a policy with blank vehicle/coverage fields is
+   *  at best misleading and at worst defamatory toward the insurer. */
+  isUnverified?: boolean
 }
 
-export function MobileMarketComparisonCard({ policy, evaluation }: MarketComparisonCardProps) {
+export function MobileMarketComparisonCard({
+  policy,
+  evaluation,
+  isUnverified,
+}: MarketComparisonCardProps) {
   const { t, locale } = useI18n()
   const { formatConverted } = useDisplayCurrency()
+
+  if (isUnverified) {
+    return null
+  }
 
   if (
     !policy.marketComparison ||
@@ -148,9 +160,17 @@ export function MobileMarketComparisonCard({ policy, evaluation }: MarketCompari
   )
 }
 
-export function DesktopMarketComparisonCard({ policy, evaluation }: MarketComparisonCardProps) {
+export function DesktopMarketComparisonCard({
+  policy,
+  evaluation,
+  isUnverified,
+}: MarketComparisonCardProps) {
   const { t, locale } = useI18n()
   const { formatConverted } = useDisplayCurrency()
+
+  if (isUnverified) {
+    return null
+  }
 
   if (
     !policy.marketComparison ||

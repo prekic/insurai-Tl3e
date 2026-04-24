@@ -329,8 +329,12 @@ export async function extractTextFromPDF(
       }
     }
 
-    // Extract text from all pages with per-page timeout protection
-    const textContent: string[] = []
+    // Extract text from all pages with per-page timeout protection.
+    // We track the bare page text separately from the page-marked version:
+    // the 50-char threshold below must measure ACTUAL content, not the
+    // `[PAGE N]\n` prefix — otherwise a PDF with 41 chars of content would
+    // pass the threshold (41 + 9-char prefix = 50).
+    const pageTexts: string[] = []
 
     for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
       try {
@@ -349,11 +353,11 @@ export async function extractTextFromPDF(
           .replace(/\s+/g, ' ')
           .trim()
 
-        textContent.push(`[PAGE ${pageNum}]\n${pageText}`)
+        pageTexts.push(pageText)
       } catch (pageError) {
         // Log but continue - partial extraction is better than complete failure
         console.warn(`[PDF.js] Failed to extract page ${pageNum}:`, pageError)
-        textContent.push(`[PAGE ${pageNum}]\n`) // Add empty string to maintain page count
+        pageTexts.push('') // Maintain page count without inflating length.
       }
     }
 
@@ -366,10 +370,11 @@ export async function extractTextFromPDF(
       // Metadata extraction is optional
     }
 
-    const fullText = textContent.join('\n\n')
+    // Threshold check runs on actual content only. Sum of bare page texts
+    // drives the EMPTY_PDF decision, independent of the page-marker layout.
+    const contentLength = pageTexts.reduce((s, t) => s + t.length, 0)
 
-    // Check if we extracted any meaningful text
-    if (fullText.length < 50) {
+    if (contentLength < 50) {
       return {
         success: false,
         error: {
@@ -379,6 +384,11 @@ export async function extractTextFromPDF(
         },
       }
     }
+
+    // Threshold passed — now build the page-marked version for downstream
+    // consumers that care about per-page boundaries (OCR, chunking, etc.).
+    const textContent = pageTexts.map((t, i) => `[PAGE ${i + 1}]\n${t}`)
+    const fullText = textContent.join('\n\n')
 
     if (fullText.includes('%DûODQJÖo') || fullText.includes('ûWHUL')) {
       return {

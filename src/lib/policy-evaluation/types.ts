@@ -87,6 +87,10 @@ export interface PolicyEvaluation {
   extractionIncomplete?: boolean
   /** Trigger codes from the extraction completeness gate (for audit / debugging). */
   extractionGateTriggers?: string[]
+  /** Displayed AI confidence — capped when extractionIncomplete is true so the
+   *  UI cannot render "98% confidence" next to "Incomplete extraction". The
+   *  raw value on `AnalyzedPolicy.aiConfidence` is preserved for audit. */
+  displayedAiConfidence?: number
   status: EvaluationStatus
 
   // Category scores

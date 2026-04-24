@@ -122,6 +122,40 @@ describe('extractVehicleInfoFromText', () => {
     expect(result?.model).toMatch(/TIGUAN/)
     expect(result?.year).toBe(2016)
   })
+
+  it('recovers make from Allianz inverted `: VALUE\\tLabel` layout', () => {
+    // Allianz Peugeot PDFs emit the value BEFORE the label on the same line:
+    //   ": PEUGEOT (114)\tMarka Plaka No : 34 GM 6461"
+    // Forward scan from `Marka` hits `Plaka No :` immediately and captures
+    // nothing. The backward fallback recovers `PEUGEOT (114)` and the first
+    // word becomes the make.
+    const text = `
+      Policy header line
+      : PEUGEOT (114)\tMarka Plaka No : 34 GM 6461
+    `
+    const result = extractVehicleInfoFromText(text)
+    expect(result?.make).toBe('PEUGEOT')
+  })
+
+  it('does NOT false-positive when another labeled field precedes on the same line', () => {
+    // A line like `Plaka : 34 ABC 12\tMarka` has a preceding value (34 ABC 12)
+    // that already belongs to the Plaka label. The backward scan requires the
+    // segment to start with `:`, so this is safely rejected and returns
+    // `undefined` rather than mis-claiming the plate as the make.
+    const text = 'Plaka : 34 ABC 12\tMarka'
+    const result = extractVehicleInfoFromText(text)
+    expect(result?.make).toBeUndefined()
+    // Plate extraction still works via the standalone plate regex.
+    expect(result?.plate).toBe('34 ABC 12')
+  })
+
+  it('does NOT fire the backward fallback when forward scan already succeeded', () => {
+    // Sanity: when forward scan returns a value, the backward fallback is
+    // never consulted. This guards against double-fire regressions.
+    const text = 'Marka : FORD\n: IRRELEVANT PEUGEOT\tMarka'
+    const result = extractVehicleInfoFromText(text)
+    expect(result?.make).toBe('FORD')
+  })
 })
 
 describe('parseTurkishCurrency — known good cases', () => {

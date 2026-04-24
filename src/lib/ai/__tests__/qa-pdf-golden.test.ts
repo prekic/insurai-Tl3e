@@ -99,11 +99,9 @@ const fixtures: PdfFixture[] = [
     expectedPremiumOneOf: [1659.72, 1580.67],
     shouldFindDahilHaric: true,
     // Allianz uses an inverted `: PEUGEOT (114)\tMarka Plaka No : ...` format
-    // where the make VALUE precedes the `Marka` LABEL on the same line. Our
-    // alias-aware extractor can't recover this without a bidirectional scan;
-    // the make assertion falls back to a text-contains check until we add
-    // that support.
-    extractorLenientFor: ['make'],
+    // where the make VALUE precedes the `Marka` LABEL on the same line. The
+    // backward-scan fallback in `matchLabeledField` now recovers this — no
+    // lenient mode needed. (Added Apr 24, 2026.)
   },
   {
     path: 'policies/KASKO POLİÇESİ.pdf',

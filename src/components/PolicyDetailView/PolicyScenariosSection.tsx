@@ -4,10 +4,18 @@ import type { ScenarioCard } from '@/lib/policy-evaluation/types'
 
 interface PolicyScenariosSectionProps {
   scenarios: ScenarioCard[] | undefined
+  /** Hides all scenario cards when the extraction gate is active. Scenarios
+   *  computed from incomplete data can be misleading (e.g. an "IMM unlimited"
+   *  card derived from a policy whose coverage rows are placeholders). */
+  isUnverified?: boolean
 }
 
-export function PolicyScenariosSection({ scenarios }: PolicyScenariosSectionProps) {
+export function PolicyScenariosSection({ scenarios, isUnverified }: PolicyScenariosSectionProps) {
   const { t, locale } = useI18n()
+
+  if (isUnverified) {
+    return null
+  }
 
   if (!scenarios || scenarios.length === 0) {
     return null

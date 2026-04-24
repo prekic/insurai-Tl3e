@@ -691,13 +691,22 @@ describe('PolicyDetailView Branch Coverage', () => {
       expect(screen.queryByText('Marka')).not.toBeInTheDocument()
     })
 
-    it('hides model/year/usage/class when undefined', () => {
+    it('renders headline vehicle fields as "Cannot Verify" when missing, hides optional metadata', () => {
+      // Reviewer feedback (Apr 24): hiding rows is worse than showing empty —
+      // hidden rows look intentional. Plate/Make/Model/Model Year are headline
+      // fields and always render. Usage Type / Vehicle Class stay conditional.
       mockGetPolicyById.mockReturnValue(buildPolicy({ vehicleInfo: { plate: '34 XYZ 99' } }))
       renderComponent()
-      expect(screen.queryByText('Model')).not.toBeInTheDocument()
-      expect(screen.queryByText('Model Yılı')).not.toBeInTheDocument()
-      expect(screen.queryByText('Kullanım Şekli')).not.toBeInTheDocument()
-      expect(screen.queryByText('Araç Sınıfı')).not.toBeInTheDocument()
+      // Headline field labels still render (EN locale labels)
+      expect(screen.getByText('Model')).toBeInTheDocument()
+      expect(screen.getByText('Model Year')).toBeInTheDocument()
+      // Make also renders as headline
+      expect(screen.getByText('Make')).toBeInTheDocument()
+      // All three missing headline fields surface the "Cannot Verify" placeholder
+      expect(screen.getAllByTestId('vehicle-field-cannot-verify')).toHaveLength(3)
+      // Optional metadata labels stay hidden when absent
+      expect(screen.queryByText('Usage Type')).not.toBeInTheDocument()
+      expect(screen.queryByText('Vehicle Class')).not.toBeInTheDocument()
     })
 
     it('shows plate in header for kasko with plate', () => {

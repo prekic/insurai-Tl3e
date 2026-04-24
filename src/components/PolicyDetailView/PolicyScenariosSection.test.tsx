@@ -126,4 +126,25 @@ describe('PolicyScenariosSection', () => {
     expect(screen.queryByText('User Pays:')).not.toBeInTheDocument()
     expect(screen.queryByText('Trigger:')).not.toBeInTheDocument()
   })
+
+  it('renders nothing when isUnverified is true, even with populated scenarios', () => {
+    // Reviewer feedback (Apr 24): when the extraction completeness gate fires,
+    // scenarios computed from incomplete data can be misleading. Suppress
+    // entirely rather than dimming — half-gating is the bug we're fixing.
+    const { container } = render(
+      <PolicyScenariosSection
+        scenarios={[riskScenario, coveredScenario, partialScenario]}
+        isUnverified
+      />
+    )
+    expect(container.firstChild).toBeNull()
+    expect(screen.queryByText('Flood Uncovered')).not.toBeInTheDocument()
+    expect(screen.queryByText('Collision Covered')).not.toBeInTheDocument()
+    expect(screen.queryByText('Scenario Risk Analysis')).not.toBeInTheDocument()
+  })
+
+  it('renders scenarios when isUnverified is false (default behaviour)', () => {
+    render(<PolicyScenariosSection scenarios={[riskScenario]} isUnverified={false} />)
+    expect(screen.getByText('Flood Uncovered')).toBeInTheDocument()
+  })
 })

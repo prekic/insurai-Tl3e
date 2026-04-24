@@ -44,6 +44,23 @@ import { inferIndustryFromInsuredName } from '../ai/turkish-utils'
 import { evaluateSimpleDisplayMode } from '../analysis/kasko-pilot-gate'
 
 /**
+ * Maximum displayed AI confidence when the extraction completeness gate fires.
+ *
+ * Raw LLM-returned confidence can be 0.95+ even when headline vehicle fields
+ * are missing. Without a cap, the UI ends up rendering e.g. "98% confident"
+ * next to an "Incomplete extraction" banner — the contradiction the April 24
+ * human review flagged as the worst kind of calibration bug ("confidently
+ * wrong about confidence").
+ *
+ * 0.65 is below any green/confident threshold in the UI (which starts at 0.75)
+ * and always renders as amber — keeping this file as the single source of truth
+ * for the cap value. The same constant is mirrored in
+ * `scripts/qa-extraction-quality.ts:INCOMPLETE_CONFIDENCE_CAP`; keep them
+ * in sync.
+ */
+export const INCOMPLETE_CONFIDENCE_CAP = 0.65
+
+/**
  * Safely format a numeric value as Turkish Lira string.
  * Returns '0' for undefined, null, or NaN values instead of crashing.
  */
@@ -557,6 +574,17 @@ export function evaluatePolicy(
   )
   const extractionIncomplete = extractionCompletenessTriggers.length > 0
 
+  // Displayed confidence is capped when the gate fires so the UI cannot show
+  // a high confidence % next to the "Incomplete extraction" banner. The raw
+  // value on AnalyzedPolicy.aiConfidence is preserved for audit/debug.
+  const rawAiConfidence = (policy as { aiConfidence?: number }).aiConfidence
+  const displayedAiConfidence =
+    typeof rawAiConfidence === 'number'
+      ? extractionIncomplete
+        ? Math.min(rawAiConfidence, INCOMPLETE_CONFIDENCE_CAP)
+        : rawAiConfidence
+      : undefined
+
   return {
     policyId: policy.id,
     policyNumber: policy.policyNumber,
@@ -575,6 +603,7 @@ export function evaluatePolicy(
     extractionIncomplete: extractionIncomplete || undefined,
     extractionGateTriggers:
       extractionCompletenessTriggers.length > 0 ? extractionCompletenessTriggers : undefined,
+    displayedAiConfidence,
     status: getStatusFromScore(overallScore, statusThresholds),
 
     scoreBreakdown: {

@@ -447,6 +447,7 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     extractionIncomplete: 'Eksik çıkarım — yeniden tarama önerilir',
     extractionIncompleteDesc:
       'Bazı temel alanlar (araç marka/model/yıl veya teminat detayları) eksik ya da net değil. Güvenilir bir not alabilmek için daha temiz bir tarama yükleyin.',
+    cannotVerify: 'Doğrulanamadı',
     freeTrialResult: 'Ücretsiz Deneme Sonucu',
     goBack: 'Geri Dön',
     goToDashboard: 'Gösterge Paneline Git',

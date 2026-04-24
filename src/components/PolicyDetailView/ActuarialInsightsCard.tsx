@@ -15,6 +15,10 @@ export function ActuarialInsightsCard({
 }) {
   const { t, locale } = useI18n()
 
+  // Suppress actuarial insights entirely when the extraction gate is active —
+  // EOOP / TOPSIS outputs on incomplete extractions are unreliable.
+  if (isUnverified) return null
+
   if (!actuarialResult) return null
 
   return (

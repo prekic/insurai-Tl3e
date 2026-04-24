@@ -30,6 +30,7 @@
     "loadtest": "tsx scripts/load-test.ts",
     "loadtest:quick": "LOAD_TEST_DURATION=5 tsx scripts/load-test.ts",
     "loadtest:stress": "LOAD_TEST_DURATION=30 LOAD_TEST_CONNECTIONS=100 tsx scripts/load-test.ts",
+    "qa:extraction": "tsx scripts/qa-extraction-quality.ts",
     "test:e2e": "playwright test",
     "test:e2e:fast": "playwright test --project=chromium",
     "test:e2e:ui": "playwright test --ui",

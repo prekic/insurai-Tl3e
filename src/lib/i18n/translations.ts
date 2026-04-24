@@ -450,6 +450,7 @@ export interface TranslationDictionary {
     draftStatus: string
     extractionIncomplete: string
     extractionIncompleteDesc: string
+    cannotVerify: string
     freeTrialResult: string
     goBack: string
     goToDashboard: string

@@ -80,7 +80,10 @@ describe('VehicleInfoCard', () => {
     expect(screen.getByText('M1')).toBeInTheDocument()
   })
 
-  it('omits fields that are not present', () => {
+  it('renders headline fields as "Cannot Verify" when missing instead of hiding them', () => {
+    // Reviewer feedback (Apr 24): hiding rows is worse than showing empty —
+    // hidden rows look intentional (as if the policy didn't contain the data),
+    // whereas an explicit "Cannot Verify" row signals extraction failure.
     const policy: AnalyzedPolicy = {
       ...basePolicy,
       vehicleInfo: {
@@ -91,8 +94,36 @@ describe('VehicleInfoCard', () => {
     render(<VehicleInfoCard policy={policy} />)
 
     expect(screen.getByText('06 XYZ 5678')).toBeInTheDocument()
-    // Make/Model/Year/Usage/Class should not render their labels when absent
+    // Plate, Make, Model, Year are headline fields and always render. When
+    // missing, the value text is the locale-aware "Cannot Verify" placeholder.
+    const cannotVerifyRows = screen.getAllByTestId('vehicle-field-cannot-verify')
+    // make + model + year are missing → 3 placeholder rows.
+    expect(cannotVerifyRows).toHaveLength(3)
+    cannotVerifyRows.forEach((row) => {
+      expect(row).toHaveTextContent('Cannot Verify')
+    })
+    // Raw values that aren't in the fixture must still not appear.
     expect(screen.queryByText('Toyota')).not.toBeInTheDocument()
+  })
+
+  it('does not render "Cannot Verify" rows for optional fields (usage, vehicleClass)', () => {
+    // Usage and vehicleClass are optional metadata — showing "Cannot Verify"
+    // for them would add noise; they stay conditionally rendered.
+    const policy: AnalyzedPolicy = {
+      ...basePolicy,
+      vehicleInfo: {
+        plate: '06 XYZ 5678',
+        make: 'Toyota',
+        model: 'Corolla',
+        year: 2022,
+      },
+    }
+
+    render(<VehicleInfoCard policy={policy} />)
+
+    expect(screen.queryAllByTestId('vehicle-field-cannot-verify')).toHaveLength(0)
+    expect(screen.queryByText('Usage Type')).not.toBeInTheDocument()
+    expect(screen.queryByText('Vehicle Class')).not.toBeInTheDocument()
   })
 
   it('shows the commercial-vehicle callout when usage is "commercial"', () => {

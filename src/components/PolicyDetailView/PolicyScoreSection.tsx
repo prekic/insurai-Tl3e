@@ -18,16 +18,23 @@ export function MobileEvaluationCard(props: any) {
   return (
     <Card className="lg:hidden">
       {isUnverified && (
-        <div className="px-3 pt-2 sm:px-6 sm:pt-3">
-          <div className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
-            <AlertTriangle size={12} className="flex-shrink-0" />
-            <span>
-              {evaluation.extractionIncomplete
-                ? t.policy.extractionIncomplete
-                : locale === 'tr'
-                  ? 'Puanlar taslak niteliğindedir — insan incelemesi bekleniyor'
-                  : 'Scores are preliminary — pending human review'}
-            </span>
+        <div className="px-3 pt-2 sm:px-6 sm:pt-3" data-testid="unverified-banner-mobile">
+          <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5 space-y-1">
+            <div className="flex items-center gap-1.5">
+              <AlertTriangle size={12} className="flex-shrink-0" />
+              <span className="font-medium">
+                {evaluation.extractionIncomplete
+                  ? t.policy.extractionIncomplete
+                  : locale === 'tr'
+                    ? 'Puanlar taslak niteliğindedir — insan incelemesi bekleniyor'
+                    : 'Scores are preliminary — pending human review'}
+              </span>
+            </div>
+            {evaluation.extractionIncomplete && (
+              <p className="text-[11px] leading-snug text-amber-700/90 pl-[18px]">
+                {t.policy.extractionIncompleteDesc}
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -136,30 +143,34 @@ export function MobileEvaluationCard(props: any) {
             ? 'Bu derecelendirme mevcut iç model eşiklerine dayanmaktadır ve karşılaştırma kapsamı geliştikçe yeniden kalibre edilebilir.'
             : 'This rating is based on current internal model thresholds and may be recalibrated as benchmark coverage improves.'}
         </p>
-        /* Score Breakdown - Expandable */
-        <div className="pt-2 border-t">
-          <button
-            onClick={() => setScoreBreakdownExpanded(!scoreBreakdownExpanded)}
-            className="flex items-center justify-between w-full text-left mb-2"
-          >
-            <p className="text-xs sm:text-sm font-medium text-gray-700">
-              {t.policy.scoreBreakdown}
-            </p>
-            <ChevronDown
-              size={16}
-              className={`text-gray-400 transition-transform ${scoreBreakdownExpanded ? 'rotate-180' : ''}`}
-            />
-          </button>
-          <div className={isUnverified ? 'opacity-60 transition-opacity hover:opacity-100' : ''}>
-            {scoreBreakdownExpanded ? (
-              <ScoreBreakdown breakdown={evaluation.scoreBreakdown} variant="full" />
-            ) : (
-              <ScoreBreakdown breakdown={evaluation.scoreBreakdown} variant="mini" />
-            )}
+        /* Score Breakdown - Expandable. Fully suppressed when isUnverified so a gate-triggered
+        policy cannot leak confident category scores. */
+        {!isUnverified && (
+          <div className="pt-2 border-t">
+            <button
+              onClick={() => setScoreBreakdownExpanded(!scoreBreakdownExpanded)}
+              className="flex items-center justify-between w-full text-left mb-2"
+            >
+              <p className="text-xs sm:text-sm font-medium text-gray-700">
+                {t.policy.scoreBreakdown}
+              </p>
+              <ChevronDown
+                size={16}
+                className={`text-gray-400 transition-transform ${scoreBreakdownExpanded ? 'rotate-180' : ''}`}
+              />
+            </button>
+            <div>
+              {scoreBreakdownExpanded ? (
+                <ScoreBreakdown breakdown={evaluation.scoreBreakdown} variant="full" />
+              ) : (
+                <ScoreBreakdown breakdown={evaluation.scoreBreakdown} variant="mini" />
+              )}
+            </div>
           </div>
-        </div>
-        /* Recommendations - Expandable */
-        {evaluation.recommendations.length > 0 && (
+        )}
+        /* Recommendations - Expandable. Suppressed with score breakdown on gate-triggered policies
+        — recommendations computed on incomplete data can be misleading. */
+        {!isUnverified && evaluation.recommendations.length > 0 && (
           <div className="pt-2 border-t">
             <p className="text-xs sm:text-sm font-medium text-gray-700 mb-2">
               {t.policy.recommendations}
@@ -199,8 +210,14 @@ export function MobileEvaluationCard(props: any) {
 
 // Mobile Insights
 export function MobileInsightsCard(props: any) {
-  const { policy, summary, isPilotResult, displaySummary, locale, t } = props
+  const { policy, summary, isPilotResult, displaySummary, locale, t, evaluation } = props
   const [insightsExpanded, setInsightsExpanded] = useState(false)
+  // Prefer the evaluator-capped value so a gate-triggered policy can't render
+  // a high confidence % next to the "Incomplete extraction" banner.
+  const confidenceForDisplay =
+    typeof evaluation?.displayedAiConfidence === 'number'
+      ? evaluation.displayedAiConfidence
+      : policy.aiConfidence
   /* AI Insights - Mobile only (high priority) */
   return (
     <Card className="lg:hidden bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
@@ -232,7 +249,7 @@ export function MobileInsightsCard(props: any) {
           <Sparkles className="text-purple-600 flex-shrink-0" size={18} />
           <span className="truncate">{t.policy.aiInsightsTitle}</span>
           <Badge variant="outline" className="text-xs text-purple-600 border-purple-300 ml-auto">
-            {Math.round(policy.aiConfidence * 100)}%
+            {Math.round(confidenceForDisplay * 100)}%
           </Badge>
         </CardTitle>
       </CardHeader>
@@ -339,6 +356,27 @@ export function DesktopEvaluationCard(props: any) {
   if (!evaluation || isEvaluationLoading) return null
   return (
     <Card>
+      {isUnverified && (
+        <div className="px-6 pt-4" data-testid="unverified-banner-desktop">
+          <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 space-y-1">
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={14} className="flex-shrink-0" />
+              <span className="font-medium">
+                {evaluation.extractionIncomplete
+                  ? t.policy.extractionIncomplete
+                  : locale === 'tr'
+                    ? 'Puanlar taslak niteliğindedir — insan incelemesi bekleniyor'
+                    : 'Scores are preliminary — pending human review'}
+              </span>
+            </div>
+            {evaluation.extractionIncomplete && (
+              <p className="text-xs leading-snug text-amber-700/90 pl-[22px]">
+                {t.policy.extractionIncompleteDesc}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <BarChart3 className="text-blue-600" size={20} />
@@ -444,13 +482,16 @@ export function DesktopEvaluationCard(props: any) {
             ? 'Bu derecelendirme mevcut iç model eşiklerine dayanmaktadır ve karşılaştırma kapsamı geliştikçe yeniden kalibre edilebilir.'
             : 'This rating is based on current internal model thresholds and may be recalibrated as benchmark coverage improves.'}
         </p>
-        /* Score Breakdown */
-        <div className="pt-2 border-t">
-          <p className="text-sm font-medium text-gray-700 mb-2">{t.policy.scoreBreakdown}</p>
-          <ScoreBreakdown breakdown={evaluation.scoreBreakdown} variant="full" />
-        </div>
-        /* Top Recommendations */
-        {evaluation.recommendations.length > 0 && (
+        /* Score Breakdown — suppressed for gate-triggered policies so we don't leak confident
+        category scores next to the "Incomplete" badge. */
+        {!isUnverified && (
+          <div className="pt-2 border-t">
+            <p className="text-sm font-medium text-gray-700 mb-2">{t.policy.scoreBreakdown}</p>
+            <ScoreBreakdown breakdown={evaluation.scoreBreakdown} variant="full" />
+          </div>
+        )}
+        /* Top Recommendations — suppressed with score breakdown on gate-triggered policies. */
+        {!isUnverified && evaluation.recommendations.length > 0 && (
           <div className="pt-2 border-t">
             <p className="text-sm font-medium text-gray-700 mb-2">{t.policy.recommendations}</p>
             <div className="space-y-2">
@@ -472,7 +513,11 @@ export function DesktopEvaluationCard(props: any) {
 
 // Desktop Insights
 export function DesktopInsightsCard(props: any) {
-  const { policy, summary, isPilotResult, displaySummary, locale, t } = props
+  const { policy, summary, isPilotResult, displaySummary, locale, t, evaluation } = props
+  const confidenceForDisplay =
+    typeof evaluation?.displayedAiConfidence === 'number'
+      ? evaluation.displayedAiConfidence
+      : policy.aiConfidence
   /* AI Insights */
   return (
     <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
@@ -523,7 +568,7 @@ export function DesktopInsightsCard(props: any) {
           <div className="flex items-center gap-2 text-sm">
             <span className="text-purple-600">{t.policy.confidenceLabel}</span>
             <span className="font-semibold text-purple-900">
-              {Math.round(policy.aiConfidence * 100)}%
+              {Math.round(confidenceForDisplay * 100)}%
             </span>
           </div>
           {summary.insights.map((insightText: string, i: number) => {

@@ -340,7 +340,10 @@ export function PolicyDetailView() {
             <FinancialWarningsCard evaluation={evaluation} />
 
             {/* Plain-Language Scenario Explainability Layer */}
-            <PolicyScenariosSection scenarios={evaluation?.scenarioCards} />
+            <PolicyScenariosSection
+              scenarios={evaluation?.scenarioCards}
+              isUnverified={isUnverified}
+            />
 
             {/* Policy Evaluation - Mobile only (high priority) */}
             <MobileEvaluationCard
@@ -360,10 +363,15 @@ export function PolicyDetailView() {
               locale={locale}
               t={t}
               isUnverified={isUnverified}
+              evaluation={evaluation}
             />
 
             {/* Market Comparison - Mobile only */}
-            <MobileMarketComparisonCard policy={policy} evaluation={evaluation} />
+            <MobileMarketComparisonCard
+              policy={policy}
+              evaluation={evaluation}
+              isUnverified={isUnverified}
+            />
 
             {/* Vehicle Information (Kasko Only) */}
             <VehicleInfoCard policy={policy} />
@@ -472,10 +480,15 @@ export function PolicyDetailView() {
               locale={locale}
               t={t}
               isUnverified={isUnverified}
+              evaluation={evaluation}
             />
 
             {/* Market Comparison - Only show when we have valid premium data */}
-            <DesktopMarketComparisonCard policy={policy} evaluation={evaluation} />
+            <DesktopMarketComparisonCard
+              policy={policy}
+              evaluation={evaluation}
+              isUnverified={isUnverified}
+            />
 
             <ActuarialInsightsCard
               policy={policy}

@@ -156,5 +156,61 @@ export function matchLabeledField(text: string, field: VehicleFieldName): string
       if (value.length > 0) return value
     }
   }
+
+  // Forward scan yielded nothing. Try the backward fallback for insurer
+  // formats that place the value BEFORE the label on the same line, e.g.
+  // the Allianz Peugeot layout `: PEUGEOT (114)\tMarka Plaka No : ...`.
+  // See scanBackwardForInvertedValue for the strict shape requirements.
+  for (const alias of myAliases) {
+    const globalRe = new RegExp(
+      alias.source,
+      alias.flags.includes('g') ? alias.flags : alias.flags + 'g'
+    )
+    let labelMatch: RegExpExecArray | null
+    while ((labelMatch = globalRe.exec(text)) !== null) {
+      const backValue = scanBackwardForInvertedValue(text, labelMatch.index)
+      if (backValue) return backValue
+    }
+  }
+
   return undefined
+}
+
+/**
+ * Backward fallback for the Allianz inverted `: VALUE\tLabel` layout where
+ * the value precedes the label on the same line. Forward scan from the
+ * label position returns nothing (the char immediately after the label is
+ * another label like `Plaka No :`), so we walk back to the start of the
+ * line and look for a value that sits after a leading `:`.
+ *
+ * Narrow by design: only fires when the line segment before the label
+ * begins with `:` (optionally after whitespace). Any other shape is an
+ * ambiguity risk — for example a line like `Plaka : 34 ABC 12\tMarka`
+ * would otherwise mis-capture the plate value as the make. Returning
+ * `undefined` in the ambiguous cases is safer than a false positive.
+ */
+function scanBackwardForInvertedValue(text: string, labelStart: number): string | undefined {
+  // Walk backwards to the start of the current line.
+  let lineStart = labelStart - 1
+  while (lineStart >= 0 && text[lineStart] !== '\n' && text[lineStart] !== '\r') {
+    lineStart--
+  }
+  lineStart++ // move past the newline to the first char of the line
+
+  // Drop trailing whitespace so the tab/spaces immediately before the label
+  // don't count against us.
+  const segment = text.slice(lineStart, labelStart).replace(/\s+$/, '')
+  if (segment.length === 0) return undefined
+
+  // Require the inverted-format `:` prefix. Anything else (another label,
+  // prose, a different delimiter) is not a confident inverted-value signal.
+  const trimmedStart = segment.replace(/^\s+/, '')
+  if (!trimmedStart.startsWith(':')) return undefined
+
+  const candidate = trimmedStart.slice(1).trim()
+  // Minimum two characters; must start with a capital letter or digit
+  // (values like `PEUGEOT (114)`, `VOLKSWAGEN`, `308`, `2010`).
+  if (candidate.length < 2) return undefined
+  if (!/^[A-ZÇĞİÖŞÜ0-9]/.test(candidate)) return undefined
+  return candidate
 }

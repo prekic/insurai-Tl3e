@@ -16,6 +16,34 @@ export function VehicleInfoCard({ policy }: VehicleInfoCardProps) {
 
   const isCommercial = policy.vehicleInfo.usage?.toLowerCase() === 'commercial'
 
+  // Headline vehicle fields are rendered UNCONDITIONALLY so a parsing failure
+  // surfaces as an explicit "Cannot Verify" row rather than silently missing.
+  // The April 24 human review flagged the silent-hide pattern as a trust bug:
+  // a hidden row looks intentional (as if the policy didn't contain the data),
+  // whereas an empty row signals extraction failure and invites a re-scan.
+  const renderField = (label: string, value: string | number | undefined | null) => {
+    const hasValue =
+      value !== undefined &&
+      value !== null &&
+      (typeof value === 'number' || value.trim().length > 0)
+    return (
+      <div>
+        <p className="text-sm text-gray-500">{label}</p>
+        {hasValue ? (
+          <p className="font-semibold text-gray-900">{value}</p>
+        ) : (
+          <p
+            className="italic text-gray-400"
+            data-testid="vehicle-field-cannot-verify"
+            aria-label={t.policy.cannotVerify}
+          >
+            {t.policy.cannotVerify}
+          </p>
+        )}
+      </div>
+    )
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -41,42 +69,13 @@ export function VehicleInfoCard({ policy }: VehicleInfoCardProps) {
       </CardHeader>
       <CardContent>
         <div className="grid md:grid-cols-2 gap-4">
-          {policy.vehicleInfo.plate && (
-            <div>
-              <p className="text-sm text-gray-500">{t.policy.plate}</p>
-              <p className="font-semibold text-gray-900">{policy.vehicleInfo.plate}</p>
-            </div>
-          )}
-          {policy.vehicleInfo.make && (
-            <div>
-              <p className="text-sm text-gray-500">{t.policy.make}</p>
-              <p className="font-semibold text-gray-900">{policy.vehicleInfo.make}</p>
-            </div>
-          )}
-          {policy.vehicleInfo.model && (
-            <div>
-              <p className="text-sm text-gray-500">{t.policy.model}</p>
-              <p className="font-semibold text-gray-900">{policy.vehicleInfo.model}</p>
-            </div>
-          )}
-          {policy.vehicleInfo.year && (
-            <div>
-              <p className="text-sm text-gray-500">{t.policy.modelYear}</p>
-              <p className="font-semibold text-gray-900">{policy.vehicleInfo.year}</p>
-            </div>
-          )}
-          {policy.vehicleInfo.usage && (
-            <div>
-              <p className="text-sm text-gray-500">{t.policy.usageType}</p>
-              <p className="font-semibold text-gray-900">{policy.vehicleInfo.usage}</p>
-            </div>
-          )}
-          {policy.vehicleInfo.vehicleClass && (
-            <div>
-              <p className="text-sm text-gray-500">{t.policy.vehicleClass}</p>
-              <p className="font-semibold text-gray-900">{policy.vehicleInfo.vehicleClass}</p>
-            </div>
-          )}
+          {renderField(t.policy.plate, policy.vehicleInfo.plate)}
+          {renderField(t.policy.make, policy.vehicleInfo.make)}
+          {renderField(t.policy.model, policy.vehicleInfo.model)}
+          {renderField(t.policy.modelYear, policy.vehicleInfo.year)}
+          {policy.vehicleInfo.usage && renderField(t.policy.usageType, policy.vehicleInfo.usage)}
+          {policy.vehicleInfo.vehicleClass &&
+            renderField(t.policy.vehicleClass, policy.vehicleInfo.vehicleClass)}
         </div>
       </CardContent>
     </Card>

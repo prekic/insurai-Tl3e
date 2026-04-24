@@ -441,6 +441,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     extractionIncomplete: 'Incomplete extraction — re-scan recommended',
     extractionIncompleteDesc:
       'Some headline fields (vehicle make/model/year or coverage details) are missing or unclear. Re-upload a cleaner scan to get a confident grade.',
+    cannotVerify: 'Cannot Verify',
     freeTrialResult: 'Free Trial Result',
     goBack: 'Go Back',
     goToDashboard: 'Go to Dashboard',
