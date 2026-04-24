@@ -79,6 +79,17 @@ export function PolicyScenariosSection({ scenarios }: PolicyScenariosSectionProp
               : scenario.whyItMatters}
           </div>
         )}
+        {((locale === 'tr' ? scenario.caveatTR : scenario.caveat) || scenario.caveat) && (
+          <div
+            className="mt-2 flex gap-2 bg-amber-50 border border-amber-200 rounded p-2 text-xs text-amber-800"
+            role="note"
+          >
+            <span className="font-semibold flex-shrink-0">
+              {locale === 'tr' ? 'İstisna:' : 'Caveat:'}
+            </span>
+            <span>{locale === 'tr' ? scenario.caveatTR || scenario.caveat : scenario.caveat}</span>
+          </div>
+        )}
       </div>
 
       {(scenario.riskAmount || scenario.riskAmountTR) && (

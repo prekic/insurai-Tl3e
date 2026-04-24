@@ -166,6 +166,14 @@ export interface ScenarioCard {
   triggerTR?: string
   whyItMatters?: string
   whyItMattersTR?: string
+  /**
+   * Optional caveat surfaced as a secondary badge under the main card body.
+   * Populated when a coverage that looks generous in aggregate has a
+   * per-scenario cap (e.g. IMM Sınırsız capped at 2.5M TL at airports,
+   * ports, fuel depots, refineries).
+   */
+  caveat?: string
+  caveatTR?: string
 }
 
 export interface Recommendation {

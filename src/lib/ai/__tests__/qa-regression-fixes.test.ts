@@ -266,8 +266,10 @@ describe('P0-4: DAHİL/HARİÇ extraction schema', () => {
     expect(coverageItems.required).toContain('included')
   })
 
-  it('has 13 total coverage properties', () => {
-    expect(Object.keys(coverageItems.properties)).toHaveLength(13)
+  it('has 14 total coverage properties', () => {
+    // v4: added `carveOuts` for per-scenario caps on unlimited coverages
+    // (IMM Sınırsız 2.5M TL at airports/ports etc.). 13 → 14.
+    expect(Object.keys(coverageItems.properties)).toHaveLength(14)
   })
 
   it('included field description mentions DAHİL/HARİÇ', () => {

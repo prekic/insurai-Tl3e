@@ -89,6 +89,64 @@ function matchesIMMPattern(text: string | undefined | null): boolean {
 }
 
 /**
+ * Location keywords that indicate the canonical Artan Mali Sorumluluk
+ * Sınırsız carve-out: unlimited in theory, capped (typically 2.500.000 TL
+ * per event) in specific high-exposure environments.
+ */
+const IMM_CARVEOUT_LOCATION_HINTS = [
+  'havaliman',
+  'liman',
+  'akaryak',
+  'rafineri',
+  'benzin istasyon',
+  'kimyasal',
+  'mühimmat',
+  'tren istasyon',
+  'demiryolu',
+]
+
+/**
+ * Inspect an IMM coverage's evidence fields (clause, quote, and any
+ * carveOuts the LLM populated) for the 2.5M TL airport/port/fuel-depot
+ * carve-out. Returns a short bilingual caveat string when found, else
+ * null.
+ */
+function detectImmCarveOut(
+  coverage: import('@/types/policy').Coverage
+): { en: string; tr: string } | null {
+  const carveOuts = (coverage as { carveOuts?: string[] | null }).carveOuts
+  if (Array.isArray(carveOuts) && carveOuts.length > 0) {
+    const first = carveOuts[0]
+    return {
+      en: `Carve-out: ${first}`,
+      tr: `İstisna: ${first}`,
+    }
+  }
+
+  const haystack =
+    `${coverage.clause ?? ''} ${coverage.quote ?? ''} ${coverage.description ?? ''}`.toLowerCase()
+  if (!haystack.trim()) return null
+
+  const locationHit = IMM_CARVEOUT_LOCATION_HINTS.some((h) => haystack.includes(h))
+  // The amount language is usually "2.500.000" or "2,5 milyon"; catch both.
+  const amountHit = /2[.,\s]*500[.,\s]*000/.test(haystack) || /2[,.]?5\s*milyon/.test(haystack)
+
+  if (locationHit && amountHit) {
+    return {
+      en: 'Capped at 2,500,000 TL per event at airports, ports, fuel depots, refineries, and similar high-exposure locations.',
+      tr: 'Havalimanı, liman, akaryakıt depoları, rafineri ve benzeri yerlerde meydana gelen olaylarda olay başı 2.500.000 TL üst sınırı uygulanır.',
+    }
+  }
+  if (locationHit) {
+    return {
+      en: 'A per-event sub-limit applies at airports, ports, fuel depots, refineries, and similar high-exposure locations — verify the exact cap in the policy.',
+      tr: 'Havalimanı, liman, akaryakıt depoları ve benzeri yerlerde olay başı özel üst sınır uygulanabilir — tutar için poliçeye bakılmalı.',
+    }
+  }
+  return null
+}
+
+/**
  * Check whether a coverage is included in the policy.
  *
  * Insurance documents list coverages that ARE included. The AI extraction
@@ -1883,6 +1941,13 @@ function generateScenarioCards(
 
   if (immCoverage) {
     if (immCoverage.isUnlimited) {
+      // Detect the Artan Mali Sorumluluk Sınırsız carve-out: unlimited IMM
+      // is routinely capped at 2.5M TL per event at airports, ports, fuel
+      // depots, refineries, chemical storage, and similar high-exposure
+      // locations. If the coverage's quote / clause / explicit carveOuts
+      // hint at that pattern, surface it as a caveat badge rather than
+      // claiming the user truly pays 0 TL in every scenario.
+      const carveOutCaveat = detectImmCarveOut(immCoverage)
       cards.push({
         id: 'imm-scenario',
         title: 'At-Fault Major Accident',
@@ -1902,6 +1967,7 @@ function generateScenarioCards(
         whyItMatters: 'IMM protects you from lawsuits when your compulsory insurance runs out.',
         whyItMattersTR:
           'İMM, zorunlu trafik sigortası limitiniz tükendiğinde sizi davalardan korur.',
+        ...(carveOutCaveat ? { caveat: carveOutCaveat.en, caveatTR: carveOutCaveat.tr } : {}),
       })
     } else {
       const limitStr = formatTRY(immCoverage.limit)
