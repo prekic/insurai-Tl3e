@@ -18,9 +18,11 @@ import { evaluateDisplayMode } from '../review-thresholds'
 import { normalizeBranchExtraction } from '@/lib/ai/extraction-normalizer'
 import type { ExtractedPolicyData } from '@/lib/ai/extraction-schema'
 
+// v4: "unlimited" / "sınırsız" are NOT prohibited — they're legitimate
+// structural descriptors (IMM Sınırsız). The carve-out caveat pattern is
+// surfaced separately; destroying the signal broke user trust.
 const PROHIBITED_PHRASES = [
   'no deductible',
-  'unlimited',
   'fully covered',
   'tam kapsamlı',
   'guaranteed',
@@ -32,7 +34,6 @@ const PROHIBITED_PHRASES = [
   'fully compliant',
   'muafiyetsiz',
   'tamamen kapsar',
-  'sınırsız',
 ]
 
 // ============================================================================
@@ -371,10 +372,14 @@ describe('Phase 8C: KASKO Real-Document Validation', () => {
       expect(hasCondDeductible).toBe(true)
     })
 
-    it('unlimited IMM suppressed in display', () => {
+    it('unlimited IMM signal is preserved in display (v4)', () => {
+      // v4 change: preserve the Sınırsız / Unlimited signal in structural
+      // limit fields so users see the headline IMM feature. Carve-outs
+      // (e.g. 2.5M TL at airports/ports) are surfaced as separate caveat
+      // badges, not by erasing the "Sınırsız" value.
       const summaryText = JSON.stringify(r.summary).toLowerCase()
-      expect(summaryText).not.toContain('sınırsız')
-      expect(summaryText).not.toContain('unlimited')
+      // The hedge-string placeholder from v3 must NOT be rendered as content.
+      expect(summaryText).not.toContain('coverage subject to sublimits')
     })
 
     it('cam kırılması service distinction preserved', () => {
@@ -440,10 +445,11 @@ describe('Phase 8C: KASKO Real-Document Validation', () => {
       expect(r.normalized.coverages?.some((c) => c.isMarketValue)).toBe(true)
     })
 
-    it('unlimited suppressed', () => {
+    it('legacy sublimits hedge-string is not rendered (v4)', () => {
+      // v4: preserve Sınırsız / Unlimited signal; only suppress the v3
+      // placeholder string that was destroying the signal.
       const t = JSON.stringify(r.summary).toLowerCase()
-      expect(t).not.toContain('sınırsız')
-      expect(t).not.toContain('unlimited')
+      expect(t).not.toContain('coverage subject to sublimits')
     })
 
     it('at least 3 coverages', () => {

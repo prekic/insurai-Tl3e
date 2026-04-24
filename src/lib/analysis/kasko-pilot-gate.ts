@@ -393,11 +393,39 @@ export function createPilotQARecord(
 }
 
 /**
+ * Phrases that indicate a coverage row is rendering legacy hedge-string
+ * placeholders as content. If any coverage's name or limit matches, we flag
+ * the extraction as incomplete instead of confidently grading it.
+ */
+const COVERAGE_PLACEHOLDER_PATTERNS = [
+  /coverage subject to sublimits/i,
+  /subject to sublimits and specific carve-outs/i,
+] as const
+
+function hasCoveragePlaceholder(coverages: unknown[] | undefined): boolean {
+  if (!coverages) return false
+  for (const c of coverages) {
+    if (!c || typeof c !== 'object') continue
+    const cov = c as { name?: unknown; limit?: unknown }
+    const name = typeof cov.name === 'string' ? cov.name : ''
+    const limit = typeof cov.limit === 'string' ? cov.limit : ''
+    for (const pat of COVERAGE_PLACEHOLDER_PATTERNS) {
+      if (pat.test(name) || pat.test(limit)) return true
+    }
+  }
+  return false
+}
+
+/**
  * Lightweight display mode evaluator for pilot QA records.
  * Uses data available at extraction time (confidence, extracted data fields)
  * without requiring the full ValidationResult / AnalysisBundle types.
  *
- * Returns display mode and trigger rules for the QA record.
+ * Returns display mode and trigger rules for the QA record. v4 adds vehicle
+ * completeness and coverage-placeholder detection so that the Overall Grade
+ * UI gates to "Incomplete — re-scan recommended" when headline fields like
+ * Make / Model / Year are blank, or when any coverage row still contains
+ * the legacy hedge-string placeholder text.
  */
 export function evaluateSimpleDisplayMode(
   confidenceScore: number,
@@ -405,6 +433,14 @@ export function evaluateSimpleDisplayMode(
     policyNumber?: string | null
     provider?: string | null
     coverages?: unknown[]
+    /** Vehicle info for kasko/traffic policies — triggers completeness gate. */
+    vehicle?: {
+      make?: string | null
+      model?: string | null
+      year?: number | null
+    } | null
+    /** Policy type — "kasko" / "traffic" / etc. Controls vehicle-field strictness. */
+    policyType?: string | null
   }
 ): { mode: 'full' | 'restricted' | 'human_review_required'; triggers: string[] } {
   const triggers: string[] = []
@@ -431,6 +467,40 @@ export function evaluateSimpleDisplayMode(
   // No coverages extracted → restricted
   if (!extractedData.coverages || extractedData.coverages.length === 0) {
     triggers.push('NO_COVERAGES_EXTRACTED')
+  }
+
+  // Vehicle completeness — only enforced for kasko (traffic insurance can omit
+  // make/model when only the plate is on the declarations page).
+  if (extractedData.policyType === 'kasko' && extractedData.vehicle !== undefined) {
+    const v = extractedData.vehicle ?? {}
+    const make = typeof v.make === 'string' ? v.make.trim() : ''
+    const model = typeof v.model === 'string' ? v.model.trim() : ''
+    const year = typeof v.year === 'number' ? v.year : null
+
+    if (make.length < 2) {
+      triggers.push('MISSING_VEHICLE_MAKE')
+    }
+    // Reject single-char / known label-leak values like "No" or "Hayır" that
+    // indicate a parser failure leaked field-label text into the model value.
+    const modelLower = model.toLowerCase()
+    if (
+      model.length < 2 ||
+      modelLower === 'no' ||
+      modelLower === 'hayır' ||
+      modelLower === 'hayir'
+    ) {
+      triggers.push('MISSING_VEHICLE_MODEL')
+    }
+    if (year === null) {
+      triggers.push('MISSING_VEHICLE_YEAR')
+    }
+  }
+
+  // Coverage placeholder detection — catches policies that slipped through the
+  // v3 pipeline with the legacy "Coverage subject to sublimits..." hedge string
+  // as a coverage value. We should never render that as content.
+  if (hasCoveragePlaceholder(extractedData.coverages)) {
+    triggers.push('COVERAGE_PLACEHOLDER_DETECTED')
   }
 
   if (triggers.length > 0) {

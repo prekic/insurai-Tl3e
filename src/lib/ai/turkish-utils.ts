@@ -5,6 +5,8 @@
  * Handles date formats, currency, character normalization, and field matching.
  */
 
+import { matchLabeledField } from '../../../shared/field-aliases'
+
 // =============================================================================
 // TURKISH CHARACTER NORMALIZATION
 // =============================================================================
@@ -351,9 +353,14 @@ export function parseTurkishPlate(plateStr: string): {
 // =============================================================================
 
 /**
- * Extract vehicle metadata (make, model, year, plate, chassis) from raw
- * Turkish kasko policy text. Uses regex patterns matching common section
- * labels: "Marka", "Tip", "Model Yılı", "Plaka", "Şasi No".
+ * Extract vehicle metadata (make, model, year, plate, engine no, chassis no)
+ * from raw Turkish kasko policy text.
+ *
+ * Labels vary across insurers (`Model Yılı` / `Model Bilgisi` / `İmal Yılı` /
+ * `Üretim Yılı`, `Marka` / `MARKASI/TİPİ`, `Şasi No` / `VIN`, etc.), so this
+ * delegates to `matchLabeledField()` which iterates the canonical alias table
+ * in `shared/field-aliases.ts`. Adding a new insurer format is typically a
+ * one-line alias addition.
  *
  * Returns undefined if no fields could be extracted.
  */
@@ -363,6 +370,7 @@ export function extractVehicleInfoFromText(rawText: string):
       model?: string
       year?: number
       plate?: string
+      engineNo?: string
       chassisNo?: string
     }
   | undefined {
@@ -373,10 +381,11 @@ export function extractVehicleInfoFromText(rawText: string):
     model?: string
     year?: number
     plate?: string
+    engineNo?: string
     chassisNo?: string
   } = {}
 
-  // Plate — already-existing PLATE_PATTERN
+  // Plate — standalone TR plate pattern (no label required).
   const plateMatch = rawText.match(/\b(\d{2})\s*([A-Z]{1,3})\s*(\d{1,4})\b/)
   if (plateMatch) {
     const cityNum = parseInt(plateMatch[1], 10)
@@ -385,59 +394,51 @@ export function extractVehicleInfoFromText(rawText: string):
     }
   }
 
-  // Make — "Marka", "Marka/Tip", or "MARKASI/TİPİ" followed by value
-  // e.g. "Marka : PEUGEOT", "MARKASI/TİPİ: IVECO/KAMYON 80-12"
-  // Allow wide spacing (column-aligned layouts) between colon and value.
-  const makeMatch = rawText.match(
-    /Marka(?:s[ıi])?\s*(?:\/\s*T[iİ]p[iİ]?)?\s*[:.]?\s{0,50}([A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜa-zçğıöşü\d\s.\-/]{1,80})/i
-  )
-  if (makeMatch) {
-    const raw = makeMatch[1].trim()
-    // Take the first word as make (e.g., "PEUGEOT" from "PEUGEOT 308 COMFORT")
-    const parts = raw.split(/\s+/)
-    if (parts[0] && parts[0].length >= 2 && parts[0].length <= 25) {
-      result.make = parts[0]
-      // Take the rest as model if reasonable length
-      if (parts.length > 1) {
-        const modelStr = parts
-          .slice(1)
-          .join(' ')
-          .replace(/[\n\r,.;:].*/, '')
-          .trim()
-        if (modelStr.length >= 1 && modelStr.length <= 60) {
-          result.model = modelStr
-        }
+  // Make — first word of the labeled value.
+  const rawMake = matchLabeledField(rawText, 'make')
+  if (rawMake) {
+    const firstWord = rawMake.split(/\s+/)[0]
+    if (firstWord && firstWord.length >= 2 && firstWord.length <= 25) {
+      result.make = firstWord
+    }
+  }
+
+  // Model — from the dedicated `Model:` / `Tip:` / `Trim:` label.
+  // The alias excludes `Model Yılı` / `Model Bilgisi` / bare `Model: <year>`
+  // so year-bearing labels don't poison the model value.
+  const rawModel = matchLabeledField(rawText, 'model')
+  if (rawModel) {
+    const cleaned = rawModel.replace(/[\n\r,;].*/, '').trim()
+    if (cleaned.length >= 1 && cleaned.length <= 60) {
+      result.model = cleaned
+    }
+  }
+
+  // Model year — accepts Model Yılı / Model Bilgisi / İmal Yılı / Üretim Yılı /
+  // Model Year / Araç Yılı / bare `MODEL: <year>`.
+  const rawYear = matchLabeledField(rawText, 'modelYear')
+  if (rawYear) {
+    const y = rawYear.match(/\b(\d{4})\b/)
+    if (y) {
+      const yr = parseInt(y[1], 10)
+      if (yr >= 1950 && yr <= new Date().getFullYear() + 1) {
+        result.year = yr
       }
     }
   }
 
-  // Standalone Tip / Model field — "Tip : 308 COMFORT 1.6"
-  if (!result.model) {
-    const tipMatch = rawText.match(
-      /(?:^|\n)\s*Tip\s*[:.]?\s*([A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜa-zçğıöşü\d\s.\-/]{1,60})/i
-    )
-    if (tipMatch) {
-      const cleaned = tipMatch[1].replace(/[\n\r,.;:].*/, '').trim()
-      if (cleaned.length >= 2 && cleaned.length <= 60) {
-        result.model = cleaned
-      }
-    }
+  // Engine / motor number — `Motor No: CZE307964` and variants.
+  const rawEngine = matchLabeledField(rawText, 'motorNo')
+  if (rawEngine) {
+    const m = rawEngine.match(/\b([A-Z0-9]{5,20})\b/i)
+    if (m) result.engineNo = m[1].toUpperCase()
   }
 
-  // Model year — "Model Yılı : 2010", "Model Bilgisi: 2016", or standalone "MODEL: 1997"
-  // (handle dotless İ + various separators + wide spacing)
-  const yearMatch = rawText.match(/Model\s*(?:Bilgisi|Y[ıi]l[ıi]?)?\s*[:.]?\s{0,50}(\d{4})/i)
-  if (yearMatch) {
-    const yr = parseInt(yearMatch[1], 10)
-    if (yr >= 1950 && yr <= new Date().getFullYear() + 1) {
-      result.year = yr
-    }
-  }
-
-  // Chassis — "Şasi No : VF34..." or "Sasi No"
-  const chassisMatch = rawText.match(/[ŞS]asi\s*(?:No)?\s*[:.]?\s*([A-Z0-9]{6,20})/i)
-  if (chassisMatch) {
-    result.chassisNo = chassisMatch[1].toUpperCase()
+  // Chassis / VIN — `Şasi No: WVGZZZ5NZHW862628` and variants.
+  const rawChassis = matchLabeledField(rawText, 'chassisNo')
+  if (rawChassis) {
+    const m = rawChassis.match(/\b([A-Z0-9]{6,20})\b/i)
+    if (m) result.chassisNo = m[1].toUpperCase()
   }
 
   return Object.keys(result).length > 0 ? result : undefined

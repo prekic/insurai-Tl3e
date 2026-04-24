@@ -25,9 +25,12 @@ import { generateDisplaySafeSummary } from '../display-interpreter'
 import { evaluateDisplayMode } from '../review-thresholds'
 import { normalizeBranchExtraction } from '@/lib/ai/extraction-normalizer'
 
+// v4: "unlimited" and "sınırsız" were intentionally removed from the
+// prohibited list. They're legitimate structural descriptors (IMM Sınırsız,
+// Artan Mali Sorumluluk Sınırsız). Hedging them destroyed signals users
+// needed; carve-outs now surface as separate caveat badges.
 const PROHIBITED_PHRASES = [
   'no deductible',
-  'unlimited',
   'fully covered',
   'tam kapsamlı',
   'guaranteed',
@@ -39,7 +42,6 @@ const PROHIBITED_PHRASES = [
   'fully compliant',
   'muafiyetsiz',
   'tamamen kapsar',
-  'sınırsız',
 ]
 
 function getDisplayOutput(sample: PilotSample) {

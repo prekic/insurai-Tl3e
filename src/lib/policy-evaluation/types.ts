@@ -81,6 +81,12 @@ export interface PolicyEvaluation {
   overallScore: number // 0-100
   grade: EvaluationGrade
   isProvisional?: boolean
+  /** True when extraction produced missing/placeholder values for headline fields
+   *  (e.g. vehicle make/model blank, coverage rows contain legacy hedge strings).
+   *  When set, UI gates the letter grade to "Incomplete — re-scan recommended". */
+  extractionIncomplete?: boolean
+  /** Trigger codes from the extraction completeness gate (for audit / debugging). */
+  extractionGateTriggers?: string[]
   status: EvaluationStatus
 
   // Category scores

@@ -438,6 +438,9 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     expiredStatus: 'Expired',
     pendingStatus: 'Pending Review',
     draftStatus: 'Draft',
+    extractionIncomplete: 'Incomplete extraction — re-scan recommended',
+    extractionIncompleteDesc:
+      'Some headline fields (vehicle make/model/year or coverage details) are missing or unclear. Re-upload a cleaner scan to get a confident grade.',
     freeTrialResult: 'Free Trial Result',
     goBack: 'Go Back',
     goToDashboard: 'Go to Dashboard',

@@ -396,6 +396,8 @@ export const SKELETON_TRANSLATIONS: TranslationDictionary = {
     expiredStatus: '',
     pendingStatus: '',
     draftStatus: '',
+    extractionIncomplete: '',
+    extractionIncompleteDesc: '',
     freeTrialResult: '',
     goBack: '',
     goToDashboard: '',

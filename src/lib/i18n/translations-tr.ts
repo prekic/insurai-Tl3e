@@ -444,6 +444,9 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     expiredStatus: 'Süresi Dolmuş',
     pendingStatus: 'İnceleme Bekliyor',
     draftStatus: 'Taslak',
+    extractionIncomplete: 'Eksik çıkarım — yeniden tarama önerilir',
+    extractionIncompleteDesc:
+      'Bazı temel alanlar (araç marka/model/yıl veya teminat detayları) eksik ya da net değil. Güvenilir bir not alabilmek için daha temiz bir tarama yükleyin.',
     freeTrialResult: 'Ücretsiz Deneme Sonucu',
     goBack: 'Geri Dön',
     goToDashboard: 'Gösterge Paneline Git',

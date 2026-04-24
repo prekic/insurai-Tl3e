@@ -183,14 +183,18 @@ describe('formatCoverageTotalForReview', () => {
 // ── Coverage item limit cascade ─────────────────────────────────────
 
 describe('formatCoverageItemLimitForReview', () => {
-  it('returns safe-worded unlimited text for isUnlimited in TR', () => {
+  it('returns "Sınırsız" for isUnlimited in TR without hedging', () => {
     // @ts-expect-error - mismatch due to schema update
     const c: Coverage = { name: 'Test', limit: 0, deductible: 0, included: true, isUnlimited: true }
-    // applySafeWording replaces "Sınırsız" with hedged phrasing
-    const result = formatCoverageItemLimitForReview(c, 'tr')
-    expect(result).not.toBe('Sınırsız')
-    expect(typeof result).toBe('string')
-    expect(result.length).toBeGreaterThan(0)
+    // v4: preserve the structural "Sınırsız" signal. Carve-outs surface as
+    // separate caveats, not by replacing the limit value with hedged phrasing.
+    expect(formatCoverageItemLimitForReview(c, 'tr')).toBe('Sınırsız')
+  })
+
+  it('returns "Unlimited" for isUnlimited in EN without hedging', () => {
+    // @ts-expect-error - mismatch due to schema update
+    const c: Coverage = { name: 'Test', limit: 0, deductible: 0, included: true, isUnlimited: true }
+    expect(formatCoverageItemLimitForReview(c, 'en')).toBe('Unlimited')
   })
 
   it('returns "Market Value" for isMarketValue in EN', () => {
@@ -217,15 +221,15 @@ describe('formatCoverageItemLimitForReview', () => {
     expect(formatCoverageItemLimitForReview(c, 'en')).toContain('500')
   })
 
-  it('applies applySafeWording to result', () => {
-    // "Sınırsız" is promotional — applySafeWording replaces it
+  it('does NOT run structural limit values through applySafeWording', () => {
+    // v4: "Sınırsız" / "Unlimited" / "Dahil" / "Rayiç Değer" / numeric limits
+    // are structural labels, not promotional narrative. Hedging them destroyed
+    // the signals users relied on (IMM Sınırsız headline feature). Narrative
+    // insights still go through applySafeWording on a separate path.
     // @ts-expect-error - mismatch due to schema update
     const c: Coverage = { name: 'Test', limit: 0, deductible: 0, included: true, isUnlimited: true }
-    const result = formatCoverageItemLimitForReview(c, 'tr')
-    expect(result).not.toBe('Sınırsız')
-    // EN "Unlimited" should also be safe-worded
-    const resultEn = formatCoverageItemLimitForReview(c, 'en')
-    expect(typeof resultEn).toBe('string')
+    expect(formatCoverageItemLimitForReview(c, 'tr')).toBe('Sınırsız')
+    expect(formatCoverageItemLimitForReview(c, 'en')).toBe('Unlimited')
   })
 })
 

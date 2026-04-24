@@ -55,7 +55,6 @@ const validValidation: ValidationResult = { isValid: true, flags: [] }
 describe('checkProhibitedPhrase', () => {
   it.each([
     ['no deductible'],
-    ['unlimited'],
     ['fully covered'],
     ['tam kapsamlı'],
     ['guaranteed'],
@@ -66,10 +65,21 @@ describe('checkProhibitedPhrase', () => {
     ['fully compliant'],
     ['muafiyetsiz'],
     ['tamamen kapsar'],
-    ['sınırsız'],
   ])('blocks prohibited phrase: "%s"', (phrase) => {
     expect(checkProhibitedPhrase(`This policy is ${phrase} for all scenarios`)).toBe(phrase)
   })
+
+  // v4: "unlimited" / "sınırsız" are NOT prohibited — they're legitimate
+  // structural descriptors when a coverage actually is unlimited (IMM Sınırsız).
+  // Hedging them blindly destroyed signals users rely on; narrative-level
+  // promotional patterns are caught by the more specific multi-word rules in
+  // applySafeWording.
+  it.each([['unlimited'], ['sınırsız'], ['Sınırsız'], ['Unlimited']])(
+    'does NOT block legitimate structural descriptor: "%s"',
+    (phrase) => {
+      expect(checkProhibitedPhrase(`Liability coverage: ${phrase}`)).toBeNull()
+    }
+  )
 
   it('allows safe text through', () => {
     expect(
@@ -116,7 +126,7 @@ describe('generateDisplaySafeSummary', () => {
     expect(kaskoCov!.statementType).toBe('conditional_from_policy')
   })
 
-  it('KASKO: unlimited-with-carve-out renders as conditional/narrowed wording', () => {
+  it('KASKO: unlimited coverage renders the Sınırsız signal + limit_conditional marker', () => {
     const data = makeKaskoData({
       // @ts-expect-error - mismatch due to schema update
       coverages: [{ name: 'Kasko', isMarketValue: true, isUnlimited: true, deductible: 0 }],
@@ -126,9 +136,11 @@ describe('generateDisplaySafeSummary', () => {
 
     const kaskoCov = summary.keyCoverageCards.find((c) => c.coverageName === 'Kasko')
     expect(kaskoCov).toBeDefined()
-    // Must NOT say "unlimited"
-    expect(kaskoCov!.limit!.toLowerCase()).not.toContain('unlimited')
-    expect(kaskoCov!.limit).toContain('subject to sublimits')
+    // We intentionally preserve the "Sınırsız" signal instead of replacing it
+    // with a hedge string — carve-outs (e.g. 2.5M TL cap at airports on IMM)
+    // surface as a separate caveat, not by destroying the limit value.
+    expect(kaskoCov!.limit).toContain('Sınırsız')
+    expect(kaskoCov!.limit!.toLowerCase()).not.toContain('subject to sublimits')
     expect(kaskoCov!.conditionMarkers).toContain('limit_conditional')
   })
 

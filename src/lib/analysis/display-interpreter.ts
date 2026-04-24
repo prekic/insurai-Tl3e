@@ -38,9 +38,18 @@ function dedup<T extends { title: string }>(cards: T[]): T[] {
 // WORKSTREAM C: WORDING GOVERNANCE — PROHIBITED PHRASES
 // ============================================================================
 
+// NOTE: "unlimited" and "sınırsız" are NOT in this list. They are legitimate
+// structural descriptors when a coverage actually is unlimited (e.g. IMM
+// Sınırsız / Artan Mali Sorumluluk). The earlier blanket-hedging of these
+// words in coverage cards produced user-hostile output like "Liability —
+// Limit: Coverage subject to sublimits and specific carve-outs". Carve-outs
+// (e.g. 2.5M TL cap at airports/ports on IMM Sınırsız) are surfaced as a
+// separate caveat badge on the scenario card, not by replacing the limit
+// value. Narrative-level promotional patterns ("mükemmel kapsamlı kasko
+// teminatı ... sınırsız koruma") are still caught below via the specific
+// multi-word patterns in applySafeWording.
 const PROHIBITED_PHRASES = [
   'no deductible',
-  'unlimited',
   'fully covered',
   'tam kapsamlı',
   'guaranteed',
@@ -52,7 +61,6 @@ const PROHIBITED_PHRASES = [
   'fully compliant',
   'muafiyetsiz',
   'tamamen kapsar',
-  'sınırsız',
   'tam koruma',
   'mükemmel',
 ]
@@ -78,7 +86,12 @@ export function applySafeWording(text: string): string {
   let safe = text
   const replacements: [RegExp, string][] = [
     [/\bno deductible\b/gi, 'Deductible treatment depends on the specific scenario'],
-    [/\bunlimited\b/gi, 'Coverage subject to sublimits and specific carve-outs'],
+    // NOTE: We intentionally do NOT replace "unlimited" / "Sınırsız" here.
+    // Rewriting a headline coverage feature into a hedge string ("Coverage
+    // subject to sublimits...") destroyed the signal users needed. When a
+    // coverage is truly unlimited, render it as such; any carve-outs (e.g.
+    // the "2.5M TL at airports/ports" cap on IMM Sınırsız) are surfaced as a
+    // separate caveat badge attached to the scenario card, not here.
     [/\bfully covered\b/gi, 'Policy wording indicates coverage, subject to conditions'],
     [/\btam kapsamlı\b/gi, 'Poliçe kapsamı koşullara bağlıdır'],
     [/\bguaranteed\b/gi, 'Policy wording indicates this protection, subject to conditions'],
@@ -269,11 +282,12 @@ function buildCoverageCards(
       conditionMarkers.push('deductible_conditional')
     }
 
-    // Limit wording
+    // Limit wording — preserve the "Sınırsız" signal. Carve-outs (e.g. the
+    // 2.5M TL cap on IMM Sınırsız at airports/ports) are attached to the
+    // scenario card as a separate caveat, not blended into the limit value.
     let limitStr: string | undefined
     if (cov.isUnlimited) {
-      // Use safe wording — consistent with unlimited reconciliation
-      limitStr = 'Coverage subject to sublimits and specific carve-outs'
+      limitStr = 'Sınırsız'
       conditionMarkers.push('limit_conditional')
     } else if (cov.limit) {
       limitStr = `${cov.limit.toLocaleString('tr-TR')} TRY`
@@ -779,7 +793,7 @@ function missCard(
 }
 
 function limStr(c: { limit?: number | null; isUnlimited?: boolean }): string | undefined {
-  if (c.isUnlimited) return 'Coverage subject to sublimits and specific carve-outs'
+  if (c.isUnlimited) return 'Sınırsız'
   if (c.limit) return `${c.limit.toLocaleString('tr-TR')} TRY`
   return undefined
 }

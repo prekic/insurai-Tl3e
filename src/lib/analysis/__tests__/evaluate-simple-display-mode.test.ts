@@ -143,4 +143,119 @@ describe('evaluateSimpleDisplayMode', () => {
     expect(result.mode).toBe('restricted')
     expect(result.triggers).toContain('MISSING_POLICY_NUMBER')
   })
+
+  // ────────────────────────────────────────────────────────────────────────
+  // v4: vehicle + placeholder completeness gate
+  // ────────────────────────────────────────────────────────────────────────
+
+  it('flags MISSING_VEHICLE_MAKE when kasko policy has blank make', () => {
+    const result = evaluateSimpleDisplayMode(0.9, {
+      policyNumber: 'POL-001',
+      provider: 'Anadolu',
+      coverages: [{ name: 'Collision' }],
+      vehicle: { make: '', model: 'TIGUAN', year: 2016 },
+      policyType: 'kasko',
+    })
+    expect(result.mode).toBe('restricted')
+    expect(result.triggers).toContain('MISSING_VEHICLE_MAKE')
+  })
+
+  it('flags MISSING_VEHICLE_MODEL when kasko policy has "No" as model (label leak)', () => {
+    const result = evaluateSimpleDisplayMode(0.9, {
+      policyNumber: 'POL-001',
+      provider: 'Anadolu',
+      coverages: [{ name: 'Collision' }],
+      vehicle: { make: 'VOLKSWAGEN', model: 'No', year: 2016 },
+      policyType: 'kasko',
+    })
+    expect(result.mode).toBe('restricted')
+    expect(result.triggers).toContain('MISSING_VEHICLE_MODEL')
+  })
+
+  it('flags MISSING_VEHICLE_YEAR when kasko policy has null year', () => {
+    const result = evaluateSimpleDisplayMode(0.9, {
+      policyNumber: 'POL-001',
+      provider: 'Anadolu',
+      coverages: [{ name: 'Collision' }],
+      vehicle: { make: 'VOLKSWAGEN', model: 'TIGUAN', year: null },
+      policyType: 'kasko',
+    })
+    expect(result.mode).toBe('restricted')
+    expect(result.triggers).toContain('MISSING_VEHICLE_YEAR')
+  })
+
+  it('does NOT enforce vehicle completeness for non-kasko policy types', () => {
+    const result = evaluateSimpleDisplayMode(0.9, {
+      policyNumber: 'POL-001',
+      provider: 'Anadolu',
+      coverages: [{ name: 'Collision' }],
+      vehicle: { make: '', model: '', year: null },
+      policyType: 'home',
+    })
+    expect(result.mode).toBe('full')
+    expect(result.triggers.some((t) => t.startsWith('MISSING_VEHICLE_'))).toBe(false)
+  })
+
+  it('does NOT enforce vehicle completeness when vehicle is undefined (backwards compat)', () => {
+    const result = evaluateSimpleDisplayMode(0.9, {
+      policyNumber: 'POL-001',
+      provider: 'Anadolu',
+      coverages: [{ name: 'Collision' }],
+      policyType: 'kasko',
+    })
+    expect(result.mode).toBe('full')
+    expect(result.triggers.some((t) => t.startsWith('MISSING_VEHICLE_'))).toBe(false)
+  })
+
+  it('flags COVERAGE_PLACEHOLDER_DETECTED when a coverage name contains legacy hedge string', () => {
+    const result = evaluateSimpleDisplayMode(0.9, {
+      policyNumber: 'POL-001',
+      provider: 'Anadolu',
+      coverages: [
+        { name: 'Collision', limit: 500000 },
+        { name: 'Coverage subject to sublimits and specific carve-outs', limit: 1000000 },
+      ],
+    })
+    expect(result.mode).toBe('restricted')
+    expect(result.triggers).toContain('COVERAGE_PLACEHOLDER_DETECTED')
+  })
+
+  it('flags COVERAGE_PLACEHOLDER_DETECTED when a coverage limit is the hedge string', () => {
+    const result = evaluateSimpleDisplayMode(0.9, {
+      policyNumber: 'POL-001',
+      provider: 'Anadolu',
+      coverages: [
+        { name: 'Liability', limit: 'Coverage subject to sublimits and specific carve-outs' },
+      ],
+    })
+    expect(result.mode).toBe('restricted')
+    expect(result.triggers).toContain('COVERAGE_PLACEHOLDER_DETECTED')
+  })
+
+  it('accumulates vehicle + placeholder triggers together', () => {
+    const result = evaluateSimpleDisplayMode(0.9, {
+      policyNumber: 'POL-001',
+      provider: 'Anadolu',
+      coverages: [{ name: 'Coverage subject to sublimits...' }],
+      vehicle: { make: '', model: 'No', year: null },
+      policyType: 'kasko',
+    })
+    expect(result.mode).toBe('restricted')
+    expect(result.triggers).toContain('MISSING_VEHICLE_MAKE')
+    expect(result.triggers).toContain('MISSING_VEHICLE_MODEL')
+    expect(result.triggers).toContain('MISSING_VEHICLE_YEAR')
+    expect(result.triggers).toContain('COVERAGE_PLACEHOLDER_DETECTED')
+  })
+
+  it('returns "full" for a kasko policy with complete vehicle info + clean coverages', () => {
+    const result = evaluateSimpleDisplayMode(0.9, {
+      policyNumber: 'POL-001',
+      provider: 'Anadolu',
+      coverages: [{ name: 'Collision' }],
+      vehicle: { make: 'VOLKSWAGEN', model: 'TIGUAN 1.4 TSI', year: 2016 },
+      policyType: 'kasko',
+    })
+    expect(result.mode).toBe('full')
+    expect(result.triggers).toEqual([])
+  })
 })

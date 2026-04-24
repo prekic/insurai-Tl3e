@@ -41,6 +41,7 @@ import {
 
 import { KASKO_COMMERCIAL_BENCHMARKS } from '@/data/market-data/benchmarks'
 import { inferIndustryFromInsuredName } from '../ai/turkish-utils'
+import { evaluateSimpleDisplayMode } from '../analysis/kasko-pilot-gate'
 
 /**
  * Safely format a numeric value as Turkish Lira string.
@@ -472,6 +473,32 @@ export function evaluatePolicy(
     recommendations
   )
 
+  // Extraction completeness gate — blank vehicle fields or legacy placeholder
+  // coverage rows downgrade the grade to provisional and surface the reason
+  // via extractionGateTriggers. See evaluateSimpleDisplayMode() for the full
+  // trigger list. This is the single chokepoint for "the extraction produced
+  // output that isn't trustworthy enough to show a confident letter grade".
+  const gateResult = evaluateSimpleDisplayMode(
+    (policy as { aiConfidence?: number }).aiConfidence ?? 1,
+    {
+      policyNumber: policy.policyNumber,
+      provider: policy.provider,
+      coverages: policy.coverages as unknown[],
+      vehicle: analyzedPolicy.vehicleInfo
+        ? {
+            make: analyzedPolicy.vehicleInfo.make,
+            model: analyzedPolicy.vehicleInfo.model,
+            year: analyzedPolicy.vehicleInfo.year,
+          }
+        : null,
+      policyType: policy.type,
+    }
+  )
+  const extractionCompletenessTriggers = gateResult.triggers.filter(
+    (t) => t.startsWith('MISSING_VEHICLE_') || t === 'COVERAGE_PLACEHOLDER_DETECTED'
+  )
+  const extractionIncomplete = extractionCompletenessTriggers.length > 0
+
   return {
     policyId: policy.id,
     policyNumber: policy.policyNumber,
@@ -484,8 +511,12 @@ export function evaluatePolicy(
       (policy as { isDraft?: boolean }).isDraft ||
       ((policy as { aiConfidence?: number }).aiConfidence ?? 1) < 0.85 ||
       !benchmarkForDate ||
-      benchmarkForDate.benchmarkStatus === 'untrusted'
+      benchmarkForDate.benchmarkStatus === 'untrusted' ||
+      extractionIncomplete
     ),
+    extractionIncomplete: extractionIncomplete || undefined,
+    extractionGateTriggers:
+      extractionCompletenessTriggers.length > 0 ? extractionCompletenessTriggers : undefined,
     status: getStatusFromScore(overallScore, statusThresholds),
 
     scoreBreakdown: {
