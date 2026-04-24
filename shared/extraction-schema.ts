@@ -166,10 +166,16 @@ export const EXTRACTION_JSON_SCHEMA = {
               description:
                 'Verbatim quote of the coverage limit, deductible, or inclusion status as written in the text. Essential for grounding.',
             },
+            carveOuts: {
+              type: ['array', 'null'],
+              items: { type: 'string' },
+              description:
+                'Optional list of carve-outs / exceptions that apply to this coverage (e.g. "Artan Mali Sorumluluk Sınırsız Teminatı Klozu — havalimanı, liman, akaryakıt deposu, rafineri ve benzeri yerlerde meydana gelen olaylar için azami 2.500.000 TL"). Use only when the policy text explicitly narrows an otherwise-unlimited or wide coverage in specific scenarios. Return null or [] when no carve-out applies.',
+            },
           },
           // STRICT MODE: ALL properties must be in required (Issue #331).
-          // limit, deductible, description, category are nullable types so the
-          // LLM can return null when it can't determine a value.
+          // limit, deductible, description, category, carveOuts are nullable
+          // types so the LLM can return null when it can't determine a value.
           required: [
             'name',
             'nameTr',
@@ -184,11 +190,12 @@ export const EXTRACTION_JSON_SCHEMA = {
             'page',
             'clause',
             'quote',
+            'carveOuts',
           ],
           additionalProperties: false,
         },
         description:
-          'List of coverage items. IMPORTANT: Set isUnlimited=true for "Sınırsız", isMarketValue=true for "Rayiç Değer".',
+          'List of coverage items. IMPORTANT: Set isUnlimited=true for "Sınırsız", isMarketValue=true for "Rayiç Değer". Populate carveOuts when a coverage is explicitly capped for specific scenarios (airports, fuel depots, etc. on IMM Sınırsız is the canonical case).',
       },
       specialConditions: {
         type: 'array',

@@ -32,6 +32,91 @@ import {
 import { generateAIInsightsAsync, generateMarketComparisonAsync } from './policy-extractor'
 
 /**
+ * Headers that precede an Ek Sözleşme Maddeleri bulleted list in Turkish
+ * kasko policies. Different insurers phrase the preamble differently, but
+ * they all produce a bulleted block of add-on coverages afterwards.
+ */
+const EK_SOZLESME_HEADERS: RegExp[] = [
+  /ek\s*s[öo]zle[şs]me\s*maddeler[iİ]?/i,
+  /ek\s*teminat(?:lar)?\s*(?:listesi)?/i,
+  /ek\s*s[öo]zle[şs]meyle\s*teminat\s*kapsam[ıi]na\s*d[aâ]hil/i,
+  /genel\s*[şs]artlar['’]?a?\s*g[öo]re\s*ek\s*s[öo]zle[şs]me/i,
+]
+
+/**
+ * Extract bulleted Ek Sözleşme / additional-coverage entries from the raw
+ * policy text. Returns canonical short names (first 80 chars before a
+ * comma/paren, trimmed).
+ *
+ * Bullet markers vary across pdf-parse output: `•`, `●`, `·`, `-`, and
+ * (common for Anadolu) a lowercase `l` that the PDF renderer emits in place
+ * of a filled-circle glyph.
+ */
+export function extractEkSozlesmeBullets(rawText: string): string[] {
+  if (!rawText) return []
+
+  // Find the first matching section header
+  let sectionStart = -1
+  for (const header of EK_SOZLESME_HEADERS) {
+    const m = rawText.match(header)
+    if (m && m.index !== undefined && (sectionStart === -1 || m.index < sectionStart)) {
+      sectionStart = m.index
+    }
+  }
+  if (sectionStart === -1) return []
+
+  // Scan from a little before the header through the next ~4000 chars so we
+  // catch the continuation page that Anadolu prints the bullets on.
+  const windowText = rawText.slice(sectionStart, sectionStart + 4000)
+  const lines = windowText.split(/\r?\n/)
+
+  const bullets: string[] = []
+  const seen = new Set<string>()
+  // Accept bullet-prefixed or indented lines; stop when we encounter a line
+  // that looks like a new section heading (ALL CAPS without a bullet).
+  const BULLET_RE = /^[\s\t]*[l•●·▪►·-]\s+(.{3,})$/
+  let hitFirstBullet = false
+  let consecutiveNonBullets = 0
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim()
+    if (!line) continue
+    const m = line.match(BULLET_RE)
+    if (m) {
+      hitFirstBullet = true
+      consecutiveNonBullets = 0
+      // Strip trailing punctuation, chapter references like `(A.4.2.)`, and
+      // any stray trailing punctuation left behind. Apply in this order so
+      // that `hasarlar (A.4.11.),` → `hasarlar`.
+      const cleaned = m[1]
+        .replace(/\s*[,;.]+\s*$/, '')
+        .replace(/\s*\([^)]*\)\s*$/, '')
+        .replace(/\s*[,;.]+\s*$/, '')
+        .trim()
+      // Accept 3-char names like "Sel" / "TÜV" that are real Turkish kasko
+      // add-on labels; cap at 120 to avoid capturing whole sentences.
+      if (cleaned.length < 3 || cleaned.length > 120) continue
+      const key = cleaned.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      bullets.push(cleaned)
+      continue
+    }
+    if (hitFirstBullet) {
+      // Stop immediately on an ALL-CAPS line (Turkish section heading) —
+      // "SONRAKİ BÖLÜM", "TEMİNAT HAKKINDA GENEL BİLGİLER", etc.
+      if (/^[A-ZÇĞİÖŞÜ\s\d.]{4,}$/.test(line)) break
+      // Tolerate one wrapped-line continuation (no bullet marker on the
+      // next line), but stop after two consecutive non-bullet lines.
+      consecutiveNonBullets++
+      if (consecutiveNonBullets >= 2) break
+    }
+  }
+
+  return bullets
+}
+
+/**
  * Convert extracted data to AnalyzedPolicy format
  * @param data - Extracted policy data from AI
  * @param file - Original PDF file
@@ -141,6 +226,7 @@ export async function convertToAnalyzedPolicy(
       page: c.page ?? null,
       clause: c.clause ?? null,
       quote: c.quote ?? null,
+      carveOuts: c.carveOuts ?? null,
     }
   })
 
@@ -155,6 +241,51 @@ export async function convertToAnalyzedPolicy(
     console.warn(
       `[convertToAnalyzedPolicy] Unknown policy type: ${rawPolicyType}, falling back to 'home'`
     )
+  }
+
+  // ── Ek Sözleşme Maddeleri deterministic fallback ───────────────────
+  // Turkish kasko policies typically include a bulleted "Ek Sözleşme
+  // Maddeleri" / "Genel Şartlar'a göre ek sözleşmeyle ... dâhil edilmiştir"
+  // section listing add-on coverages (Deprem, Sel, Terör, Anahtarın Ele
+  // Geçirilmesi, Kilit Mekanizması, etc.). When the LLM omits these as
+  // structured coverages, we parse the bullets from the raw text and
+  // inject synthetic `category: 'supplementary'` rows so downstream coverage
+  // enumeration and Value scoring pick them up.
+  if (rawText && (policyType === 'kasko' || policyType === 'traffic')) {
+    const supplementaryFromLlm = coverages.filter((c) => c.category === 'supplementary').length
+    if (supplementaryFromLlm < 3) {
+      const bullets = extractEkSozlesmeBullets(rawText)
+      const existingNames = new Set(coverages.map((c) => c.name.toLowerCase()))
+      for (const bullet of bullets) {
+        const key = bullet.toLowerCase()
+        // Skip bullets that duplicate an existing coverage name (startsWith
+        // match is sufficient — "Deprem, toprak kayması, ..." collides with
+        // "Deprem" already extracted as a main-category peril).
+        const dup = [...existingNames].some(
+          (n) => n.length >= 5 && (key.startsWith(n) || n.startsWith(key.slice(0, 12)))
+        )
+        if (dup) continue
+        const name = bullet
+        const nameTr = lookupCoverageNameTr(name) ?? name
+        coverages.push({
+          name,
+          nameTr,
+          limit: 0,
+          deductible: 0,
+          included: true,
+          description: undefined,
+          isUnlimited: false,
+          isMarketValue: false,
+          category: 'supplementary',
+          importance: 'standard',
+          page: null,
+          clause: 'Ek Sözleşme Maddeleri',
+          quote: bullet,
+          carveOuts: null,
+        })
+        existingNames.add(key)
+      }
+    }
   }
 
   // Calculate total coverage based on policy type
@@ -1028,12 +1159,79 @@ function normalizeTurkishLegalEntityName(name: string): string {
  * share a cluster, the longer (more informative) one is kept.
  */
 /**
+ * Named scenario patterns for the common Turkish kasko conditional deductibles.
+ * Each entry produces a canonical, reviewer-friendly line of the form
+ * `"<Scenario label>: %<N>"` (e.g. `"Anlaşmalı olmayan servis: %35"`) when
+ * the exclusion text matches both the scenario keywords AND surfaces a
+ * percentage. Order matters — more specific patterns first so `lpg` does
+ * not swallow the generic `muafiyet` case.
+ *
+ * The enumerated output replaces the old behavior that collapsed every
+ * match into a single evidence-softened string, which surfaced as
+ * "1 conditional" in the UI even when a policy had 5+ distinct triggers.
+ */
+const NAMED_DEDUCTIBLE_SCENARIOS: Array<{
+  keywords: RegExp[]
+  labelTr: string
+}> = [
+  {
+    keywords: [/(anla[şs]mal[ıi]\s*olmayan|anla[şs]mas[ıi]z)/i, /servis|yetkili\s*servis/i],
+    labelTr: 'Anlaşmalı olmayan servis',
+  },
+  {
+    keywords: [/pert|hurda/i, /muaf[iİ]yet|tenzil/i],
+    labelTr: 'Pert araç muafiyeti',
+  },
+  {
+    keywords: [/lpg|cng|beyan\s*d[ıi][şs][ıi]|beyan\s*edilmemi[şs]/i],
+    labelTr: 'Beyan dışı LPG / CNG donanımı',
+  },
+  {
+    keywords: [
+      /rent[\s-]*a[\s-]*car|taksi|kurye|uygulama\s*ta[şs][ıi]mac[ıi]l[ıi]g[ıi]|ticari\s*kullan[ıi]m/i,
+    ],
+    labelTr: 'Rent-a-car / ticari kullanım',
+  },
+  {
+    keywords: [
+      /(ilk|birinci|1\.?)\s*cam|cam\s*hasar[ıi]?\s*(ilk|birinci|1\.?)|anla[şs]mal[ıi]\s*cam/i,
+    ],
+    labelTr: 'İlk cam hasarı muafiyeti',
+  },
+  {
+    keywords: [/ya[şs]|sür[üu]c[üu]\s*ya[şs]|25\s*ya[şs]|18\s*ya[şs]/i],
+    labelTr: 'Sürücü yaşı',
+  },
+  {
+    keywords: [/ehliyet|s[üu]r[üu]c[üu]\s*belgesi|belge\s*s[üu]resi|belge\s*y[ıi]l/i],
+    labelTr: 'Ehliyet süresi',
+  },
+]
+
+/**
+ * Format a matched conditional-deductible line as `"<Scenario>: %<N>"` when
+ * the text yields a percent, else fall back to the softened original.
+ */
+function formatNamedDeductible(labelTr: string, rawText: string, percent: number | null): string {
+  if (percent !== null) {
+    return `${labelTr}: %${percent}`
+  }
+  return `${labelTr}: ${softenConditionalDeductible(rawText)}`
+}
+
+/**
  * Classify exclusions into true exclusions vs conditional deductibles.
  * Items that describe percentage-based deductibles, repair conditions,
  * or application-specific muafiyet rules are separated from true
  * non-coverage exclusions (theft scenarios, licence requirements, etc.).
+ *
+ * v4: now emits ONE named entry per recognized scenario (non-contracted
+ * servis, pert araç, LPG, rent-a-car, first-glass, driver age, licence
+ * duration). Previously collapsed everything into a single soft-worded
+ * string, causing the UI to report "1 conditional" for policies with
+ * five or more distinct triggers.
  */
-function classifyExclusions(exclusions: string[]): {
+export function classifyExclusions(exclusions: string[]): {
   trueExclusions: string[]
   conditionalDeductibles: string[]
   trueExclusionIndices: Set<number>
@@ -1045,35 +1243,59 @@ function classifyExclusions(exclusions: string[]): {
     /tenzil/i, // "tenzili muafiyet" = applied deductible
     /%\s*\d+/i, // percentage like %35
     /\d+\s*%/i, // percentage like 35%
-    /anlaşmalı olmayan.*servis/i, // non-contracted repair
-    /anlaşmasız.*servis/i, // same variant
-    /onarım.*muafiyet/i, // repair deductible
-    /pert.*muafiyet/i, // total loss deductible
+    /anla[şs]mal[ıi]\s*olmayan.*servis/i, // non-contracted repair
+    /anla[şs]mas[ıi]z.*servis/i, // same variant
+    /onar[ıi]m.*muaf[iİ]yet/i, // repair deductible
+    /pert.*muaf[iİ]yet/i, // total loss deductible
     /pert.*tenzil/i, // total loss applied deductible
+    /lpg|cng/i, // fuel-system declaration triggers
+    /rent[\s-]*a[\s-]*car|taksi|kurye/i, // use-case triggers
   ]
 
   const trueExclusions: string[] = []
   const conditionalDeductibles: string[] = []
+  const seenScenarios = new Set<string>()
   const trueExclusionIndices = new Set<number>()
   let maxDeductiblePercent = 0
 
   for (let i = 0; i < exclusions.length; i++) {
     const text = exclusions[i]
     const isConditional = conditionalPatterns.some((p) => p.test(text))
-    if (isConditional) {
-      // Extract percentage value if present (e.g., "35%" or "%35")
-      const pctMatch = text.match(/(\d{1,3})\s*%/) || text.match(/%\s*(\d{1,3})/)
-      if (pctMatch) {
-        const pct = parseInt(pctMatch[1], 10)
-        if (pct > 0 && pct <= 100 && pct > maxDeductiblePercent) {
-          maxDeductiblePercent = pct
-        }
-      }
-      // Apply evidence-softened wording
-      conditionalDeductibles.push(softenConditionalDeductible(text))
-    } else {
+    if (!isConditional) {
       trueExclusions.push(text)
       trueExclusionIndices.add(i)
+      continue
+    }
+
+    // Extract percentage value if present (e.g., "35%" or "%35")
+    const pctMatch = text.match(/(\d{1,3})\s*%/) || text.match(/%\s*(\d{1,3})/)
+    let pct: number | null = null
+    if (pctMatch) {
+      const parsed = parseInt(pctMatch[1], 10)
+      if (parsed > 0 && parsed <= 100) {
+        pct = parsed
+        if (parsed > maxDeductiblePercent) maxDeductiblePercent = parsed
+      }
+    }
+
+    // Try to attach a scenario label. Each scenario fires at most once per
+    // policy so duplicate phrasings (e.g. two mentions of non-contracted
+    // servis) don't inflate the conditional-deductible list.
+    let labeled = false
+    for (const scenario of NAMED_DEDUCTIBLE_SCENARIOS) {
+      const allMatch = scenario.keywords.every((kw) => kw.test(text))
+      if (allMatch && !seenScenarios.has(scenario.labelTr)) {
+        conditionalDeductibles.push(formatNamedDeductible(scenario.labelTr, text, pct))
+        seenScenarios.add(scenario.labelTr)
+        labeled = true
+        break
+      }
+    }
+
+    // Fallback: unrecognized scenario — keep the evidence-softened string
+    // so we don't silently drop the deductible signal.
+    if (!labeled) {
+      conditionalDeductibles.push(softenConditionalDeductible(text))
     }
   }
 

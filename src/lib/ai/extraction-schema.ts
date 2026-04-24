@@ -168,6 +168,14 @@ export interface ExtractedCoverage {
   clause?: string | null
   /** Verbatim text describing this limit for audit/grounding */
   quote?: string | null
+  /**
+   * Optional carve-outs / specific-scenario exceptions that narrow this coverage.
+   * Canonical case: `Artan Mali Sorumluluk Sınırsız` capped at 2.500.000 TL per
+   * event at airports / ports / fuel depots / refineries. Populate from the
+   * `...Klozu` / exception language in the policy text. Empty or undefined
+   * means no carve-outs apply.
+   */
+  carveOuts?: string[] | null
 }
 
 // Re-export the canonical schema from the shared single source of truth.

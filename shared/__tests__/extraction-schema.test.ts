@@ -21,8 +21,11 @@ describe('shared/extraction-schema', () => {
     expect(schema.additionalProperties).toBe(false)
   })
 
-  it('has 23 top-level required fields', () => {
-    expect(schema.required).toHaveLength(23)
+  it('has 30 top-level required fields', () => {
+    // This count tracks EXTRACTION_JSON_SCHEMA.schema.required.length and must
+    // be updated alongside every top-level property addition/removal per
+    // gotcha #47 (OpenAI strict-mode required[] completeness).
+    expect(schema.required).toHaveLength(30)
   })
 
   it('has discounts object with required sub-fields', () => {
@@ -64,10 +67,12 @@ describe('shared/extraction-schema', () => {
     expect(props.coverages.items.required).toContain('nameTr')
   })
 
-  it('has all 9 coverage item properties in required', () => {
+  it('has all 14 coverage item properties in required', () => {
+    // Must be updated alongside every addition/removal of a coverage-item
+    // property per gotcha #47. v4: added `carveOuts` (13 → 14).
     const coverageItems = props.coverages.items
     const coverageKeys = Object.keys(coverageItems.properties)
-    expect(coverageKeys).toHaveLength(9)
+    expect(coverageKeys).toHaveLength(14)
     for (const key of coverageKeys) {
       expect(coverageItems.required).toContain(key)
     }

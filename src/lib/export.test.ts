@@ -673,7 +673,10 @@ describe('exportSinglePolicyToCSV', () => {
     exportSinglePolicyToCSV(policy, 'en')
 
     const content = getCsvContent()
-    expect(content).toContain('subject to sublimits')
+    // v4: structural limit preserves the signal; we no longer hedge "Unlimited"
+    // into "Coverage subject to sublimits..." which destroyed it for users.
+    expect(content).toContain('Unlimited')
+    expect(content).not.toContain('subject to sublimits')
   })
 
   it('should show "Sınırsız" for unlimited coverages in Turkish', () => {
@@ -692,7 +695,10 @@ describe('exportSinglePolicyToCSV', () => {
     exportSinglePolicyToCSV(policy, 'tr')
 
     const content = getCsvContent()
-    expect(content).toContain('Özel şartlara bağlı olabilir')
+    // v4: Turkish users also get the preserved "Sınırsız" signal rather than
+    // the hedged "Özel şartlara bağlı olabilir" placeholder.
+    expect(content).toContain('Sınırsız')
+    expect(content).not.toContain('Özel şartlara bağlı olabilir')
   })
 
   it('should show "Market Value" for market value coverages in English', () => {

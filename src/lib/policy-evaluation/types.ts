@@ -81,6 +81,12 @@ export interface PolicyEvaluation {
   overallScore: number // 0-100
   grade: EvaluationGrade
   isProvisional?: boolean
+  /** True when extraction produced missing/placeholder values for headline fields
+   *  (e.g. vehicle make/model blank, coverage rows contain legacy hedge strings).
+   *  When set, UI gates the letter grade to "Incomplete — re-scan recommended". */
+  extractionIncomplete?: boolean
+  /** Trigger codes from the extraction completeness gate (for audit / debugging). */
+  extractionGateTriggers?: string[]
   status: EvaluationStatus
 
   // Category scores
@@ -160,6 +166,14 @@ export interface ScenarioCard {
   triggerTR?: string
   whyItMatters?: string
   whyItMattersTR?: string
+  /**
+   * Optional caveat surfaced as a secondary badge under the main card body.
+   * Populated when a coverage that looks generous in aggregate has a
+   * per-scenario cap (e.g. IMM Sınırsız capped at 2.5M TL at airports,
+   * ports, fuel depots, refineries).
+   */
+  caveat?: string
+  caveatTR?: string
 }
 
 export interface Recommendation {

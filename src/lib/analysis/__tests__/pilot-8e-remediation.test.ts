@@ -198,14 +198,17 @@ describe('DEF-EX-002: Long-doc special conditions preservation', () => {
     expect(hasEndorsement).toBe(true)
   })
 
-  it('unlimited IMM is suppressed in display output', () => {
+  it('unlimited IMM signal is preserved, legacy hedge string is not leaked (v4)', () => {
+    // v4 change: the "Sınırsız" signal is preserved in structural limit fields
+    // (users need to see the headline IMM feature). Carve-outs surface as a
+    // separate caveat badge. Only the v3 placeholder string "Coverage subject
+    // to sublimits..." must never render as content.
     const normalized = normalizeBranchExtraction(longDocKasko)
     const validation = validateExtractionSafety(normalized)
     const analysis = generateAnalysisBundle('LONG-DOC', normalized, validation)
     const summary = generateDisplaySafeSummary(normalized, validation, analysis)
     const text = JSON.stringify(summary).toLowerCase()
-    expect(text).not.toContain('sınırsız')
-    expect(text).not.toContain('unlimited')
+    expect(text).not.toContain('coverage subject to sublimits')
   })
 
   it('mode is full for high-confidence long document', () => {

@@ -152,22 +152,26 @@ describe('Section 5: KASKO coverage contradiction', () => {
 // Section 6: Unlimited liability wording
 // ─────────────────────────────────────────────────────────────────────
 
-describe('Section 6: Unlimited liability wording consistency', () => {
-  it('applySafeWording replaces "unlimited" with consistent sublimit wording', async () => {
+describe('Section 6: Unlimited liability wording preserves the Sınırsız / Unlimited signal', () => {
+  // v4 change: the blanket `unlimited → "Coverage subject to sublimits..."`
+  // rewrite destroyed information users needed (e.g. the headline IMM Sınırsız
+  // feature rendered as placeholder text). We now preserve the signal in
+  // structural limit fields; carve-outs surface as separate caveat badges.
+  it('applySafeWording preserves the English "Unlimited" token', async () => {
     const { applySafeWording } = await import('@/lib/analysis/display-interpreter')
 
     const result = applySafeWording('Unlimited Increased Civil Liability')
-    expect(result).toContain('sublimits')
-    expect(result).not.toContain('may be narrowed in some cases')
+    expect(result).toContain('Unlimited')
+    expect(result).not.toContain('subject to sublimits')
   })
 
-  it('display interpreter uses consistent wording for isUnlimited coverages', async () => {
+  it('applySafeWording preserves "unlimited" in a structural sentence', async () => {
     const { applySafeWording } = await import('@/lib/analysis/display-interpreter')
 
     const input = 'Coverage is unlimited for this item'
     const result = applySafeWording(input)
-    expect(result).toContain('subject to sublimits')
-    expect(result).toContain('sublimits')
+    expect(result).toContain('unlimited')
+    expect(result).not.toContain('subject to sublimits')
   })
 })
 

@@ -220,7 +220,11 @@ export function formatCoverageTotalForReview(
  * 5. Zero-limit with name heuristics (rayiç, asistans, hizmet, etc.)
  * 6. Numeric limit
  *
- * Result is passed through applySafeWording.
+ * Returns structural labels ("Sınırsız", "Unlimited", "Rayiç Değer", "Dahil",
+ * formatted numbers) WITHOUT running them through applySafeWording —
+ * structural descriptors are not promotional claims and hedging them
+ * destroys information users need. Promotional narrative text is sanitized
+ * on a separate path (reviewer insights in policy-converter.ts).
  */
 export function formatCoverageItemLimitForReview(
   c: Coverage,
@@ -228,42 +232,35 @@ export function formatCoverageItemLimitForReview(
   formatAmount?: (amount: number) => string
 ): string {
   const isTr = locale === 'tr'
-  let raw: string
 
   // 1. Explicit flags
   if (c.isUnlimited) {
-    raw = isTr ? 'Sınırsız' : 'Unlimited'
-  } else if (c.isMarketValue) {
-    raw = isTr ? 'Rayiç Değer' : 'Market Value'
-  } else if (shouldShowUnlimited(c.name, c.limit)) {
+    return isTr ? 'Sınırsız' : 'Unlimited'
+  }
+  if (c.isMarketValue) {
+    return isTr ? 'Rayiç Değer' : 'Market Value'
+  }
+  if (shouldShowUnlimited(c.name, c.limit)) {
     // 2. Name-based detection from kasko knowledge hub
-    raw = isTr ? 'Sınırsız' : 'Unlimited'
-  } else if (shouldShowIncluded(c.name, c.limit)) {
-    raw = isTr ? 'Dahil' : 'Included'
-  } else if (c.limit === 0) {
+    return isTr ? 'Sınırsız' : 'Unlimited'
+  }
+  if (shouldShowIncluded(c.name, c.limit)) {
+    return isTr ? 'Dahil' : 'Included'
+  }
+  if (c.limit === 0) {
     // 3. Zero-limit with name heuristics
     const nameLower = c.name.toLowerCase()
     if (nameLower.includes('sınırsız') || nameLower.includes('unlimited')) {
-      raw = isTr ? 'Sınırsız' : 'Unlimited'
-    } else if (nameLower.includes('rayiç') || nameLower.includes('market value')) {
-      raw = isTr ? 'Rayiç Değer' : 'Market Value'
-    } else if (
-      nameLower.includes('asistans') ||
-      nameLower.includes('hizmet') ||
-      nameLower.includes('ikame') ||
-      nameLower.includes('onarım') ||
-      c.included
-    ) {
-      raw = isTr ? 'Dahil' : 'Included'
-    } else {
-      raw = isTr ? 'Dahil' : 'Included'
+      return isTr ? 'Sınırsız' : 'Unlimited'
     }
-  } else {
-    // 4. Numeric limit
-    raw = formatAmount ? formatAmount(c.limit) : formatCurrency(c.limit, 'TRY', locale)
+    if (nameLower.includes('rayiç') || nameLower.includes('market value')) {
+      return isTr ? 'Rayiç Değer' : 'Market Value'
+    }
+    // Assistance / service-class coverages with zero sum insured
+    return isTr ? 'Dahil' : 'Included'
   }
-
-  return applySafeWording(raw)
+  // 4. Numeric limit
+  return formatAmount ? formatAmount(c.limit) : formatCurrency(c.limit, 'TRY', locale)
 }
 
 /**

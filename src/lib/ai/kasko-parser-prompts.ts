@@ -206,9 +206,17 @@ OUTPUT FORMAT (MUST FOLLOW EXACTLY):
       "deductible": number or null,
       "deductibleType": "fixed|percentage",
       "conditions": "string or null",
-      "source": "page/section reference"
+      "source": "page/section reference",
+      "carveOuts": ["array of per-scenario caps (e.g. 'IMM Sınırsız capped at 2.500.000 TL at airports/ports/fuel depots') or null if none"]
     }
   ],
+  // IMPORTANT: Ek Sözleşme Maddeleri section MUST be expanded into
+  // individual supplementary coverages (one per bullet). Do NOT collapse.
+  // Canonical add-ons seen in Anadolu/Allianz/Türkiye policies: Deprem,
+  // Sel/Seylap, Terör, Grev/Lokavt, Anahtarın Ele Geçirilmesi, Kilit
+  // Mekanizması Değiştirilmesi, Hasarsızlık İndirimi Koruma, Cam Hasarı
+  // Koruma, Hatalı Akaryakıt, Evcil Hayvan, Kötü Niyetli Hareketler,
+  // Manevi Tazminat, İkame Araç, Mini Onarım, Kapıdan Oto Servis.
   "deductiblesPenalties": [
     {
       "trigger": "string describing when it applies",

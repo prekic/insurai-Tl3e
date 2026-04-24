@@ -448,6 +448,8 @@ export interface TranslationDictionary {
     expiredStatus: string
     pendingStatus: string
     draftStatus: string
+    extractionIncomplete: string
+    extractionIncompleteDesc: string
     freeTrialResult: string
     goBack: string
     goToDashboard: string

@@ -131,6 +131,13 @@ export interface Coverage {
   clause?: string | null
   /** Verbatim text describing this limit */
   quote?: string | null
+  /**
+   * Optional per-scenario caps that narrow an otherwise-unlimited / broad
+   * coverage. Canonical case: IMM Sınırsız capped at 2.500.000 TL at
+   * airports / ports / fuel depots / refineries. The evaluator surfaces
+   * these as a caveat badge on the relevant scenario card.
+   */
+  carveOuts?: string[] | null
 }
 
 /** Exclusion with severity information */

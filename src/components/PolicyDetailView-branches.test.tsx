@@ -1230,6 +1230,8 @@ describe('PolicyDetailView Branch Coverage', () => {
   // =====================================================================
   describe('Coverage formatting and categories', () => {
     it('shows special value color (text-blue-600) for unlimited/market value coverages', () => {
+      // v4: structural "Unlimited" signal is now preserved instead of being
+      // replaced with a "subject to sublimits" placeholder.
       mockGetPolicyById.mockReturnValue(
         buildPolicy({
           coverages: [
@@ -1246,10 +1248,14 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      const val = screen.getAllByText(/sublimits/i)[0]
+      const val = screen.getAllByText(/Unlimited/i)[0]
       expect(val).toHaveClass('text-blue-600')
     })
     it('shows "Unlimited" (or Sınırsız for TR) for isUnlimited coverage', () => {
+      // v4: preserve the Unlimited / Sınırsız signal. The old behavior that
+      // rendered "Coverage subject to sublimits..." destroyed the headline
+      // IMM Sınırsız feature in the UI; carve-outs now surface as separate
+      // caveat badges.
       mockGetPolicyById.mockReturnValue(
         buildPolicy({
           coverages: [
@@ -1266,7 +1272,7 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText(/sublimits/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Unlimited/i).length).toBeGreaterThan(0)
     })
 
     it('shows "Market Value" for isMarketValue coverage', () => {
@@ -1324,7 +1330,7 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText(/sublimits/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Unlimited/i).length).toBeGreaterThan(0)
     })
 
     it('shows formatted currency for positive limit', () => {
@@ -1348,7 +1354,7 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText(/sublimits/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Unlimited/i).length).toBeGreaterThan(0)
     })
 
     it('shows "Market Value" for zero-limit name containing "rayiç"', () => {
@@ -1462,7 +1468,7 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText(/sublimits/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Unlimited/i).length).toBeGreaterThan(0)
     })
   })
 
@@ -1656,8 +1662,8 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      const unlimitedElements = screen.getAllByText(/sublimits/i)
-      // At least one should have the blue styling
+      // v4: Unlimited / Sınırsız signal is preserved in rendering.
+      const unlimitedElements = screen.getAllByText(/Unlimited/i)
       expect(unlimitedElements.length).toBeGreaterThan(0)
     })
   })

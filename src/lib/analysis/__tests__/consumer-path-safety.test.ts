@@ -148,9 +148,12 @@ describe('Consumer Path Safety: Display Interpreter is Sole Source', () => {
 // ============================================================================
 
 describe('Consumer Path Safety: Prohibited Phrases Blocked in Rendered Output', () => {
+  // v4: "unlimited" and "sınırsız" were intentionally removed from the
+  // prohibited list. They're legitimate structural descriptors (IMM Sınırsız,
+  // Artan Mali Sorumluluk Sınırsız) — hedging them destroyed signal users
+  // rely on. Carve-outs are surfaced as separate caveat badges.
   const prohibitedPhrases = [
     'no deductible',
-    'unlimited',
     'fully covered',
     'tam kapsamlı',
     'guaranteed',
@@ -173,7 +176,16 @@ describe('Consumer Path Safety: Prohibited Phrases Blocked in Rendered Output', 
   it('applySafeWording replaces prohibited phrases', () => {
     expect(applySafeWording('This policy is fully covered')).not.toContain('fully covered')
     expect(applySafeWording('No deductible applies')).not.toContain('no deductible')
-    expect(applySafeWording('Unlimited towing')).not.toContain('unlimited')
+  })
+
+  it('v4: preserves structural "unlimited" / "Sınırsız" signal without hedging', () => {
+    // The old blanket replacement rendered user-hostile output like
+    // "Liability — Limit: Coverage subject to sublimits...". Now the
+    // signal is preserved; carve-outs are caveat badges, not limit-value
+    // replacements.
+    expect(applySafeWording('Unlimited towing')).toContain('Unlimited')
+    expect(applySafeWording('Unlimited towing')).not.toContain('subject to sublimits')
+    expect(checkProhibitedPhrase('This policy is unlimited for all scenarios')).toBeNull()
   })
 
   it('no prohibited phrase appears in generated summary card bodies', () => {

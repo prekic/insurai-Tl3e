@@ -41,6 +41,7 @@ import {
 
 import { KASKO_COMMERCIAL_BENCHMARKS } from '@/data/market-data/benchmarks'
 import { inferIndustryFromInsuredName } from '../ai/turkish-utils'
+import { evaluateSimpleDisplayMode } from '../analysis/kasko-pilot-gate'
 
 /**
  * Safely format a numeric value as Turkish Lira string.
@@ -85,6 +86,64 @@ function matchesIMMPattern(text: string | undefined | null): boolean {
   if (!text) return false
   const lower = text.toLowerCase()
   return IMM_COVERAGE_PATTERNS.some((pat) => lower.includes(pat))
+}
+
+/**
+ * Location keywords that indicate the canonical Artan Mali Sorumluluk
+ * Sınırsız carve-out: unlimited in theory, capped (typically 2.500.000 TL
+ * per event) in specific high-exposure environments.
+ */
+const IMM_CARVEOUT_LOCATION_HINTS = [
+  'havaliman',
+  'liman',
+  'akaryak',
+  'rafineri',
+  'benzin istasyon',
+  'kimyasal',
+  'mühimmat',
+  'tren istasyon',
+  'demiryolu',
+]
+
+/**
+ * Inspect an IMM coverage's evidence fields (clause, quote, and any
+ * carveOuts the LLM populated) for the 2.5M TL airport/port/fuel-depot
+ * carve-out. Returns a short bilingual caveat string when found, else
+ * null.
+ */
+function detectImmCarveOut(
+  coverage: import('@/types/policy').Coverage
+): { en: string; tr: string } | null {
+  const carveOuts = (coverage as { carveOuts?: string[] | null }).carveOuts
+  if (Array.isArray(carveOuts) && carveOuts.length > 0) {
+    const first = carveOuts[0]
+    return {
+      en: `Carve-out: ${first}`,
+      tr: `İstisna: ${first}`,
+    }
+  }
+
+  const haystack =
+    `${coverage.clause ?? ''} ${coverage.quote ?? ''} ${coverage.description ?? ''}`.toLowerCase()
+  if (!haystack.trim()) return null
+
+  const locationHit = IMM_CARVEOUT_LOCATION_HINTS.some((h) => haystack.includes(h))
+  // The amount language is usually "2.500.000" or "2,5 milyon"; catch both.
+  const amountHit = /2[.,\s]*500[.,\s]*000/.test(haystack) || /2[,.]?5\s*milyon/.test(haystack)
+
+  if (locationHit && amountHit) {
+    return {
+      en: 'Capped at 2,500,000 TL per event at airports, ports, fuel depots, refineries, and similar high-exposure locations.',
+      tr: 'Havalimanı, liman, akaryakıt depoları, rafineri ve benzeri yerlerde meydana gelen olaylarda olay başı 2.500.000 TL üst sınırı uygulanır.',
+    }
+  }
+  if (locationHit) {
+    return {
+      en: 'A per-event sub-limit applies at airports, ports, fuel depots, refineries, and similar high-exposure locations — verify the exact cap in the policy.',
+      tr: 'Havalimanı, liman, akaryakıt depoları ve benzeri yerlerde olay başı özel üst sınır uygulanabilir — tutar için poliçeye bakılmalı.',
+    }
+  }
+  return null
 }
 
 /**
@@ -472,6 +531,32 @@ export function evaluatePolicy(
     recommendations
   )
 
+  // Extraction completeness gate — blank vehicle fields or legacy placeholder
+  // coverage rows downgrade the grade to provisional and surface the reason
+  // via extractionGateTriggers. See evaluateSimpleDisplayMode() for the full
+  // trigger list. This is the single chokepoint for "the extraction produced
+  // output that isn't trustworthy enough to show a confident letter grade".
+  const gateResult = evaluateSimpleDisplayMode(
+    (policy as { aiConfidence?: number }).aiConfidence ?? 1,
+    {
+      policyNumber: policy.policyNumber,
+      provider: policy.provider,
+      coverages: policy.coverages as unknown[],
+      vehicle: analyzedPolicy.vehicleInfo
+        ? {
+            make: analyzedPolicy.vehicleInfo.make,
+            model: analyzedPolicy.vehicleInfo.model,
+            year: analyzedPolicy.vehicleInfo.year,
+          }
+        : null,
+      policyType: policy.type,
+    }
+  )
+  const extractionCompletenessTriggers = gateResult.triggers.filter(
+    (t) => t.startsWith('MISSING_VEHICLE_') || t === 'COVERAGE_PLACEHOLDER_DETECTED'
+  )
+  const extractionIncomplete = extractionCompletenessTriggers.length > 0
+
   return {
     policyId: policy.id,
     policyNumber: policy.policyNumber,
@@ -484,8 +569,12 @@ export function evaluatePolicy(
       (policy as { isDraft?: boolean }).isDraft ||
       ((policy as { aiConfidence?: number }).aiConfidence ?? 1) < 0.85 ||
       !benchmarkForDate ||
-      benchmarkForDate.benchmarkStatus === 'untrusted'
+      benchmarkForDate.benchmarkStatus === 'untrusted' ||
+      extractionIncomplete
     ),
+    extractionIncomplete: extractionIncomplete || undefined,
+    extractionGateTriggers:
+      extractionCompletenessTriggers.length > 0 ? extractionCompletenessTriggers : undefined,
     status: getStatusFromScore(overallScore, statusThresholds),
 
     scoreBreakdown: {
@@ -1852,6 +1941,13 @@ function generateScenarioCards(
 
   if (immCoverage) {
     if (immCoverage.isUnlimited) {
+      // Detect the Artan Mali Sorumluluk Sınırsız carve-out: unlimited IMM
+      // is routinely capped at 2.5M TL per event at airports, ports, fuel
+      // depots, refineries, chemical storage, and similar high-exposure
+      // locations. If the coverage's quote / clause / explicit carveOuts
+      // hint at that pattern, surface it as a caveat badge rather than
+      // claiming the user truly pays 0 TL in every scenario.
+      const carveOutCaveat = detectImmCarveOut(immCoverage)
       cards.push({
         id: 'imm-scenario',
         title: 'At-Fault Major Accident',
@@ -1871,6 +1967,7 @@ function generateScenarioCards(
         whyItMatters: 'IMM protects you from lawsuits when your compulsory insurance runs out.',
         whyItMattersTR:
           'İMM, zorunlu trafik sigortası limitiniz tükendiğinde sizi davalardan korur.',
+        ...(carveOutCaveat ? { caveat: carveOutCaveat.en, caveatTR: carveOutCaveat.tr } : {}),
       })
     } else {
       const limitStr = formatTRY(immCoverage.limit)

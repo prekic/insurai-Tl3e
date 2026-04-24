@@ -95,8 +95,34 @@ Create a table with one row per coverage where possible:
 • Key conditions / notes
 If limits are not explicit, write [NOT STATED].
 
+IMPORTANT — Ek Sözleşme Maddeleri (add-on coverages):
+Turkish kasko policies typically list add-on coverages under a bulleted
+"Ek Sözleşme Maddeleri" (or "Genel Şartlar'a göre ek sözleşmeyle teminat
+kapsamına dâhil edilmiştir") section. Each bullet is a distinct coverage
+and MUST be emitted as an individual row in the structured coverages
+array with category = "supplementary" and included = true. Typical
+entries include: Deprem/Toprak Kayması, Sel/Seylap, Terör, Grev/Lokavt,
+Anahtarın Ele Geçirilmesi, Kilit Mekanizması Değiştirilmesi, Hasarsızlık
+İndirimi Koruma, Cam Hasarı Koruma, Hatalı Akaryakıt, Evcil Hayvan,
+Kötü Niyetli Hareketler, Manevi Tazminat, İkame Araç, Mini Onarım.
+Do NOT collapse them into a single "Ek Sözleşmeler" entry.
+
+IMPORTANT — Carve-outs on Sınırsız / unlimited coverages:
+When a coverage is marked Sınırsız / unlimited but the policy separately
+caps it for specific scenarios (e.g. "Artan Mali Sorumluluk Sınırsız
+Teminatı Klozu" capping the unlimited IMM at 2.500.000 TL per event at
+airports, ports, fuel depots, refineries, chemical storage), populate
+the coverage's carveOuts array with a short description of each cap.
+Keep isUnlimited = true; the carveOuts surface the exception separately.
+
 6. Deductibles / Special Deductibles
-List all deductibles and when they apply.
+List all deductibles and when they apply. For each conditional deductible
+(percentage-based or scenario-triggered), emit a structured
+conditionalDeductibles entry with explicit trigger, rate, and a verbatim
+evidence quote. Name the scenario concretely — "Anlaşmalı olmayan servis
+%35", "Pert araç %35", "Beyan dışı LPG %80", "Rent-a-car/taksi kullanımı
+%80", "İlk cam hasarı %35". Do NOT collapse multiple scenarios into a
+single entry.
 
 7. Exclusions & Major Limitations
 List key exclusions, restrictions, and conditions that materially change coverage (e.g., sanctions clause, misuse, territorial limits, specific perils excluded). Do not paraphrase legal text; summarize briefly and cite the clause excerpt.

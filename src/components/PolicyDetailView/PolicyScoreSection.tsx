@@ -22,9 +22,11 @@ export function MobileEvaluationCard(props: any) {
           <div className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
             <AlertTriangle size={12} className="flex-shrink-0" />
             <span>
-              {locale === 'tr'
-                ? 'Puanlar taslak niteliğindedir — insan incelemesi bekleniyor'
-                : 'Scores are preliminary — pending human review'}
+              {evaluation.extractionIncomplete
+                ? t.policy.extractionIncomplete
+                : locale === 'tr'
+                  ? 'Puanlar taslak niteliğindedir — insan incelemesi bekleniyor'
+                  : 'Scores are preliminary — pending human review'}
             </span>
           </div>
         </div>
@@ -47,7 +49,9 @@ export function MobileEvaluationCard(props: any) {
           <div className="flex items-center gap-1.5 sm:gap-2">
             {isUnverified ? (
               <Badge variant="outline" className="text-gray-500 border-gray-300">
-                {t.policy.draftStatus}
+                {evaluation.extractionIncomplete
+                  ? t.policy.extractionIncomplete
+                  : t.policy.draftStatus}
               </Badge>
             ) : (
               <GradeBadge
@@ -353,7 +357,9 @@ export function DesktopEvaluationCard(props: any) {
           <div className="flex items-center gap-2">
             {isUnverified ? (
               <Badge variant="outline" className="text-gray-500 border-gray-300">
-                {t.policy.draftStatus}
+                {evaluation.extractionIncomplete
+                  ? t.policy.extractionIncomplete
+                  : t.policy.draftStatus}
               </Badge>
             ) : (
               <GradeBadge

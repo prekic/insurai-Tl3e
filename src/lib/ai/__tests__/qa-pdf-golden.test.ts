@@ -42,8 +42,15 @@ interface PdfFixture {
   path: string
   insurer: string
   description: string
-  // What we expect the patterns to find
+  // Structural strict assertions on the alias-aware extractor output.
+  // When set, the test requires `extractVehicleInfoFromText(text).<field>`
+  // to match exactly — no `text.includes(...)` fallback. Leave undefined for
+  // fixtures where the field is a known limitation of the current extractor
+  // (e.g. inverted `: VALUE\tLabel` layouts, OCR-corrupted labels).
   expectedMakeContains?: string
+  expectedModelContains?: string
+  expectedEngineNo?: string
+  expectedChassisNo?: string
   expectedYear?: number
   expectedPlate?: string
   // Premium tolerance — allow either Net or Brüt or Vergi öncesi
@@ -56,6 +63,11 @@ interface PdfFixture {
   // (see gotcha #61). The other expected* fields stay on the fixture as
   // canonical documentation for future OCR-backed tests.
   requiresOcr?: boolean
+  // Known-limitation fields: when listed, the strict extractor assertion is
+  // replaced by a lenient `text.includes(...)` fallback so the fixture still
+  // documents the expected value. Use only for genuine latent bugs with a
+  // follow-up tracked.
+  extractorLenientFor?: Array<'make' | 'model' | 'engineNo' | 'chassisNo'>
   // Expected DAHİL/HARİÇ coverage counts (captured for OCR-backed tests).
   expectedCoverageCounts?: { included: number; excluded: number }
 }
@@ -66,6 +78,9 @@ const fixtures: PdfFixture[] = [
     insurer: 'Anadolu',
     description: 'Eriş Ambalaj VOLKSWAGEN Tiguan 2016',
     expectedMakeContains: 'VOLKSWAGEN',
+    expectedModelContains: 'TIGUAN',
+    expectedEngineNo: 'CZE307964',
+    expectedChassisNo: 'WVGZZZ5NZHW862628',
     expectedYear: 2016,
     expectedPlate: '34 RZ 9511',
     expectedPremiumOneOf: [29657.14, 31140.0], // Vergi öncesi or ödenecek
@@ -76,16 +91,28 @@ const fixtures: PdfFixture[] = [
     insurer: 'Allianz',
     description: 'Allianz PEUGEOT 308 2010',
     expectedMakeContains: 'PEUGEOT',
+    expectedModelContains: '308 COMFORT',
+    expectedEngineNo: '10FHBV0596086',
+    expectedChassisNo: 'VF34C5FWFAY000475',
     expectedYear: 2010,
     expectedPlate: '34 GM 6461',
     expectedPremiumOneOf: [1659.72, 1580.67],
     shouldFindDahilHaric: true,
+    // Allianz uses an inverted `: PEUGEOT (114)\tMarka Plaka No : ...` format
+    // where the make VALUE precedes the `Marka` LABEL on the same line. Our
+    // alias-aware extractor can't recover this without a bidirectional scan;
+    // the make assertion falls back to a text-contains check until we add
+    // that support.
+    extractorLenientFor: ['make'],
   },
   {
     path: 'policies/KASKO POLİÇESİ.pdf',
     insurer: 'Anadolu',
     description: 'Anadolu RENAULT Clio 2018',
     expectedMakeContains: 'RENAULT',
+    expectedModelContains: 'CLIO',
+    expectedEngineNo: 'K9KE629R035133',
+    expectedChassisNo: 'VF15R436D62350356',
     expectedYear: 2018,
     expectedPlate: '35 G 0001',
     expectedPremiumOneOf: [2475.23, 2599.0],
@@ -94,8 +121,12 @@ const fixtures: PdfFixture[] = [
   {
     path: 'policies/ANADOLU.PDF',
     insurer: 'Anadolu',
-    description: 'Anadolu VOLKSWAGEN',
+    description: 'Anadolu VOLKSWAGEN Golf 2001',
     expectedMakeContains: 'VOLKSWAGEN',
+    expectedModelContains: 'GOLF',
+    expectedEngineNo: 'AKL886820',
+    expectedChassisNo: 'WVZZZ1JZ1W484917',
+    expectedYear: 2001,
     expectedPlate: '35 PR 962',
     expectedPremiumOneOf: [1095.23], // Vergi öncesi prim
     shouldFindDahilHaric: true,
@@ -112,6 +143,12 @@ const fixtures: PdfFixture[] = [
     expectedPremiumOneOf: [755.21],
     shouldFindDahilHaric: true,
     requiresOcr: false,
+    // OCR of this scanned PDF corrupts the label text (`MARKASI/TİPİ` reads
+    // as `SVTİPİ`-ish artifacts). The hasKvSeparator guard now correctly
+    // returns undefined rather than a bogus make; we fall back to raw-text
+    // contains checks. Production routes these policies through GCP Document
+    // AI OCR via `requiresOcr: true` on the scanned fixture above.
+    extractorLenientFor: ['make', 'model', 'engineNo', 'chassisNo'],
   },
   {
     path: 'policies/KRK_35 VD 458 Kasko Police_32630901_3.pdf',
@@ -204,32 +241,71 @@ describe('PDF Golden Regression — committed Turkish kasko policies', () => {
         expect(matched, `Expected one of ${fx.expectedPremiumOneOf} in found ${found}`).toBe(true)
       })
 
+      const lenient = new Set(fx.extractorLenientFor ?? [])
+
       if (fx.expectedMakeContains) {
-        it(`extracts vehicle info containing "${fx.expectedMakeContains}"`, () => {
+        it(`extracts make containing "${fx.expectedMakeContains}"`, () => {
           const result = extractVehicleInfoFromText(text)
           expect(result).toBeDefined()
-          // The make may be in result.make OR in the chassis/plate area; check raw text
-          const makeFound =
-            result?.make?.toUpperCase().includes(fx.expectedMakeContains!.toUpperCase()) ||
-            text.toUpperCase().includes(fx.expectedMakeContains!.toUpperCase())
-          expect(makeFound).toBe(true)
+          if (lenient.has('make')) {
+            // Known extractor limitation — assert the value is at least
+            // present in the raw text so the fixture still documents truth.
+            expect(text.toUpperCase()).toContain(fx.expectedMakeContains!.toUpperCase())
+          } else {
+            expect(result?.make?.toUpperCase()).toContain(fx.expectedMakeContains!.toUpperCase())
+          }
+        })
+      }
+
+      if (fx.expectedModelContains) {
+        it(`extracts model containing "${fx.expectedModelContains}"`, () => {
+          const result = extractVehicleInfoFromText(text)
+          if (lenient.has('model')) {
+            expect(text.toUpperCase()).toContain(fx.expectedModelContains!.toUpperCase())
+          } else {
+            expect(result?.model?.toUpperCase()).toContain(fx.expectedModelContains!.toUpperCase())
+          }
+        })
+      }
+
+      if (fx.expectedEngineNo) {
+        it(`extracts engine number "${fx.expectedEngineNo}"`, () => {
+          const result = extractVehicleInfoFromText(text)
+          if (lenient.has('engineNo')) {
+            expect(text).toContain(fx.expectedEngineNo!)
+          } else {
+            expect(result?.engineNo).toBe(fx.expectedEngineNo)
+          }
+        })
+      }
+
+      if (fx.expectedChassisNo) {
+        it(`extracts chassis number "${fx.expectedChassisNo}"`, () => {
+          const result = extractVehicleInfoFromText(text)
+          if (lenient.has('chassisNo')) {
+            expect(text).toContain(fx.expectedChassisNo!)
+          } else {
+            expect(result?.chassisNo).toBe(fx.expectedChassisNo)
+          }
         })
       }
 
       if (fx.expectedYear) {
-        it(`extracts model year ${fx.expectedYear} or finds it in raw text`, () => {
+        it(`extracts model year ${fx.expectedYear}`, () => {
           const result = extractVehicleInfoFromText(text)
-          const yearMatch =
-            result?.year === fx.expectedYear || text.includes(String(fx.expectedYear))
-          expect(yearMatch).toBe(true)
+          // Year is a 4-digit number with a plausible range — no known
+          // extractor limitation, always strict.
+          expect(result?.year).toBe(fx.expectedYear)
         })
       }
 
       if (fx.expectedPlate) {
-        it(`finds plate "${fx.expectedPlate}" in document`, () => {
-          // Plates may have variable spacing — normalize
-          const normPlate = fx.expectedPlate!.replace(/\s+/g, '\\s*')
-          expect(new RegExp(normPlate, 'i').test(text)).toBe(true)
+        it(`extracts plate "${fx.expectedPlate}"`, () => {
+          const result = extractVehicleInfoFromText(text)
+          // Plate value comes from a standalone pattern (no labeled-field
+          // requirement); strict assertion on extractor output.
+          const norm = (s: string) => s.replace(/\s+/g, ' ').trim()
+          expect(result?.plate ? norm(result.plate) : undefined).toBe(norm(fx.expectedPlate!))
         })
       }
 

@@ -29,7 +29,6 @@ import {
   type AnalyzedExclusion,
   type ExclusionAnalysisResult,
 } from '@/lib/knowledge/kasko-knowledge'
-import { applySafeWording } from '@/lib/analysis/display-interpreter'
 import { EvidenceQuote } from './shared'
 
 /**
@@ -75,8 +74,11 @@ function formatCoverageLimit(
     raw = fmt(coverage.limit)
   }
 
-  // Pass through display interpreter safe wording filter
-  return applySafeWording(raw)
+  // raw is always a structural translation key (t.global.unlimited / included /
+  // marketValue) or a formatted currency string at this point — do NOT run it
+  // through applySafeWording. Hedging these destroys the "Sınırsız" / "Dahil"
+  // signal that tells users whether coverage is unlimited or bundled.
+  return raw
 }
 
 /**
@@ -142,13 +144,16 @@ function getCoverageInfoText(
     parts.push(t.policy.criticalCoverage)
   }
 
-  // Add info about special values
+  // Add info about special values. These are structural i18n labels, not
+  // narrative text — do NOT run them through applySafeWording, which would
+  // hedge "Sınırsız" / "Unlimited" into placeholder phrases and destroy the
+  // signal that a coverage actually is unlimited.
   if (coverage.isMarketValue) {
-    parts.push(applySafeWording(t.policy.paidByMarketValue))
+    parts.push(t.policy.paidByMarketValue)
   }
 
   if (coverage.isUnlimited) {
-    parts.push(applySafeWording(t.policy.noUpperLimit))
+    parts.push(t.policy.noUpperLimit)
   }
 
   return parts.length > 0 ? parts.join(' • ') : null
@@ -253,9 +258,7 @@ function CollapsibleCoverageCategory({
                       <span
                         className={`font-medium flex-shrink-0 ${subLimit.isUnlimited ? 'text-blue-600' : 'text-gray-900'}`}
                       >
-                        {subLimit.isUnlimited
-                          ? applySafeWording(t.global.unlimited)
-                          : formatAmount(subLimit.limit)}
+                        {subLimit.isUnlimited ? t.global.unlimited : formatAmount(subLimit.limit)}
                       </span>
                     </div>
                   ))}
