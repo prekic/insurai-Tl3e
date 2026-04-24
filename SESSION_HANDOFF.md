@@ -44,15 +44,16 @@
 
 ## Current State
 
-**Branch**: `claude/load-project-context-bNYCu` (3 commits ahead of `main`)
-**Working tree**: Clean before this handoff commit; doc updates land here.
-**Database**: 70 policies from 10 unique providers (unchanged this session)
-**Grade thresholds**: Calibrated from 64-policy sample (unchanged this session)
-**Tests**: 771 tests across 22 touched/adjacent suites pass. Full repo count ~17,486+ (adding 22 new tests this session: 9 vehicle, 10 display-mode, 14 pr3-extraction-depth, 3 IMM carve-out, minus some rewritten pre-existing tests).
+**Branch**: `claude/load-project-context-bNYCu` (4 commits ahead of `origin/main`)
+**Working tree**: Clean (all changes pushed, including this doc pass).
+**Database**: 70 policies from 10 unique providers (unchanged this session).
+**Grade thresholds**: Calibrated from 64-policy sample (unchanged this session).
+**Tests**: 35 new tests added this session across 4 files (9 in `turkish-utils-vehicle.test.ts`, 9 in `evaluate-simple-display-mode.test.ts`, 14 in new `pr3-extraction-depth.test.ts`, 3 in `imm-scenario-detection.test.ts`) + 9 pre-existing test suites updated for the `unlimited`/`sınırsız`-preservation behavior change (`display-interpreter`, `reviewer-safety-hardening`, `consumer-path-safety`, `pilot-8b`, `pilot-8c`, `pilot-8e`, `export`, `policy-reviewer-summary`, `PolicyDetailView-branches`) + 1 count-bump update (`qa-regression-fixes.test.ts`). 771 tests across 22 touched/adjacent suites pass.
 
 ### Commits landed this session
 
 ```
+cfc8731 chore(docs): session handoff — v4 extraction-depth pass (PRs 1-3)
 fa3e298 feat(extraction): Ek Sözleşme bullets + named deductibles + IMM carve-out caveat
 0308b8f fix(extraction): tighten PDF golden assertions + fix Modeli partial-match + prose-match guard
 3005328 fix(extraction): canonical field-alias table, kill placeholder, gate incomplete extractions
@@ -67,7 +68,7 @@ Covers v3 QA priorities **#2** (Model Year label drift across insurers), **#3** 
 - **New file**: `shared/field-aliases.ts` with `VEHICLE_FIELD_ALIASES` (6 canonical fields × multiple label variants) and `matchLabeledField(text, field)` helper. Handles Model Yılı / Model Bilgisi / İmal Yılı / Üretim Yılı / Model Year / Araç Yılı / bare `MODEL: <year>`.
 - **Killed the `"Coverage subject to sublimits..."` placeholder**: Removed the `unlimited → sublimits` regex from `display-interpreter.ts:applySafeWording`, removed `"unlimited"` and `"sınırsız"` from `PROHIBITED_PHRASES`, and bypassed `applySafeWording()` on structural limit values in `PolicyCoverageSection.tsx` and `policy-reviewer-summary.ts`. The Sınırsız/Unlimited signal now reaches the UI intact.
 - **Completeness gate**: `evaluateSimpleDisplayMode()` extended with vehicle + policyType + coverage-placeholder triggers (`MISSING_VEHICLE_MAKE`, `MISSING_VEHICLE_MODEL`, `MISSING_VEHICLE_YEAR`, `COVERAGE_PLACEHOLDER_DETECTED`). `evaluatePolicy()` now sets `isProvisional = true` and populates new `extractionIncomplete` + `extractionGateTriggers` fields on `PolicyEvaluation`. `PolicyScoreSection.tsx` renders `t.policy.extractionIncomplete` banner/badge when the flag fires.
-- **i18n**: Added `policy.extractionIncomplete` + `policy.extractionIncompleteDesc` to EN/TR/skeleton dictionaries.
+- **i18n**: Added `policy.extractionIncomplete` + `policy.extractionIncompleteDesc` to EN/TR/skeleton dictionaries AND to the `TranslationDictionary` interface in `src/lib/i18n/translations.ts`. When adding new keys the TypeScript contract lives in the interface file — touching only EN/TR/skeleton without the interface will surface TS errors on first consumer rebuild.
 - **Tests**: 9 new `turkish-utils-vehicle` tests, 8 new `evaluate-simple-display-mode` tests, plus updates to 7 pre-existing test suites that had pinned the old hedge-string behavior.
 
 ### PR-2 — Tightened golden assertions (commit `0308b8f`)
@@ -126,6 +127,9 @@ No new migrations were applied. No new packages were added. No `package.json` ch
 2. **Ray Sigorta OCR corruption** — the `.txt` fixture for the scanned Ray IVECO PDF has corrupted labels (e.g. `MARKASI/TİPİ` → `SVTİPİ`). `hasKvSeparator` correctly filters these out now (no more bogus make value), and production routes such scanned PDFs through GCP Document AI OCR via the `requiresOcr: true` companion fixture.
 3. **Test count drift** — Before this session, `shared/__tests__/extraction-schema.test.ts` had an assertion of 23 top-level required fields (actual: 29 at that time) and 9 coverage props (actual: 13). Both corrected to current reality (30 / 14). If you add more schema fields, update ALL count assertions — see gotcha #47 + #95.
 4. **Post-commit file reformatting** — `.husky/pre-commit` runs lint-staged which auto-applies `eslint --fix` + `prettier --write` on every committed `.ts/.tsx` file. The editor/linter notes these as "intentional changes" after each commit. Treat as informational.
+5. **Tiguan "HIGHLINE" suffix truncation (latent)** — `matchLabeledField` stops the value capture at `\n`, so when `pdf-parse` output splits a long model string across two lines (Anadolu Tiguan PDF emits `TIGUAN 1.4 TSI ACT BMT 150 DSG\nHIGHLINE`), the `HIGHLINE` trim word is lost. Golden fixture tolerates this via `expectedModelContains: 'TIGUAN'`. Fix path would be a line-continuation heuristic in `matchLabeledField` that joins the next line when it's indented or lacks a fresh label. Not in scope for v4.
+6. **Local `main` staleness after sandbox merges (gotcha #58 in action this session)** — when auditing branch scope, `git rev-parse main` returned `9750e7c…` while `git rev-parse origin/main` was at `c49003f…`. Always `git fetch origin main` then compare via `origin/main...HEAD` (never local `main`) before claiming a "clean diff." The stale-local main would have made 34 post-merge files look like session work.
+7. **Parameterized `checkProhibitedPhrase` `it.each` lists** — `display-interpreter.test.ts:56` and `consumer-path-safety.test.ts` each maintain a parameterized test list that mirrors the `PROHIBITED_PHRASES` constant. Removing/re-adding a phrase in the production constant requires updating BOTH parameterized lists. See gotcha #97 for the full contract.
 
 ## Architecture Check
 
