@@ -408,8 +408,12 @@ export function extractVehicleInfoFromText(rawText: string):
   // so year-bearing labels don't poison the model value.
   const rawModel = matchLabeledField(rawText, 'model')
   if (rawModel) {
+    // Some insurers (Allianz Peugeot) run the full trim string onto one line
+    // ("308 COMFORT 1.6 VTI (120) 5 KAPI OV (792)"). STOP_LABELS catches
+    // `Kullanım Şekli` / `Yer Adedi` etc. as terminators; the 80-char cap
+    // still guards against pathological captures that bypassed those.
     const cleaned = rawModel.replace(/[\n\r,;].*/, '').trim()
-    if (cleaned.length >= 1 && cleaned.length <= 60) {
+    if (cleaned.length >= 1 && cleaned.length <= 80) {
       result.model = cleaned
     }
   }

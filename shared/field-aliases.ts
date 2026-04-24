@@ -29,8 +29,13 @@ export const VEHICLE_FIELD_ALIASES = {
   /** Make / manufacturer */
   make: [/marka(?:s[ıi])?(?:\s*\/\s*t[iİ]p[iİ]?)?/i, /[üu]retici/i, /\bmake\b/i],
 
-  /** Model / trim — excludes modelYear forms via negative lookahead */
-  model: [/model(?!\s*(?:y[ıi]l|bilgisi|year|\s*[:.]?\s*\d{4}\b))/i, /\btip\b/i, /\btrim\b/i],
+  /** Model / trim — excludes modelYear forms via negative lookahead.
+   *  Allows optional trailing [iİ] to match Turkish possessive "Modeli". */
+  model: [
+    /model[iİ]?(?!\s*(?:y[ıi]l|bilgisi|year|\s*[:.]?\s*\d{4}\b))/i,
+    /\btip[iİ]?\b/i,
+    /\btrim\b/i,
+  ],
 
   /** Engine / motor number */
   motorNo: [/motor\s*(?:no|numaras[ıi])/i, /engine\s*(?:no|number)/i],
@@ -44,9 +49,29 @@ export const VEHICLE_FIELD_ALIASES = {
 
 export type VehicleFieldName = keyof typeof VEHICLE_FIELD_ALIASES
 
-function nonGlobal(re: RegExp): RegExp {
-  return re.flags.includes('g') ? new RegExp(re.source, re.flags.replace('g', '')) : re
-}
+/**
+ * Auxiliary labels that commonly appear in the `SİGORTA KONUSU ARAÇ BİLGİLERİ`
+ * block in Turkish kasko policies but are NOT fields we extract. Used by
+ * `matchLabeledField()` solely as value-capture boundaries so that e.g. a
+ * `Model : CLIO HB TOUCH 1.5 DCI EDC 90` capture stops before the following
+ * `Kullanım Şekli : HUSUSİ OTOMOBİL` leaks into the model value.
+ *
+ * Keep Turkish-possessive variants ("Türü", "Modeli", "Tescili") in mind;
+ * patterns use the same [iİ]? trailing-possessive trick as the main table.
+ */
+export const STOP_LABELS: readonly RegExp[] = [
+  /kullan[ıi]m\s*[şs]ekl[iİ]?/i,
+  /kullan[ıi]m/i,
+  /t[üu]r[üu]?\b/i,
+  /t[üu]r[üu]?\s*\(/i,
+  /tescil\s*tarih[iİ]?/i,
+  /yer\s*aded[iİ]?/i,
+  /trafi[ğg]e\s*[çc][ıi]k[ıi][şs]/i,
+  /ruhsat/i,
+  /m[üu][şs]ter[iİ]?\s*numaras[ıi]?/i,
+  /sbm\s*tramer/i,
+  /acente/i,
+]
 
 function anchoredAt(alias: RegExp): RegExp {
   return new RegExp('^(?:' + alias.source + ')', alias.flags.replace('g', ''))
@@ -66,34 +91,70 @@ function anchoredAt(alias: RegExp): RegExp {
  *
  * Returns `undefined` if the field's label is not found in the text.
  */
+/**
+ * After `pos`, look for a key/value separator signature: `:`, a tab, or a
+ * run of 2+ spaces (column-aligned layout). A bare word followed by prose
+ * punctuation (`,`, `.`, single space + letter) is NOT a kv context and
+ * indicates this "match" is a mid-sentence occurrence of the alias word,
+ * not a labeled field. Returns true only when `pos` looks like the start
+ * of a labeled value.
+ */
+function hasKvSeparator(text: string, pos: number): boolean {
+  let i = pos
+  while (i < text.length) {
+    const ch = text[i]
+    if (ch === ':' || ch === '\t') return true
+    if (ch === ' ') {
+      // Tolerate a single space, but a run of 2+ is column alignment.
+      if (text[i + 1] === ' ') return true
+      i++
+      continue
+    }
+    // Any word / punctuation char before a separator → mid-prose match.
+    return false
+  }
+  return false
+}
+
 export function matchLabeledField(text: string, field: VehicleFieldName): string | undefined {
   if (!text) return undefined
 
   const myAliases = VEHICLE_FIELD_ALIASES[field]
-  const otherAliases = (Object.keys(VEHICLE_FIELD_ALIASES) as VehicleFieldName[])
-    .filter((f) => f !== field)
-    .flatMap((f) => VEHICLE_FIELD_ALIASES[f])
-    .map(anchoredAt)
+  const otherAliases = [
+    ...(Object.keys(VEHICLE_FIELD_ALIASES) as VehicleFieldName[])
+      .filter((f) => f !== field)
+      .flatMap((f) => VEHICLE_FIELD_ALIASES[f]),
+    ...STOP_LABELS,
+  ].map(anchoredAt)
 
   for (const alias of myAliases) {
-    const re = nonGlobal(alias)
-    const labelMatch = re.exec(text)
-    if (!labelMatch || labelMatch.index === undefined) continue
+    // Iterate all occurrences, not just the first. Mid-prose mentions of
+    // common words like "marka, model, model yılı" must not beat the real
+    // labeled occurrence in the vehicle-info section.
+    const globalRe = new RegExp(
+      alias.source,
+      alias.flags.includes('g') ? alias.flags : alias.flags + 'g'
+    )
+    let labelMatch: RegExpExecArray | null
+    while ((labelMatch = globalRe.exec(text)) !== null) {
+      const labelEnd = labelMatch.index + labelMatch[0].length
+      if (!hasKvSeparator(text, labelEnd)) continue
 
-    let start = labelMatch.index + labelMatch[0].length
-    while (start < text.length && /[:.\s]/.test(text[start])) start++
+      let start = labelEnd
+      while (start < text.length && /[:.\s]/.test(text[start])) start++
 
-    let end = start
-    while (end < text.length) {
-      const ch = text[end]
-      if (ch === '\n' || ch === '\r') break
-      const remaining = text.slice(end)
-      if (otherAliases.some((a) => a.test(remaining))) break
-      end++
+      let end = start
+      while (end < text.length) {
+        const ch = text[end]
+        if (ch === '\n' || ch === '\r') break
+        const remaining = text.slice(end)
+        if (otherAliases.some((a) => a.test(remaining))) break
+        end++
+      }
+
+      const value = text.slice(start, end).trim()
+      if (value.length > 0) return value
     }
-
-    const value = text.slice(start, end).trim()
-    if (value.length > 0) return value
   }
   return undefined
 }
