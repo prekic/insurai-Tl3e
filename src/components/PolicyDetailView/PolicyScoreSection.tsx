@@ -45,7 +45,7 @@ export function MobileEvaluationCard(props: any) {
         </CardTitle>
       </CardHeader>
       <CardContent className="p-3 sm:p-6 space-y-3 sm:space-y-4">
-        /* Overall Score with Grade - Compact */
+        {/* Overall Score with Grade - Compact */}
         <div className="flex items-center justify-between p-2.5 sm:p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="text-2xl sm:text-3xl font-bold text-gray-900">
@@ -70,8 +70,8 @@ export function MobileEvaluationCard(props: any) {
             <StatusIndicator status={evaluation.status} showLabel size="sm" />
           </div>
         </div>
-        /* Top Score Drivers — concise "why this grade" */ /* Suppressed for unverified/draft
-        policies to avoid leaking confident category scores */
+        {/* Top Score Drivers — concise "why this grade" — Suppressed for unverified/draft
+        policies to avoid leaking confident category scores */}
         {!isUnverified &&
           (() => {
             const breakdown = evaluation.scoreBreakdown
@@ -134,7 +134,7 @@ export function MobileEvaluationCard(props: any) {
               </div>
             )
           })()}
-        /* Model disclosure */
+        {/* Model disclosure */}
         <p
           className="text-[10px] text-gray-400 italic leading-tight"
           data-testid="grade-model-disclosure"
@@ -143,8 +143,8 @@ export function MobileEvaluationCard(props: any) {
             ? 'Bu derecelendirme mevcut iç model eşiklerine dayanmaktadır ve karşılaştırma kapsamı geliştikçe yeniden kalibre edilebilir.'
             : 'This rating is based on current internal model thresholds and may be recalibrated as benchmark coverage improves.'}
         </p>
-        /* Score Breakdown - Expandable. Fully suppressed when isUnverified so a gate-triggered
-        policy cannot leak confident category scores. */
+        {/* Score Breakdown - Expandable. Fully suppressed when isUnverified so a gate-triggered
+        policy cannot leak confident category scores. */}
         {!isUnverified && (
           <div className="pt-2 border-t">
             <button
@@ -168,8 +168,8 @@ export function MobileEvaluationCard(props: any) {
             </div>
           </div>
         )}
-        /* Recommendations - Expandable. Suppressed with score breakdown on gate-triggered policies
-        — recommendations computed on incomplete data can be misleading. */
+        {/* Recommendations - Expandable. Suppressed with score breakdown on gate-triggered policies
+        — recommendations computed on incomplete data can be misleading. */}
         {!isUnverified && evaluation.recommendations.length > 0 && (
           <div className="pt-2 border-t">
             <p className="text-xs sm:text-sm font-medium text-gray-700 mb-2">
@@ -384,7 +384,7 @@ export function DesktopEvaluationCard(props: any) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        /* Overall Score with Grade */
+        {/* Overall Score with Grade */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="text-3xl font-bold text-gray-900">
@@ -409,8 +409,8 @@ export function DesktopEvaluationCard(props: any) {
             <StatusIndicator status={evaluation.status} showLabel size="sm" />
           </div>
         </div>
-        /* Top Score Drivers — desktop */ /* Suppressed for unverified/draft policies to avoid
-        leaking confident category scores */
+        {/* Top Score Drivers — desktop — Suppressed for unverified/draft policies to avoid
+        leaking confident category scores */}
         {!isUnverified &&
           (() => {
             const bd = evaluation.scoreBreakdown
@@ -473,7 +473,7 @@ export function DesktopEvaluationCard(props: any) {
               </div>
             )
           })()}
-        /* Model disclosure — desktop */
+        {/* Model disclosure — desktop */}
         <p
           className="text-[10px] text-gray-400 italic leading-tight"
           data-testid="grade-model-disclosure"
@@ -482,15 +482,15 @@ export function DesktopEvaluationCard(props: any) {
             ? 'Bu derecelendirme mevcut iç model eşiklerine dayanmaktadır ve karşılaştırma kapsamı geliştikçe yeniden kalibre edilebilir.'
             : 'This rating is based on current internal model thresholds and may be recalibrated as benchmark coverage improves.'}
         </p>
-        /* Score Breakdown — suppressed for gate-triggered policies so we don't leak confident
-        category scores next to the "Incomplete" badge. */
+        {/* Score Breakdown — suppressed for gate-triggered policies so we don't leak confident
+        category scores next to the "Incomplete" badge. */}
         {!isUnverified && (
           <div className="pt-2 border-t">
             <p className="text-sm font-medium text-gray-700 mb-2">{t.policy.scoreBreakdown}</p>
             <ScoreBreakdown breakdown={evaluation.scoreBreakdown} variant="full" />
           </div>
         )}
-        /* Top Recommendations — suppressed with score breakdown on gate-triggered policies. */
+        {/* Top Recommendations — suppressed with score breakdown on gate-triggered policies. */}
         {!isUnverified && evaluation.recommendations.length > 0 && (
           <div className="pt-2 border-t">
             <p className="text-sm font-medium text-gray-700 mb-2">{t.policy.recommendations}</p>
