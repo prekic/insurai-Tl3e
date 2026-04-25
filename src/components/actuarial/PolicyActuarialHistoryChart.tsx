@@ -100,27 +100,16 @@ export function PolicyActuarialHistoryChart({ policyId }: PolicyActuarialHistory
   }
 
   if (error) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{t.policy.evaluationHistory}</CardTitle>
-          <CardDescription className="text-red-500">
-            {t.policy.evaluationHistoryError.replace('{error}', error)}
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    )
+    // P0: Never leak raw Supabase / internal error strings to users.
+    // Log for debugging and suppress entirely from UI rendering.
+    console.warn('[PolicyActuarialHistoryChart] History fetch error (suppressed from UI):', error)
+    return null
   }
 
   if (data.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{t.policy.evaluationHistory}</CardTitle>
-          <CardDescription>{t.policy.evaluationHistoryEmpty}</CardDescription>
-        </CardHeader>
-      </Card>
-    )
+    // Suppress empty-state card — an empty chart card is UI noise for users
+    // who don't have historical evaluations yet.
+    return null
   }
 
   // Format data for Recharts

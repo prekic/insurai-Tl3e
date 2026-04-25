@@ -141,6 +141,18 @@ function policyRowToAnalyzedPolicy(row: PolicyRow): AnalyzedPolicy {
     processedText: rawData.processedText,
     // Evidence data for AI insights and exclusions
     evidenceData: rawData.evidenceData,
+    // Vehicle information for kasko policies
+    vehicleInfo: rawData.vehicleInfo,
+    // Discounts
+    discounts: rawData.discounts ?? undefined,
+    // Extraction warnings
+    extractionWarnings: rawData.extractionWarnings,
+    conditionalDeductibles: rawData.conditionalDeductibles,
+    deductiblePercent: rawData.deductiblePercent,
+    premiumMissing: rawData.premiumMissing,
+    insuredMissing: rawData.insuredMissing,
+    deductibleUncertain: rawData.deductibleUncertain,
+    insuredEntityType: rawData.insuredEntityType,
     // Universal schema mapping
     canonicalText: row.canonical_text || undefined,
     spanMaps: (row.span_maps as AnalyzedPolicy['spanMaps']) || undefined,
@@ -192,6 +204,15 @@ function analyzedPolicyToInsert(policy: AnalyzedPolicy, userId: string): PolicyI
       extractedText: policy.extractedText,
       processedText: policy.processedText,
       evidenceData: policy.evidenceData,
+      vehicleInfo: policy.vehicleInfo,
+      discounts: policy.discounts,
+      extractionWarnings: policy.extractionWarnings,
+      conditionalDeductibles: policy.conditionalDeductibles,
+      deductiblePercent: policy.deductiblePercent,
+      premiumMissing: policy.premiumMissing,
+      insuredMissing: policy.insuredMissing,
+      deductibleUncertain: policy.deductibleUncertain,
+      insuredEntityType: policy.insuredEntityType,
     },
     canonical_text: policy.canonicalText,
     span_maps: policy.spanMaps,
@@ -262,7 +283,16 @@ function analyzedPolicyToUpdate(updates: Partial<AnalyzedPolicy>): PolicyUpdate 
     updates.gapActions !== undefined ||
     updates.extractedText !== undefined ||
     updates.processedText !== undefined ||
-    updates.evidenceData !== undefined
+    updates.evidenceData !== undefined ||
+    updates.vehicleInfo !== undefined ||
+    updates.discounts !== undefined ||
+    updates.extractionWarnings !== undefined ||
+    updates.conditionalDeductibles !== undefined ||
+    updates.deductiblePercent !== undefined ||
+    updates.premiumMissing !== undefined ||
+    updates.insuredMissing !== undefined ||
+    updates.deductibleUncertain !== undefined ||
+    updates.insuredEntityType !== undefined
 
   if (hasRawDataUpdates) {
     result.raw_data = {
@@ -280,6 +310,15 @@ function analyzedPolicyToUpdate(updates: Partial<AnalyzedPolicy>): PolicyUpdate 
       extractedText: updates.extractedText,
       processedText: updates.processedText,
       evidenceData: updates.evidenceData,
+      vehicleInfo: updates.vehicleInfo,
+      discounts: updates.discounts,
+      extractionWarnings: updates.extractionWarnings,
+      conditionalDeductibles: updates.conditionalDeductibles,
+      deductiblePercent: updates.deductiblePercent,
+      premiumMissing: updates.premiumMissing,
+      insuredMissing: updates.insuredMissing,
+      deductibleUncertain: updates.deductibleUncertain,
+      insuredEntityType: updates.insuredEntityType,
     }
   }
 
