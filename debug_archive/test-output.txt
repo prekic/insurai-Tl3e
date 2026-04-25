@@ -1,0 +1,39 @@
+
+Running 1 test using 1 worker
+
+  ✘  1 [chromium] › e2e/admin-flows.spec.ts:199:5 › Admin Dashboard › Comprehensive Authenticated Flows › should complete login flow and redirect to dashboard (27.9s)
+
+
+  1) [chromium] › e2e/admin-flows.spec.ts:199:5 › Admin Dashboard › Comprehensive Authenticated Flows › should complete login flow and redirect to dashboard 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('header')
+    Expected pattern: [32m/Admin/i[39m
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 15000ms[22m
+    [2m  - waiting for locator('header')[22m
+
+
+      205 |       // It should navigate to /admin and show the admin dashboard
+      206 |       await expect(page).toHaveURL(/\/admin$/)
+    > 207 |       await expect(page.locator('header')).toContainText(/Admin/i, { timeout: 15000 })
+          |                                            ^
+      208 |       await expect(page.getByText(/operational/i).first()).toBeVisible()
+      209 |     })
+      210 |
+        at /workspaces/insurai/e2e/admin-flows.spec.ts:207:44
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/admin-flows-Admin-Dashboar-ef9c4-w-and-redirect-to-dashboard-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/admin-flows-Admin-Dashboar-ef9c4-w-and-redirect-to-dashboard-chromium/error-context.md
+
+  1 failed
+    [chromium] › e2e/admin-flows.spec.ts:199:5 › Admin Dashboard › Comprehensive Authenticated Flows › should complete login flow and redirect to dashboard 
+
+[36m  Serving HTML report at http://localhost:43013. Press Ctrl+C to quit.[39m
