@@ -331,6 +331,11 @@ async function main(): Promise<void> {
       `${tag}  ${result.id.slice(0, 8)} (${result.provider.slice(0, 24).padEnd(24)}) #${result.policyNumber}`
     )
     if (summary) console.log(`         ${summary}`)
+    // For error outcomes, ALSO print the detail line — the make/model/year
+    // values are what we attempted to write, not what we successfully wrote.
+    if (result.outcome === 'error' && result.detail) {
+      console.log(`         ${result.detail}`)
+    }
   }
 
   // Summary
