@@ -185,8 +185,20 @@ describe('getMainCoverageValue', () => {
       type: 'traffic',
       coverage: 100000,
       coverages: [
-        { name: 'Material Damage', nameTr: 'Maddi Hasar', limit: 300000, deductible: 0, included: true },
-        { name: 'Bodily Injury per Accident', nameTr: 'Kaza Başı Ölüm/Sakatlık', limit: 2700000, deductible: 0, included: true },
+        {
+          name: 'Material Damage',
+          nameTr: 'Maddi Hasar',
+          limit: 300000,
+          deductible: 0,
+          included: true,
+        },
+        {
+          name: 'Bodily Injury per Accident',
+          nameTr: 'Kaza Başı Ölüm/Sakatlık',
+          limit: 2700000,
+          deductible: 0,
+          included: true,
+        },
         { name: 'Death', nameTr: 'Ölüm Teminatı', limit: 1500000, deductible: 0, included: true },
       ],
     })
@@ -198,7 +210,13 @@ describe('getMainCoverageValue', () => {
       type: 'traffic',
       coverage: 50000,
       coverages: [
-        { name: 'Legal Aid', nameTr: 'Hukuki Yardım', limit: 200000, deductible: 0, included: true },
+        {
+          name: 'Legal Aid',
+          nameTr: 'Hukuki Yardım',
+          limit: 200000,
+          deductible: 0,
+          included: true,
+        },
         { name: 'Towing', nameTr: 'Çekici', limit: 10000, deductible: 0, included: true },
       ],
     })
@@ -209,9 +227,7 @@ describe('getMainCoverageValue', () => {
     const policy = makePolicy({
       type: 'traffic',
       coverage: 75000,
-      coverages: [
-        { name: 'Test', nameTr: 'Test', limit: 0, deductible: 0, included: true },
-      ],
+      coverages: [{ name: 'Test', nameTr: 'Test', limit: 0, deductible: 0, included: true }],
     })
     expect(getMainCoverageValue(policy)).toBe(75000)
   })
@@ -231,29 +247,28 @@ describe('getMainCoverageValue', () => {
 // getInsuredSubject
 // ==================================================================
 describe('getInsuredSubject', () => {
-  it('returns plate from rawData.plateNumber for kasko', () => {
-    const policy = makePolicy({ type: 'kasko' })
-    ;(policy as any).raw_data = { plateNumber: '34 ABC 1234' }
+  it('returns plate from vehicleInfo for kasko', () => {
+    const policy = makePolicy({ type: 'kasko', vehicleInfo: { plate: '34 ABC 1234' } })
     expect(getInsuredSubject(policy)).toBe('34 ABC 1234')
   })
 
-  it('returns plate from rawData.vehiclePlate for traffic', () => {
-    const policy = makePolicy({ type: 'traffic' })
-    ;(policy as any).raw_data = { vehiclePlate: '06 XY 789' }
+  it('returns plate from vehicleInfo for traffic', () => {
+    const policy = makePolicy({ type: 'traffic', vehicleInfo: { plate: '06 XY 789' } })
     expect(getInsuredSubject(policy)).toBe('06 XY 789')
-  })
-
-  it('returns plate from rawData.plaka', () => {
-    const policy = makePolicy({ type: 'kasko' })
-    ;(policy as any).raw_data = { plaka: '35 AB 123' }
-    expect(getInsuredSubject(policy)).toBe('35 AB 123')
   })
 
   it('extracts plate from coverage descriptions', () => {
     const policy = makePolicy({
       type: 'kasko',
       coverages: [
-        { name: 'Test', nameTr: 'Test', limit: 0, deductible: 0, included: true, description: 'Plaka: 34 AB 1234 sigorta' },
+        {
+          name: 'Test',
+          nameTr: 'Test',
+          limit: 0,
+          deductible: 0,
+          included: true,
+          description: 'Plaka: 34 AB 1234 sigorta',
+        },
       ],
     })
     expect(getInsuredSubject(policy)).toBe('34 AB 1234')
@@ -267,22 +282,19 @@ describe('getInsuredSubject', () => {
     expect(getInsuredSubject(policy)).toBe('06 XYZ 78')
   })
 
-  it('returns vehicle model as fallback for kasko', () => {
-    const policy = makePolicy({ type: 'kasko' })
-    ;(policy as any).raw_data = { vehicleModel: 'Toyota Corolla' }
+  it('returns vehicle make and model as fallback for kasko', () => {
+    const policy = makePolicy({ type: 'kasko', vehicleInfo: { make: 'Toyota', model: 'Corolla' } })
     expect(getInsuredSubject(policy)).toBe('Toyota Corolla')
   })
 
-  it('returns vehicle brand as fallback for kasko', () => {
-    const policy = makePolicy({ type: 'kasko' })
-    ;(policy as any).raw_data = { vehicleBrand: 'BMW' }
+  it('returns vehicle make as fallback for kasko if no model', () => {
+    const policy = makePolicy({ type: 'kasko', vehicleInfo: { make: 'BMW' } })
     expect(getInsuredSubject(policy)).toBe('BMW')
   })
 
-  it('returns aracModel as fallback for kasko', () => {
-    const policy = makePolicy({ type: 'kasko' })
-    ;(policy as any).raw_data = { aracModel: 'Ford Focus' }
-    expect(getInsuredSubject(policy)).toBe('Ford Focus')
+  it('returns vehicle model as fallback for kasko if no make', () => {
+    const policy = makePolicy({ type: 'kasko', vehicleInfo: { model: 'Focus' } })
+    expect(getInsuredSubject(policy)).toBe('Focus')
   })
 
   it('returns null for kasko with no subject info', () => {
@@ -293,24 +305,6 @@ describe('getInsuredSubject', () => {
   it('returns location for home policy', () => {
     const policy = makePolicy({ type: 'home', location: 'Istanbul, Kadıköy' })
     expect(getInsuredSubject(policy)).toBe('Istanbul, Kadıköy')
-  })
-
-  it('returns propertyAddress from rawData for home', () => {
-    const policy = makePolicy({ type: 'home', location: undefined as any })
-    ;(policy as any).raw_data = { propertyAddress: 'Ankara, Çankaya' }
-    expect(getInsuredSubject(policy)).toBe('Ankara, Çankaya')
-  })
-
-  it('returns riskAddress from rawData for dask', () => {
-    const policy = makePolicy({ type: 'dask', location: undefined as any })
-    ;(policy as any).raw_data = { riskAddress: 'İzmir, Bornova' }
-    expect(getInsuredSubject(policy)).toBe('İzmir, Bornova')
-  })
-
-  it('returns riziko_adresi from rawData for business', () => {
-    const policy = makePolicy({ type: 'business', location: undefined as any })
-    ;(policy as any).raw_data = { riziko_adresi: 'Bursa, Osmangazi' }
-    expect(getInsuredSubject(policy)).toBe('Bursa, Osmangazi')
   })
 
   it('returns null for home with no address', () => {
@@ -371,31 +365,27 @@ describe('getSubjectDisplay', () => {
   })
 
   it('shows plate label for kasko with plate number', () => {
-    const policy = makePolicy({ type: 'kasko' })
-    ;(policy as any).raw_data = { plateNumber: '34 ABC 1234' }
+    const policy = makePolicy({ type: 'kasko', vehicleInfo: { plate: '34 ABC 1234' } })
     const display = getSubjectDisplay(policy)
     expect(display?.label).toBe('Plate')
     expect(display?.value).toBe('34 ABC 1234')
   })
 
   it('shows Plaka label for kasko with plate number in Turkish', () => {
-    const policy = makePolicy({ type: 'kasko' })
-    ;(policy as any).raw_data = { plateNumber: '34 ABC 1234' }
+    const policy = makePolicy({ type: 'kasko', vehicleInfo: { plate: '34 ABC 1234' } })
     const display = getSubjectDisplay(policy, 'tr')
     expect(display?.label).toBe('Plaka')
   })
 
   it('shows Vehicle label for kasko with vehicle model (not plate)', () => {
-    const policy = makePolicy({ type: 'kasko' })
-    ;(policy as any).raw_data = { vehicleModel: 'Toyota Corolla' }
+    const policy = makePolicy({ type: 'kasko', vehicleInfo: { make: 'Toyota', model: 'Corolla' } })
     const display = getSubjectDisplay(policy)
     expect(display?.label).toBe('Vehicle')
     expect(display?.value).toBe('Toyota Corolla')
   })
 
   it('shows Araç label for kasko with vehicle model in Turkish', () => {
-    const policy = makePolicy({ type: 'kasko' })
-    ;(policy as any).raw_data = { vehicleModel: 'BMW X5' }
+    const policy = makePolicy({ type: 'kasko', vehicleInfo: { make: 'BMW', model: 'X5' } })
     const display = getSubjectDisplay(policy, 'tr')
     expect(display?.label).toBe('Araç')
   })
