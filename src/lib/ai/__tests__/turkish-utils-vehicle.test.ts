@@ -178,6 +178,18 @@ Motor No MP0428 úDVL1R NNATFR86JL2000712`
     expect(result?.engineNo).toBe('MP0428')
   })
 
+  it('extracts model with corrupted leading quote (AXA 14f3378a)', () => {
+    const text = `
+  .XOODQÖP7DU]Ö &LQVL KAMYONET Marka ISUZU
+  Marka Tipi '0$;dù)7.$%ù1
+  Tipi d(.ù'(0ù5ù%$*$-+$98=8g1
+  Model Bilgisi 2013 Plaka Il Kodu ZONGULDAK
+  Plaka No 67UA659 Motor No KM3182`
+    const result = extractVehicleInfoFromText(text)
+    expect(result?.make).toBe('ISUZU')
+    expect(result?.model).toBe("'0$;dù)7.$%ù1")
+  })
+
   it('does NOT fire tabular fallback for lowercase prose mentions of "marka"', () => {
     // Mid-prose lowercase mention of "marka" should not be claimed as a
     // labeled value just because the next token is uppercase. The tabular

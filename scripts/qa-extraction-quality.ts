@@ -319,7 +319,8 @@ async function main(): Promise<void> {
   let query = supabase.from('policies').select('*').limit(limit)
   if (typeFilter) query = query.eq('type', typeFilter)
   if (providerFilter) query = query.ilike('provider', `%${providerFilter}%`)
-  const { data: rows, error } = await query
+  const { data, error } = await query
+  const rows = (data || []) as any[]
   if (error) {
     console.error('Error fetching policies:', error)
     process.exit(1)

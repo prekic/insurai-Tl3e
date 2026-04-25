@@ -2892,3 +2892,11 @@ npm run build:analyze
 **Vitest Mocking Mismatches causing terminal noise (Added Apr 12, 2026):**
 - Manually tracking and spying on `console.error` and `console.warn` across multiple test hooks leads to terminal noise and test reporter pollution, especially when mocking external network responses like `vi.mock('./config')`.
 - **The fix**: Do not use inline `vi.spyOn` assertions. Instead, wrap them in scoped `beforeEach` and `afterEach` hooks per `describe` block. Also, ensure `mockRestore()` is correctly enforced in `afterEach` to block spy bleed-over into the next describe block test suite.
+
+**Sparse OCR Fallback (Added Apr 25, 2026):**
+- **Gotcha #110**: When using `pdf-parse`, scanned or image-based PDFs will often parse successfully but return very sparse text (e.g., < 100 characters). This triggers silent failures in downstream extraction logic.
+- **The fix**: Implement a fallback gate (e.g., `if (recovered.length < 100)`) to dynamically route these sparse documents to `extractWithDocumentAI` instead, ensuring resilient data extraction on image-heavy PDFs.
+
+**Node.js Script Execution Polyfill (Added Apr 25, 2026):**
+- **Gotcha #111**: When executing backend scripts (e.g., `ts-node` or `tsx`) that import files originally designed for Vite (`import.meta.env`), the script will crash because `import.meta.env` is `undefined` outside of a Vite context.
+- **The fix**: Inject a polyfill at the top of shared environment/config files (like `env.ts`) that maps `process.env` to `import.meta.env` when `typeof process !== 'undefined'`. Use `env.config` uniformly instead of accessing `import.meta.env` directly.

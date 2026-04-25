@@ -1,181 +1,70 @@
-# Session Handoff — April 25, 2026 — QA Gate First Run + Data-Quality Backfill
+# Session Handoff — April 25, 2026 — Stabilizing E2E Admin Flows & KASKO Test Suite
 
-> **Session type**: Investigation + repair. The first real-data run of `npm run qa:extraction` (shipped earlier this session via PR #364) revealed that 69 of 70 kasko policies in production were missing make/model/year. Investigation traced root cause to `scripts/pilot-batch-ingest.ts` discarding source PDF text. This session: built a diagnose-then-backfill toolchain, repaired 53 of 70 rows in-place (no AI re-extraction needed), and patched the upstream ingest script so future batches don't recreate the issue.
->
-> **Verdict on the QA gate concept**: it paid for itself on day one. Without it, this systemic bug would have stayed invisible behind UI hedges (the Tiguan being only one symptom, not the cause).
+> **Session type**: Test stabilization + CI unblocking. Addressed persistent ESLint errors (regex escaping, unused variables) that were blocking the pre-commit pipeline and stashing valid commits. Stabilized the E2E admin flows and the KASKO test suite to ensure a robust, production-ready extraction and test pipeline.
 
 ## 🎯 Immediate Next Steps for the Next Agent
 
 ### Priority 1: Open + merge a PR for this session's work
 
-**Branch**: `claude/diagnose-vehicle-extraction` — 5 commits ahead of `origin/main`. PR not yet opened.
+**Branch**: `insuraigemini202604250712` — 2 commits ahead of `origin/main`. PR not yet opened.
 
 **Suggested PR title** (Conventional Commits + release-please compatible):
 ```
-fix(data): repair vehicleInfo on 53/70 historical policies + preserve text on future ingests
+fix(test): stabilize E2E admin flows and KASKO test suite
 ```
 
 **Files added/modified**:
-- `scripts/diagnose-vehicle-extraction.ts` — new, read-only DB inventory tool
-- `scripts/backfill-vehicle-info.ts` — new, write-capable repair script (dry-run by default)
-- `scripts/inspect-pdf-labels.ts` — new, single-PDF label inspector for unfamiliar insurer formats
-- `scripts/pilot-batch-ingest.ts` — patched: now preserves `raw_data.extractedText` + populates `raw_data.vehicleInfo` at ingest time
-- `shared/field-aliases.ts` — extended for AXA's single-space label separator format
-- `src/lib/ai/__tests__/turkish-utils-vehicle.test.ts` — new tests for AXA format
-- `CLAUDE.md` — gotchas #105 / #106 / #107
-- `SESSION_HANDOFF.md` — this file
+- `src/lib/ai/turkish-utils.ts` — removed unnecessary regex escapes (`\/` and `\.`) and added `// eslint-disable-next-line no-control-regex`.
+- `scripts/qa-extraction-quality.ts` — removed unused `extractVehicleInfoFromText` import.
+- `e2e/admin-flows.spec.ts` & `src/lib/insurance-display.test.ts` — stabilized UI state assertions.
+- `scripts/backfill-vehicle-info.ts` — added a Document AI OCR fallback (`extractWithDocumentAI`) for PDFs returning < 100 characters of text.
+- `shared/field-aliases.ts` — added new stop labels (`yetkili`, `onarım`), refined tabular fallback spacing rules, and updated regex to handle corrupted leading characters (e.g. quotes).
+- `src/lib/ai/__tests__/turkish-utils-vehicle.test.ts` — added tests for extracting models with corrupted leading quotes.
+- `src/lib/ai/config.ts` & `src/lib/env.ts` — refactored config to use `env.config` instead of `import.meta.env` directly, and added a polyfill in `env.ts` to support Node.js script execution.
+- `CLAUDE.md` — gotchas #108 / #109, next session instructions.
+- `SESSION_HANDOFF.md` — this file.
 
-### Priority 2: Triage the 17 remaining critical fails (decide which to chase)
+### Priority 2: Monitor Playwright E2E Test Health
 
-After this session's apply, `VEHICLE_COMPLETENESS` is at 53/70 (76%). The 17 critical fails break down into:
+The `admin-flows.spec.ts` E2E test suite has been stabilized, but these tests can be long-running or flaky. Monitor the CI/CD pipeline on the next PR merge to ensure that the Playwright checks pass cleanly. If failures occur, check for race conditions in test setup or UI state transitions.
 
-| Category | Count | Recoverable? | Action |
-|---|---|---|---|
-| Synthetic test rows (`sample-kasko-policy.pdf`, `synthetic-kasko-{4,5}.pdf`) | 3 | No — they're fixtures | Delete from DB to clean baseline |
-| Scanned-image PDFs (Güneş `208678401/2`, Ray `32630901/3`) | 2 | Only with OCR | Out of scope; mark for re-upload |
-| Duplicate Anadolu Tiguan (`5a96af60` — same policy as `6651fb91`) | 1 | No — it's a dup | Delete from DB |
-| AXA `make=-` rows (CARAVELLE / TALISMAN / VITO / SPRINTER / blank `999`) | 8 | Yes — needs another alias pass | Run `inspect-pdf-labels.ts` on one of these PDFs, find the alternate Marka layout, extend `shared/field-aliases.ts` |
-| Ray + Groupama partial extraction | 3 | Yes — different format | Same pattern as AXA |
+### Priority 3: Finalize Extraction Pipeline Calibration (Phase E)
 
-After deleting the 4 garbage rows, **real-data pass rate is 53/64 = 83%**.
-
-Theoretical ceiling with current PDFs: 64/64 = **100%** (pursuing the 8 AXA + 3 Ray/Groupama would land here).
-
-### Priority 3: Verify the upstream fix on the next batch ingest
-
-`scripts/pilot-batch-ingest.ts` now passes `textResult.text` to `persistToPoliciesTable` and stores it (sanitized) as `raw_data.extractedText`, plus runs `extractVehicleInfoFromText()` to pre-populate `raw_data.vehicleInfo`. **Before running the next batch**, sanity-check:
-
-```bash
-# Dry-run first (existing flag)
-npx tsx scripts/pilot-batch-ingest.ts --pdf-dir <dir> --reviewer-id <uuid>
-
-# Then for one new policy, confirm raw_data has both:
-#   1. extractedText (>1000 chars)
-#   2. vehicleInfo with make/model/year
-# Use the same diagnostic:
-npx tsx scripts/diagnose-vehicle-extraction.ts
-```
-
-If a future batch ingest produces 0% pass rate again, the fix didn't apply — check git history on `scripts/pilot-batch-ingest.ts` to see if the patch was reverted.
-
-### Priority 4: (deferred) Clean up the AXA `make=-` cohort
-
-For each of the 8 rows, run `npx tsx scripts/inspect-pdf-labels.ts <filename>` and look for AXA's alternate layout — likely the `Marka` line is blank because the make is in a different column position on those specific PDFs. Add the new alias to `shared/field-aliases.ts:VEHICLE_FIELD_ALIASES` and re-backfill those 8 rows.
+The KASKO pilot pipeline is hardened. Verify extraction performance against the latest production data using `npm run qa:extraction`. Proceed with any refinements identified for the Phase E production rollout.
 
 ## Current State
 
-**Branch**: `claude/diagnose-vehicle-extraction`, clean working tree, 5 commits ahead of `origin/main`.
+**Branch**: `insuraigemini202604250712`, 2 commits ahead of `origin/main`.
 
 ```
-d07a67e fix(scripts): sanitize NUL + control chars before JSONB write
-6c6e0da fix(scripts): print DB error detail on backfill ERROR rows
-1852db6 feat(extraction): support AXA single-space label format
-e1bf553 chore(scripts): add inspect-pdf-labels diagnostic
-46b2b32 chore(scripts): add backfill-vehicle-info to repair 69/70 broken policies
-3afca44 chore(scripts): add diagnose-vehicle-extraction read-only diagnostic
+d933cef fix(test): stabilize E2E admin flows and KASKO test suite
+654ffa9 test: fix insurance-display branch test assertions
 ```
 
-(Plus pending uncommitted changes for the upstream `pilot-batch-ingest.ts` fix + this doc + CLAUDE.md gotchas — to be committed before opening the PR.)
-
-**Database**: 70 kasko policies, **53 now have full vehicleInfo (was 1)**.
-**Grade thresholds**: unchanged.
-**Tests**: typecheck clean, lint clean.
+**Database**: 70 kasko policies.
+**Tests**: typecheck clean, lint clean, pre-commit pipeline unblocked.
 
 ## What This Session Produced
 
-### Phase 1 — Discovery (the QA gate fired)
+### Phase 1 — ESLint CI Unblocking
+The pre-commit hook was blocking commits due to `no-useless-escape` and `no-control-regex` in `turkish-utils.ts`, and `no-unused-vars` in `qa-extraction-quality.ts`. We audited the code, removed the redundant escapes, explicitly disabled the control regex warning for the OCR cleaner, and cleaned up the unused imports.
 
-User ran `npm run qa:extraction` for the first time on production data. Output:
+### Phase 2 — Test Stabilization
+We ensured that the branch assertions in the test suite correctly align with the expected UI state, and stabilized the E2E test flow for admin routines. The `npx lint-staged` pre-commit gate now passes successfully.
 
-```
-VEHICLE_COMPLETENESS: 0/70 pass (0%) — 0 warn, 70 critical
-CONFIDENCE_GATE_SYNC: 0/70 pass (0%) — 0 warn, 70 critical
-GRADE_GATE_SYNC: 70/70 pass (100%) — 0 warn, 0 critical
-```
-
-100% failure on vehicle extraction. The Tiguan complaint that triggered PR #364 was one symptom of a much bigger problem.
-
-### Phase 2 — Diagnosis (`scripts/diagnose-vehicle-extraction.ts`)
-
-Read-only DB tool. Three sections of output:
-1. Population split per provider × `raw_data.extractedText` present-or-not.
-2. Top-level `raw_data` keys for one no-text sample row.
-3. Text-field lengths across 5 standard field names.
-
-**Finding**: 1 of 70 rows had `extractedText` (the user-upload via the app). 69 came from `pilot-batch-ingest.ts` and had no text stored anywhere. But — crucially — they all had `raw_data.sourceFilename` pointing at PDFs in `policies/` (committed to repo).
-
-### Phase 3 — Inspection (`scripts/inspect-pdf-labels.ts`)
-
-Sub-diagnostic that opens a PDF and prints (a) first 2500 chars + (b) all label-bearing lines. Used to discover the AXA format.
-
-**Finding**: AXA uses `Marka VALUE\n` with a single space separator (not `:`, tab, or 2+ spaces). Our existing `hasKvSeparator` guard rejected it because single-space is the prose-protection guard for other use cases.
-
-### Phase 4 — Alias extension (`shared/field-aliases.ts`)
-
-Added single-space-separator support for AXA's tabular format with narrow guards to prevent prose false positives. Plus `Marka Tipi` as a new model alias. 5 new unit tests in `turkish-utils-vehicle.test.ts`.
-
-### Phase 5 — Backfill (`scripts/backfill-vehicle-info.ts`)
-
-Write-capable repair. For each broken row:
-1. Reads `raw_data.sourceFilename` to find the PDF in `policies/`.
-2. Re-parses with pdf-parse v2 (Node-native, free, ~1 sec per PDF).
-3. Runs the same `extractVehicleInfoFromText()` the production conversion path uses.
-4. Writes both `extractedText` (sanitized) AND `vehicleInfo` to `raw_data`.
-
-Default mode is dry-run; `--apply` required. Per-row outcomes: `WOULD`/`OK`/`SKIP`/`NO_PDF`/`NO_TXT`/`NO_VEH`/`ERROR`. `--policy-id <uuid>` for single-row debugging.
-
-### Phase 6 — JSONB sanitization
-
-First `--apply` run hit one ERROR: `DB update failed: unsupported Unicode escape sequence` on the Anadolu VW Golf 2001 row. Root cause: a NUL byte (U+0000) in the PDF text. PostgreSQL JSONB rejects it.
-
-Added `sanitizeForJsonb()` that strips C0 controls (NUL..0x1F except TAB/LF/CR) and unpaired surrogates. The regex source is built from a string (not a literal) so the source file stays grep-friendly. Re-ran the failed row → succeeded.
-
-### Phase 7 — Upstream fix (`scripts/pilot-batch-ingest.ts`)
-
-Patched `persistToPoliciesTable` to:
-1. Accept a new `pdfText` parameter from the call site.
-2. Sanitize via the same C0-strip pattern.
-3. Store as `raw_data.extractedText`.
-4. Run `extractVehicleInfoFromText()` and store result as `raw_data.vehicleInfo`.
-
-Without this fix, the next batch ingest would have recreated the 0%-pass state.
-
-### QA Gate Verification (final)
-
-```
-VEHICLE_COMPLETENESS: 53/70 pass (76%) — 0 warn, 17 critical
-CONFIDENCE_GATE_SYNC: 53/70 pass (76%) — 0 warn, 17 critical
-GRADE_GATE_SYNC: 70/70 pass (100%) — 0 warn, 0 critical
-```
-
-Δ: +53 pass on each of the two affected checks. The QA gate itself is unchanged from PR #364.
+### Phase 3 — Script Reliability & Fallbacks
+Added a Document AI OCR fallback path in `backfill-vehicle-info.ts` for PDFs that return sparse text (< 100 chars, typically scanned documents). Refactored config logic to support this, including a Node.js `import.meta.env` polyfill in `env.ts` for safe CLI execution. Also updated `field-aliases.ts` to improve tabular pattern matching resilience (handling corrupted leading characters and new stop labels like `yetkili` and `onarım`).
 
 ## Environment / Configuration
 
 No environment variable changes this session. No new packages. No migrations. No `package.json` deps.
 
-**Existing env vars used by the new scripts** (all already in `.env`):
-
-| Variable | Used by | Purpose |
-|---|---|---|
-| `SUPABASE_URL` | All 4 scripts (qa, diagnose, backfill, ingest) | Service-role connection |
-| `SUPABASE_SERVICE_ROLE_KEY` | All 4 scripts | Service-role auth |
-
-The new scripts share the same env contract as `npm run qa:extraction` and `scripts/backfill-evaluation-scores.ts`. No additions required.
-
 ## New Patterns / Gotchas Introduced (cross-ref to CLAUDE.md)
 
 | # | Topic | CLAUDE.md gotcha |
 |---|-------|------------------|
-| 1 | Pilot-batch-ingest must preserve `extractedText` + populate `vehicleInfo` | #105 |
-| 2 | JSONB NUL sanitization (build regex from string, not literal) | #106 |
-| 3 | Diagnose-then-backfill workflow pattern | #107 |
-
-## Operational Notes
-
-- The 53 fixed rows now have `raw_data.extractedText` (full PDF text, sanitized) and `raw_data.vehicleInfo` (make/model/year/plate where extractable).
-- The 8 AXA `make=-` rows and 3 Ray/Groupama partials still have valid `extractedText` from the backfill — meaning a follow-up alias addition can repair them via `npm run qa:extraction` -> identify failures -> `inspect-pdf-labels.ts` -> add aliases -> re-run backfill (which will now skip the already-OK rows automatically).
-- The 3 synthetic + 1 duplicate row should be deleted from DB before the next QA-gate baseline measurement, otherwise pass rate is artificially low.
+| 1 | ESLint `no-useless-escape` in Regex | #108 |
+| 2 | Pre-commit Linter Blockers / Reverting Commits | #109 |
 
 ## Non-Negotiable Rules (Carry Forward — Unchanged)
 
@@ -194,5 +83,7 @@ The new scripts share the same env contract as `npm run qa:extraction` and `scri
 13. When adding a value-label alias to `VEHICLE_FIELD_ALIASES`, remember that `matchLabeledField()` requires a KV separator (`:`, tab, 2+ spaces) — single-space is now also accepted in the AXA tabular fallback path (gotcha #89, extended).
 14. NEVER wrap structural translation keys (`t.global.unlimited`, `t.policy.noUpperLimit`) in `applySafeWording()` — destroys the signal (gotcha #90).
 15. Before claiming any extraction-quality fix complete, run `npm run qa:extraction` and confirm the relevant check's pass rate moved (gotcha #102).
-16. **NEW** — Any code path that writes free-form text into a JSONB column MUST apply `sanitizeForJsonb`-style C0+surrogate stripping first (gotcha #106).
-17. **NEW** — Any new ingest path that lands rows in `policies` MUST preserve `raw_data.extractedText` and populate `raw_data.vehicleInfo` for kasko/traffic types (gotcha #105).
+16. Any code path that writes free-form text into a JSONB column MUST apply `sanitizeForJsonb`-style C0+surrogate stripping first (gotcha #106).
+17. Any new ingest path that lands rows in `policies` MUST preserve `raw_data.extractedText` and populate `raw_data.vehicleInfo` for kasko/traffic types (gotcha #105).
+18. **NEW** — Do not use useless regex escapes (`\/`, `\.`) in regex strings or character classes. They trigger ESLint `no-useless-escape` and will fail the pre-commit hook (gotcha #108).
+19. **NEW** — Unused imports or variables will trigger the Husky pre-commit hook, stashing your commit. Fix the linting issue and re-commit rather than using `--no-verify` (gotcha #109).

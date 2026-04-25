@@ -140,6 +140,8 @@ function readVehicleStored(rd: Record<string, unknown> | null): {
   }
 }
 
+import { extractWithDocumentAI } from '../src/lib/ai/document-ocr'
+
 async function processRow(
   row: PolicyRow,
   isDryRun: boolean,
@@ -186,17 +188,40 @@ async function processRow(
       }
     }
     if (recovered.length < 100) {
-      return {
-        id: row.id,
-        policyNumber: row.policy_number ?? '',
-        provider: row.provider,
-        outcome: 'no_text_extracted',
-        before,
-        detail: `pdf parsed but only ${recovered.length} chars (likely scanned/image)`,
+      console.log(`         [OCR FALLBACK] Triggering Document AI for ${filename}...`)
+      try {
+        const filepath = path.join(POLICIES_DIR, filename)
+        const buf = await fs.readFile(filepath)
+        const file = new File([buf], filename, { type: 'application/pdf' })
+        const result = await extractWithDocumentAI(file)
+        if (result.success) {
+          text = sanitizeForJsonb(result.data.text)
+          textRecovered = true
+          console.log(`         [OCR FALLBACK] Success: extracted ${text.length} chars`)
+        } else {
+          return {
+            id: row.id,
+            policyNumber: row.policy_number ?? '',
+            provider: row.provider,
+            outcome: 'no_text_extracted',
+            before,
+            detail: `Document AI failed: ${result.error.message}`,
+          }
+        }
+      } catch (err) {
+        return {
+          id: row.id,
+          policyNumber: row.policy_number ?? '',
+          provider: row.provider,
+          outcome: 'no_text_extracted',
+          before,
+          detail: `Document AI threw error: ${err instanceof Error ? err.message : String(err)}`,
+        }
       }
+    } else {
+      text = recovered
+      textRecovered = true
     }
-    text = recovered
-    textRecovered = true
   }
 
   const vehicle = extractVehicleInfoFromText(text)

@@ -3,6 +3,17 @@
  * Validates required environment variables and provides type-safe access
  */
 
+// Polyfill for Node.js script execution
+if (
+  typeof process !== 'undefined' &&
+  typeof import.meta !== 'undefined' &&
+  !(import.meta as any).env
+) {
+  ;(import.meta as any).env = process.env || {}
+  ;(import.meta as any).env.DEV = process.env.NODE_ENV !== 'production'
+  ;(import.meta as any).env.PROD = process.env.NODE_ENV === 'production'
+}
+
 interface EnvConfig {
   // Supabase
   supabaseUrl: string | null
