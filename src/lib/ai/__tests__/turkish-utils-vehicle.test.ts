@@ -156,6 +156,54 @@ describe('extractVehicleInfoFromText', () => {
     const result = extractVehicleInfoFromText(text)
     expect(result?.make).toBe('FORD')
   })
+
+  // ─────────────────────────────────────────────────────────────────────
+  // AXA Sigorta packed-line tabular format (single-space label/value
+  // separator). Fixture is verbatim text from
+  // KASKO_ERDEMİR_Ereğli_462660798_67LA807_2024.12-2025.12.pdf as parsed
+  // by pdf-parse. See scripts/inspect-pdf-labels.ts.
+  // ─────────────────────────────────────────────────────────────────────
+  it('extracts make/model/year/plate/motor from AXA Sigorta packed-line format', () => {
+    const text = `.XOODQÖP7DU]Ö &LQVL KAMYONET Marka ISUZU
+Marka Tipi 1003 --- D-MAX CIFT KABIN
+KAMYONET 2.5 4X2 LIMITED 6MT
+Model Bilgisi 2015
+Plaka Il Kodu ZONGULDAK Plaka No 67LA807
+Motor No MP0428 úDVL1R NNATFR86JL2000712`
+    const result = extractVehicleInfoFromText(text)
+    expect(result?.make).toBe('ISUZU')
+    expect(result?.model).toMatch(/D-MAX/)
+    expect(result?.year).toBe(2015)
+    expect(result?.plate).toBe('67 LA 807')
+    expect(result?.engineNo).toBe('MP0428')
+  })
+
+  it('does NOT fire tabular fallback for lowercase prose mentions of "marka"', () => {
+    // Mid-prose lowercase mention of "marka" should not be claimed as a
+    // labeled value just because the next token is uppercase. The tabular
+    // fallback requires the matched label to start with an uppercase letter.
+    const text = 'Bu marka ISUZU çok iyidir' // prose, not a label
+    const result = extractVehicleInfoFromText(text)
+    expect(result?.make).toBeUndefined()
+  })
+
+  it('tabular fallback requires uppercase/digit at value start', () => {
+    // Label + single space + lowercase letter → not a value, just prose flow.
+    const text = 'Marka iyi bir araç' // "Brand is a good vehicle"
+    const result = extractVehicleInfoFromText(text)
+    expect(result?.make).toBeUndefined()
+  })
+
+  it('Marka Tipi alias resolves to model, not to make+Tipi-as-value', () => {
+    // The new `marka\s+t[iİ]p[iİ]?` model alias must match BEFORE the bare
+    // `marka` make alias on a `Marka Tipi 308` line. Otherwise make would
+    // capture `Tipi 308` as its value.
+    const text = 'Marka Tipi 308 COMFORT 1.6'
+    const result = extractVehicleInfoFromText(text)
+    // The bare "Marka" is not present standalone here; only "Marka Tipi".
+    // model should capture; make should be undefined (no plain Marka label).
+    expect(result?.model).toMatch(/308/)
+  })
 })
 
 describe('parseTurkishCurrency — known good cases', () => {

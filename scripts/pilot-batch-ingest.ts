@@ -776,10 +776,25 @@ async function findDuplicatePolicy(
   return data && data.length > 0 ? data[0].id : null
 }
 
+/**
+ * Strip characters PostgreSQL JSONB rejects with "unsupported Unicode escape
+ * sequence". Same logic as scripts/backfill-vehicle-info.ts. NUL (U+0000)
+ * is the most common offender on real Turkish kasko PDFs.
+ */
+function sanitizeForJsonbInline(text: string): string {
+  // eslint-disable-next-line no-control-regex
+  const c0 = new RegExp('[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F]', 'g')
+  return text
+    .replace(c0, '')
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, '')
+    .replace(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '')
+}
+
 async function persistToPoliciesTable(
   extracted: any,
   reviewerUserIdArg: string,
-  filename: string
+  filename: string,
+  pdfText: string
 ): Promise<{ ok: boolean; id?: string; skipped?: boolean; error?: string }> {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -833,6 +848,27 @@ async function persistToPoliciesTable(
           ? extracted.specialConditions
           : [],
         aiConfidence: extracted.confidence?.overall ?? 0,
+        // PDF text preserved so the QA gate (npm run qa:extraction) can re-run
+        // vehicle extraction without needing the original PDF on disk. The
+        // April 24 audit found 69/70 historical batch rows missing this — the
+        // fix scripts/backfill-vehicle-info.ts repaired them. Storing the text
+        // here prevents the same regression on future batches.
+        // sanitizeForJsonbInline strips NUL + unpaired surrogates that PG
+        // JSONB rejects with "unsupported Unicode escape sequence".
+        extractedText: sanitizeForJsonbInline(pdfText),
+        // Run the same regex-based vehicle extractor the production conversion
+        // path uses on freshly-uploaded policies, so the row lands in the same
+        // shape as a user-upload row.
+        vehicleInfo: (() => {
+          try {
+            const utils = require('../src/lib/ai/turkish-utils') as {
+              extractVehicleInfoFromText: (t: string) => Record<string, unknown> | undefined
+            }
+            return utils.extractVehicleInfoFromText(sanitizeForJsonbInline(pdfText))
+          } catch {
+            return undefined
+          }
+        })(),
         sourceFilename: filename,
         extractionModel: extracted._model || 'unknown',
         _batchIngested: true,
@@ -1043,7 +1079,15 @@ async function main() {
       if (!reviewerUserId) {
         console.log('  policies: SKIP (missing --reviewer-id=<uuid> or PILOT_REVIEWER_USER_ID)')
       } else {
-        const r = await persistToPoliciesTable(extracted, reviewerUserId, pdf.name)
+        // Pass the raw PDF text so persistToPoliciesTable can preserve it in
+        // raw_data.extractedText AND extract vehicleInfo at ingest time. See
+        // the function comment + April 24 SESSION_HANDOFF for context.
+        const r = await persistToPoliciesTable(
+          extracted,
+          reviewerUserId,
+          pdf.name,
+          textResult.text || ''
+        )
         if (r.ok && r.skipped) {
           console.log(`  policies: duplicate skipped (id ${r.id})`)
         } else if (r.ok) {

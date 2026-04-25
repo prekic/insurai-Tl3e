@@ -1,180 +1,181 @@
-# Session Handoff — April 24, 2026 (Evening) — Trust-Damage Fixes + Backend QA Gate
+# Session Handoff — April 25, 2026 — QA Gate First Run + Data-Quality Backfill
 
-> **Session type**: Fix. The April 24 human review flagged three "still broken" trust-damage bugs: hidden vehicle rows (4th consecutive failure), 98% confidence contradicting the "Incomplete extraction" banner on the same screen, and a half-implemented completeness gate (letter grade still shown next to incomplete banner). Underneath those specifics, the reviewer called out the meta-pattern: improvements were landing at the UI layer without being validated against the 70 policies in the DB before shipping.
+> **Session type**: Investigation + repair. The first real-data run of `npm run qa:extraction` (shipped earlier this session via PR #364) revealed that 69 of 70 kasko policies in production were missing make/model/year. Investigation traced root cause to `scripts/pilot-batch-ingest.ts` discarding source PDF text. This session: built a diagnose-then-backfill toolchain, repaired 53 of 70 rows in-place (no AI re-extraction needed), and patched the upstream ingest script so future batches don't recreate the issue.
 >
-> This session: (1) shipped a backend QA gate that runs every extraction-quality fix against every kasko policy in the DB before we claim it complete, (2) closed each of the three specific bugs with tests that pin the new behavior.
+> **Verdict on the QA gate concept**: it paid for itself on day one. Without it, this systemic bug would have stayed invisible behind UI hedges (the Tiguan being only one symptom, not the cause).
 
 ## 🎯 Immediate Next Steps for the Next Agent
 
-### Priority 1: Run the QA gate against production data, commit report, decide on follow-ups
+### Priority 1: Open + merge a PR for this session's work
 
-- **Command**: `npm run qa:extraction` (requires `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` in `.env`).
-- **Reads**: all kasko policies in `policies` table. Fully read-only against the DB.
-- **Outputs**: `reports/qa-extraction-quality-<timestamp>.{csv,md}` (dir is gitignored).
-- **Expected baseline on existing 70-policy batch**:
-  - `VEHICLE_COMPLETENESS`: expect criticals on the Anadolu Tiguan policy and any other PDFs where the regex pipeline returned undefined. These are surfaced so we can prioritize which insurer formats to extend `shared/field-aliases.ts` for.
-  - `CONFIDENCE_GATE_SYNC`: expect all policies to pass now that `displayedAiConfidence` caps at 0.65 when `extractionIncomplete` fires. If any critical appears, the cap isn't wired on the write path the policy came from.
-  - `GRADE_GATE_SYNC`: expect 100% pass — the `isProvisional` chain was already intact.
-- **Triage**: for every `VEHICLE_COMPLETENESS` critical, capture the policy ID + insurer, look at the raw_data text, and either (a) extend `shared/field-aliases.ts` with a new label alias/STOP_LABEL, or (b) flag the policy as genuinely unreadable (probably OCR casualty — needs GCP Document AI re-run).
+**Branch**: `claude/diagnose-vehicle-extraction` — 5 commits ahead of `origin/main`. PR not yet opened.
 
-### Priority 2: Open a PR for this session's work
+**Suggested PR title** (Conventional Commits + release-please compatible):
+```
+fix(data): repair vehicleInfo on 53/70 historical policies + preserve text on future ingests
+```
 
-- **Branch**: `claude/load-project-context-0P7Rm` — 5 commits ahead of `origin/main` (including this QA-audit delta commit):
-  - `76b3abb` fix(extraction): backend QA gate, empty-row vehicle UI, confidence cap, full gate suppression
-  - `83583ea` docs(qa): fix stale runbook path reference in qa-extraction-quality header
-  - `ea57112` fix(extraction): Allianz inverted-label make + pdf-parser length threshold
-  - `6c89c7b` chore(docs): session handoff sync — ADR-020 for QA gate, expand coverage
-  - `4d87585` chore(docs): completeness-delta QA audit — stale counts, ADR path, commit cross-refs
-- **Suggested PR title** (Conventional Commits + release-please compatible):
-  ```
-  fix(extraction): backend QA gate + six trust-damage fixes
-  ```
-- **Summary bullets** (put in PR body, not title):
-  - Adds `scripts/qa-extraction-quality.ts` + `npm run qa:extraction` + runbook 07 — backend gate that validates every extraction fix against the 70-policy DB before we claim it complete.
-  - `VehicleInfoCard`: renders plate/make/model/model-year unconditionally; missing fields show `t.policy.cannotVerify` as an italic gray placeholder (fixes reviewer complaint #1).
-  - `evaluator.ts`: derives `displayedAiConfidence`, capped at 0.65 when `extractionIncomplete` fires. `PolicyScoreSection` read sites swap to `evaluation.displayedAiConfidence ?? policy.aiConfidence` (fixes reviewer complaint #2).
-  - Full-gate: ScoreBreakdown, Recommendations, PolicyScenariosSection, MarketComparisonCard (mobile+desktop), ActuarialInsightsCard now fully suppressed (`return null`) when `isUnverified`. Amber incomplete-extraction banner gains `extractionIncompleteDesc` as a sub-message (fixes reviewer complaint #3).
-  - Adds `policy.cannotVerify` to EN/TR/skeleton/interface (4-file rule, gotcha #98).
-  - `matchLabeledField()` gains `scanBackwardForInvertedValue()` fallback — recovers make from Allianz Peugeot `: PEUGEOT (114)\tMarka Plaka No : ...` format. Strict Peugeot golden assertion re-enabled.
-  - `pdf-parser.ts` EMPTY_PDF threshold now measures actual content length, not page-marked string. Fixes 49-char threshold test.
-  - Adds ADR-020 documenting the QA gate pattern as a new class of engineering artefact.
-  - Test regressions: 4 evaluator cap tests, 2 Scenarios suppression tests, 2 VehicleInfoCard empty-row tests, 3 Allianz inverted-label tests, 1 updated PolicyDetailView-branches test, 1 pdf-parser 49-char test now green. 765 tests across 20 touched/adjacent vitest files (see "Verification Performed in This Session" table) pass.
+**Files added/modified**:
+- `scripts/diagnose-vehicle-extraction.ts` — new, read-only DB inventory tool
+- `scripts/backfill-vehicle-info.ts` — new, write-capable repair script (dry-run by default)
+- `scripts/inspect-pdf-labels.ts` — new, single-PDF label inspector for unfamiliar insurer formats
+- `scripts/pilot-batch-ingest.ts` — patched: now preserves `raw_data.extractedText` + populates `raw_data.vehicleInfo` at ingest time
+- `shared/field-aliases.ts` — extended for AXA's single-space label separator format
+- `src/lib/ai/__tests__/turkish-utils-vehicle.test.ts` — new tests for AXA format
+- `CLAUDE.md` — gotchas #105 / #106 / #107
+- `SESSION_HANDOFF.md` — this file
 
-### Priority 3: Carry-forward items — all resolved this session except monitoring
+### Priority 2: Triage the 17 remaining critical fails (decide which to chase)
 
-- **Allianz inverted-label make extraction** ✅ DONE. `scanBackwardForInvertedValue()` added to `matchLabeledField` at `shared/field-aliases.ts`. `extractorLenientFor: ['make']` removed from the Peugeot golden fixture — strict `expectedMakeContains: 'PEUGEOT'` now passes (gotcha #103). 3 regression tests in `turkish-utils-vehicle.test.ts`.
-- **`pdf-parser.test.ts` length-threshold assertion** ✅ DONE. Root cause: the 50-char EMPTY_PDF threshold was measuring the page-marked string (`[PAGE 1]\n...`), inflating count by 9 chars per page. Fixed to measure actual content length. All 102 `pdf-parser.test.ts` tests pass (gotcha #104).
-- **Grade threshold drift monitoring** — passive. Thresholds calibrated on 64-policy sample (A≥89, B≥85, C≥39, D≥2). Recalibration needs n≥50 per non-negotiable rule #11.
-- **Ek Sözleşme / IMM caveat edge cases** — reactive. Tighten `extractEkSozlesmeBullets` regex or extend `IMM_CARVEOUT_LOCATION_HINTS` / amount regex only when live policies surface false positives or missed caps.
+After this session's apply, `VEHICLE_COMPLETENESS` is at 53/70 (76%). The 17 critical fails break down into:
+
+| Category | Count | Recoverable? | Action |
+|---|---|---|---|
+| Synthetic test rows (`sample-kasko-policy.pdf`, `synthetic-kasko-{4,5}.pdf`) | 3 | No — they're fixtures | Delete from DB to clean baseline |
+| Scanned-image PDFs (Güneş `208678401/2`, Ray `32630901/3`) | 2 | Only with OCR | Out of scope; mark for re-upload |
+| Duplicate Anadolu Tiguan (`5a96af60` — same policy as `6651fb91`) | 1 | No — it's a dup | Delete from DB |
+| AXA `make=-` rows (CARAVELLE / TALISMAN / VITO / SPRINTER / blank `999`) | 8 | Yes — needs another alias pass | Run `inspect-pdf-labels.ts` on one of these PDFs, find the alternate Marka layout, extend `shared/field-aliases.ts` |
+| Ray + Groupama partial extraction | 3 | Yes — different format | Same pattern as AXA |
+
+After deleting the 4 garbage rows, **real-data pass rate is 53/64 = 83%**.
+
+Theoretical ceiling with current PDFs: 64/64 = **100%** (pursuing the 8 AXA + 3 Ray/Groupama would land here).
+
+### Priority 3: Verify the upstream fix on the next batch ingest
+
+`scripts/pilot-batch-ingest.ts` now passes `textResult.text` to `persistToPoliciesTable` and stores it (sanitized) as `raw_data.extractedText`, plus runs `extractVehicleInfoFromText()` to pre-populate `raw_data.vehicleInfo`. **Before running the next batch**, sanity-check:
+
+```bash
+# Dry-run first (existing flag)
+npx tsx scripts/pilot-batch-ingest.ts --pdf-dir <dir> --reviewer-id <uuid>
+
+# Then for one new policy, confirm raw_data has both:
+#   1. extractedText (>1000 chars)
+#   2. vehicleInfo with make/model/year
+# Use the same diagnostic:
+npx tsx scripts/diagnose-vehicle-extraction.ts
+```
+
+If a future batch ingest produces 0% pass rate again, the fix didn't apply — check git history on `scripts/pilot-batch-ingest.ts` to see if the patch was reverted.
+
+### Priority 4: (deferred) Clean up the AXA `make=-` cohort
+
+For each of the 8 rows, run `npx tsx scripts/inspect-pdf-labels.ts <filename>` and look for AXA's alternate layout — likely the `Marka` line is blank because the make is in a different column position on those specific PDFs. Add the new alias to `shared/field-aliases.ts:VEHICLE_FIELD_ALIASES` and re-backfill those 8 rows.
 
 ## Current State
 
-**Branch**: `claude/load-project-context-0P7Rm`, clean working tree, 5 commits ahead of `origin/main` (this session; see Priority 2 for the full commit list).
-**Database**: unchanged (70 policies from 10 providers).
+**Branch**: `claude/diagnose-vehicle-extraction`, clean working tree, 5 commits ahead of `origin/main`.
+
+```
+d07a67e fix(scripts): sanitize NUL + control chars before JSONB write
+6c6e0da fix(scripts): print DB error detail on backfill ERROR rows
+1852db6 feat(extraction): support AXA single-space label format
+e1bf553 chore(scripts): add inspect-pdf-labels diagnostic
+46b2b32 chore(scripts): add backfill-vehicle-info to repair 69/70 broken policies
+3afca44 chore(scripts): add diagnose-vehicle-extraction read-only diagnostic
+```
+
+(Plus pending uncommitted changes for the upstream `pilot-batch-ingest.ts` fix + this doc + CLAUDE.md gotchas — to be committed before opening the PR.)
+
+**Database**: 70 kasko policies, **53 now have full vehicleInfo (was 1)**.
 **Grade thresholds**: unchanged.
-**Tests**: 765 verified passing across 20 vitest files — 8 directly-invoked (VehicleInfoCard 8, PolicyScenariosSection 10, evaluator 47, PolicyDetailView 44, PolicyDetailView-branches 163, turkish-utils-vehicle 21, qa-pdf-golden 46, pdf-parser 102) + 12 via 3 sweep bundles (evaluator-adjacent 5 files / 115, PolicyCard+pilot-gate+pilot-qa 3 files / 97, reviewer-mode 4 files / 112). Typecheck clean. Lint 0 errors / 25 warnings (cap 47). See "Verification Performed in This Session" table below for per-file breakdown.
+**Tests**: typecheck clean, lint clean.
 
 ## What This Session Produced
 
-### Part A — Backend QA Gate (ships first, gates every subsequent fix)
+### Phase 1 — Discovery (the QA gate fired)
 
-**New**:
-- `scripts/qa-extraction-quality.ts` — ~350 lines. Imports `reconstructPolicySafely` from `backfill-evaluation-scores.ts` and `evaluatePolicy` from the evaluator. Three per-policy checks (vehicle completeness, confidence-gate sync, grade-gate sync). Writes CSV + markdown to `reports/` (gitignored). Exits non-zero when any check has criticals. Read-only against the DB.
-- `docs/runbooks/07-qa-extraction-quality.md` — runbook with command reference, when-to-run list, interpretation guide, and non-goals.
-- `package.json` — new `"qa:extraction"` script.
-- `.gitignore` — `reports/` (local audit artefacts, contain policy IDs).
+User ran `npm run qa:extraction` for the first time on production data. Output:
 
-**Rule added**: gotcha #102 in CLAUDE.md. Before claiming any extraction-or-display fix as complete, run the gate and confirm the relevant check moved.
+```
+VEHICLE_COMPLETENESS: 0/70 pass (0%) — 0 warn, 70 critical
+CONFIDENCE_GATE_SYNC: 0/70 pass (0%) — 0 warn, 70 critical
+GRADE_GATE_SYNC: 70/70 pass (100%) — 0 warn, 0 critical
+```
 
-**ADR**: `docs/adr/020-backend-qa-gate-for-extraction-quality.md` — documents the QA gate pattern as a new class of engineering artefact (new artefact class, mandatory pre-ship convention, why it's manual rather than CI-enforced for this iteration).
+100% failure on vehicle extraction. The Tiguan complaint that triggered PR #364 was one symptom of a much bigger problem.
 
-### Part B1 — Empty-row Vehicle UI + i18n
+### Phase 2 — Diagnosis (`scripts/diagnose-vehicle-extraction.ts`)
 
-**Changed**:
-- `src/components/PolicyDetailView/VehicleInfoCard.tsx` — extracted a `renderField(label, value)` helper. Plate / Make / Model / Model Year render unconditionally; when value is missing/empty, render `t.policy.cannotVerify` as italic gray placeholder with `data-testid="vehicle-field-cannot-verify"`. Usage Type and Vehicle Class stay conditional (not headline fields).
-- `src/lib/i18n/translations-{en,tr,skeleton}.ts` + `translations.ts` interface — added `policy.cannotVerify` (EN: "Cannot Verify", TR: "Doğrulanamadı") to all four files.
+Read-only DB tool. Three sections of output:
+1. Population split per provider × `raw_data.extractedText` present-or-not.
+2. Top-level `raw_data` keys for one no-text sample row.
+3. Text-field lengths across 5 standard field names.
 
-**Test updates**:
-- `VehicleInfoCard.test.tsx` — replaced the "hides when undefined" test with two new ones: "renders headline fields as Cannot Verify when missing" and "does not render Cannot Verify for optional fields".
-- `PolicyDetailView-branches.test.tsx` — rewrote the "hides model/year/usage/class" test to assert the new pattern.
+**Finding**: 1 of 70 rows had `extractedText` (the user-upload via the app). 69 came from `pilot-batch-ingest.ts` and had no text stored anywhere. But — crucially — they all had `raw_data.sourceFilename` pointing at PDFs in `policies/` (committed to repo).
 
-**Rule added**: gotcha #99. Why empty > hidden.
+### Phase 3 — Inspection (`scripts/inspect-pdf-labels.ts`)
 
-### Part B2 — Displayed AI Confidence Cap
+Sub-diagnostic that opens a PDF and prints (a) first 2500 chars + (b) all label-bearing lines. Used to discover the AXA format.
 
-**Changed**:
-- `src/lib/policy-evaluation/types.ts` — new optional `displayedAiConfidence?: number` on `PolicyEvaluation`.
-- `src/lib/policy-evaluation/evaluator.ts` — exported `INCOMPLETE_CONFIDENCE_CAP = 0.65`. The return block derives `displayedAiConfidence = extractionIncomplete ? min(raw, 0.65) : raw`. Undefined raw → undefined displayed.
-- `src/components/PolicyDetailView/PolicyScoreSection.tsx` — both `MobileInsightsCard` and `DesktopInsightsCard` now accept `evaluation` via props and read `evaluation?.displayedAiConfidence ?? policy.aiConfidence` when rendering the confidence pill (lines 235, 526).
-- `src/components/PolicyDetailView.tsx` — passes `evaluation={evaluation}` to both Insight card call-sites.
-- `scripts/qa-extraction-quality.ts` — mirrors the cap constant and asserts it in `CONFIDENCE_GATE_SYNC`.
+**Finding**: AXA uses `Marka VALUE\n` with a single space separator (not `:`, tab, or 2+ spaces). Our existing `hasKvSeparator` guard rejected it because single-space is the prose-protection guard for other use cases.
 
-**Test additions**:
-- `evaluator.test.ts` — new "Displayed AI Confidence" describe block with 4 regression tests (cap engages, raw passes through, min-of-raw-and-cap behavior, undefined raw → undefined displayed).
+### Phase 4 — Alias extension (`shared/field-aliases.ts`)
 
-**Rule added**: gotcha #100. Two constants, one source of truth.
+Added single-space-separator support for AXA's tabular format with narrow guards to prevent prose false positives. Plus `Marka Tipi` as a new model alias. 5 new unit tests in `turkish-utils-vehicle.test.ts`.
 
-### Part B3 — Full Gate Suppression of Scoring-Dependent Cards
+### Phase 5 — Backfill (`scripts/backfill-vehicle-info.ts`)
 
-**Changed**:
-- `src/components/PolicyDetailView/PolicyScoreSection.tsx` — mobile ScoreBreakdown was wrapped in `opacity-60` on `isUnverified`; now fully guarded with `{!isUnverified && <ScoreBreakdown/>}`. Same for desktop. Same for Recommendations section. The amber incomplete-extraction banner gains `extractionIncompleteDesc` as a secondary line.
-- `src/components/PolicyDetailView/PolicyScenariosSection.tsx` — new `isUnverified?: boolean` prop. Early returns `null` when true.
-- `src/components/PolicyDetailView/MarketComparisonCard.tsx` — same prop + early null on both Mobile/Desktop variants.
-- `src/components/PolicyDetailView/ActuarialInsightsCard.tsx` — early null when `isUnverified` (prop already existed on the signature).
-- `src/components/PolicyDetailView.tsx` — pass `isUnverified` through to Scenarios and both Market Comparison cards.
+Write-capable repair. For each broken row:
+1. Reads `raw_data.sourceFilename` to find the PDF in `policies/`.
+2. Re-parses with pdf-parse v2 (Node-native, free, ~1 sec per PDF).
+3. Runs the same `extractVehicleInfoFromText()` the production conversion path uses.
+4. Writes both `extractedText` (sanitized) AND `vehicleInfo` to `raw_data`.
 
-**Test additions**:
-- `PolicyScenariosSection.test.tsx` — 2 new tests: suppressed when isUnverified, rendered when false.
+Default mode is dry-run; `--apply` required. Per-row outcomes: `WOULD`/`OK`/`SKIP`/`NO_PDF`/`NO_TXT`/`NO_VEH`/`ERROR`. `--policy-id <uuid>` for single-row debugging.
 
-**Rule added**: gotcha #101. Half-gate is the bug; full-suppression is the fix.
+### Phase 6 — JSONB sanitization
 
-### Part C — Carry-over Priority Fixes (commit `ea57112`)
+First `--apply` run hit one ERROR: `DB update failed: unsupported Unicode escape sequence` on the Anadolu VW Golf 2001 row. Root cause: a NUL byte (U+0000) in the PDF text. PostgreSQL JSONB rejects it.
 
-Two items from the previous session's handoff closed in the same session.
+Added `sanitizeForJsonb()` that strips C0 controls (NUL..0x1F except TAB/LF/CR) and unpaired surrogates. The regex source is built from a string (not a literal) so the source file stays grep-friendly. Re-ran the failed row → succeeded.
 
-**Allianz inverted-label make extraction** (`shared/field-aliases.ts`):
-- `matchLabeledField()` gains a backward-scan fallback via `scanBackwardForInvertedValue()` that fires after the forward scan yields nothing.
-- Handles the Allianz Peugeot KASKO layout `: PEUGEOT (114)\tMarka Plaka No : 34 GM 6461` where the value precedes the label on the same line.
-- Narrow by design: only fires when the pre-label line segment starts with `:`. Any other shape (e.g. `Plaka : 34 ABC 12\tMarka`) returns `undefined` to prevent mis-capture of neighboring labeled fields.
-- `extractorLenientFor: ['make']` removed from the Peugeot golden fixture; strict `expectedMakeContains: 'PEUGEOT'` now passes.
+### Phase 7 — Upstream fix (`scripts/pilot-batch-ingest.ts`)
 
-**Test additions (Allianz)**:
-- `turkish-utils-vehicle.test.ts` — 3 new tests: the inverted layout case, the preceding-label false-positive guard, and a no-double-fire sanity check. 21/21 pass.
-- `qa-pdf-golden.test.ts` — 46/46 pass with the strict Peugeot assertion.
+Patched `persistToPoliciesTable` to:
+1. Accept a new `pdfText` parameter from the call site.
+2. Sanitize via the same C0-strip pattern.
+3. Store as `raw_data.extractedText`.
+4. Run `extractVehicleInfoFromText()` and store result as `raw_data.vehicleInfo`.
 
-**`pdf-parser.test.ts` length threshold** (`src/lib/ai/pdf-parser.ts`):
-- Root cause: the 50-char EMPTY_PDF threshold was measuring the page-marked string (`[PAGE 1]\n...`), inflating the count by 9 chars per page. A PDF with 41 actual chars of content passed the threshold because 41 + 9 = 50.
-- Fix: track `pageTexts` separately from the page-marked `textContent`. Threshold runs on `pageTexts.reduce((s, t) => s + t.length, 0)`. Page-marked output shape unchanged — downstream consumers (`document-ocr.ts`) still see `[PAGE N]\n...`.
-- 102/102 `pdf-parser.test.ts` pass (was 101 + 1 pre-existing fail).
+Without this fix, the next batch ingest would have recreated the 0%-pass state.
 
-**Rules added**: gotchas #103 (backward-scan) + #104 (pdf-parser threshold).
+### QA Gate Verification (final)
 
-## Verification Performed in This Session
+```
+VEHICLE_COMPLETENESS: 53/70 pass (76%) — 0 warn, 17 critical
+CONFIDENCE_GATE_SYNC: 53/70 pass (76%) — 0 warn, 17 critical
+GRADE_GATE_SYNC: 70/70 pass (100%) — 0 warn, 0 critical
+```
 
-| Command | Result |
-|---|---|
-| `npm run typecheck` | Clean (0 errors) |
-| `npm run lint` | 0 errors / 25 warnings (cap 47) |
-| `npx vitest run src/components/PolicyDetailView/VehicleInfoCard.test.tsx` | 8/8 pass |
-| `npx vitest run src/components/PolicyDetailView/PolicyScenariosSection.test.tsx` | 10/10 pass |
-| `npx vitest run src/lib/policy-evaluation/__tests__/evaluator.test.ts` | 47/47 pass (+4 new cap tests) |
-| `npx vitest run src/components/PolicyDetailView.test.tsx` | 44/44 pass |
-| `npx vitest run src/components/PolicyDetailView-branches.test.tsx` | 163/163 pass |
-| Evaluator-adjacent sweep (5 files) | 115/115 pass |
-| PolicyCard + pilot-gate + pilot-qa sweep (3 files) | 97/97 pass |
-| Reviewer-mode sweep (4 files) | 112/112 pass |
-| Isolated typecheck of `scripts/qa-extraction-quality.ts` | 0 errors |
-| `npx vitest run src/lib/ai/__tests__/turkish-utils-vehicle.test.ts` | 21/21 pass (+3 new inverted-label tests) |
-| `npx vitest run src/lib/ai/__tests__/qa-pdf-golden.test.ts` | 46/46 pass (strict Peugeot make assertion now live) |
-| `npx vitest run src/lib/ai/pdf-parser.test.ts` | 102/102 pass (49-char EMPTY_PDF test now green) |
-
-**Not run** (per `.cursorrules`): full test suite (`npm run test`) — takes >10 minutes and no evidence was needed beyond the 20 touched/adjacent vitest files (see "Verification Performed in This Session" table).
+Δ: +53 pass on each of the two affected checks. The QA gate itself is unchanged from PR #364.
 
 ## Environment / Configuration
 
-No environment variable **additions** this session. No new packages. No migrations. No `package.json` deps — only the new `qa:extraction` npm script entry.
+No environment variable changes this session. No new packages. No migrations. No `package.json` deps.
 
-**Existing env vars required by the new QA gate** (all already documented in `CLAUDE.md > Environment Variables`):
+**Existing env vars used by the new scripts** (all already in `.env`):
 
-| Variable | Required by | Purpose |
+| Variable | Used by | Purpose |
 |---|---|---|
-| `SUPABASE_URL` | `npm run qa:extraction` | Service-role connection to list policies |
-| `SUPABASE_SERVICE_ROLE_KEY` | `npm run qa:extraction` | Service-role key (not anon) |
+| `SUPABASE_URL` | All 4 scripts (qa, diagnose, backfill, ingest) | Service-role connection |
+| `SUPABASE_SERVICE_ROLE_KEY` | All 4 scripts | Service-role auth |
 
-The script fails fast with a clear error if either is missing. No API keys or write credentials are needed — the gate is read-only.
-
-Sandbox note: a fresh `npm ci --prefer-offline` was needed mid-session because `node_modules` was empty. No real Supabase credentials in this sandbox — the QA runner was typechecked in isolation but could not be run live. Human/CI environment can run it directly.
+The new scripts share the same env contract as `npm run qa:extraction` and `scripts/backfill-evaluation-scores.ts`. No additions required.
 
 ## New Patterns / Gotchas Introduced (cross-ref to CLAUDE.md)
 
 | # | Topic | CLAUDE.md gotcha |
 |---|-------|------------------|
-| 1 | Empty-row UI pattern for extraction failures | #99 |
-| 2 | `displayedAiConfidence` cap + sync between evaluator.ts and qa-extraction-quality.ts | #100 |
-| 3 | `isUnverified` full suppression (not dimming) of scoring-dependent cards | #101 |
-| 4 | QA extraction quality gate (`npm run qa:extraction`) | #102 |
-| 5 | Backward-scan fallback for inverted `: VALUE\tLabel` layouts | #103 |
-| 6 | PDF-parser length threshold measures content, not page-markers | #104 |
+| 1 | Pilot-batch-ingest must preserve `extractedText` + populate `vehicleInfo` | #105 |
+| 2 | JSONB NUL sanitization (build regex from string, not literal) | #106 |
+| 3 | Diagnose-then-backfill workflow pattern | #107 |
+
+## Operational Notes
+
+- The 53 fixed rows now have `raw_data.extractedText` (full PDF text, sanitized) and `raw_data.vehicleInfo` (make/model/year/plate where extractable).
+- The 8 AXA `make=-` rows and 3 Ray/Groupama partials still have valid `extractedText` from the backfill — meaning a follow-up alias addition can repair them via `npm run qa:extraction` -> identify failures -> `inspect-pdf-labels.ts` -> add aliases -> re-run backfill (which will now skip the already-OK rows automatically).
+- The 3 synthetic + 1 duplicate row should be deleted from DB before the next QA-gate baseline measurement, otherwise pass rate is artificially low.
 
 ## Non-Negotiable Rules (Carry Forward — Unchanged)
 
@@ -190,6 +191,8 @@ Sandbox note: a fresh `npm ci --prefer-offline` was needed mid-session because `
 10. `isIncluded()` treats `undefined` as included (industry standard).
 11. Grade recalibrations require n ≥ 50 sample size.
 12. When adding a coverage-item schema property, update THREE places: `properties`, `required[]`, AND the count-assertion tests (see gotcha #47 / #95).
-13. When adding a value-label alias to `VEHICLE_FIELD_ALIASES`, remember that `matchLabeledField()` requires a KV separator (`:`, tab, 2+ spaces) after the label (gotcha #89).
-14. NEVER wrap structural translation keys (`t.global.unlimited`, `t.policy.noUpperLimit`) in `applySafeWording()` — it destroys the signal. (gotcha #90)
-15. **NEW** — Before claiming any extraction-quality fix complete, run `npm run qa:extraction` and confirm the relevant check's pass rate moved. No UI-only fixes without backend validation. (gotcha #102)
+13. When adding a value-label alias to `VEHICLE_FIELD_ALIASES`, remember that `matchLabeledField()` requires a KV separator (`:`, tab, 2+ spaces) — single-space is now also accepted in the AXA tabular fallback path (gotcha #89, extended).
+14. NEVER wrap structural translation keys (`t.global.unlimited`, `t.policy.noUpperLimit`) in `applySafeWording()` — destroys the signal (gotcha #90).
+15. Before claiming any extraction-quality fix complete, run `npm run qa:extraction` and confirm the relevant check's pass rate moved (gotcha #102).
+16. **NEW** — Any code path that writes free-form text into a JSONB column MUST apply `sanitizeForJsonb`-style C0+surrogate stripping first (gotcha #106).
+17. **NEW** — Any new ingest path that lands rows in `policies` MUST preserve `raw_data.extractedText` and populate `raw_data.vehicleInfo` for kasko/traffic types (gotcha #105).
