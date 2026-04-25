@@ -479,9 +479,21 @@ export async function convertToAnalyzedPolicy(
           ? extractVehicleInfoFromText(rawText)
           : undefined
 
-      if (!baseInfo && !data.vehicleUsage) return undefined
+      const hasLlmData = !!(
+        data.vehicleMake ||
+        data.vehicleModel ||
+        data.vehicleYear ||
+        data.vehiclePlate ||
+        data.vehicleUsage
+      )
+
+      if (!baseInfo && !hasLlmData) return undefined
       return {
         ...(baseInfo || {}),
+        ...(data.vehicleMake ? { make: data.vehicleMake } : {}),
+        ...(data.vehicleModel ? { model: data.vehicleModel } : {}),
+        ...(data.vehicleYear ? { year: data.vehicleYear } : {}),
+        ...(data.vehiclePlate ? { plate: data.vehiclePlate } : {}),
         ...(data.vehicleUsage ? { usage: data.vehicleUsage } : {}),
       }
     })(),

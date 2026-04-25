@@ -149,6 +149,7 @@ const FORBIDDEN = [
   { pattern: /is not a function/i, label: 'JS runtime error' },
   { pattern: /Incomplete extraction/i, label: '❌ THE BUG WE FIXED — this was the main defect' },
   { pattern: /re-scan recommended/i, label: '❌ THE BUG WE FIXED — rescan banner' },
+  { pattern: /Cannot Verify/i, label: '❌ THE BUG WE FIXED — vehicle info not mapped correctly' },
   { pattern: /NEXT_REDIRECT/, label: 'framework internal' },
   { pattern: /SUPABASE_/, label: 'leaked env var name' },
   { pattern: /process\.env/, label: 'leaked env reference' },
