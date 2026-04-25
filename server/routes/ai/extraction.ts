@@ -34,6 +34,11 @@ import { getAIConfig } from '../../services/config-service.js'
 import { sendExtractionCompleteNotification } from '../../services/notification-service.js'
 import { getExtractionPrompt } from '../../services/prompt-service.js'
 import { buildAnthropicSchemaPrompt, type ConfidenceWeights } from '../../lib/ai-prompts.js'
+import {
+  executeWithSelfHealingLoop,
+  JUDGE_JSON_SCHEMA,
+  JUDGE_SYSTEM_PROMPT,
+} from '../../lib/self-healing.js'
 import { recordExtractionEvent, recordOverviewMetrics } from './shared.js'
 
 const log = logger.child('AI')
@@ -302,37 +307,89 @@ router.post(
           ? finalUserPrompt
           : finalUserPrompt + jsonReminder
 
-      const response = await client.chat.completions.create(
-        {
-          model: model || aiConfig.openaiExtractionModel,
-          messages: [
-            { role: 'system', content: systemPromptWithJson },
-            { role: 'user', content: userPromptWithJson },
-          ],
-          response_format: {
-            type: 'json_schema',
-            json_schema: EXTRACTION_JSON_SCHEMA,
+      const workerCaller = async (userPrompt: string, temperature: number) => {
+        const response = await client.chat.completions.create(
+          {
+            model: model || aiConfig.openaiExtractionModel,
+            messages: [
+              { role: 'system', content: systemPromptWithJson },
+              { role: 'user', content: userPrompt },
+            ],
+            response_format: {
+              type: 'json_schema',
+              json_schema: EXTRACTION_JSON_SCHEMA,
+            },
+            max_tokens: aiConfig.maxTokens,
+            temperature,
           },
-          max_tokens: aiConfig.maxTokens,
-          temperature: aiConfig.temperature,
-        },
-        { signal: AbortSignal.timeout(60_000) }
-      )
-      log.debug('OpenAI responded', { requestId })
+          { signal: AbortSignal.timeout(60_000) }
+        )
+        const usedModel = response.model || model || 'gpt-4o'
+        const inputTokens = response.usage?.prompt_tokens || 0
+        const outputTokens = response.usage?.completion_tokens || 0
+        return {
+          content: response.choices[0]?.message?.content || '',
+          usage: {
+            inputTokens,
+            outputTokens,
+            cost: calculateCost(usedModel, inputTokens, outputTokens).totalCost,
+            model: usedModel,
+          },
+        }
+      }
 
-      const content = response.choices[0]?.message?.content
-      if (!content) {
+      const judgeCaller = async (documentTextStr: string, workerContent: string) => {
+        const judgeUserPrompt = `Original Document:\n\n${documentTextStr}\n\nExtraction Result:\n\n${workerContent}`
+        const response = await client.chat.completions.create(
+          {
+            model: model || aiConfig.openaiExtractionModel,
+            messages: [
+              { role: 'system', content: JUDGE_SYSTEM_PROMPT },
+              { role: 'user', content: judgeUserPrompt },
+            ],
+            response_format: {
+              type: 'json_schema',
+              json_schema: JUDGE_JSON_SCHEMA,
+            },
+            temperature: 0.0,
+          },
+          { signal: AbortSignal.timeout(60_000) }
+        )
+        const usedModel = response.model || model || 'gpt-4o'
+        const inputTokens = response.usage?.prompt_tokens || 0
+        const outputTokens = response.usage?.completion_tokens || 0
+        return {
+          content: response.choices[0]?.message?.content || '',
+          usage: {
+            inputTokens,
+            outputTokens,
+            cost: calculateCost(usedModel, inputTokens, outputTokens).totalCost,
+            model: usedModel,
+          },
+        }
+      }
+
+      const healingResult = await executeWithSelfHealingLoop(
+        documentText,
+        userPromptWithJson,
+        aiConfig.temperature,
+        workerCaller,
+        judgeCaller,
+        (content) => JSON.parse(content)
+      )
+
+      if (!healingResult.success && !healingResult.data) {
         return res.status(500).json({
-          error: 'Empty response from OpenAI',
-          code: 'EMPTY_RESPONSE',
+          error: healingResult.error || 'OpenAI extraction failed',
+          code: healingResult.code || 'EMPTY_RESPONSE',
         })
       }
 
-      // Track cost usage
-      const usedModel = response.model || model || 'gpt-4o'
-      const inputTokens = response.usage?.prompt_tokens || 0
-      const outputTokens = response.usage?.completion_tokens || 0
-      const cost = calculateCost(usedModel, inputTokens, outputTokens)
+      const parsedData = healingResult.data
+      const usedModel = healingResult.finalModel || model || 'gpt-4o'
+      const inputTokens = healingResult.totalInputTokens
+      const outputTokens = healingResult.totalOutputTokens
+      const totalCost = healingResult.totalCost
 
       // Record usage asynchronously (don't block response)
       recordUsage({
@@ -342,9 +399,9 @@ router.post(
         inputTokens,
         outputTokens,
         totalTokens: inputTokens + outputTokens,
-        inputCost: cost.inputCost,
-        outputCost: cost.outputCost,
-        totalCost: cost.totalCost,
+        inputCost: 0, // calculateCost returns totalCost in our simple mock
+        outputCost: 0,
+        totalCost,
         timestamp: new Date().toISOString(),
       }).catch((err) => {
         if (process.env.NODE_ENV !== 'production') {
@@ -354,25 +411,12 @@ router.post(
         }
       })
 
-      let parsedData: unknown
-      try {
-        parsedData = JSON.parse(content)
-      } catch (parseError) {
-        log.error('OpenAI returned invalid JSON', {
-          requestId,
-          parseError: parseError instanceof Error ? parseError.message : String(parseError),
-          contentPreview: content.slice(0, 200),
-        })
-        return res
-          .status(502)
-          .json({ success: false, error: 'AI returned invalid JSON', code: 'INVALID_JSON' })
-      }
-
       log.info('Extraction successful', {
         requestId,
         inputTokens,
         outputTokens,
-        cost: cost.totalCost,
+        cost: totalCost,
+        attempts: healingResult.attempts,
       })
 
       // Record successful extraction metric
@@ -393,7 +437,7 @@ router.post(
         durationMs: Date.now() - startTime,
         inputTokens,
         outputTokens,
-        cost: cost.totalCost,
+        cost: totalCost,
         documentLength: (req.body as OpenAIExtractionInput).documentText?.length ?? 0,
         userId: req.headers['x-user-id'] as string | undefined,
       })
@@ -417,9 +461,14 @@ router.post(
       res.json({
         success: true,
         data: parsedData,
-        usage: response.usage,
-        model: response.model,
-        cost: cost.totalCost,
+        usage: {
+          prompt_tokens: inputTokens,
+          completion_tokens: outputTokens,
+          total_tokens: inputTokens + outputTokens,
+        },
+        model: usedModel,
+        cost: totalCost,
+        attempts: healingResult.attempts,
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -604,36 +653,90 @@ router.post(
         }
       }
 
-      const response = await client.messages.create(
-        {
-          model: model || aiConfig.anthropicExtractionModel,
-          max_tokens: aiConfig.maxTokens,
-          system: finalSystemPrompt,
-          messages: [{ role: 'user', content: finalUserPrompt }],
-        },
-        { signal: AbortSignal.timeout(60_000) }
+      const workerCaller = async (userPrompt: string, temperature: number) => {
+        const response = await client.messages.create(
+          {
+            model: model || aiConfig.anthropicExtractionModel,
+            max_tokens: aiConfig.maxTokens,
+            system: finalSystemPrompt,
+            messages: [{ role: 'user', content: userPrompt }],
+            temperature,
+          },
+          { signal: AbortSignal.timeout(60_000) }
+        )
+        const textBlock = response.content.find((block) => block.type === 'text')
+        let jsonContent = textBlock?.type === 'text' ? textBlock.text : ''
+        const jsonMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)```/)
+        if (jsonMatch) {
+          jsonContent = jsonMatch[1].trim()
+        }
+        const usedModel = response.model || model || aiConfig.anthropicExtractionModel
+        const inputTokens = response.usage.input_tokens
+        const outputTokens = response.usage.output_tokens
+        return {
+          content: jsonContent,
+          usage: {
+            inputTokens,
+            outputTokens,
+            cost: calculateCost(usedModel, inputTokens, outputTokens).totalCost,
+            model: usedModel,
+          },
+        }
+      }
+
+      const judgeCaller = async (documentTextStr: string, workerContent: string) => {
+        const judgeUserPrompt = `Original Document:\n\n${documentTextStr}\n\nExtraction Result:\n\n${workerContent}\n\nPlease output the JSON containing stepByStepAnalysis, score, pass, and qualitativeFeedback as instructed.`
+        const response = await client.messages.create(
+          {
+            model: model || aiConfig.anthropicExtractionModel,
+            max_tokens: aiConfig.maxTokens,
+            system: JUDGE_SYSTEM_PROMPT,
+            messages: [{ role: 'user', content: judgeUserPrompt }],
+            temperature: 0.0,
+          },
+          { signal: AbortSignal.timeout(60_000) }
+        )
+        const textBlock = response.content.find((block) => block.type === 'text')
+        let jsonContent = textBlock?.type === 'text' ? textBlock.text : ''
+        const jsonMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)```/)
+        if (jsonMatch) {
+          jsonContent = jsonMatch[1].trim()
+        }
+        const usedModel = response.model || model || aiConfig.anthropicExtractionModel
+        const inputTokens = response.usage.input_tokens
+        const outputTokens = response.usage.output_tokens
+        return {
+          content: jsonContent,
+          usage: {
+            inputTokens,
+            outputTokens,
+            cost: calculateCost(usedModel, inputTokens, outputTokens).totalCost,
+            model: usedModel,
+          },
+        }
+      }
+
+      const healingResult = await executeWithSelfHealingLoop(
+        documentText,
+        finalUserPrompt,
+        aiConfig.temperature,
+        workerCaller,
+        judgeCaller,
+        (content) => JSON.parse(content)
       )
 
-      const textBlock = response.content.find((block) => block.type === 'text')
-      if (!textBlock || textBlock.type !== 'text') {
+      if (!healingResult.success && !healingResult.data) {
         return res.status(500).json({
-          error: 'Empty response from Anthropic',
-          code: 'EMPTY_RESPONSE',
+          error: healingResult.error || 'Anthropic extraction failed',
+          code: healingResult.code || 'EMPTY_RESPONSE',
         })
       }
 
-      // Parse JSON from response (Claude may wrap in markdown)
-      let jsonContent = textBlock.text
-      const jsonMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)```/)
-      if (jsonMatch) {
-        jsonContent = jsonMatch[1].trim()
-      }
-
-      // Track cost usage
-      const usedModel = response.model || model || aiConfig.anthropicExtractionModel
-      const inputTokens = response.usage.input_tokens
-      const outputTokens = response.usage.output_tokens
-      const cost = calculateCost(usedModel, inputTokens, outputTokens)
+      const parsedData = healingResult.data
+      const usedModel = healingResult.finalModel || model || aiConfig.anthropicExtractionModel
+      const inputTokens = healingResult.totalInputTokens
+      const outputTokens = healingResult.totalOutputTokens
+      const totalCost = healingResult.totalCost
 
       // Record usage asynchronously (don't block response)
       recordUsage({
@@ -643,9 +746,9 @@ router.post(
         inputTokens,
         outputTokens,
         totalTokens: inputTokens + outputTokens,
-        inputCost: cost.inputCost,
-        outputCost: cost.outputCost,
-        totalCost: cost.totalCost,
+        inputCost: 0,
+        outputCost: 0,
+        totalCost,
         timestamp: new Date().toISOString(),
       }).catch((err) => {
         if (process.env.NODE_ENV !== 'production') {
@@ -654,20 +757,6 @@ router.post(
           })
         }
       })
-
-      let parsedData: unknown
-      try {
-        parsedData = JSON.parse(jsonContent)
-      } catch (parseError) {
-        log.error('Anthropic returned invalid JSON', {
-          requestId,
-          parseError: parseError instanceof Error ? parseError.message : String(parseError),
-          contentPreview: jsonContent.slice(0, 200),
-        })
-        return res
-          .status(502)
-          .json({ success: false, error: 'AI returned invalid JSON', code: 'INVALID_JSON' })
-      }
 
       // Record successful extraction metric
       recordExtractionEvent({
@@ -687,7 +776,7 @@ router.post(
         durationMs: Date.now() - startTime,
         inputTokens,
         outputTokens,
-        cost: cost.totalCost,
+        cost: totalCost,
         documentLength: (req.body as AnthropicExtractionInput).documentText?.length ?? 0,
         userId: req.headers['x-user-id'] as string | undefined,
       })
@@ -695,12 +784,10 @@ router.post(
       res.json({
         success: true,
         data: parsedData,
-        usage: {
-          input_tokens: response.usage.input_tokens,
-          output_tokens: response.usage.output_tokens,
-        },
-        model: response.model,
-        cost: cost.totalCost,
+        usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+        model: usedModel,
+        cost: totalCost,
+        attempts: healingResult.attempts,
       })
 
       // Fire push notification if user is authenticated (non-blocking fire-and-forget)

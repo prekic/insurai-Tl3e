@@ -20,9 +20,7 @@ function createBasePolicy(
     premium: 5000,
     currency: 'TRY',
     paymentFrequency: 'annual',
-    coverages: [
-      { name: 'Fire Coverage', limit: 500000, deductible: 1000, description: null },
-    ],
+    coverages: [{ name: 'Fire Coverage', limit: 500000, deductible: 1000, description: null }],
     specialConditions: [],
     exclusions: [],
     confidence: {
@@ -60,9 +58,7 @@ describe('Base Field Validation', () => {
     const result = validateExtraction(data)
 
     expect(result.isValid).toBe(false)
-    expect(result.issues.some((i) => i.field === 'startDate' && i.severity === 'error')).toBe(
-      true
-    )
+    expect(result.issues.some((i) => i.field === 'startDate' && i.severity === 'error')).toBe(true)
   })
 
   it('should error on missing end date', () => {
@@ -90,9 +86,7 @@ describe('Base Field Validation', () => {
     })
     const result = validateExtraction(data)
 
-    expect(result.issues.some((i) => i.field === 'dates' && i.severity === 'warning')).toBe(
-      true
-    )
+    expect(result.issues.some((i) => i.field === 'dates' && i.severity === 'warning')).toBe(true)
   })
 
   it('should warn about missing premium', () => {
@@ -107,9 +101,7 @@ describe('Base Field Validation', () => {
     const result = validateExtraction(data)
 
     expect(result.isValid).toBe(false)
-    expect(result.issues.some((i) => i.field === 'premium' && i.severity === 'error')).toBe(
-      true
-    )
+    expect(result.issues.some((i) => i.field === 'premium' && i.severity === 'error')).toBe(true)
   })
 
   it('should warn about missing coverages', () => {
@@ -174,9 +166,9 @@ describe('Kasko Validation', () => {
     })
     const result = validateExtraction(data)
 
-    expect(
-      result.issues.some((i) => i.field === 'premium' && i.message.includes('below'))
-    ).toBe(true)
+    expect(result.issues.some((i) => i.field === 'premium' && i.message.includes('below'))).toBe(
+      true
+    )
   })
 
   it('should warn about invalid plate number', () => {
@@ -403,9 +395,7 @@ describe('Health Insurance Validation', () => {
     })
     const result = validateExtraction(data)
 
-    expect(
-      result.issues.some((i) => i.field === 'healthCostSharing.copayPercentage')
-    ).toBe(true)
+    expect(result.issues.some((i) => i.field === 'healthCostSharing.copayPercentage')).toBe(true)
   })
 })
 
@@ -615,5 +605,127 @@ describe('Format Validation Issues', () => {
     const formatted = formatValidationIssues(result.issues, 'en')
 
     expect(formatted.some((f) => f.includes('❌'))).toBe(true)
+  })
+})
+
+// --- Self-Healing Simulation Tests ---
+import { executeWithSelfHealingLoop } from '../../../server/lib/self-healing'
+
+describe('Agentic Self-Healing Loop Simulation', () => {
+  it('should return on first attempt if worker parses and judge passes', async () => {
+    const workerCaller = async () => ({
+      content: '{"mock":"data"}',
+      usage: { inputTokens: 10, outputTokens: 10, cost: 0.1, model: 'test' },
+    })
+    const judgeCaller = async () => ({
+      content: '{"stepByStepAnalysis":"ok","score":90,"pass":true,"qualitativeFeedback":"none"}',
+      usage: { inputTokens: 5, outputTokens: 5, cost: 0.05, model: 'test' },
+    })
+
+    const result = await executeWithSelfHealingLoop(
+      'doc text',
+      'user prompt',
+      0.1,
+      workerCaller,
+      judgeCaller,
+      JSON.parse
+    )
+
+    expect(result.success).toBe(true)
+    expect(result.attempts).toBe(1)
+    expect(result.data).toEqual({ mock: 'data' })
+    expect(result.totalCost).toBeCloseTo(0.15)
+  })
+
+  it('should retry if judge fails once then passes', async () => {
+    let workerCount = 0
+    let judgeCount = 0
+
+    const workerCaller = async (_prompt: string) => {
+      workerCount++
+      return {
+        content: workerCount === 1 ? '{"mock":"bad"}' : '{"mock":"good"}',
+        usage: { inputTokens: 10, outputTokens: 10, cost: 0.1, model: 'test' },
+      }
+    }
+
+    const judgeCaller = async () => {
+      judgeCount++
+      if (judgeCount === 1) {
+        return {
+          content:
+            '{"stepByStepAnalysis":"bad","score":50,"pass":false,"qualitativeFeedback":"fix mock"}',
+          usage: { inputTokens: 5, outputTokens: 5, cost: 0.05, model: 'test' },
+        }
+      }
+      return {
+        content: '{"stepByStepAnalysis":"good","score":95,"pass":true,"qualitativeFeedback":""}',
+        usage: { inputTokens: 5, outputTokens: 5, cost: 0.05, model: 'test' },
+      }
+    }
+
+    const result = await executeWithSelfHealingLoop(
+      'doc text',
+      'user prompt',
+      0.1,
+      workerCaller,
+      judgeCaller,
+      JSON.parse
+    )
+
+    expect(result.success).toBe(true)
+    expect(result.attempts).toBe(2)
+    expect(result.data).toEqual({ mock: 'good' })
+    expect(result.totalCost).toBeCloseTo(0.3) // 2 workers (0.2) + 2 judges (0.1)
+  })
+
+  it('should fast-fail if judge returns score <= 10', async () => {
+    const workerCaller = async () => ({
+      content: '{"mock":"garbage"}',
+      usage: { inputTokens: 10, outputTokens: 10, cost: 0.1, model: 'test' },
+    })
+    const judgeCaller = async () => ({
+      content:
+        '{"stepByStepAnalysis":"terrible","score":5,"pass":false,"qualitativeFeedback":"impossible"}',
+      usage: { inputTokens: 5, outputTokens: 5, cost: 0.05, model: 'test' },
+    })
+
+    const result = await executeWithSelfHealingLoop(
+      'doc text',
+      'user prompt',
+      0.1,
+      workerCaller,
+      judgeCaller,
+      JSON.parse
+    )
+
+    expect(result.success).toBe(false)
+    expect(result.attempts).toBe(1)
+    expect(result.code).toBe('STRUCTURALLY_IMPOSSIBLE')
+  })
+
+  it('should exhaust retries and return best effort', async () => {
+    const workerCaller = async () => ({
+      content: '{"mock":"data"}',
+      usage: { inputTokens: 10, outputTokens: 10, cost: 0.1, model: 'test' },
+    })
+    const judgeCaller = async () => ({
+      content:
+        '{"stepByStepAnalysis":"bad","score":50,"pass":false,"qualitativeFeedback":"fix mock"}',
+      usage: { inputTokens: 5, outputTokens: 5, cost: 0.05, model: 'test' },
+    })
+
+    const result = await executeWithSelfHealingLoop(
+      'doc text',
+      'user prompt',
+      0.1,
+      workerCaller,
+      judgeCaller,
+      JSON.parse
+    )
+
+    expect(result.success).toBe(true) // Returns best effort
+    expect(result.attempts).toBe(3)
+    expect(result.data).toEqual({ mock: 'data' })
   })
 })
