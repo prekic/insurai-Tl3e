@@ -116,6 +116,41 @@ export interface RawPolicyData {
     actionTr: string
     estimatedCost: number | null
   }>
+
+  // Vehicle information for kasko policies
+  vehicleInfo?: {
+    plate?: string
+    make?: string
+    model?: string
+    year?: number
+    engineNo?: string
+    chassisNo?: string
+    color?: string
+    usage?: string
+    vehicleClass?: string
+    fuelType?: string
+  }
+
+  // Discounts
+  discounts?: {
+    ncdDiscount: number | null
+    groupDiscount: number | null
+    otherDiscountPct: number | null
+    evidence: string | null
+  } | null
+
+  // Extraction completeness flags
+  extractionWarnings?: string[]
+  conditionalDeductibles?: string[]
+  deductiblePercent?: number
+  premiumMissing?: boolean
+  insuredMissing?: boolean
+  deductibleUncertain?: boolean
+  insuredEntityType?: 'individual' | 'corporate' | null
+
+  // Trial transfer metadata
+  fromTrial?: boolean
+  originalFileName?: string
 }
 
 // =============================================================================
