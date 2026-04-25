@@ -16,6 +16,11 @@ fix(test): stabilize E2E admin flows and KASKO test suite
 **Files added/modified**:
 - `src/lib/ai/turkish-utils.ts` — removed unnecessary regex escapes (`\/` and `\.`) and added `// eslint-disable-next-line no-control-regex`.
 - `scripts/qa-extraction-quality.ts` — removed unused `extractVehicleInfoFromText` import.
+- `e2e/admin-flows.spec.ts` & `src/lib/insurance-display.test.ts` — stabilized UI state assertions.
+- `scripts/backfill-vehicle-info.ts` — added a Document AI OCR fallback (`extractWithDocumentAI`) for PDFs returning < 100 characters of text.
+- `shared/field-aliases.ts` — added new stop labels (`yetkili`, `onarım`), refined tabular fallback spacing rules, and updated regex to handle corrupted leading characters (e.g. quotes).
+- `src/lib/ai/__tests__/turkish-utils-vehicle.test.ts` — added tests for extracting models with corrupted leading quotes.
+- `src/lib/ai/config.ts` & `src/lib/env.ts` — refactored config to use `env.config` instead of `import.meta.env` directly, and added a polyfill in `env.ts` to support Node.js script execution.
 - `CLAUDE.md` — gotchas #108 / #109, next session instructions.
 - `SESSION_HANDOFF.md` — this file.
 
@@ -46,6 +51,9 @@ The pre-commit hook was blocking commits due to `no-useless-escape` and `no-cont
 
 ### Phase 2 — Test Stabilization
 We ensured that the branch assertions in the test suite correctly align with the expected UI state, and stabilized the E2E test flow for admin routines. The `npx lint-staged` pre-commit gate now passes successfully.
+
+### Phase 3 — Script Reliability & Fallbacks
+Added a Document AI OCR fallback path in `backfill-vehicle-info.ts` for PDFs that return sparse text (< 100 chars, typically scanned documents). Refactored config logic to support this, including a Node.js `import.meta.env` polyfill in `env.ts` for safe CLI execution. Also updated `field-aliases.ts` to improve tabular pattern matching resilience (handling corrupted leading characters and new stop labels like `yetkili` and `onarım`).
 
 ## Environment / Configuration
 
