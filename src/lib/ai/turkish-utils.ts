@@ -376,6 +376,18 @@ export function extractVehicleInfoFromText(rawText: string):
   | undefined {
   if (!rawText || typeof rawText !== 'string') return undefined
 
+  // Clean up OCR artifacts that can disrupt regex matching (e.g. \u0014)
+  // Fix ISO-8859-9 misinterpreted as ISO-8859-1 (common in Turkish PDFs)
+  const sanitizedText = rawText
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+    .replace(/ý/g, 'ı')
+    .replace(/þ/g, 'ş')
+    .replace(/ð/g, 'ğ')
+    .replace(/Ý/g, 'İ')
+    .replace(/Þ/g, 'Ş')
+    .replace(/Ð/g, 'Ğ')
+
   const result: {
     make?: string
     model?: string
@@ -386,7 +398,7 @@ export function extractVehicleInfoFromText(rawText: string):
   } = {}
 
   // Plate — standalone TR plate pattern (no label required).
-  const plateMatch = rawText.match(/\b(\d{2})\s*([A-Z]{1,3})\s*(\d{1,4})\b/)
+  const plateMatch = sanitizedText.match(/\b(\d{2})\s*([A-Z]{1,3})\s*(\d{1,4})\b/)
   if (plateMatch) {
     const cityNum = parseInt(plateMatch[1], 10)
     if (cityNum >= 1 && cityNum <= 81) {
@@ -395,7 +407,7 @@ export function extractVehicleInfoFromText(rawText: string):
   }
 
   // Make — first word of the labeled value.
-  const rawMake = matchLabeledField(rawText, 'make')
+  const rawMake = matchLabeledField(sanitizedText, 'make')
   if (rawMake) {
     const firstWord = rawMake.split(/\s+/)[0]
     if (firstWord && firstWord.length >= 2 && firstWord.length <= 25) {
@@ -406,13 +418,13 @@ export function extractVehicleInfoFromText(rawText: string):
   // Model — from the dedicated `Model:` / `Tip:` / `Trim:` label.
   // The alias excludes `Model Yılı` / `Model Bilgisi` / bare `Model: <year>`
   // so year-bearing labels don't poison the model value.
-  const rawModel = matchLabeledField(rawText, 'model')
+  const rawModel = matchLabeledField(sanitizedText, 'model')
   if (rawModel) {
     // Some insurers (Allianz Peugeot) run the full trim string onto one line
     // ("308 COMFORT 1.6 VTI (120) 5 KAPI OV (792)"). STOP_LABELS catches
     // `Kullanım Şekli` / `Yer Adedi` etc. as terminators; the 80-char cap
     // still guards against pathological captures that bypassed those.
-    const cleaned = rawModel.replace(/[\n\r,;].*/, '').trim()
+    const cleaned = rawModel.replace(/[\n\r].*/, '').trim()
     if (cleaned.length >= 1 && cleaned.length <= 80) {
       result.model = cleaned
     }
@@ -420,7 +432,7 @@ export function extractVehicleInfoFromText(rawText: string):
 
   // Model year — accepts Model Yılı / Model Bilgisi / İmal Yılı / Üretim Yılı /
   // Model Year / Araç Yılı / bare `MODEL: <year>`.
-  const rawYear = matchLabeledField(rawText, 'modelYear')
+  const rawYear = matchLabeledField(sanitizedText, 'modelYear')
   if (rawYear) {
     const y = rawYear.match(/\b(\d{4})\b/)
     if (y) {
@@ -432,17 +444,179 @@ export function extractVehicleInfoFromText(rawText: string):
   }
 
   // Engine / motor number — `Motor No: CZE307964` and variants.
-  const rawEngine = matchLabeledField(rawText, 'motorNo')
+  const rawEngine = matchLabeledField(sanitizedText, 'motorNo')
   if (rawEngine) {
     const m = rawEngine.match(/\b([A-Z0-9]{5,20})\b/i)
-    if (m) result.engineNo = m[1].toUpperCase()
+    if (m && /\d/.test(m[1])) result.engineNo = m[1].toUpperCase()
   }
 
   // Chassis / VIN — `Şasi No: WVGZZZ5NZHW862628` and variants.
-  const rawChassis = matchLabeledField(rawText, 'chassisNo')
+  const rawChassis = matchLabeledField(sanitizedText, 'chassisNo')
   if (rawChassis) {
     const m = rawChassis.match(/\b([A-Z0-9]{6,20})\b/i)
-    if (m) result.chassisNo = m[1].toUpperCase()
+    if (m && /\d/.test(m[1])) result.chassisNo = m[1].toUpperCase()
+  }
+
+  // ---------------------------------------------------------------------------
+  // FALLBACK: Global pattern heuristics for broken tabular OCR
+  // When OCR splits labels into one text block and values into another block,
+  // `matchLabeledField` completely fails. We use global regex heuristics here.
+  // ---------------------------------------------------------------------------
+
+  if (!result.chassisNo) {
+    const chassisMatches = sanitizedText.match(/\b([A-Z0-9]{17})\b/gi)
+    if (chassisMatches) {
+      for (const m of chassisMatches) {
+        if (/[A-Z]/i.test(m) && /\d/.test(m)) {
+          result.chassisNo = m.toUpperCase()
+          break
+        }
+      }
+    }
+  }
+
+  const standaloneValues =
+    sanitizedText.match(/^[:\s]+(.+)$/gim)?.map((l) => l.replace(/^[:\s]+/, '').trim()) || []
+
+  if (!result.engineNo) {
+    for (const v of standaloneValues) {
+      const upperV = v.toUpperCase()
+      if (
+        upperV !== result.chassisNo &&
+        upperV.length >= 6 &&
+        upperV.length <= 15 &&
+        /[A-Z]/.test(upperV) &&
+        /\d/.test(upperV)
+      ) {
+        if (/^[A-Z0-9]+$/.test(upperV)) {
+          result.engineNo = upperV
+          break
+        }
+      }
+    }
+  }
+
+  if (!result.year) {
+    for (const v of standaloneValues) {
+      if (/^(?:19|20)\d{2}$/.test(v)) {
+        const parsedYear = parseInt(v, 10)
+        if (parsedYear >= 1950 && parsedYear <= new Date().getFullYear() + 1) {
+          result.year = parsedYear
+          break
+        }
+      }
+    }
+
+    if (!result.year) {
+      const lines = sanitizedText.split('\n').map((l) => l.trim())
+      const modelIndex = lines.findIndex((l) => /\b(?:MODEL|MODEL[Iİ]? YILI)\b/i.test(l))
+      if (modelIndex !== -1) {
+        for (let i = modelIndex + 1; i < Math.min(lines.length, modelIndex + 20); i++) {
+          if (/^(?:19|20)\d{2}$/.test(lines[i])) {
+            const parsedYear = parseInt(lines[i], 10)
+            if (parsedYear >= 1950 && parsedYear <= new Date().getFullYear() + 1) {
+              result.year = parsedYear
+              break
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (!result.make) {
+    const COMMON_MAKES = [
+      'RENAULT',
+      'FIAT',
+      'FORD',
+      'VOLKSWAGEN',
+      'HYUNDAI',
+      'TOYOTA',
+      'HONDA',
+      'DACIA',
+      'PEUGEOT',
+      'OPEL',
+      'CITROEN',
+      'NISSAN',
+      'SKODA',
+      'SEAT',
+      'KIA',
+      'AUDI',
+      'BMW',
+      'MERCEDES-BENZ',
+      'MERCEDES',
+      'VOLVO',
+      'SUZUKI',
+      'MAZDA',
+      'CHEVROLET',
+      'IVECO',
+      'ISUZU',
+      'MITSUBISHI',
+    ]
+    for (const v of standaloneValues) {
+      const upperV = v.toUpperCase()
+      for (const make of COMMON_MAKES) {
+        if (upperV.includes(make)) {
+          // Store just the first word, or the matching make
+          result.make = v.split(/\s+/)[0]
+          break
+        }
+      }
+      if (result.make) break
+    }
+  }
+
+  if (!result.model) {
+    const nonModelPatterns = [
+      /^(?:evet|hay[ıi]r|var|yok|yoktur|vard[iı]r)$/i, // booleans
+      /^(?:standart|muafiyetsiz|di[ğg]er|or[j|i]inal|cam|kasko|i[h|s]tiyari|belirsiz|yeni|ikinci\s*el)$/i, // common policy terms
+      /sigorta|poli[çc]e|acente|broker|b[oö]lge|m[uü]d[uü]rl[uü][gğ][uü]|a\.[sş]\.|anonim/i, // company/agency names
+      /cad\.|cadde|sok\.|sokak|mah\.|mahalle|bulvar|meydan|plaza|no:|kat:|d:|bulvar[ıi]/i, // addresses
+      /^\d{1,2}[/.]\d{1,2}[/.]\d{2,4}$/, // dates
+      /^\d+$/, // pure numbers
+      /^\d+\s*(?:g[üu]n|ay|y[ıi]l|saat)$/i, // durations
+      /hususi|ticari|kamyon|otomobil|m[iı]n[iı]b[üu]s|trakt[öo]r|motosiklet/i, // usage/class
+      /^[:\-\s0]+$/, // empty/symbols
+      /^\[PAGE\s*\d+\]$/i, // page markers
+      /^[A-Z0-9]{2,}-\d{3,}$/i, // agency codes
+      /^GSM$/i,
+    ]
+
+    let makeIndex = -1
+    if (result.make) {
+      makeIndex = standaloneValues.findIndex((v) =>
+        v.toUpperCase().includes(result.make!.toUpperCase())
+      )
+    }
+    const startIndex = makeIndex >= 0 ? makeIndex + 1 : 0
+
+    for (let i = startIndex; i < standaloneValues.length; i++) {
+      const v = standaloneValues[i]
+      const isMake = result.make ? v.toUpperCase().includes(result.make.toUpperCase()) : false
+      const isYear = v === result.year?.toString()
+      const isPlate = result.plate
+        ? v.replace(/\s+/g, '') === result.plate.replace(/\s+/g, '')
+        : false
+      const isChassis = result.chassisNo ? v.toUpperCase() === result.chassisNo : false
+      const isEngine = result.engineNo ? v.toUpperCase() === result.engineNo : false
+
+      if (!isMake && !isYear && !isPlate && !isChassis && !isEngine) {
+        if (v.length < 3 || v.length > 50) continue
+
+        let isExcluded = false
+        for (const pattern of nonModelPatterns) {
+          if (pattern.test(v)) {
+            isExcluded = true
+            break
+          }
+        }
+
+        if (!isExcluded && /[a-z]/i.test(v)) {
+          result.model = v
+          break
+        }
+      }
+    }
   }
 
   return Object.keys(result).length > 0 ? result : undefined

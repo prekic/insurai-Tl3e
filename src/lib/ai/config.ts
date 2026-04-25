@@ -8,9 +8,9 @@ let cachedOpenAI: OpenAI | null = null
 let cachedAnthropic: Anthropic | null = null
 
 // Environment variables for AI providers
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY
-const ANTHROPIC_API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY
-const GOOGLE_CLOUD_API_KEY = import.meta.env.VITE_GOOGLE_CLOUD_API_KEY
+const OPENAI_API_KEY = env.config.openaiKey
+const ANTHROPIC_API_KEY = env.config.anthropicKey
+const GOOGLE_CLOUD_API_KEY = env.config.googleCloudKey
 
 // API key storage key (for user-configured keys)
 const STORAGE_KEYS = {
@@ -62,7 +62,7 @@ export async function checkProxyProviders(): Promise<{
 /**
  * Get API key from environment or localStorage
  */
-function getApiKey(envKey: string | undefined, storageKey: string): string | null {
+function getApiKey(envKey: string | null | undefined, storageKey: string): string | null {
   // First check environment variable
   if (envKey && envKey !== 'sk-...' && envKey !== 'sk-ant-...') {
     return envKey

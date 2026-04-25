@@ -36,9 +36,10 @@ export const VEHICLE_FIELD_ALIASES = {
     // (with a single space, not a slash) — must come BEFORE the bare
     // `model` alias so it's tried first when both could apply.
     /marka\s+t[iİ]p[iİ]?/i,
+    /marka(?:s[ıi])?\s*\/\s*t[iİ]p[iİ]?/i,
     /model[iİ]?(?!\s*(?:y[ıi]l|bilgisi|year|\s*[:.]?\s*\d{4}\b))/i,
-    /\btip[iİ]?\b/i,
-    /\btrim\b/i,
+    /(?<![a-zçğıöşüA-ZÇĞİÖŞÜ])t[iİ]p[iİ]?(?![a-zçğıöşüA-ZÇĞİÖŞÜ])/i,
+    /(?<![a-zçğıöşüA-ZÇĞİÖŞÜ])trim(?![a-zçğıöşüA-ZÇĞİÖŞÜ])/i,
   ],
 
   /** Engine / motor number */
@@ -75,6 +76,8 @@ export const STOP_LABELS: readonly RegExp[] = [
   /m[üu][şs]ter[iİ]?\s*numaras[ıi]?/i,
   /sbm\s*tramer/i,
   /acente/i,
+  /\byetkili\b/i,
+  /\bonar[ıi]m\b/i,
 ]
 
 function anchoredAt(alias: RegExp): RegExp {
@@ -108,9 +111,9 @@ function hasKvSeparator(text: string, pos: number): boolean {
   while (i < text.length) {
     const ch = text[i]
     if (ch === ':' || ch === '\t') return true
-    if (ch === ' ') {
-      // Tolerate a single space, but a run of 2+ is column alignment.
-      if (text[i + 1] === ' ') return true
+    if (ch === ' ' || ch === '\n' || ch === '\r') {
+      // Tolerate a single space, but a run of 2+ spaces is column alignment.
+      if (ch === ' ' && text[i + 1] === ' ') return true
       i++
       continue
     }
@@ -286,9 +289,9 @@ function scanTabularSpaceSeparated(
 
   const start = labelEnd + 1
 
-  // Guard 3: value must start with uppercase letter or digit.
+  // Guard 3: value must start with uppercase letter or digit, or common corrupted leading chars.
   if (start >= text.length) return undefined
-  if (!/[A-ZÇĞİÖŞÜ0-9]/.test(text[start])) return undefined
+  if (!/[A-ZÇĞİÖŞÜ0-9'+(]/.test(text[start])) return undefined
 
   // Guard 4: the label must be at line-start OR preceded by another
   // recognized label or stop-label (i.e. a column break, not prose).
@@ -311,7 +314,9 @@ function scanTabularSpaceSeparated(
       )
       return m !== null
     })
-    const endsWithUppercaseToken = /[A-ZÇĞİÖŞÜ0-9][A-ZÇĞİÖŞÜ0-9./-]*\s*$/.test(beforeLabel)
+    const lastToken = beforeLabel.trim().split(/[\s]+/).pop() || ''
+    const isLowercaseProse = /^[a-zçğıöşü]+$/.test(lastToken)
+    const endsWithUppercaseToken = !isLowercaseProse
     if (!endsWithLabel && !endsWithUppercaseToken) return undefined
   }
 

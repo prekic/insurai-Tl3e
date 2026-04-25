@@ -12,7 +12,9 @@ test.describe('Admin Dashboard', () => {
     test('should display admin login form', async ({ page }) => {
       await page.goto('/admin')
 
-      await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+      // Increased timeout to 15000ms because the backend rate limiter (429) can delay
+      // the initial unauthenticated redirect, and Vite lazy-loading can take time on CI
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15000 })
       await expect(page.getByLabel(/email/i)).toBeVisible()
       await expect(page.getByLabel(/password/i)).toBeVisible()
       await expect(page.getByRole('button', { name: /sign in|log in|login/i })).toBeVisible()
@@ -31,6 +33,15 @@ test.describe('Admin Dashboard', () => {
 
     test('should show error for invalid credentials', async ({ page }) => {
       await page.goto('/admin')
+
+      // Mock failed login
+      await page.route('**/api/admin/auth/login', async (route) => {
+        await route.fulfill({
+          status: 401,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: false, error: 'Invalid credentials' }),
+        })
+      })
 
       await page.getByLabel(/email/i).fill('wrong@example.com')
       await page.getByLabel(/password/i).fill('wrongpassword')
@@ -59,6 +70,259 @@ test.describe('Admin Dashboard', () => {
     test('should have admin route accessible', async ({ page }) => {
       const response = await page.goto('/admin')
       expect(response?.status()).toBeLessThan(500)
+    })
+  })
+
+  test.describe('Comprehensive Authenticated Flows', () => {
+    test.beforeEach(async ({ page }) => {
+      // Mock the login API
+      await page.route('**/api/admin/auth/login', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            data: {
+              token: 'fake-jwt-token',
+              refreshToken: 'fake-refresh-token',
+              user: { id: 'admin-1', email: 'admin@insurai.com', role: 'super_admin' },
+            },
+          }),
+        })
+      })
+
+      // Mock the current user API (to verify session)
+      await page.route('**/api/admin/auth/me', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            data: { id: 'admin-1', email: 'admin@insurai.com', role: 'super_admin' },
+          }),
+        })
+      })
+
+      // Catch-all for other admin APIs to prevent timeouts
+      await page.route('**/api/admin/**', async (route, request) => {
+        if (!request.url().includes('/auth/')) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ success: true, data: {} }),
+          })
+        } else {
+          await route.fallback()
+        }
+      })
+
+      // Specific mocks for lists to prevent map/filter crashes
+      await page.route('**/api/admin/users', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, data: [] }),
+        })
+      })
+      await page.route('**/api/admin/policies', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, data: [] }),
+        })
+      })
+      await page.route('**/api/admin/policies/operations*', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, data: [] }),
+        })
+      })
+      await page.route('**/api/admin/segments*', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, data: [] }),
+        })
+      })
+      await page.route('**/api/admin/security/logs*', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, data: [] }),
+        })
+      })
+      await page.route('**/api/admin/security/rate-limits*', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, data: { endpoints: [], blockedIPs: [] } }),
+        })
+      })
+      await page.route('**/api/admin/settings/feature-flags*', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, data: [] }),
+        })
+      })
+
+      // Mock system health and alerts to populate dashboard
+      await page.route('**/api/admin/health', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            data: {
+              status: 'healthy',
+              environment: 'test',
+              version: '1.0.0',
+              uptime: 3600,
+              components: [
+                {
+                  name: 'Database',
+                  status: 'healthy',
+                  responseTime: 15,
+                  lastChecked: new Date().toISOString(),
+                },
+                {
+                  name: 'OpenAI',
+                  status: 'healthy',
+                  responseTime: 250,
+                  lastChecked: new Date().toISOString(),
+                },
+              ],
+            },
+          }),
+        })
+      })
+
+      await page.route('**/api/admin/metrics', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            data: {
+              cpu: { usage: 15, cores: 4 },
+              memory: { used: 2000000000, total: 8000000000, percentage: 25 },
+              disk: { used: 0, total: 0, percentage: 0 },
+              network: { requestsPerMinute: 120, bytesIn: 0, bytesOut: 0 },
+              process: { pid: 1, uptime: 3600, heapUsed: 100000000, heapTotal: 200000000 },
+            },
+          }),
+        })
+      })
+
+      await page.route('**/api/admin/ai/stats*', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            data: {
+              totalRequests: 150,
+              totalTokens: 500000,
+              totalCost: 5.25,
+              errorRate: 0.01,
+              averageResponseTime: 1200,
+              byProvider: {
+                openai: {
+                  requests: 100,
+                  tokens: { input: 200000, output: 100000, total: 300000 },
+                  cost: 3.5,
+                  errorCount: 1,
+                  averageResponseTime: 1100,
+                  errorRate: 0.01,
+                },
+                anthropic: {
+                  requests: 50,
+                  tokens: { input: 150000, output: 50000, total: 200000 },
+                  cost: 1.75,
+                  errorCount: 0,
+                  averageResponseTime: 1300,
+                  errorRate: 0,
+                },
+              },
+              byOperation: {
+                extraction: {
+                  requests: 150,
+                  successRate: 0.99,
+                  averageResponseTime: 1200,
+                  averageTokens: 3333,
+                  totalCost: 5.25,
+                },
+              },
+            },
+          }),
+        })
+      })
+
+      await page.route('**/api/admin/policies/stats*', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            data: {
+              total: 200,
+              byType: { kasko: 150, traffic: 50 },
+              byStatus: { processed: 195, failed: 5 },
+              averageExtractionTime: 2500,
+              extractionSuccessRate: 0.975,
+              ocrUsageRate: 0.2,
+            },
+          }),
+        })
+      })
+
+      await page.route('**/api/admin/security/logs*', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, data: [] }),
+        })
+      })
+    })
+
+    test('should complete login flow and redirect to dashboard', async ({ page }) => {
+      page.on('request', (req) => console.log('>>', req.method(), req.url()))
+      page.on('response', (res) => console.log('<<', res.status(), res.url()))
+
+      await page.goto('/admin/login')
+      await page.getByLabel(/email/i).fill('admin@insurai.com')
+      await page.getByLabel(/password/i).fill('password123')
+      await page.getByRole('button', { name: /sign in/i }).click()
+
+      // It should navigate to /admin and show the admin dashboard
+      await expect(page).toHaveURL(/\/admin$/)
+      await expect(page.locator('header')).toContainText(/Admin/i, { timeout: 15000 })
+      await expect(page.getByRole('heading', { name: /Dashboard Overview/i })).toBeVisible()
+    })
+
+    test('should navigate between dashboard tabs', async ({ page }) => {
+      // First authenticate via localstorage to skip login UI
+      await page.goto('/admin/login')
+      await page.evaluate(() => {
+        localStorage.setItem('admin_token', 'fake-jwt-token')
+        localStorage.setItem('admin_refresh_token', 'fake-refresh-token')
+      })
+
+      await page.goto('/admin')
+      await expect(page.locator('header')).toContainText(/Admin/i, { timeout: 15000 })
+
+      // Click 'Users' tab in the sidebar
+      await page.locator('nav').getByRole('button', { name: 'Users', exact: true }).click()
+      await expect(page.getByRole('heading', { name: /User Management/i }).first()).toBeVisible()
+
+      // Click 'Policies' tab
+      await page.locator('nav').getByRole('button', { name: 'Policies', exact: true }).click()
+      await expect(page.getByRole('heading', { name: /Policy Operations/i }).first()).toBeVisible()
+
+      // Click 'Security' tab
+      await page.locator('nav').getByRole('button', { name: 'Security', exact: true }).click()
+      await expect(page.getByRole('heading', { name: /Security/i }).first()).toBeVisible()
     })
   })
 })

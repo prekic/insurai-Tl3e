@@ -189,7 +189,9 @@ describe('getShortCompanyName', () => {
   // -----------------------------------------------------------------------
   describe('partial matching', () => {
     it('matches partial "anadolu" in longer string', () => {
-      expect(getShortCompanyName('Anadolu Hayat ve Emeklilik Anonim Sirketi')).toBe('Anadolu Sigorta')
+      expect(getShortCompanyName('Anadolu Hayat ve Emeklilik Anonim Sirketi')).toBe(
+        'Anadolu Sigorta'
+      )
     })
 
     it('matches partial "aksigorta"', () => {
@@ -308,20 +310,28 @@ describe('getShortCompanyName', () => {
     })
 
     it('removes ANONİM ŞİRKETİ suffix', () => {
-      expect(getShortCompanyName('SPECIAL INSURANCE COMPANY ANONİM ŞİRKETİ')).toBe('SPECIAL INSURANCE')
+      expect(getShortCompanyName('SPECIAL INSURANCE COMPANY ANONİM ŞİRKETİ')).toBe(
+        'SPECIAL INSURANCE'
+      )
     })
 
     it('removes ANONIM ŞİRKETİ suffix (without Turkish i)', () => {
-      expect(getShortCompanyName('SPECIAL INSURANCE COMPANY ANONIM ŞİRKETİ')).toBe('SPECIAL INSURANCE')
+      expect(getShortCompanyName('SPECIAL INSURANCE COMPANY ANONIM ŞİRKETİ')).toBe(
+        'SPECIAL INSURANCE'
+      )
     })
 
     it('removes SİGORTA ŞİRKETİ suffix', () => {
-      expect(getShortCompanyName('MEGA BRAND CORPORATE SİGORTA ŞİRKETİ')).toBe('MEGA BRAND CORPORATE')
+      expect(getShortCompanyName('MEGA BRAND CORPORATE SİGORTA ŞİRKETİ')).toBe(
+        'MEGA BRAND CORPORATE'
+      )
     })
 
     it('removes SIGORTA ŞİRKETİ suffix (no Turkish i)', () => {
       // After removing "SIGORTA ŞİRKETİ", result is "MEGA BRAND CORPORATE" (20 chars) which is <= 20
-      expect(getShortCompanyName('MEGA BRAND CORPORATE SIGORTA ŞİRKETİ')).toBe('MEGA BRAND CORPORATE')
+      expect(getShortCompanyName('MEGA BRAND CORPORATE SIGORTA ŞİRKETİ')).toBe(
+        'MEGA BRAND CORPORATE'
+      )
     })
 
     it('removes TÜRK SİGORTA suffix', () => {
@@ -417,9 +427,7 @@ describe('getMainCoverageValue', () => {
       const policy = makePolicy({
         type: 'traffic',
         coverage: 300000,
-        coverages: [
-          makeCoverage({ nameTr: 'Kaza başı limit', limit: 8000000, included: true }),
-        ],
+        coverages: [makeCoverage({ nameTr: 'Kaza başı limit', limit: 8000000, included: true })],
       })
       expect(getMainCoverageValue(policy)).toBe(8000000)
     })
@@ -440,9 +448,7 @@ describe('getMainCoverageValue', () => {
       const policy = makePolicy({
         type: 'traffic',
         coverage: 300000,
-        coverages: [
-          makeCoverage({ name: 'Bodily injury', limit: 5000000, included: true }),
-        ],
+        coverages: [makeCoverage({ name: 'Bodily injury', limit: 5000000, included: true })],
       })
       expect(getMainCoverageValue(policy)).toBe(5000000)
     })
@@ -451,9 +457,7 @@ describe('getMainCoverageValue', () => {
       const policy = makePolicy({
         type: 'traffic',
         coverage: 300000,
-        coverages: [
-          makeCoverage({ name: 'Limit per accident', limit: 10000000, included: true }),
-        ],
+        coverages: [makeCoverage({ name: 'Limit per accident', limit: 10000000, included: true })],
       })
       expect(getMainCoverageValue(policy)).toBe(10000000)
     })
@@ -489,8 +493,18 @@ describe('getMainCoverageValue', () => {
         type: 'traffic',
         coverage: 300000,
         coverages: [
-          makeCoverage({ nameTr: 'Maddi hasar kişi', name: 'Material damage per person', limit: 600000, included: true }),
-          makeCoverage({ nameTr: 'Maddi hasar toplam', name: 'Material damage total', limit: 300000, included: true }),
+          makeCoverage({
+            nameTr: 'Maddi hasar kişi',
+            name: 'Material damage per person',
+            limit: 600000,
+            included: true,
+          }),
+          makeCoverage({
+            nameTr: 'Maddi hasar toplam',
+            name: 'Material damage total',
+            limit: 300000,
+            included: true,
+          }),
         ],
       })
       // No relevant coverages match (no olum, sakatlik, kaza basi, death, bodily, per accident)
@@ -502,9 +516,7 @@ describe('getMainCoverageValue', () => {
       const policy = makePolicy({
         type: 'traffic',
         coverage: 300000,
-        coverages: [
-          makeCoverage({ nameTr: 'Something', limit: 0, included: true }),
-        ],
+        coverages: [makeCoverage({ nameTr: 'Something', limit: 0, included: true })],
       })
       // maxLimit is -Infinity from empty filtered array, or 0 via filter
       // Actually: filter keeps included ones, maps to limit, max of [0] = 0
@@ -516,9 +528,7 @@ describe('getMainCoverageValue', () => {
       const policy = makePolicy({
         type: 'traffic',
         coverage: 300000,
-        coverages: [
-          makeCoverage({ nameTr: 'Something', limit: 500000, included: false }),
-        ],
+        coverages: [makeCoverage({ nameTr: 'Something', limit: 500000, included: false })],
       })
       // filter(c => c.included) yields empty, Math.max(...[]) = -Infinity
       // -Infinity > 0 is false, so returns policy.coverage
@@ -582,31 +592,9 @@ describe('getInsuredSubject', () => {
   // -----------------------------------------------------------------------
   // Auto policies (kasko, traffic) - plate number extraction
   // -----------------------------------------------------------------------
-  describe('kasko/traffic - plate number from raw_data', () => {
-    it('returns plateNumber from raw_data', () => {
-      const policy = makePolicy({ type: 'kasko' }) as unknown as AnalyzedPolicy & { raw_data: Record<string, unknown> }
-      ;(policy as unknown as { raw_data: Record<string, unknown> }).raw_data = { plateNumber: '34 ABC 1234' }
-      expect(getInsuredSubject(policy)).toBe('34 ABC 1234')
-    })
-
-    it('returns vehiclePlate from raw_data', () => {
-      const policy = makePolicy({ type: 'traffic' }) as unknown as { raw_data: Record<string, unknown> } & AnalyzedPolicy
-      ;(policy as unknown as { raw_data: Record<string, unknown> }).raw_data = { vehiclePlate: '06 XY 789' }
-      expect(getInsuredSubject(policy)).toBe('06 XY 789')
-    })
-
-    it('returns plaka from raw_data', () => {
-      const policy = makePolicy({ type: 'kasko' }) as unknown as { raw_data: Record<string, unknown> } & AnalyzedPolicy
-      ;(policy as unknown as { raw_data: Record<string, unknown> }).raw_data = { plaka: '35 DEF 456' }
-      expect(getInsuredSubject(policy)).toBe('35 DEF 456')
-    })
-
-    it('prefers plateNumber over vehiclePlate', () => {
-      const policy = makePolicy({ type: 'kasko' }) as unknown as { raw_data: Record<string, unknown> } & AnalyzedPolicy
-      ;(policy as unknown as { raw_data: Record<string, unknown> }).raw_data = {
-        plateNumber: '34 ABC 1234',
-        vehiclePlate: '06 XY 789',
-      }
+  describe('kasko/traffic - plate number from vehicleInfo', () => {
+    it('returns plate from vehicleInfo', () => {
+      const policy = makePolicy({ type: 'kasko', vehicleInfo: { plate: '34 ABC 1234' } })
       expect(getInsuredSubject(policy)).toBe('34 ABC 1234')
     })
   })
@@ -615,9 +603,7 @@ describe('getInsuredSubject', () => {
     it('extracts plate number from coverage description', () => {
       const policy = makePolicy({
         type: 'kasko',
-        coverages: [
-          makeCoverage({ description: 'Kasko for vehicle 34 ABC 1234 comprehensive' }),
-        ],
+        coverages: [makeCoverage({ description: 'Kasko for vehicle 34 ABC 1234 comprehensive' })],
       })
       expect(getInsuredSubject(policy)).toBe('34 ABC 1234')
     })
@@ -625,9 +611,7 @@ describe('getInsuredSubject', () => {
     it('normalizes whitespace in extracted plate', () => {
       const policy = makePolicy({
         type: 'traffic',
-        coverages: [
-          makeCoverage({ description: 'Policy for 06  XY  789 vehicle' }),
-        ],
+        coverages: [makeCoverage({ description: 'Policy for 06  XY  789 vehicle' })],
       })
       expect(getInsuredSubject(policy)).toBe('06 XY 789')
     })
@@ -635,9 +619,7 @@ describe('getInsuredSubject', () => {
     it('returns null when no plate pattern found in coverages', () => {
       const policy = makePolicy({
         type: 'kasko',
-        coverages: [
-          makeCoverage({ description: 'General coverage without plate info' }),
-        ],
+        coverages: [makeCoverage({ description: 'General coverage without plate info' })],
       })
       expect(getInsuredSubject(policy)).toBeNull()
     })
@@ -645,9 +627,7 @@ describe('getInsuredSubject', () => {
     it('handles coverage with undefined description', () => {
       const policy = makePolicy({
         type: 'kasko',
-        coverages: [
-          makeCoverage({ description: undefined }),
-        ],
+        coverages: [makeCoverage({ description: undefined })],
       })
       expect(getInsuredSubject(policy)).toBeNull()
     })
@@ -665,9 +645,7 @@ describe('getInsuredSubject', () => {
     it('extracts plate number from special conditions', () => {
       const policy = makePolicy({
         type: 'traffic',
-        specialConditions: [
-          'This policy covers vehicle with plate 34 AB 5678',
-        ],
+        specialConditions: ['This policy covers vehicle with plate 34 AB 5678'],
       })
       expect(getInsuredSubject(policy)).toBe('34 AB 5678')
     })
@@ -675,9 +653,7 @@ describe('getInsuredSubject', () => {
     it('normalizes whitespace in plate from conditions', () => {
       const policy = makePolicy({
         type: 'kasko',
-        specialConditions: [
-          'Plate: 06  ABC  12',
-        ],
+        specialConditions: ['Plate: 06  ABC  12'],
       })
       expect(getInsuredSubject(policy)).toBe('06 ABC 12')
     })
@@ -691,31 +667,30 @@ describe('getInsuredSubject', () => {
     })
   })
 
-  describe('kasko/traffic - vehicle info fallback from raw_data', () => {
-    it('returns vehicleModel from raw_data when no plate found', () => {
-      const policy = makePolicy({ type: 'kasko' }) as unknown as { raw_data: Record<string, unknown> } & AnalyzedPolicy
-      ;(policy as unknown as { raw_data: Record<string, unknown> }).raw_data = { vehicleModel: 'Toyota Corolla 2024' }
+  describe('kasko/traffic - vehicle info fallback', () => {
+    it('returns vehicle make and model when no plate found', () => {
+      const policy = makePolicy({
+        type: 'kasko',
+        vehicleInfo: { make: 'Toyota', model: 'Corolla 2024' },
+      })
       expect(getInsuredSubject(policy)).toBe('Toyota Corolla 2024')
     })
 
-    it('returns vehicleBrand from raw_data when no plate or model found', () => {
-      const policy = makePolicy({ type: 'traffic' }) as unknown as { raw_data: Record<string, unknown> } & AnalyzedPolicy
-      ;(policy as unknown as { raw_data: Record<string, unknown> }).raw_data = { vehicleBrand: 'Honda' }
+    it('returns vehicle make when no plate or model found', () => {
+      const policy = makePolicy({ type: 'traffic', vehicleInfo: { make: 'Honda' } })
       expect(getInsuredSubject(policy)).toBe('Honda')
     })
 
-    it('returns aracModel from raw_data (Turkish field name)', () => {
-      const policy = makePolicy({ type: 'kasko' }) as unknown as { raw_data: Record<string, unknown> } & AnalyzedPolicy
-      ;(policy as unknown as { raw_data: Record<string, unknown> }).raw_data = { aracModel: 'BMW 320i' }
+    it('returns vehicle model when no plate or make found', () => {
+      const policy = makePolicy({ type: 'kasko', vehicleInfo: { model: 'BMW 320i' } })
       expect(getInsuredSubject(policy)).toBe('BMW 320i')
     })
 
     it('prefers plate over vehicle info', () => {
-      const policy = makePolicy({ type: 'kasko' }) as unknown as { raw_data: Record<string, unknown> } & AnalyzedPolicy
-      ;(policy as unknown as { raw_data: Record<string, unknown> }).raw_data = {
-        plateNumber: '34 ABC 1234',
-        vehicleModel: 'Toyota Corolla',
-      }
+      const policy = makePolicy({
+        type: 'kasko',
+        vehicleInfo: { plate: '34 ABC 1234', make: 'Toyota', model: 'Corolla' },
+      })
       expect(getInsuredSubject(policy)).toBe('34 ABC 1234')
     })
   })
@@ -748,27 +723,17 @@ describe('getInsuredSubject', () => {
       expect(getInsuredSubject(policy)).toBe('Sisli Plaza, Istanbul')
     })
 
-    it('falls back to propertyAddress from raw_data', () => {
-      const policy = makePolicy({ type: 'home' }) as unknown as { raw_data: Record<string, unknown> } & AnalyzedPolicy
-      ;(policy as unknown as { raw_data: Record<string, unknown> }).raw_data = { propertyAddress: 'Ataturk Mah, Ankara' }
+    it('falls back to insuredAddress if location is missing', () => {
+      const policy = makePolicy({ type: 'home', insuredAddress: 'Ataturk Mah, Ankara' })
       expect(getInsuredSubject(policy)).toBe('Ataturk Mah, Ankara')
     })
 
-    it('falls back to riskAddress from raw_data', () => {
-      const policy = makePolicy({ type: 'dask' }) as unknown as { raw_data: Record<string, unknown> } & AnalyzedPolicy
-      ;(policy as unknown as { raw_data: Record<string, unknown> }).raw_data = { riskAddress: 'Izmir Konak' }
-      expect(getInsuredSubject(policy)).toBe('Izmir Konak')
-    })
-
-    it('falls back to riziko_adresi from raw_data (Turkish field)', () => {
-      const policy = makePolicy({ type: 'business' }) as unknown as { raw_data: Record<string, unknown> } & AnalyzedPolicy
-      ;(policy as unknown as { raw_data: Record<string, unknown> }).raw_data = { riziko_adresi: 'Bursa Merkez' }
-      expect(getInsuredSubject(policy)).toBe('Bursa Merkez')
-    })
-
-    it('prefers policy.location over raw_data addresses', () => {
-      const policy = makePolicy({ type: 'home', location: 'Direct Location' }) as unknown as { raw_data: Record<string, unknown> } & AnalyzedPolicy
-      ;(policy as unknown as { raw_data: Record<string, unknown> }).raw_data = { propertyAddress: 'Raw Data Address' }
+    it('prefers policy.location over insuredAddress', () => {
+      const policy = makePolicy({
+        type: 'home',
+        location: 'Direct Location',
+        insuredAddress: 'Fallback Address',
+      })
       expect(getInsuredSubject(policy)).toBe('Direct Location')
     })
 
@@ -882,8 +847,7 @@ describe('getSubjectDisplay', () => {
   // -----------------------------------------------------------------------
   describe('kasko/traffic display', () => {
     it('returns Plate label for plate number in EN', () => {
-      const policy = makePolicy({ type: 'kasko' }) as unknown as { raw_data: Record<string, unknown> } & AnalyzedPolicy
-      ;(policy as unknown as { raw_data: Record<string, unknown> }).raw_data = { plateNumber: '34 ABC 1234' }
+      const policy = makePolicy({ type: 'kasko', vehicleInfo: { plate: '34 ABC 1234' } })
       expect(getSubjectDisplay(policy, 'en')).toEqual({
         label: 'Plate',
         value: '34 ABC 1234',
@@ -891,8 +855,7 @@ describe('getSubjectDisplay', () => {
     })
 
     it('returns Plaka label for plate number in TR', () => {
-      const policy = makePolicy({ type: 'traffic' }) as unknown as { raw_data: Record<string, unknown> } & AnalyzedPolicy
-      ;(policy as unknown as { raw_data: Record<string, unknown> }).raw_data = { plateNumber: '06 XY 789' }
+      const policy = makePolicy({ type: 'traffic', vehicleInfo: { plate: '06 XY 789' } })
       expect(getSubjectDisplay(policy, 'tr')).toEqual({
         label: 'Plaka',
         value: '06 XY 789',
@@ -900,8 +863,10 @@ describe('getSubjectDisplay', () => {
     })
 
     it('returns Vehicle label when subject is not a plate pattern in EN', () => {
-      const policy = makePolicy({ type: 'kasko' }) as unknown as { raw_data: Record<string, unknown> } & AnalyzedPolicy
-      ;(policy as unknown as { raw_data: Record<string, unknown> }).raw_data = { vehicleModel: 'Toyota Corolla' }
+      const policy = makePolicy({
+        type: 'kasko',
+        vehicleInfo: { make: 'Toyota', model: 'Corolla' },
+      })
       expect(getSubjectDisplay(policy, 'en')).toEqual({
         label: 'Vehicle',
         value: 'Toyota Corolla',
@@ -909,8 +874,7 @@ describe('getSubjectDisplay', () => {
     })
 
     it('returns Arac label when subject is not a plate pattern in TR', () => {
-      const policy = makePolicy({ type: 'traffic' }) as unknown as { raw_data: Record<string, unknown> } & AnalyzedPolicy
-      ;(policy as unknown as { raw_data: Record<string, unknown> }).raw_data = { vehicleBrand: 'Honda Civic' }
+      const policy = makePolicy({ type: 'traffic', vehicleInfo: { make: 'Honda', model: 'Civic' } })
       expect(getSubjectDisplay(policy, 'tr')).toEqual({
         label: 'Araç',
         value: 'Honda Civic',
@@ -918,8 +882,7 @@ describe('getSubjectDisplay', () => {
     })
 
     it('defaults to EN locale when locale not specified', () => {
-      const policy = makePolicy({ type: 'kasko' }) as unknown as { raw_data: Record<string, unknown> } & AnalyzedPolicy
-      ;(policy as unknown as { raw_data: Record<string, unknown> }).raw_data = { plateNumber: '34 ABC 1234' }
+      const policy = makePolicy({ type: 'kasko', vehicleInfo: { plate: '34 ABC 1234' } })
       const result = getSubjectDisplay(policy)
       expect(result?.label).toBe('Plate')
     })
@@ -1029,15 +992,16 @@ describe('getSubjectDisplay', () => {
   // -----------------------------------------------------------------------
   describe('edge cases', () => {
     it('handles plate number with single letter group', () => {
-      const policy = makePolicy({ type: 'kasko' }) as unknown as { raw_data: Record<string, unknown> } & AnalyzedPolicy
-      ;(policy as unknown as { raw_data: Record<string, unknown> }).raw_data = { plateNumber: '34 A 1234' }
+      const policy = makePolicy({ type: 'kasko', vehicleInfo: { plate: '34 A 1234' } })
       const result = getSubjectDisplay(policy, 'en')
       expect(result?.label).toBe('Plate')
     })
 
     it('treats non-plate-format string as Vehicle', () => {
-      const policy = makePolicy({ type: 'kasko' }) as unknown as { raw_data: Record<string, unknown> } & AnalyzedPolicy
-      ;(policy as unknown as { raw_data: Record<string, unknown> }).raw_data = { vehicleModel: 'Renault Megane 2024' }
+      const policy = makePolicy({
+        type: 'kasko',
+        vehicleInfo: { make: 'Renault', model: 'Megane 2024' },
+      })
       const result = getSubjectDisplay(policy, 'en')
       expect(result?.label).toBe('Vehicle')
     })
@@ -1076,10 +1040,7 @@ describe('getSubjectDisplay', () => {
     it('extracts plate from second condition when first has no match', () => {
       const policy = makePolicy({
         type: 'kasko',
-        specialConditions: [
-          'General terms apply',
-          'Plate number: 35 XYZ 99',
-        ],
+        specialConditions: ['General terms apply', 'Plate number: 35 XYZ 99'],
       })
       const result = getSubjectDisplay(policy, 'en')
       expect(result?.label).toBe('Plate')
