@@ -84,6 +84,28 @@ interface BackfillResult {
   detail?: string
 }
 
+/**
+ * Strip characters that PostgreSQL's JSONB parser rejects with
+ * "unsupported Unicode escape sequence". The most common offender is
+ * NUL (U+0000) — observed on the Anadolu VW Golf 2001 PDF — but lone
+ * UTF-16 surrogate halves and other C0 controls are also unsafe.
+ *
+ * Built from a string so the source stays grep-friendly (no literal
+ * NULs in regex literals which would corrupt the source file).
+ */
+function sanitizeForJsonb(text: string): string {
+  // Intentional: stripping control characters IS the point of this regex.
+  // PG JSONB rejects NUL with "unsupported Unicode escape sequence"; we
+  // strip the C0 range (except TAB/LF/CR) plus unpaired surrogates so every
+  // downstream JSONB write succeeds.
+  // eslint-disable-next-line no-control-regex
+  const c0 = new RegExp('[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F]', 'g')
+  return text
+    .replace(c0, '')
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, '')
+    .replace(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '')
+}
+
 async function loadPdfText(filename: string): Promise<string | null> {
   try {
     const filepath = path.join(POLICIES_DIR, filename)
@@ -96,7 +118,8 @@ async function loadPdfText(filename: string): Promise<string | null> {
     }
     const parser = new PDFParse(new Uint8Array(buf))
     const result = await parser.getText()
-    return result.pages.map((p) => p.text).join('\n')
+    const raw = result.pages.map((p) => p.text).join('\n')
+    return sanitizeForJsonb(raw)
   } catch {
     return null
   }
