@@ -24,7 +24,7 @@ const STORAGE_KEYS = {
 let TRIAL_EXPIRY_MS = 24 * 60 * 60 * 1000
 
 // Max uploads per window — configurable via app_settings ui.trial_max_uploads_per_day
-const TRIAL_MAX_UPLOADS = Infinity
+const TRIAL_MAX_UPLOADS = 100
 
 // Lazy-load config override (fire-and-forget, non-blocking)
 let _trialConfigLoaded = false
@@ -35,7 +35,7 @@ async function _loadTrialConfig(): Promise<void> {
     const { configService } = await import('@/lib/config')
     const uiCfg = await configService.getUIConfig()
     TRIAL_EXPIRY_MS = uiCfg.trialExpiryMs
-    // TRIAL_MAX_UPLOADS = uiCfg.trialMaxUploadsPerDay // Limit removed
+    // TRIAL_MAX_UPLOADS = uiCfg.trialMaxUploadsPerDay // Set to 100 hard limit
   } catch {
     // Keep defaults
   }
