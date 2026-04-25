@@ -32,6 +32,10 @@ export const VEHICLE_FIELD_ALIASES = {
   /** Model / trim — excludes modelYear forms via negative lookahead.
    *  Allows optional trailing [iİ] to match Turkish possessive "Modeli". */
   model: [
+    // AXA Sigorta packed-line format puts the model under "Marka Tipi"
+    // (with a single space, not a slash) — must come BEFORE the bare
+    // `model` alias so it's tried first when both could apply.
+    /marka\s+t[iİ]p[iİ]?/i,
     /model[iİ]?(?!\s*(?:y[ıi]l|bilgisi|year|\s*[:.]?\s*\d{4}\b))/i,
     /\btip[iİ]?\b/i,
     /\btrim\b/i,
@@ -173,6 +177,32 @@ export function matchLabeledField(text: string, field: VehicleFieldName): string
     }
   }
 
+  // Both prior passes failed. Try the tabular single-space fallback for
+  // packed-line formats like AXA Sigorta:
+  //   `Kullanım Tarzı KAMYONET Marka ISUZU\nMarka Tipi 1003 --- D-MAX...`
+  // hasKvSeparator() rejects single-space layouts (it would create prose
+  // false positives), but legitimate AXA labels are followed by exactly
+  // one space then an UPPERCASE letter or digit. We use that signature
+  // (label + single space + uppercase/digit) as the narrow tabular signal.
+  // See scanTabularSpaceSeparated for guards.
+  for (const alias of myAliases) {
+    const globalRe = new RegExp(
+      alias.source,
+      alias.flags.includes('g') ? alias.flags : alias.flags + 'g'
+    )
+    let labelMatch: RegExpExecArray | null
+    while ((labelMatch = globalRe.exec(text)) !== null) {
+      const tabValue = scanTabularSpaceSeparated(
+        text,
+        labelMatch.index,
+        labelMatch.index + labelMatch[0].length,
+        labelMatch[0],
+        otherAliases
+      )
+      if (tabValue) return tabValue
+    }
+  }
+
   return undefined
 }
 
@@ -213,4 +243,89 @@ function scanBackwardForInvertedValue(text: string, labelStart: number): string 
   if (candidate.length < 2) return undefined
   if (!/^[A-ZÇĞİÖŞÜ0-9]/.test(candidate)) return undefined
   return candidate
+}
+
+/**
+ * Tabular single-space-separator fallback for packed-line insurer formats
+ * like AXA Sigorta KASKO PDFs:
+ *
+ *   `Kullanım Tarzı / Cinsi KAMYONET Marka ISUZU`
+ *   `Marka Tipi 1003 --- D-MAX CIFT KABIN`
+ *   `Model Bilgisi 2015`
+ *   `Plaka No 67LA807`
+ *   `Motor No MP0428 Şasi No NNATFR86JL2000712`
+ *
+ * The label is followed by exactly one space (not `:`, not tab, not
+ * multiple spaces), which `hasKvSeparator()` correctly rejects as
+ * potentially mid-prose. To distinguish a legitimate tabular label from
+ * mid-prose use, we require:
+ *   1. The label match begins with an UPPERCASE Turkish letter (rejects
+ *      lowercase prose like "bu marka ISUZU"). The aliases match
+ *      case-insensitively, so uppercase initial is the discriminator.
+ *   2. Exactly one space follows the label.
+ *   3. The next character is an UPPERCASE letter or DIGIT (rejects
+ *      prose continuations like "marka iyidir").
+ *
+ * Captures forward until newline or the next known label boundary.
+ */
+function scanTabularSpaceSeparated(
+  text: string,
+  labelStart: number,
+  labelEnd: number,
+  matchedLabel: string,
+  otherAliases: readonly RegExp[]
+): string | undefined {
+  // Guard 1: the label as it appeared must start with an uppercase letter.
+  // This is what distinguishes a tabular label position from mid-prose.
+  if (!/^[A-ZÇĞİÖŞÜ]/.test(matchedLabel)) return undefined
+
+  // Guard 2: exactly one space (or tab) after the label, then non-space.
+  if (text[labelEnd] !== ' ' && text[labelEnd] !== '\t') return undefined
+  // Reject 2+ spaces — those should have been caught by hasKvSeparator path.
+  if (text[labelEnd + 1] === ' ') return undefined
+
+  const start = labelEnd + 1
+
+  // Guard 3: value must start with uppercase letter or digit.
+  if (start >= text.length) return undefined
+  if (!/[A-ZÇĞİÖŞÜ0-9]/.test(text[start])) return undefined
+
+  // Guard 4: the label must be at line-start OR preceded by another
+  // recognized label or stop-label (i.e. a column break, not prose).
+  // Walk backward from labelStart until newline or text-start.
+  let lineStart = labelStart - 1
+  while (lineStart >= 0 && text[lineStart] !== '\n' && text[lineStart] !== '\r') {
+    lineStart--
+  }
+  lineStart++
+
+  const beforeLabel = text.slice(lineStart, labelStart).trimEnd()
+  if (beforeLabel.length > 0) {
+    // Something precedes the label on this line. Accept only if that
+    // segment ends with a recognized label OR appears to end with a
+    // value (uppercase token followed by space — the AXA pattern of
+    // `<prev value> <next label>` packed on one line).
+    const endsWithLabel = otherAliases.some((a) => {
+      const m = beforeLabel.match(
+        new RegExp('(?:' + a.source + ')\\s*(?:[:.\\s]+\\S+\\s*)?$', a.flags.replace('g', ''))
+      )
+      return m !== null
+    })
+    const endsWithUppercaseToken = /[A-ZÇĞİÖŞÜ0-9][A-ZÇĞİÖŞÜ0-9./-]*\s*$/.test(beforeLabel)
+    if (!endsWithLabel && !endsWithUppercaseToken) return undefined
+  }
+
+  // Capture forward until newline or next known label.
+  let end = start
+  while (end < text.length) {
+    const ch = text[end]
+    if (ch === '\n' || ch === '\r') break
+    const remaining = text.slice(end)
+    if (otherAliases.some((a) => a.test(remaining))) break
+    end++
+  }
+
+  const value = text.slice(start, end).trim()
+  if (value.length < 2) return undefined
+  return value
 }
