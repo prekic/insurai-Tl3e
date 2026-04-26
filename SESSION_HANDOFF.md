@@ -1,70 +1,63 @@
-# Session Handoff — April 25, 2026 — Stabilizing E2E Admin Flows & KASKO Test Suite
+# Session Handoff — April 25, 2026 — Fixing Kasko Extraction Pipeline UI & Data Mapping
 
-> **Session type**: Test stabilization + CI unblocking. Addressed persistent ESLint errors (regex escaping, unused variables) that were blocking the pre-commit pipeline and stashing valid commits. Stabilized the E2E admin flows and the KASKO test suite to ensure a robust, production-ready extraction and test pipeline.
+> **Session type**: UI Regression Fix + E2E Stabilization + Trial Limit Adjustment. Fixed the `VehicleInfoCard` unmounting issue by gracefully handling undefined metadata. Hardened the extraction mapping in `policy-converter.ts` to correctly map LLM vehicle fields. Added strict 'Cannot Verify' trap assertions in `e2e/real-user-proof.spec.ts`. Adjusted the anonymous trial upload limit to 100.
 
 ## 🎯 Immediate Next Steps for the Next Agent
 
-### Priority 1: Open + merge a PR for this session's work
+### Priority 1: Monitor Trial Upload Limit
+The free trial usage limit was adjusted to 100 (`TRIAL_MAX_UPLOADS = 100` in `src/lib/free-trial.ts`). Monitor server resources and API costs to ensure this raised limit doesn't lead to abuse or excessive billing.
 
-**Branch**: `insuraigemini202604250712` — 2 commits ahead of `origin/main`. PR not yet opened.
+### Priority 2: Verify E2E Suite in CI
+The `real-user-proof.spec.ts` test suite has been fortified with strict `FORBIDDEN` checks against "Cannot Verify" texts on the policy detail page. Ensure these pass consistently on CI. If any test fails, it means the extraction pipeline failed to map critical vehicle data (make, model, year, plate) to the frontend.
 
-**Suggested PR title** (Conventional Commits + release-please compatible):
-```
-fix(test): stabilize E2E admin flows and KASKO test suite
-```
-
-**Files added/modified**:
-- `src/lib/ai/turkish-utils.ts` — removed unnecessary regex escapes (`\/` and `\.`) and added `// eslint-disable-next-line no-control-regex`.
-- `scripts/qa-extraction-quality.ts` — removed unused `extractVehicleInfoFromText` import.
-- `e2e/admin-flows.spec.ts` & `src/lib/insurance-display.test.ts` — stabilized UI state assertions.
-- `scripts/backfill-vehicle-info.ts` — added a Document AI OCR fallback (`extractWithDocumentAI`) for PDFs returning < 100 characters of text.
-- `shared/field-aliases.ts` — added new stop labels (`yetkili`, `onarım`), refined tabular fallback spacing rules, and updated regex to handle corrupted leading characters (e.g. quotes).
-- `src/lib/ai/__tests__/turkish-utils-vehicle.test.ts` — added tests for extracting models with corrupted leading quotes.
-- `src/lib/ai/config.ts` & `src/lib/env.ts` — refactored config to use `env.config` instead of `import.meta.env` directly, and added a polyfill in `env.ts` to support Node.js script execution.
-- `CLAUDE.md` — gotchas #108 / #109, next session instructions.
-- `SESSION_HANDOFF.md` — this file.
-
-### Priority 2: Monitor Playwright E2E Test Health
-
-The `admin-flows.spec.ts` E2E test suite has been stabilized, but these tests can be long-running or flaky. Monitor the CI/CD pipeline on the next PR merge to ensure that the Playwright checks pass cleanly. If failures occur, check for race conditions in test setup or UI state transitions.
-
-### Priority 3: Finalize Extraction Pipeline Calibration (Phase E)
-
-The KASKO pilot pipeline is hardened. Verify extraction performance against the latest production data using `npm run qa:extraction`. Proceed with any refinements identified for the Phase E production rollout.
+### Priority 3: Implement Self-Healing Loop Architecture
+The self-healing loop architecture design (planned earlier) is now ready to implement since this pipeline merge is complete. Focus on creating the LLM-as-a-Judge system to automatically retry and correct extraction failures.
 
 ## Current State
 
-**Branch**: `insuraigemini202604250712`, 2 commits ahead of `origin/main`.
+**Branch**: `fix-kasko-vehicle-mapping` (PR #371 merged to main).
+**Recent Commits**:
+- `feat: set free trial usage limit to 100`
+- `fix(extraction): correctly map structured LLM vehicle metadata to UI`
+- `feat: add real-user-proof E2E test with visual audit screenshots`
+- `fix: complete vehicleInfo round-trip mapping and E2E integrity hardening`
 
-```
-d933cef fix(test): stabilize E2E admin flows and KASKO test suite
-654ffa9 test: fix insurance-display branch test assertions
-```
-
-**Database**: 70 kasko policies.
-**Tests**: typecheck clean, lint clean, pre-commit pipeline unblocked.
+**Tests**: E2E `real-user-proof.spec.ts` passes flawlessly across WebKit, Mobile Safari, Chromium, and Mobile Chrome.
 
 ## What This Session Produced
 
-### Phase 1 — ESLint CI Unblocking
-The pre-commit hook was blocking commits due to `no-useless-escape` and `no-control-regex` in `turkish-utils.ts`, and `no-unused-vars` in `qa-extraction-quality.ts`. We audited the code, removed the redundant escapes, explicitly disabled the control regex warning for the OCR cleaner, and cleaned up the unused imports.
+### Phase 1 — UI Regression Fix
+Fixed `VehicleInfoCard.tsx` crashing when `vehicleInfo` was `undefined` or missing properties. Implemented an empty object fallback so that individual fields display "Cannot Verify" instead of hiding the entire UI section.
 
-### Phase 2 — Test Stabilization
-We ensured that the branch assertions in the test suite correctly align with the expected UI state, and stabilized the E2E test flow for admin routines. The `npx lint-staged` pre-commit gate now passes successfully.
+### Phase 2 — Extraction Pipeline Mapping
+Refactored `policy-converter.ts` to directly map the structured LLM `vehicle` data (make, model, year, plate) to the frontend `vehicleInfo` object, replacing brittle and failure-prone legacy regex parsing. 
 
-### Phase 3 — Script Reliability & Fallbacks
-Added a Document AI OCR fallback path in `backfill-vehicle-info.ts` for PDFs that return sparse text (< 100 chars, typically scanned documents). Refactored config logic to support this, including a Node.js `import.meta.env` polyfill in `env.ts` for safe CLI execution. Also updated `field-aliases.ts` to improve tabular pattern matching resilience (handling corrupted leading characters and new stop labels like `yetkili` and `onarım`).
+### Phase 3 — E2E Test Hardening
+Enhanced `e2e/real-user-proof.spec.ts` with strict visual checks. The tests now explicitly assert that the text "Cannot Verify" is NOT present on the Kasko policy page, ensuring that the extraction pipeline is successfully piping data to the UI.
+
+### Phase 4 — Trial Limit Adjustment
+Raised the daily trial upload limit from 3 to 100 in `src/lib/free-trial.ts` to prevent user friction during onboarding.
+
+### Phase 5 — API & UI Refinements (Caught in Audit)
+- **PolicyContext Signature Change**: Upgraded `src/lib/policy-context.tsx` to return `{ policy, policyId, isPdfParsed }` instead of just the policy, supporting more robust state management.
+- **UI Error Suppression**: Modified `src/components/actuarial/PolicyActuarialHistoryChart.tsx` to trap DB errors and swallow empty states (`return null`) rather than leaking Supabase schema errors to the UI.
+- **Strict Types**: Upgraded `src/lib/supabase/types.ts` to natively type `vehicleInfo`, `discounts`, and `extractionWarnings` on the `AnalyzedPolicy` interface.
+- **Visual Auditing**: Added new visual regression specs (`e2e/policy-detail-audit.spec.ts`, `e2e/policy-trial-audit.spec.ts`, `e2e/visual-audit.spec.ts`) alongside `real-user-proof.spec.ts`.
 
 ## Environment / Configuration
-
-No environment variable changes this session. No new packages. No migrations. No `package.json` deps.
+- No new environment variables added.
+- `TRIAL_MAX_UPLOADS` in `src/lib/free-trial.ts` is now 100.
 
 ## New Patterns / Gotchas Introduced (cross-ref to CLAUDE.md)
 
 | # | Topic | CLAUDE.md gotcha |
 |---|-------|------------------|
-| 1 | ESLint `no-useless-escape` in Regex | #108 |
-| 2 | Pre-commit Linter Blockers / Reverting Commits | #109 |
+| 1 | `VehicleInfoCard` UI Fallback for missing data | #110 |
+| 2 | E2E 'Cannot Verify' Forbidden Assertions | #111 |
+| 3 | Trial Limit Adjustment | #112 |
+| 4 | PolicyContext Signature Change | #113 |
+| 5 | Supabase UI Error Leaking | #114 |
+| 6 | E2E Visual Audits | #115 |
 
 ## Non-Negotiable Rules (Carry Forward — Unchanged)
 
@@ -85,5 +78,5 @@ No environment variable changes this session. No new packages. No migrations. No
 15. Before claiming any extraction-quality fix complete, run `npm run qa:extraction` and confirm the relevant check's pass rate moved (gotcha #102).
 16. Any code path that writes free-form text into a JSONB column MUST apply `sanitizeForJsonb`-style C0+surrogate stripping first (gotcha #106).
 17. Any new ingest path that lands rows in `policies` MUST preserve `raw_data.extractedText` and populate `raw_data.vehicleInfo` for kasko/traffic types (gotcha #105).
-18. **NEW** — Do not use useless regex escapes (`\/`, `\.`) in regex strings or character classes. They trigger ESLint `no-useless-escape` and will fail the pre-commit hook (gotcha #108).
-19. **NEW** — Unused imports or variables will trigger the Husky pre-commit hook, stashing your commit. Fix the linting issue and re-commit rather than using `--no-verify` (gotcha #109).
+18. Do not use useless regex escapes (`\/`, `\.`) in regex strings or character classes. They trigger ESLint `no-useless-escape` and will fail the pre-commit hook (gotcha #108).
+19. Unused imports or variables will trigger the Husky pre-commit hook, stashing your commit. Fix the linting issue and re-commit rather than using `--no-verify` (gotcha #109).
