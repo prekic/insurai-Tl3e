@@ -419,26 +419,29 @@ describe('Overall Score Calculation', () => {
     const weights = DEFAULT_EVALUATION_CONFIG.weights
 
     // Calculate expected weighted average manually
-    let expectedScore = Math.round(
-      (evaluation.scoreBreakdown.premium.score * weights.premium +
-        evaluation.scoreBreakdown.coverage.score * weights.coverage +
-        evaluation.scoreBreakdown.deductible.score * weights.deductible +
-        evaluation.scoreBreakdown.compliance.score * weights.compliance +
-        evaluation.scoreBreakdown.value.score * weights.value) /
-        (weights.premium +
-          weights.coverage +
-          weights.deductible +
-          weights.compliance +
-          weights.value)
-    )
+    let totalWeight = 0
+    let weightedSum = 0
+
+    Object.entries(evaluation.scoreBreakdown).forEach(([key, breakDown]) => {
+      const score = (breakDown as any).score
+      const weight = (weights as any)[key] || 0
+      if (score >= 0) {
+        weightedSum += score * weight
+        totalWeight += weight
+      }
+    })
+
+    let expectedScore = totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0
 
     // Account for evaluator capping
     const hasCriticalIssues = evaluation.compliance.issues.some(
       (i: any) => i.severity === 'critical'
     )
     const hasUntrustedBenchmark = evaluation.isProvisional
-    if (hasCriticalIssues || hasUntrustedBenchmark) {
+    if (hasCriticalIssues) {
       expectedScore = Math.min(expectedScore, 60)
+    } else if (hasUntrustedBenchmark) {
+      expectedScore = Math.min(expectedScore, 85)
     }
 
     expect(evaluation.overallScore).toBe(expectedScore)

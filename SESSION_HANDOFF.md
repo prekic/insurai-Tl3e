@@ -1,12 +1,12 @@
-# Session Handoff — April 26, 2026 — AI Model Upgrade, Gemini SDK Integration & Data-Quality Backfill
+# Session Handoff — April 26, 2026 — Production-Grade Pipeline Finalization & Gemini SDK Integration
 
-> **Session type**: Feature Integration, Infrastructure Upgrade & Data Repair. Upgraded core legacy LLM references across the system to state-of-the-art models (gpt-5.4, claude-sonnet-4-6). Integrated the Gemini 2.5 Flash SDK via `@google/genai` to serve as a tertiary AI provider and direct multimodal OCR engine via `POST /api/ai/ocr/gemini`. Updated the diagnostics pipeline to include Gemini health checks.
+> **Session type**: Stabilization, Feature Integration, & Data Repair. Finalized the KASKO insurance extraction pipeline for production readiness. Upgraded legacy LLMs to state-of-the-art models (gpt-5.4, claude-sonnet-4-6). Integrated the Gemini 2.5 Flash SDK via `@google/genai` to serve as a tertiary AI provider and multimodal OCR engine (`POST /api/ai/ocr/gemini`). Hardened extraction mappings to eliminate developer artifacts, removed free-trial bottlenecks, implemented `typeof` guards against runtime crashes, fixed a 10x premium inflation bug, and enforced mandatory IMM extraction rules.
 > Also ran `npm run qa:extraction`, revealing 69/70 kasko policies in production were missing vehicle info. Traced the root cause to `scripts/pilot-batch-ingest.ts` discarding PDF text. Built a diagnose-then-backfill toolchain and repaired 53/70 rows.
 
 ## 🎯 Immediate Next Steps for the Next Agent
 
 ### Priority 1: Environment Setup
-Add `GEMINI_API_KEY` to the production/Railway environment. It is required for the new Gemini 2.5 Flash SDK to function and is distinct from the `GCP_SERVICE_ACCOUNT_BASE64` used for Document AI/Cloud Vision.
+Add `GEMINI_API_KEY` to the production/Railway environment. It is required for the new Gemini 2.5 Flash SDK to function and is distinct from the `GCP_SERVICE_ACCOUNT_BASE64` used for Document AI/Cloud Vision. Ensure existing `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` are active.
 
 ### Priority 2: Frontend Orchestration
 Update the frontend OCR orchestrator to conditionally use `/api/ai/ocr/gemini` as an alternative to Cloud Vision. The endpoint is currently implemented on the backend but needs to be wired into the frontend's document ingestion flow.
@@ -78,7 +78,7 @@ e1bf553 chore(scripts): add inspect-pdf-labels diagnostic
 3afca44 chore(scripts): add diagnose-vehicle-extraction read-only diagnostic
 ```
 
-(Plus pending uncommitted changes for the upstream `pilot-batch-ingest.ts` fix + this doc + CLAUDE.md gotchas — to be committed before opening the PR.)
+(Plus pending uncommitted changes for the upstream `pilot-batch-ingest.ts` fix + this doc + CLAUDE.md gotchas — all committed in the final PR.)
 
 **Database**: 70 kasko policies, **53 now have full vehicleInfo (was 1)**.
 **Grade thresholds**: unchanged.

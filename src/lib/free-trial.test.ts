@@ -35,7 +35,7 @@ const STORAGE_KEYS = {
   TRIAL_WINDOW_START: 'insurai_trial_window_start',
 }
 
-const TRIAL_MAX = 3 // default max uploads per day
+const TRIAL_MAX = 100 // default max uploads per day
 
 /** Helper to set count-based trial state in localStorage */
 function setTrialCount(count: number, windowStart: number) {
@@ -618,7 +618,7 @@ describe('canPerformFreeTrial', () => {
     setTrialCount(1, Date.now())
     const result = canPerformFreeTrial()
     expect(result.canTry).toBe(true)
-    expect(result.uploadsRemaining).toBe(2)
+    expect(result.uploadsRemaining).toBe(TRIAL_MAX - 1)
     expect(result.maxUploads).toBe(TRIAL_MAX)
   })
 
@@ -833,7 +833,7 @@ describe('getTrialUploadsRemaining', () => {
 
   it('returns correct remaining after partial use', () => {
     setTrialCount(1, Date.now())
-    expect(getTrialUploadsRemaining()).toBe(2)
+    expect(getTrialUploadsRemaining()).toBe(TRIAL_MAX - 1)
   })
 
   it('returns 0 when all uploads used', () => {
@@ -864,20 +864,21 @@ describe('integration', () => {
 
     // 2. Save first trial result — still can upload more
     saveTrialResult(policy, 'lifecycle.pdf')
-    expect(hasUsedFreeTrial()).toBe(false) // 1 of 3
+    expect(hasUsedFreeTrial()).toBe(false) // 1 of max
     expect(hasValidTrialResult()).toBe(true)
     expect(canPerformFreeTrial().canTry).toBe(true)
-    expect(getTrialUploadsRemaining()).toBe(2)
+    expect(getTrialUploadsRemaining()).toBe(TRIAL_MAX - 1)
 
     // 3. Second upload
     saveTrialResult(makeMockPolicy({ policyNumber: 'LIFECYCLE-002' }), 'second.pdf')
-    expect(hasUsedFreeTrial()).toBe(false) // 2 of 3
+    expect(hasUsedFreeTrial()).toBe(false) // 2 of max
     expect(canPerformFreeTrial().canTry).toBe(true)
-    expect(getTrialUploadsRemaining()).toBe(1)
+    expect(getTrialUploadsRemaining()).toBe(TRIAL_MAX - 2)
 
-    // 4. Third upload — now exhausted
+    // 4. Final upload — now exhausted
+    setTrialCount(TRIAL_MAX - 1, Date.now())
     saveTrialResult(makeMockPolicy({ policyNumber: 'LIFECYCLE-003' }), 'third.pdf')
-    expect(hasUsedFreeTrial()).toBe(true) // 3 of 3
+    expect(hasUsedFreeTrial()).toBe(true) // max reached
     expect(canPerformFreeTrial().canTry).toBe(false)
     expect(getTrialUploadsRemaining()).toBe(0)
 
@@ -905,12 +906,12 @@ describe('integration', () => {
 
   it('markTrialUsed increments count but does not save result', () => {
     markTrialUsed()
-    expect(getTrialUploadsRemaining()).toBe(2) // 1 used of 3
+    expect(getTrialUploadsRemaining()).toBe(TRIAL_MAX - 1) // 1 used
     expect(getTrialResult()).toBeNull()
     expect(hasValidTrialResult()).toBe(false)
 
-    // After 3 markTrialUsed calls, trial is exhausted
-    markTrialUsed()
+    // Exhaust the trial
+    setTrialCount(TRIAL_MAX - 1, Date.now())
     markTrialUsed()
     expect(hasUsedFreeTrial()).toBe(true)
     expect(getTrialUploadsRemaining()).toBe(0)
@@ -945,10 +946,8 @@ describe('integration', () => {
   })
 
   it('canPerformFreeTrial reason includes formatted time when exhausted', () => {
-    // Use all 3 uploads
-    markTrialUsed()
-    markTrialUsed()
-    markTrialUsed()
+    // Use all uploads
+    setTrialCount(TRIAL_MAX, Date.now())
 
     // Advance 12 hours
     vi.setSystemTime(new Date(Date.now() + 12 * 60 * 60 * 1000))
