@@ -7,6 +7,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenAI, createPartFromBase64 } from '@google/genai'
 import { Request, Response, Router } from 'express'
 import * as fs from 'fs'
 import { GoogleAuth } from 'google-auth-library'
@@ -69,6 +70,16 @@ function getAnthropicClient(): Anthropic | null {
     anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   }
   return anthropicClient
+}
+
+let geminiClient: GoogleGenAI | null = null
+
+function getGeminiClient(): GoogleGenAI | null {
+  if (!process.env.GEMINI_API_KEY) return null
+  if (!geminiClient) {
+    geminiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+  }
+  return geminiClient
 }
 
 // ============================================================================
@@ -245,7 +256,7 @@ router.post(
         requestId,
         chars: documentText?.length || 0,
         type: policyType || 'auto-detect',
-        model: model || 'gpt-4o',
+        model: model || 'gpt-5.4',
       })
 
       // Get extraction prompt from admin system (falls back to hardcoded if unavailable)
@@ -324,7 +335,7 @@ router.post(
           },
           { signal: AbortSignal.timeout(60_000) }
         )
-        const usedModel = response.model || model || 'gpt-4o'
+        const usedModel = response.model || model || 'gpt-5.4'
         const inputTokens = response.usage?.prompt_tokens || 0
         const outputTokens = response.usage?.completion_tokens || 0
         return {
@@ -355,7 +366,7 @@ router.post(
           },
           { signal: AbortSignal.timeout(60_000) }
         )
-        const usedModel = response.model || model || 'gpt-4o'
+        const usedModel = response.model || model || 'gpt-5.4'
         const inputTokens = response.usage?.prompt_tokens || 0
         const outputTokens = response.usage?.completion_tokens || 0
         return {
@@ -386,7 +397,7 @@ router.post(
       }
 
       const parsedData = healingResult.data
-      const usedModel = healingResult.finalModel || model || 'gpt-4o'
+      const usedModel = healingResult.finalModel || model || 'gpt-5.4'
       const inputTokens = healingResult.totalInputTokens
       const outputTokens = healingResult.totalOutputTokens
       const totalCost = healingResult.totalCost
@@ -542,7 +553,7 @@ router.post(
       recordOverviewMetrics({
         requestId,
         provider: 'openai',
-        model: 'gpt-4o',
+        model: 'gpt-5.4',
         operation: 'extraction',
         success: false,
         durationMs: Date.now() - startTime,
@@ -887,7 +898,7 @@ router.post(
       recordOverviewMetrics({
         requestId,
         provider: 'anthropic',
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         operation: 'extraction',
         success: false,
         durationMs: Date.now() - startTime,
@@ -1579,7 +1590,7 @@ router.post(
         recordOverviewMetrics({
           requestId,
           provider: 'openai',
-          model: 'gpt-4o',
+          model: 'gpt-5.4',
           operation: 'extraction',
           success: false,
           durationMs: Date.now() - openaiStart,
@@ -2171,6 +2182,160 @@ router.post(
     }
   }
 )
+// ============================================================================
+// GEMINI MULTIMODAL OCR
+// ============================================================================
+
+/**
+ * POST /api/ai/ocr/gemini
+ * Single-pass multimodal OCR using Gemini 2.5 Flash.
+ * Sends the raw image directly to Gemini and gets back extracted text,
+ * eliminating the legacy 3-step pipeline (Cloud Vision → LLM cleanup → text).
+ * Rate limited: 30 requests per hour
+ */
+router.post(
+  '/ocr/gemini',
+  validateJSON,
+  ocrLimiter,
+  validateOCR,
+  async (req: Request, res: Response) => {
+    const IS_PRODUCTION = process.env.NODE_ENV === 'production'
+    const startTime = Date.now()
+
+    try {
+      const client = getGeminiClient()
+      if (!client) {
+        return res.status(503).json({
+          error: IS_PRODUCTION
+            ? 'Document processing service unavailable'
+            : 'Gemini not configured — set GEMINI_API_KEY',
+          code: 'PROVIDER_NOT_CONFIGURED',
+        })
+      }
+
+      const { imageBase64 } = req.body as { imageBase64: string }
+      const aiConfig = await getAIConfig()
+      const model = aiConfig.geminiModel || 'gemini-2.5-flash'
+
+      // Detect MIME type from base64 header (fallback to image/png)
+      let mimeType = 'image/png'
+      if (imageBase64.startsWith('/9j/')) mimeType = 'image/jpeg'
+      else if (imageBase64.startsWith('JVBER')) mimeType = 'application/pdf'
+      else if (imageBase64.startsWith('iVBOR')) mimeType = 'image/png'
+
+      log.info('Gemini OCR: processing document', { model, mimeType })
+
+      const imagePart = createPartFromBase64(imageBase64, mimeType)
+
+      const response = await client.models.generateContent({
+        model,
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              imagePart,
+              {
+                text: 'Extract ALL text from this document image. Preserve the original layout, structure, and line breaks as closely as possible. Output ONLY the extracted text, no commentary or formatting instructions. For Turkish insurance documents, pay special attention to monetary values, dates, policy numbers, and coverage details.',
+              },
+            ],
+          },
+        ],
+        config: {
+          temperature: 0.0,
+          maxOutputTokens: 8192,
+        },
+      })
+
+      const extractedText = response.text || ''
+      const inputTokens = response.usageMetadata?.promptTokenCount || 0
+      const outputTokens = response.usageMetadata?.candidatesTokenCount || 0
+
+      // Calculate cost using the pricing table
+      const costResult = calculateCost(model, inputTokens, outputTokens)
+
+      // Record usage asynchronously
+      recordUsage({
+        provider: 'google',
+        model,
+        operation: 'ocr-gemini',
+        inputTokens,
+        outputTokens,
+        totalTokens: inputTokens + outputTokens,
+        inputCost: costResult.inputCost,
+        outputCost: costResult.outputCost,
+        totalCost: costResult.totalCost,
+        timestamp: new Date().toISOString(),
+      }).catch((err) => {
+        if (!IS_PRODUCTION)
+          log.debug('Cost tracking failed', {
+            error: err instanceof Error ? err.message : String(err),
+          })
+      })
+
+      const processingTimeMs = Date.now() - startTime
+      log.info('Gemini OCR complete', {
+        model,
+        inputTokens,
+        outputTokens,
+        cost: costResult.totalCost,
+        textLength: extractedText.length,
+        processingTimeMs,
+      })
+
+      res.json({
+        success: true,
+        data: {
+          text: extractedText,
+          confidence: extractedText.length > 50 ? 0.92 : 0.5,
+          pageCount: 1,
+          processingTimeMs,
+        },
+        cost: costResult.totalCost,
+        usage: { inputTokens, outputTokens, model },
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      const processingTimeMs = Date.now() - startTime
+
+      log.error('Gemini OCR failed', {
+        error: message,
+        processingTimeMs,
+      })
+
+      let code = 'GEMINI_OCR_FAILED'
+      let userMessage = IS_PRODUCTION
+        ? 'Unable to process document'
+        : `Gemini OCR failed: ${message}`
+
+      if (error instanceof Error && error.name === 'AbortError') {
+        code = 'TIMEOUT'
+        userMessage = IS_PRODUCTION ? 'Request timed out, please try again' : 'Gemini OCR timed out'
+      } else if (message.includes('429') || message.includes('RESOURCE_EXHAUSTED')) {
+        code = 'RATE_LIMITED'
+        userMessage = IS_PRODUCTION
+          ? 'Service busy, please try again later'
+          : 'Gemini rate limit exceeded'
+      } else if (
+        message.includes('API key') ||
+        message.includes('401') ||
+        message.includes('403')
+      ) {
+        code = 'AUTH_FAILED'
+        userMessage = IS_PRODUCTION
+          ? 'Document processing service unavailable'
+          : 'Gemini API key invalid — check GEMINI_API_KEY'
+      }
+
+      res.status(500).json({
+        error: userMessage,
+        code,
+        ...(!IS_PRODUCTION && { details: message }),
+        timestamp: new Date().toISOString(),
+      })
+    }
+  }
+)
+
 // ============================================================================
 // PROCESSING LOGS (Document Journey Tracking)
 // ============================================================================

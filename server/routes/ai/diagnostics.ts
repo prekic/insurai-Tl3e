@@ -7,6 +7,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenAI } from '@google/genai'
 import { Request, Response, Router } from 'express'
 import * as fs from 'fs'
 import { GoogleAuth } from 'google-auth-library'
@@ -141,6 +142,16 @@ function getAnthropicClient(): Anthropic | null {
     anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   }
   return anthropicClient
+}
+
+let geminiClient: GoogleGenAI | null = null
+
+function getGeminiClient(): GoogleGenAI | null {
+  if (!process.env.GEMINI_API_KEY) return null
+  if (!geminiClient) {
+    geminiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+  }
+  return geminiClient
 }
 
 // ============================================================================
@@ -454,6 +465,7 @@ router.get('/providers', generalLimiter, (_req: Request, res: Response) => {
     openai: !!process.env.OPENAI_API_KEY,
     anthropic: !!process.env.ANTHROPIC_API_KEY,
     google: hasGoogleVision,
+    gemini: !!process.env.GEMINI_API_KEY,
     documentAI: isDocumentAIConfigured(),
   })
 })
@@ -471,12 +483,14 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
     openai: ProviderDiagnostic
     anthropic: ProviderDiagnostic
     google: ProviderDiagnostic
+    gemini: ProviderDiagnostic
     timestamp: string
     environment?: string // Only included in non-production
   } = {
     openai: { configured: false, valid: false },
     anthropic: { configured: false, valid: false },
     google: { configured: false, valid: false },
+    gemini: { configured: false, valid: false },
     timestamp: new Date().toISOString(),
     // Only expose environment in non-production
     ...(IS_PRODUCTION ? {} : { environment: process.env.NODE_ENV || 'development' }),
@@ -532,7 +546,7 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
       if (client) {
         // Make a minimal API call to verify the key works
         const response = await client.messages.create({
-          model: 'claude-3-5-haiku-latest',
+          model: 'claude-haiku-4-5',
           max_tokens: 5,
           messages: [{ role: 'user', content: 'Say "OK"' }],
         })
@@ -701,6 +715,43 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
     }
   }
 
+  // Test Gemini
+  if (process.env.GEMINI_API_KEY) {
+    diagnostics.gemini.configured = true
+    const startTime = Date.now()
+    try {
+      const client = getGeminiClient()
+      if (client) {
+        // Minimal health check — just verify the API key works
+        await client.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: 'Say "OK"',
+          config: { maxOutputTokens: 5 },
+        })
+        diagnostics.gemini.valid = true
+        diagnostics.gemini.latencyMs = Date.now() - startTime
+        if (!IS_PRODUCTION) {
+          diagnostics.gemini.model = 'gemini-2.5-flash'
+        }
+      }
+    } catch (error) {
+      diagnostics.gemini.valid = false
+      diagnostics.gemini.latencyMs = Date.now() - startTime
+      let errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      if (errorMsg.includes('API key') || errorMsg.includes('401') || errorMsg.includes('403')) {
+        errorMsg = 'Invalid API key - check GEMINI_API_KEY in .env'
+      } else if (errorMsg.includes('429') || errorMsg.includes('RESOURCE_EXHAUSTED')) {
+        errorMsg = 'Rate limit exceeded'
+      }
+      diagnostics.gemini.errorCode = classifyDiagnosticError(errorMsg)
+      diagnostics.gemini.error = sanitizeDiagnosticError(errorMsg, IS_PRODUCTION)
+      log.warn('Gemini diagnostic failed', {
+        errorCode: diagnostics.gemini.errorCode,
+        error: errorMsg,
+      })
+    }
+  }
+
   // Log diagnostic results for debugging (only in development)
   if (process.env.NODE_ENV !== 'production') {
     // Variance adapter: log.debug accepts Record<string, unknown> metadata;
@@ -710,8 +761,12 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
   }
 
   // Determine overall status
-  const anyValid = diagnostics.openai.valid || diagnostics.anthropic.valid
-  const anyConfigured = diagnostics.openai.configured || diagnostics.anthropic.configured
+  const anyValid =
+    diagnostics.openai.valid || diagnostics.anthropic.valid || diagnostics.gemini.valid
+  const anyConfigured =
+    diagnostics.openai.configured ||
+    diagnostics.anthropic.configured ||
+    diagnostics.gemini.configured
 
   // Sanitized recommendations for production (SaaS)
   let recommendation: string
