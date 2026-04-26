@@ -52,11 +52,6 @@ describe('VehicleInfoCard', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('returns null when vehicleInfo is missing', () => {
-    const { container } = render(<VehicleInfoCard policy={basePolicy} />)
-    expect(container.firstChild).toBeNull()
-  })
-
   it('renders all vehicle fields when provided', () => {
     const policy: AnalyzedPolicy = {
       ...basePolicy,

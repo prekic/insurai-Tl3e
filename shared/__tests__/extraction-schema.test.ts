@@ -21,11 +21,11 @@ describe('shared/extraction-schema', () => {
     expect(schema.additionalProperties).toBe(false)
   })
 
-  it('has 30 top-level required fields', () => {
+  it('has 32 top-level required fields', () => {
     // This count tracks EXTRACTION_JSON_SCHEMA.schema.required.length and must
     // be updated alongside every top-level property addition/removal per
     // gotcha #47 (OpenAI strict-mode required[] completeness).
-    expect(schema.required).toHaveLength(30)
+    expect(schema.required).toHaveLength(32)
   })
 
   it('has discounts object with required sub-fields', () => {

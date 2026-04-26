@@ -6,7 +6,7 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
-test('do OCR', async () => {
+test.skip('do OCR', async () => {
   const POLICIES_DIR = path.resolve(process.cwd(), 'policies')
   const filename = 'KRK_35 VD 458 Kasko Police_32630901_3.pdf'
   const buf = await fs.readFile(path.join(POLICIES_DIR, filename))

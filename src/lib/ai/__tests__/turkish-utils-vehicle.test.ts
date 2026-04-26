@@ -189,7 +189,6 @@ Motor No MP0428 úDVL1R NNATFR86JL2000712`
     expect(result?.make).toBe('ISUZU')
     expect(result?.model).toBe("'0$;dù)7.$%ù1")
   })
-
   it('does NOT fire tabular fallback for lowercase prose mentions of "marka"', () => {
     // Mid-prose lowercase mention of "marka" should not be claimed as a
     // labeled value just because the next token is uppercase. The tabular
