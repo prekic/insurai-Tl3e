@@ -487,7 +487,13 @@ export async function convertToAnalyzedPolicy(
         data.vehicleUsage
       )
 
-      if (!baseInfo && !hasLlmData) return undefined
+      if (!baseInfo && !hasLlmData) {
+        if (policyType === 'kasko' || policyType === 'traffic') {
+          return {}
+        }
+        return undefined
+      }
+
       return {
         ...(baseInfo || {}),
         ...(data.vehicleMake ? { make: data.vehicleMake } : {}),

@@ -3,13 +3,12 @@
 > Context file for Claude Code sessions on the insurai project
 
 ## ⚠️ Next Session Instructions
-1. **Open PR for current session's work**: Branch `claude/load-project-context-0P7Rm` is ~7 commits ahead of `main` with the backend QA gate, trust-damage fixes, Allianz inverted-label fix, and pdf-parser threshold fix. Suggested title: `fix(extraction): backend QA gate + six trust-damage fixes`. Full commit list + PR body template in `SESSION_HANDOFF.md > Priority 2`.
-2. **Allianz inverted-label make extraction** ✅ DONE (this session). `scanBackwardForInvertedValue()` added to `matchLabeledField` at `shared/field-aliases.ts`; `extractorLenientFor: ['make']` removed from the Peugeot golden fixture; strict assertion passes. (Previous session's v4 work — branch `claude/load-project-context-bNYCu` — merged via PR #363, commit `6fa169d`.)
-3. **Grade Thresholds Calibrated**: 70 policies ingested → 64-policy sample calibrated thresholds: A ≥ 89, B ≥ 85, C ≥ 39, D ≥ 2, F < 2. Monitor for drift as new batches enter. Thresholds live in `app_settings[evaluation/grade_*_threshold]`.
+1. **Monitor Trial Upload Limit**: The free trial usage limit was adjusted to 100 (`TRIAL_MAX_UPLOADS = 100` in `src/lib/free-trial.ts`). Monitor server resources and API costs to ensure this raised limit doesn't lead to abuse or excessive billing.
+2. **Verify E2E Suite in CI**: The `real-user-proof.spec.ts` test suite has been fortified with strict `FORBIDDEN` checks against "Cannot Verify" texts on the policy detail page. Ensure these pass consistently on CI. If any test fails, it means the extraction pipeline failed to map critical vehicle data (make, model, year, plate) to the frontend.
+3. **Implement Self-Healing Loop Architecture**: The self-healing loop architecture design (planned earlier) is now ready to implement since this pipeline merge is complete. Focus on creating the LLM-as-a-Judge system to automatically retry and correct extraction failures.
 4. **Phase E Production Monitoring**: The KASKO pilot pipeline is hardened, deduplicated, and calibrated with real data. Ready for Phase E production operations. No active blockers.
-5. **Pre-existing Test Failure** ✅ DONE (this session). `src/lib/ai/pdf-parser.test.ts` 49-char EMPTY_PDF assertion — root cause was the threshold measuring page-marked string (inflated by 9 chars/page). Fixed in `src/lib/ai/pdf-parser.ts` to measure actual content length. All 102 tests pass.
-6. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
-7. **🚨 QA GATE BEFORE SHIPPING EXTRACTION/DISPLAY CHANGES 🚨**: Before claiming any fix complete that touches `aiConfidence`, `extractionIncomplete`, the display-mode gate, or vehicle/coverage extraction, run `npm run qa:extraction` and confirm the relevant check moved. See gotcha #102, runbook 07, ADR-020.
+5. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
+6. **🚨 QA GATE BEFORE SHIPPING EXTRACTION/DISPLAY CHANGES 🚨**: Before claiming any fix complete that touches `aiConfidence`, `extractionIncomplete`, the display-mode gate, or vehicle/coverage extraction, run `npm run qa:extraction` and confirm the relevant check moved. See gotcha #102, runbook 07, ADR-020.
 
 ---
 
@@ -230,6 +229,16 @@
 106. **JSONB NUL Sanitization for PDF Text (Added April 25, 2026)**: PostgreSQL's JSONB type rejects literal NUL bytes (U+0000) with `unsupported Unicode escape sequence` on UPDATE/INSERT. Some Turkish kasko PDFs (specifically observed: Anadolu VW Golf 2001) emit a NUL byte mid-text after pdf-parse extraction. Both `scripts/backfill-vehicle-info.ts` and `scripts/pilot-batch-ingest.ts` now strip C0 control characters (NUL..0x1F except TAB/LF/CR) plus unpaired UTF-16 surrogate halves before writing. Pattern: build the regex from a string via `new RegExp('[\\u0000-...]', 'g')` rather than a literal — a literal NUL inside a regex literal in source code corrupts the editor representation. ESLint's `no-control-regex` rule must be disabled with an explanatory comment. **Rule**: any code path that writes free-form text into a JSONB column must apply this sanitization first.
 
 107. **Diagnose-then-Backfill Workflow for DB-Wide Data Issues (Added April 25, 2026)**: When the QA gate (`npm run qa:extraction`) flags a systemic issue, the pattern that worked April 25: (1) write a read-only diagnostic script (`scripts/diagnose-vehicle-extraction.ts` template) that prints a population split + raw_data key inventory + per-row text-field probe, (2) read its output to determine whether the issue is "data missing in DB" vs "data present but in wrong key" vs "needs re-extraction from PDFs", (3) write a write-capable backfill script (`scripts/backfill-vehicle-info.ts` template) with mandatory `--apply` flag (default dry-run), per-row outcome tags (`OK`/`WOULD`/`NO_PDF`/`NO_TXT`/`NO_VEH`/`ERROR`), and a final summary block, (4) run dry-run, eyeball ~5 entries, then `--apply`, (5) re-run the QA gate to verify. April 25 example: 0/70 → 53/70 (76%) on `VEHICLE_COMPLETENESS` in two passes (one for AXA single-space label format, one to add NUL sanitization). Always include `--policy-id <uuid>` on the backfill for one-row debugging.
+
+108. **ESLint `no-useless-escape` in Regex (Added April 25, 2026)**: Do not use useless regex escapes (`\/`, `\.`) in regex strings or character classes. They trigger ESLint `no-useless-escape` and will fail the pre-commit hook.
+
+109. **Pre-commit Linter Blockers / Reverting Commits (Added April 25, 2026)**: Unused imports or variables will trigger the Husky pre-commit hook, stashing your commit. Fix the linting issue and re-commit rather than using `--no-verify`.
+
+110. **`VehicleInfoCard` UI Fallback for Missing Data (Added April 26, 2026)**: The `VehicleInfoCard` component must gracefully handle an `undefined` or partial `vehicleInfo` object. Do not let the component unmount or crash. Use an empty fallback `{}` and let the individual fields display "Cannot Verify", providing an honest extraction status rather than silently hiding the UI section.
+
+111. **E2E 'Cannot Verify' Forbidden Assertions (Added April 26, 2026)**: When validating the extraction UI in Playwright tests (e.g. `e2e/real-user-proof.spec.ts`), use strict `FORBIDDEN` assertions (like `expect(content).not.toContain('Cannot Verify')`) to trap extraction regressions and ensure critical vehicle data is successfully mapped from the LLM extraction to the frontend.
+
+112. **Free Trial Limit Configuration (Added April 26, 2026)**: The hardcoded trial limit in `src/lib/free-trial.ts` (`TRIAL_MAX_UPLOADS`) was raised from 3 to 100 to support higher onboarding throughput.
 
 ## Project Overview
 

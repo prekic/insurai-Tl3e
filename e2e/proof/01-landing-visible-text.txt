@@ -1,7 +1,18 @@
 Skip to main content
 Now viewing: Home
+Secure & Encrypted
+Licensed Insurance Advisors
+Help Center
 InsurAI
-benchmark Benchmark your insurance policies
+Policy Analysis Platform
+Dashboard
+4
+Compare
+Chat
+Upload Policy
+Sign In
+AI-powered policy analysis
+Understand and benchmark
 
 Upload a policy PDF and get plain-language coverage analysis in seconds.
 
@@ -31,31 +42,55 @@ Sample Policies Collection
 See all Turkish insurance line samples
 View All
 Built for Turkish insurance professionals|Kasko, Traffic, DASK, Health, and more
-Sample Comparison
-Best Coverage
-Allianz Kasko
-Lowest Premium
-AXA Kasko
-AI Pick
-Allianz Kasko
+Policy Comparison
 
-Illustrative example — your results will reflect your actual policies
+Side-by-side analysis
+
+Coverage
+
+Kasko A
+
+Allianz
+
+₺4,200/yr
+
+Kasko B
+
+AXA
+
+₺3,800/yr
+
+Collision Coverage
+Theft Protection
+Natural Disaster
+Glass Coverage
+Roadside Assist
+
+AI Insight: Policy A offers better natural disaster coverage
 
 7
 
 Policy Types Supported
 
+Kasko, Traffic, DASK, Health, Life, Home, Business
+
 TR / EN
 
 Languages
+
+Full Turkish and English support
 
 15+
 
 Coverage Checks
 
+Gaps, limits, exclusions, compliance
+
 <60s
 
 Analysis Time
+
+From upload to full benchmark report
 
 Works with major Turkish insurers
 Allianz
@@ -69,5 +104,3 @@ HDI
 Groupama
 Ergo
 +more
-Analyze Your Policy Free
-Free instant analysis
