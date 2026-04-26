@@ -38,6 +38,12 @@ Enhanced `e2e/real-user-proof.spec.ts` with strict visual checks. The tests now 
 ### Phase 4 — Trial Limit Adjustment
 Raised the daily trial upload limit from 3 to 100 in `src/lib/free-trial.ts` to prevent user friction during onboarding.
 
+### Phase 5 — API & UI Refinements (Caught in Audit)
+- **PolicyContext Signature Change**: Upgraded `src/lib/policy-context.tsx` to return `{ policy, policyId, isPdfParsed }` instead of just the policy, supporting more robust state management.
+- **UI Error Suppression**: Modified `src/components/actuarial/PolicyActuarialHistoryChart.tsx` to trap DB errors and swallow empty states (`return null`) rather than leaking Supabase schema errors to the UI.
+- **Strict Types**: Upgraded `src/lib/supabase/types.ts` to natively type `vehicleInfo`, `discounts`, and `extractionWarnings` on the `AnalyzedPolicy` interface.
+- **Visual Auditing**: Added new visual regression specs (`e2e/policy-detail-audit.spec.ts`, `e2e/policy-trial-audit.spec.ts`, `e2e/visual-audit.spec.ts`) alongside `real-user-proof.spec.ts`.
+
 ## Environment / Configuration
 - No new environment variables added.
 - `TRIAL_MAX_UPLOADS` in `src/lib/free-trial.ts` is now 100.
@@ -49,6 +55,9 @@ Raised the daily trial upload limit from 3 to 100 in `src/lib/free-trial.ts` to 
 | 1 | `VehicleInfoCard` UI Fallback for missing data | #110 |
 | 2 | E2E 'Cannot Verify' Forbidden Assertions | #111 |
 | 3 | Trial Limit Adjustment | #112 |
+| 4 | PolicyContext Signature Change | #113 |
+| 5 | Supabase UI Error Leaking | #114 |
+| 6 | E2E Visual Audits | #115 |
 
 ## Non-Negotiable Rules (Carry Forward — Unchanged)
 

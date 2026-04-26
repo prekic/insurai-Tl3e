@@ -240,6 +240,12 @@
 
 112. **Free Trial Limit Configuration (Added April 26, 2026)**: The hardcoded trial limit in `src/lib/free-trial.ts` (`TRIAL_MAX_UPLOADS`) was raised from 3 to 100 to support higher onboarding throughput.
 
+113. **PolicyContext Signature Change (Added April 26, 2026)**: `PolicyContext` no longer returns the `AnalyzedPolicy` directly. It now returns an object `{ policy: AnalyzedPolicy, policyId: string | null, isPdfParsed: boolean }`. All consumers must destructure `policy` from the context instead of using the context value directly.
+
+114. **Supabase UI Error Leaking (Added April 26, 2026)**: Never render raw Supabase/database error messages into the UI (e.g., in `PolicyActuarialHistoryChart`). Trap them, log via `console.warn` (suppressed from UI), and return `null` or a generic fallback to prevent leaking internal DB schemas or paths.
+
+115. **E2E Visual Audits (Added April 26, 2026)**: The E2E suite now contains heavy visual audit tests (`e2e/policy-detail-audit.spec.ts`, `e2e/policy-trial-audit.spec.ts`, `e2e/visual-audit.spec.ts`) that capture and compare screenshots in `e2e/screenshots/`.
+
 ## Project Overview
 
 144. **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
