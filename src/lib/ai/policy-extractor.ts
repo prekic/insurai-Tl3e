@@ -301,7 +301,6 @@ export async function extractPolicyFromDocument(
 
   // Try Document AI OCR first (if available)
   const documentAIAvailable = isDocumentOCRAvailable()
-  console.warn('[PolicyExtractor] Document AI available:', documentAIAvailable)
 
   const ocrPhaseStart = performance.now()
   if (documentAIAvailable) {
