@@ -169,11 +169,13 @@ export interface AmendmentInfo {
 export interface Policy {
   id: string
   policyNumber: string
+  bagliPolNo?: string
   provider: string
   logo: string
   type: PolicyType
   typeTr: string
   coverage: number
+  sigortaBedeli?: number
   premium: number
   monthlyPremium: number
   deductible: number

@@ -1377,6 +1377,8 @@ export const COMMON_EXCLUSIONS_TO_CHECK = [
     question: 'Vale park hizmeti sırasında araç çalınırsa veya hasar görürse karşılanıyor mu?',
     questionEn: 'Is theft or damage during valet parking covered?',
     importance: 'high',
+    affectsPrivate: true,
+    affectsCommercial: false,
   },
   {
     name: 'Alkollü Sürücü Limiti',
@@ -1384,6 +1386,8 @@ export const COMMON_EXCLUSIONS_TO_CHECK = [
     question: 'Hangi promil seviyesinden sonra teminat geçersiz oluyor?',
     questionEn: 'At what blood alcohol level does coverage become invalid?',
     importance: 'high',
+    affectsPrivate: true,
+    affectsCommercial: true,
   },
   {
     name: 'Yedek Sürücü',
@@ -1391,6 +1395,8 @@ export const COMMON_EXCLUSIONS_TO_CHECK = [
     question: 'Poliçede belirtilen sürücü dışında başkası aracı kullanabilir mi?',
     questionEn: 'Can someone other than the named driver operate the vehicle?',
     importance: 'high',
+    affectsPrivate: true,
+    affectsCommercial: true,
   },
   {
     name: 'Yurt Dışı Kullanımı',
@@ -1398,6 +1404,8 @@ export const COMMON_EXCLUSIONS_TO_CHECK = [
     question: 'Araç yurt dışında kullanılırsa teminat geçerli mi?',
     questionEn: 'Is coverage valid when the vehicle is used abroad?',
     importance: 'medium',
+    affectsPrivate: true,
+    affectsCommercial: true,
   },
   {
     name: 'Ticari Kullanım',
@@ -1405,6 +1413,8 @@ export const COMMON_EXCLUSIONS_TO_CHECK = [
     question: 'Aracı ticari amaçla (Uber, teslimat vb.) kullanabilir miyim?',
     questionEn: 'Can I use the vehicle commercially (Uber, delivery, etc.)?',
     importance: 'high',
+    affectsPrivate: true,
+    affectsCommercial: false,
   },
   {
     name: 'Modifikasyon',
@@ -1412,6 +1422,8 @@ export const COMMON_EXCLUSIONS_TO_CHECK = [
     question: 'Araçta modifikasyon yaparsam (jant, cam filmi, ses sistemi) teminat etkilenir mi?',
     questionEn: 'Does modifying the vehicle affect coverage?',
     importance: 'medium',
+    affectsPrivate: true,
+    affectsCommercial: true,
   },
 ]
 
@@ -1562,6 +1574,9 @@ export function analyzeExclusionsComprehensive(
   const mentionedTopics = exclusions.map((e) => e.toLowerCase()).join(' ')
 
   for (const check of COMMON_EXCLUSIONS_TO_CHECK) {
+    if (isCommercial && check.affectsCommercial === false) continue
+    if (!isCommercial && check.affectsPrivate === false) continue
+
     const keywords = check.name.toLowerCase().split(/[\s/]+/)
     const isMentioned = keywords.some((kw) => mentionedTopics.includes(kw))
 

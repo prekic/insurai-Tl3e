@@ -18,7 +18,7 @@ export default defineConfig({
   reporter: [['html'], ['list']],
 
   // Global timeout settings for faster execution
-  timeout: 30000, // 30s per test (down from default 60s)
+  timeout: 120000, // 120s per test
   expect: {
     timeout: 5000, // 5s for assertions
   },

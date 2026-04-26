@@ -578,12 +578,16 @@ export function evaluatePolicy(
   // a high confidence % next to the "Incomplete extraction" banner. The raw
   // value on AnalyzedPolicy.aiConfidence is preserved for audit/debug.
   const rawAiConfidence = (policy as { aiConfidence?: number }).aiConfidence
-  const displayedAiConfidence =
-    typeof rawAiConfidence === 'number'
-      ? extractionIncomplete
-        ? Math.min(rawAiConfidence, INCOMPLETE_CONFIDENCE_CAP)
-        : rawAiConfidence
-      : undefined
+  let displayedAiConfidence = rawAiConfidence
+  if (typeof displayedAiConfidence === 'number') {
+    if (extractionIncomplete) {
+      displayedAiConfidence = Math.min(displayedAiConfidence, INCOMPLETE_CONFIDENCE_CAP)
+    }
+    // Cap AI confidence for commercial/fleet policies at ~75% until the extractor handles fleet-specific fields
+    if (isCommercialOrNicheVehicle(analyzedPolicy)) {
+      displayedAiConfidence = Math.min(displayedAiConfidence, 0.75)
+    }
+  }
 
   return {
     policyId: policy.id,
@@ -1326,8 +1330,21 @@ function evaluateCompliance(policy: Policy, config: EvaluationConfig): Complianc
 
   // Check for Conditional Deductibles
   const analyzedPolicy = policy as import('@/types/policy').AnalyzedPolicy
-  const hasConditionalDeductibles =
+  let hasConditionalDeductibles = !!(
     analyzedPolicy.conditionalDeductibles && analyzedPolicy.conditionalDeductibles.length > 0
+  )
+
+  // Avoid flagging standard network/glass deductibles as a critical risk on commercial policies
+  if (hasConditionalDeductibles && isCommercialOrNicheVehicle(analyzedPolicy)) {
+    const onlyMinorDeductibles = analyzedPolicy.conditionalDeductibles!.every((d) => {
+      const lower = d.toLowerCase()
+      return lower.includes('cam') || lower.includes('servis') || lower.includes('casu')
+    })
+
+    if (onlyMinorDeductibles) {
+      hasConditionalDeductibles = false
+    }
+  }
 
   // Check for IMM Sublimits (Limited IMM) - Kasko typically
   // Uses the shared IMM_COVERAGE_PATTERNS constant to stay in sync with

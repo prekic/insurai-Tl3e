@@ -15,7 +15,8 @@ export function VehicleInfoCard({ policy }: VehicleInfoCardProps) {
   }
 
   const vehicleInfo = policy.vehicleInfo || {}
-  const isCommercial = vehicleInfo.usage?.toLowerCase() === 'commercial'
+  const isCommercial =
+    policy.vehicleUsage === 'commercial' || vehicleInfo.usage?.toLowerCase() === 'commercial'
 
   // Headline vehicle fields are rendered UNCONDITIONALLY so a parsing failure
   // surfaces as an explicit "Cannot Verify" row rather than silently missing.

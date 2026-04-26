@@ -33,6 +33,12 @@ Use the following importance weights to inform the overall confidence score:
 - premium: weight ${Math.round(weights.premium * 100)}%
 - coverages: weight ${Math.round(weights.coverages * 100)}%
 
+=== EXTRACTION RULES ===
+1. sigortaBedeli: Extract the explicit contractual maximum payout limit as a number if found. Do not extract market value (Rayiç Değer) text here.
+2. bağlıPolNo: Look for fleet or linked policy numbers ("Bağlı Pol No" / "Zeyl No") and extract them accurately.
+3. Seat Personal Accident (Koltuk Ferdi Kaza): Ensure the extracted limit is the *per-seat* limit (e.g., 100,000 TL), NOT the total limit across all seats.
+4. Deductibles (Muafiyet): If stated as "YOK" or "Yoktur", ensure this is extracted explicitly as 0 or omitted. Do not generate uncertain or conditional text strings for "YOK".
+
 === GROUNDING / CITATION RULES ===
 For every parsed coverage, identity, or important field where grounding fields (page, clause, quote) are available in the schema, you MUST extract them properly.
 Do not invent anything. Use the verbatim text from the document.
