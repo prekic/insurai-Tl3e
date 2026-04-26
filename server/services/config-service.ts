@@ -136,7 +136,7 @@ export interface CostConfig {
 const DEFAULT_AI_CONFIG: AIConfig = {
   openaiExtractionModel: 'gpt-5.4',
   openaiBackupModel: 'gpt-4o-mini',
-  anthropicExtractionModel: 'claude-3-5-sonnet-20241022',
+  anthropicExtractionModel: 'claude-sonnet-4-6',
   anthropicBackupModel: 'claude-haiku-4-5',
   geminiModel: 'gemini-2.5-flash',
   maxTokens: 8192,

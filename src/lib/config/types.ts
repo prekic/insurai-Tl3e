@@ -115,7 +115,7 @@ export interface AIConfig {
 export const DEFAULT_AI_CONFIG: AIConfig = {
   openaiExtractionModel: 'gpt-4o',
   openaiBackupModel: 'gpt-4o-mini',
-  anthropicExtractionModel: 'claude-3-5-sonnet-20241022',
+  anthropicExtractionModel: 'claude-sonnet-4-6',
   anthropicBackupModel: 'claude-3-5-haiku-latest',
   maxTokens: 4096,
   temperature: 0.1,
