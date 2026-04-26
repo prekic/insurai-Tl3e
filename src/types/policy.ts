@@ -177,6 +177,10 @@ export interface Policy {
   coverage: number
   sigortaBedeli?: number
   premium: number
+  /** Net premium before tax (Net Prim) */
+  premiumNet?: number
+  /** Tax amount, usually BSMV */
+  premiumTax?: number
   monthlyPremium: number
   deductible: number
   startDate: string

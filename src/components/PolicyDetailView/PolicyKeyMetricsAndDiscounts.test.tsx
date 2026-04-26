@@ -70,10 +70,10 @@ describe('PolicyKeyMetricsAndDiscounts', () => {
     expect(screen.queryByText('₺12,500')).not.toBeInTheDocument()
   })
 
-  it('shows "Conditional / requires review" when kasko deductible is zero', () => {
+  it('shows conditional deductible label when kasko deductible is zero', () => {
     const policy = { ...base, deductible: 0 }
     render(<PolicyKeyMetricsAndDiscounts policy={policy} />)
-    expect(screen.getByText(/Conditional \/ requires review/i)).toBeInTheDocument()
+    expect(screen.getByText(/No standard deductible/i)).toBeInTheDocument()
   })
 
   it('shows proportional-deductible label when deductiblePercent is set', () => {

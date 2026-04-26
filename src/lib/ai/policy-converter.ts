@@ -448,6 +448,10 @@ export async function convertToAnalyzedPolicy(
     coverage: totalCoverage,
     sigortaBedeli: data.sigortaBedeli ?? undefined,
     premium: premiumValue,
+    premiumNet:
+      typeof data.premiumNet === 'number' && data.premiumNet > 0 ? data.premiumNet : undefined,
+    premiumTax:
+      typeof data.premiumTax === 'number' && data.premiumTax > 0 ? data.premiumTax : undefined,
     monthlyPremium: premiumValue / 12,
     deductible: coverages.length > 0 ? Math.max(0, ...coverages.map((c) => c.deductible ?? 0)) : 0,
     startDate: (() => {

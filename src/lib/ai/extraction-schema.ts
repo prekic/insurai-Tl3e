@@ -22,6 +22,10 @@ export interface ExtractedPolicyData {
   premium: number | null
   currency: string | null
   paymentFrequency: 'annual' | 'semi-annual' | 'quarterly' | 'monthly' | null
+  /** Net premium before tax (Net Prim) */
+  premiumNet?: number | null
+  /** Tax amount, usually BSMV (Banka ve Sigorta Muameleleri Vergisi) */
+  premiumTax?: number | null
 
   // Entity Details
   insuredEntityType?: 'individual' | 'corporate' | null

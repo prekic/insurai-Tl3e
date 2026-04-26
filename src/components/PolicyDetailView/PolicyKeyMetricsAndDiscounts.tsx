@@ -50,6 +50,13 @@ export function PolicyKeyMetricsAndDiscounts({ policy }: PolicyKeyMetricsAndDisc
               ? formatConverted(policy.premium)
               : t.policy.notSpecified}
         </p>
+        {/* Premium breakdown: Net + BSMV */}
+        {policy.premiumNet && policy.premiumTax && (
+          <p className="text-[10px] text-gray-400 mt-0.5 truncate">
+            {locale === 'tr' ? 'Net' : 'Net'}: {formatConverted(policy.premiumNet)} + BSMV:{' '}
+            {formatConverted(policy.premiumTax)}
+          </p>
+        )}
       </div>
       <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
         <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">{t.policy.deductibleLabel}</p>

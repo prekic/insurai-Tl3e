@@ -586,12 +586,31 @@ function ExclusionsSection({
         </CardHeader>
         <CardContent>
           <ul className="space-y-2">
-            {/* Deduplicate exclusions to hide LLM variability (e.g. "Aracın çalınması" vs "Aracın çalınması.") */}
+            {/* Deduplicate exclusions: substring match + trigram Jaccard similarity (>0.55) */}
             {(() => {
+              // Trigram-based Jaccard similarity to detect paraphrases
+              const trigramSet = (s: string): Set<string> => {
+                const clean = s
+                  .toLowerCase()
+                  .replace(/[^a-zçğıöşüa-z0-9]/gi, ' ')
+                  .replace(/\s+/g, ' ')
+                  .trim()
+                const set = new Set<string>()
+                for (let i = 0; i <= clean.length - 3; i++) set.add(clean.slice(i, i + 3))
+                return set
+              }
+              const jaccardSimilarity = (a: string, b: string): number => {
+                const tA = trigramSet(a)
+                const tB = trigramSet(b)
+                if (tA.size === 0 || tB.size === 0) return 0
+                let intersection = 0
+                for (const t of tA) if (tB.has(t)) intersection++
+                return intersection / (tA.size + tB.size - intersection)
+              }
+
               const deduplicatedExclusions = analysis.exclusions.filter((current, index, self) => {
                 const currentText = current.original.trim().toLowerCase()
-                // Keep if there's no OTHER item that is slightly longer but contains this text
-                // OR if another item is identical but we are the FIRST occurrence
+                // Check for exact/substring duplicates AND semantic (trigram) duplicates
                 const isDuplicate =
                   self.findIndex((other, otherIndex) => {
                     if (index === otherIndex) return false
@@ -601,6 +620,15 @@ function ExclusionsSection({
                     // Other text is longer and contains current text? This is a subset, hide it.
                     if (otherText.length > currentText.length && otherText.includes(currentText))
                       return true
+                    // Trigram Jaccard similarity >0.55? These are likely paraphrases.
+                    // Keep the LONGER version (more informative).
+                    if (jaccardSimilarity(currentText, otherText) > 0.55) {
+                      // If the other is longer or equal and appears earlier, this one is the dup
+                      return otherText.length >= currentText.length && otherIndex < index
+                        ? true
+                        : // If the other is shorter, we keep ours — mark other as dup instead
+                          otherText.length > currentText.length
+                    }
                     return false
                   }) !== -1
 

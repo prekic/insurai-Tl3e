@@ -90,6 +90,15 @@ The main coverage for kasko is the VEHICLE VALUE, which is typically shown as:
 
 DO NOT sum all the liability limits! The other limits (Mali Sorumluluk, Hukuki Koruma, Ferdi Kaza, etc.) are SEPARATE coverages with their own limits, not added to the main vehicle coverage.
 
+**CRITICAL - Sigorta Bedeli (Sum Insured)**:
+- **sigortaBedeli**: The contractual maximum sum insured stated on the policy.
+  This is NOT the same as Araç Değeri or Rayiç Değer.
+  In fleet/commercial KASKO, Sigorta Bedeli is the upper bound for total-loss settlement.
+  Look for: "Sigorta Bedeli", "Sig. Bed.", "S. Bedeli", "SİGORTA BEDELİ" in the
+  policy header, summary table, or coverage schedule.
+  Return as a number (e.g., 875674.88). Return null ONLY if genuinely absent from the document.
+  If you see BOTH Rayiç Değer AND a specific Sigorta Bedeli amount, return the Sigorta Bedeli amount.
+
 Extract these additional vehicle-specific fields:
 - **Vehicle Information**:
   - vehicleMake (Marka): e.g., Toyota, Ford, Volkswagen
@@ -99,7 +108,12 @@ Extract these additional vehicle-specific fields:
   - chassisNumber (Şasi No): 17-character VIN
   - engineNumber (Motor No): Engine identification
   - vehicleValue (Araç Değeri): Declared value - this is the MAIN coverage amount
-  - usageType (Kullanım Şekli): 'private' (Hususi) or 'commercial' (Ticari)
+  - vehicleUsage (Kullanım Şekli / Kullanım Tarzı): MUST be 'private' or 'commercial'.
+    Classification rules:
+    - 'commercial' → KAMYON, KAMYONET, TIR, OTOBÜS, MİNİBÜS, MİDİBÜS, İŞ MAKİNESİ,
+      ÇEKİCİ, TRAKTÖR, any "Ticari" usage, fleet/filo policies, "yük taşıma", "lojistik"
+    - 'private' → HUSUSİ, BİNEK, OTOMOBİL, "Hususi Otomobil"
+    - If usage type is unclear, infer from vehicle class/make. A KAMYON is always 'commercial'.
 
 - **Driver Information**:
   - driverAge (Sürücü Yaşı): Primary driver's age
@@ -164,8 +178,15 @@ Extract these additional vehicle-specific fields:
 - **Exclusion Extraction** (CRITICAL):
   - Do NOT extract standard "General Conditions" (Genel Şartlar) as exclusions, such as "alkollü sürüş" (drunk driving), "ehliyetsiz kullanım" (unauthorized driving), or standard "çekme/kurtarma" (towing) rules unless they are specifically highlighted as extra exclusions beyond standard law.
   - Target specific sections labeled "UYARI", "Teminat Dışında Kalan Haller", "Özel Şartlar", or "Hariç" for true policy-specific exclusions.
+  - **DEDUPLICATION**: Each exclusion must represent ONE distinct clause. Do NOT produce multiple paraphrases of the same exclusion. If a single UYARI clause covers quarries AND mines AND underground work areas, return ONE exclusion string covering all of them, not three separate items.
   - Return clean, distinct exclusion strings.
   - Asistans / Çekme = Extract as "Towing and Rescue (Domestic)" if it has a specific limit (e.g. 15,000 TL) instead of generic "Asistans".
+
+- **Premium Breakdown** (extract when visible):
+  - premiumNet (Net Prim): The net premium amount before taxes
+  - premiumTax (BSMV / Vergi): The tax amount (usually BSMV at 5%)
+  - The main "premium" field should be the TOTAL (Brüt Prim = Net + BSMV).
+    Extract premiumNet and premiumTax separately for the breakdown display.
   - İkame Araç = Replacement vehicle (category: assistance)
   - Artan Mali Sorumluluk = Increased liability (category: liability)
   - Hukuki Koruma = Legal protection (category: legal)
