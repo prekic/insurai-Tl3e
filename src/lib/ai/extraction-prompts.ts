@@ -139,7 +139,12 @@ Extract these additional vehicle-specific fields:
   - Hırsızlık = Theft (category: supplementary)
   - Cam Kırılması = Glass breakage (category: supplementary)
   - Ferdi Kaza = Personal accident (category: liability). Do NOT collapse sub-limits! Extract Death/Disability, Medical Expenses, Driver, Passenger as separate line items.
-  - Asistans = Roadside assistance (category: assistance)
+
+- **Exclusion Extraction** (CRITICAL):
+  - Do NOT extract standard "General Conditions" (Genel Şartlar) as exclusions, such as "alkollü sürüş" (drunk driving), "ehliyetsiz kullanım" (unauthorized driving), or standard "çekme/kurtarma" (towing) rules unless they are specifically highlighted as extra exclusions beyond standard law.
+  - Target specific sections labeled "UYARI", "Teminat Dışında Kalan Haller", "Özel Şartlar", or "Hariç" for true policy-specific exclusions.
+  - Return clean, distinct exclusion strings.
+  - Asistans / Çekme = Extract as "Towing and Rescue (Domestic)" if it has a specific limit (e.g. 15,000 TL) instead of generic "Asistans".
   - İkame Araç = Replacement vehicle (category: assistance)
   - Artan Mali Sorumluluk = Increased liability (category: liability)
   - Hukuki Koruma = Legal protection (category: legal)

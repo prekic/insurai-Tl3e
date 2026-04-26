@@ -64,8 +64,8 @@ export function PolicyKeyMetricsAndDiscounts({ policy }: PolicyKeyMetricsAndDisc
               : `${policy.deductiblePercent}% proportional deductible`
             : isConditionalDeductible
               ? locale === 'tr'
-                ? 'Koşullu / inceleme gerekli'
-                : 'Conditional / requires review'
+                ? 'Standart muafiyet yok (Cam: %20 CASU dışı)'
+                : 'No standard deductible (Glass: 20% outside CASU)'
               : policy.deductible > 0
                 ? formatConverted(policy.deductible)
                 : t.global.none}
