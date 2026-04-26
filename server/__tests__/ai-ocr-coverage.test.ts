@@ -159,7 +159,7 @@ vi.mock('fs', async () => {
 const DEFAULT_AI_CONFIG = {
   openaiExtractionModel: 'gpt-4o',
   openaiBackupModel: 'gpt-4o-mini',
-  anthropicExtractionModel: 'claude-sonnet-4-20250514',
+  anthropicExtractionModel: 'claude-3-5-sonnet-20241022',
   anthropicBackupModel: 'claude-3-5-haiku-latest',
   maxTokens: 4096,
   temperature: 0.1,
@@ -1553,7 +1553,7 @@ describe('AI Routes - OCR & Branch Coverage', () => {
       mockAnthropicCreate.mockResolvedValue({
         content: [{ type: 'text', text: VALID_POLICY_JSON }],
         usage: { input_tokens: 100, output_tokens: 50 },
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
       })
 
       const res = await request(app)
@@ -1752,7 +1752,7 @@ describe('AI Routes - OCR & Branch Coverage', () => {
       mockAnthropicCreate.mockResolvedValue({
         content: [{ type: 'text', text: '```json\n' + VALID_POLICY_JSON + '\n```' }],
         usage: { input_tokens: 100, output_tokens: 50 },
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
       })
 
       const res = await request(app)
@@ -1770,7 +1770,7 @@ describe('AI Routes - OCR & Branch Coverage', () => {
       mockAnthropicCreate.mockResolvedValue({
         content: [{ type: 'text', text: 'not valid json at all' }],
         usage: { input_tokens: 100, output_tokens: 50 },
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
       })
 
       const res = await request(app)

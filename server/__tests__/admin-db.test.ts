@@ -1357,7 +1357,7 @@ describe('Admin Database Service', () => {
           user_prompt_template: 'Active user prompt',
           variables: [],
           default_provider: 'anthropic',
-          default_model: 'claude-sonnet-4-20250514',
+          default_model: 'claude-3-5-sonnet-20241022',
           parameters: { temperature: 0.2 },
           usage_count: 200,
           last_used_at: '2026-02-15T00:00:00Z',

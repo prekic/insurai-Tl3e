@@ -60,13 +60,13 @@ const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 const SERVER_CONFIG = {
   // Request timeout in milliseconds (default: 30 seconds, AI requests: 2 minutes)
   REQUEST_TIMEOUT: parseInt(process.env.REQUEST_TIMEOUT || '30000', 10),
-  AI_REQUEST_TIMEOUT: parseInt(process.env.AI_REQUEST_TIMEOUT || '120000', 10),
+  AI_REQUEST_TIMEOUT: parseInt(process.env.AI_REQUEST_TIMEOUT || '300000', 10),
   // Graceful shutdown timeout (how long to wait for connections to close)
   SHUTDOWN_TIMEOUT: parseInt(process.env.SHUTDOWN_TIMEOUT || '30000', 10),
   // Keep-alive timeout (must be greater than load balancer timeout)
-  KEEP_ALIVE_TIMEOUT: parseInt(process.env.KEEP_ALIVE_TIMEOUT || '65000', 10),
+  KEEP_ALIVE_TIMEOUT: parseInt(process.env.KEEP_ALIVE_TIMEOUT || '305000', 10),
   // Headers timeout (must be greater than keep-alive timeout)
-  HEADERS_TIMEOUT: parseInt(process.env.HEADERS_TIMEOUT || '66000', 10),
+  HEADERS_TIMEOUT: parseInt(process.env.HEADERS_TIMEOUT || '306000', 10),
 }
 
 // Server instance for graceful shutdown
@@ -449,6 +449,7 @@ server = app.listen(PORT, () => {
 })
 
 // Configure server timeouts
+server.timeout = SERVER_CONFIG.KEEP_ALIVE_TIMEOUT
 server.keepAliveTimeout = SERVER_CONFIG.KEEP_ALIVE_TIMEOUT
 server.headersTimeout = SERVER_CONFIG.HEADERS_TIMEOUT
 

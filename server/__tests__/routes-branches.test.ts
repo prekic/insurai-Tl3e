@@ -160,7 +160,7 @@ vi.mock('fs', async () => {
 const DEFAULT_AI_CONFIG = {
   openaiExtractionModel: 'gpt-4o',
   openaiBackupModel: 'gpt-4o-mini',
-  anthropicExtractionModel: 'claude-sonnet-4-20250514',
+  anthropicExtractionModel: 'claude-3-5-sonnet-20241022',
   anthropicBackupModel: 'claude-3-5-haiku-latest',
   maxTokens: 4096,
   temperature: 0.1,
@@ -221,7 +221,7 @@ function makeOpenAIResponse(content: string, model = 'gpt-4o') {
   }
 }
 
-function _makeAnthropicResponse(content: string, model = 'claude-sonnet-4-20250514') {
+function _makeAnthropicResponse(content: string, model = 'claude-3-5-sonnet-20241022') {
   return {
     content: [{ type: 'text', text: content }],
     usage: { input_tokens: 100, output_tokens: 50 },

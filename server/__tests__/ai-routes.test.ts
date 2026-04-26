@@ -35,7 +35,7 @@ vi.mock('@anthropic-ai/sdk', () => {
           create: vi.fn().mockResolvedValue({
             content: [{ type: 'text', text: '{"policyNumber": "POL-456"}' }],
             usage: { input_tokens: 100, output_tokens: 50 },
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-3-5-sonnet-20241022',
           }),
         },
       }

@@ -1,0 +1,133 @@
+{
+  "success": true,
+  "policy": {
+    "id": "7822b833-3848-44e7-b7eb-ff0bc0e692e0",
+    "policyNumber": "KAS-2024-001234",
+    "provider": "Allianz Sigorta",
+    "logo": "🔵",
+    "type": "kasko",
+    "typeTr": "Kasko",
+    "coverage": 500000,
+    "premium": 4800,
+    "monthlyPremium": 400,
+    "deductible": 2500,
+    "startDate": "2024-01-15",
+    "expiryDate": "2025-01-15",
+    "status": "active",
+    "uploadDate": "2026-04-26",
+    "fileName": "allianz_kasko_2024.pdf",
+    "documentType": "pdf",
+    "insuredPerson": "Ahmet Yılmaz",
+    "location": "Istanbul",
+    "policyTerm": "12 months",
+    "paymentFrequency": "Annual",
+    "agentName": "Mehmet Demir",
+    "insuranceLine": "kasko",
+    "coverages": [
+      {
+        "name": "Collision",
+        "nameTr": "Çarpışma",
+        "limit": 500000,
+        "deductible": 2500,
+        "included": true
+      },
+      {
+        "name": "Theft",
+        "nameTr": "Hırsızlık",
+        "limit": 500000,
+        "deductible": 1000,
+        "included": true
+      },
+      {
+        "name": "Natural Disaster",
+        "nameTr": "Doğal Afet",
+        "limit": 300000,
+        "deductible": 5000,
+        "included": true
+      },
+      {
+        "name": "Glass Coverage",
+        "nameTr": "Cam Kırılması",
+        "limit": 50000,
+        "deductible": 0,
+        "included": true
+      },
+      {
+        "name": "Roadside Assistance",
+        "nameTr": "Yol Yardım",
+        "limit": 10000,
+        "deductible": 0,
+        "included": true
+      }
+    ],
+    "exclusions": [
+      "Racing or speed contests",
+      "Intentional damage",
+      "Driving under influence",
+      "Unlicensed drivers"
+    ],
+    "specialConditions": [
+      "Vehicle must be parked in secure location at night",
+      "Annual inspection required"
+    ],
+    "aiConfidence": 0.5,
+    "aiInsights": [
+      "Premium is 10% below market average for this coverage level",
+      "Natural disaster deductible is higher than typical",
+      "Glass coverage included at no additional cost"
+    ],
+    "marketComparison": {
+      "averagePremium": 5300,
+      "averageCoverage": 450000,
+      "percentile": 75
+    },
+    "documentUrl": "blob:nodedata:b49eac61-eec2-41b2-9c5d-b361417c0884"
+  },
+  "extractedData": {
+    "policyNumber": null,
+    "provider": null,
+    "policyType": null,
+    "insuredName": null,
+    "insuredAddress": null,
+    "startDate": null,
+    "endDate": null,
+    "premium": null,
+    "currency": null,
+    "paymentFrequency": null,
+    "coverages": [],
+    "specialConditions": [],
+    "exclusions": [],
+    "amendmentInfo": {
+      "isAmendment": false,
+      "amendmentNumber": null,
+      "amendmentDate": null,
+      "basePolicyNumber": null,
+      "amendmentReason": null,
+      "premiumDifference": null
+    },
+    "vehicleMake": null,
+    "vehicleModel": null,
+    "vehicleYear": null,
+    "vehiclePlate": null,
+    "vin": null,
+    "tcKimlik": null,
+    "vkn": null,
+    "insuredEntityType": null,
+    "vehicleUsage": null,
+    "discounts": {
+      "ncdDiscount": null,
+      "groupDiscount": null,
+      "otherDiscountPct": null,
+      "evidence": null
+    },
+    "confidence": {
+      "overall": 0,
+      "policyNumber": 0,
+      "provider": 0,
+      "dates": 0,
+      "premium": 0,
+      "coverages": 0
+    }
+  },
+  "source": "fallback"
+}

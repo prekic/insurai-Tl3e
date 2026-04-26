@@ -306,7 +306,7 @@ describe('config-service branches', () => {
 
       expect(config.openaiExtractionModel).toBe('gpt-4o')
       expect(config.openaiBackupModel).toBe('gpt-4o-mini')
-      expect(config.anthropicExtractionModel).toBe('claude-sonnet-4-20250514')
+      expect(config.anthropicExtractionModel).toBe('claude-3-5-sonnet-20241022')
       expect(config.anthropicBackupModel).toBe('claude-3-5-haiku-latest')
       expect(config.maxTokens).toBe(4096)
       expect(config.temperature).toBe(0.1)

@@ -136,10 +136,10 @@ export interface CostConfig {
 const DEFAULT_AI_CONFIG: AIConfig = {
   openaiExtractionModel: 'gpt-5.4',
   openaiBackupModel: 'gpt-4o-mini',
-  anthropicExtractionModel: 'claude-sonnet-4-6',
+  anthropicExtractionModel: 'claude-3-5-sonnet-20241022',
   anthropicBackupModel: 'claude-haiku-4-5',
   geminiModel: 'gemini-2.5-flash',
-  maxTokens: 4096,
+  maxTokens: 8192,
   temperature: 0.1,
   chatTemperature: 0.7,
   minConfidence: 0.4,
@@ -567,6 +567,11 @@ export async function getAIConfig(): Promise<AIConfig> {
     if (dbSettings[dbKey] !== undefined) {
       ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
     }
+  }
+
+  // Ensure maxTokens is at least 8192 to prevent extraction truncation
+  if (config.maxTokens < 8192) {
+    config.maxTokens = 8192
   }
 
   // Cache the result

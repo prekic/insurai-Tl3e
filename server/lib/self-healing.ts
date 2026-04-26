@@ -131,9 +131,10 @@ export async function executeWithSelfHealingLoop<T>(
 
     // Parse worker output
     try {
+      log.warn('Worker returned content:', { length: workerResponse.content.length, start: workerResponse.content.substring(0, 100), end: workerResponse.content.substring(workerResponse.content.length - 100) })
       lastParsedData = parser(workerResponse.content)
     } catch (_error) {
-      log.warn('Worker returned invalid JSON', { attempt })
+      log.warn('Worker returned invalid JSON', { attempt, content: workerResponse.content })
       // If we can't parse it, we can't judge it easily. We could feed the raw string to the judge,
       // but let's just retry by telling the worker it was invalid JSON.
       if (attempt >= MAX_ATTEMPTS) {

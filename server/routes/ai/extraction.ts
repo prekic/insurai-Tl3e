@@ -330,10 +330,10 @@ router.post(
               type: 'json_schema',
               json_schema: EXTRACTION_JSON_SCHEMA,
             },
-            max_tokens: aiConfig.maxTokens,
+            max_completion_tokens: aiConfig.maxTokens,
             temperature,
           },
-          { signal: AbortSignal.timeout(60_000) }
+          { signal: AbortSignal.timeout(300_000) }
         )
         const usedModel = response.model || model || 'gpt-5.4'
         const inputTokens = response.usage?.prompt_tokens || 0
@@ -364,7 +364,7 @@ router.post(
             },
             temperature: 0.0,
           },
-          { signal: AbortSignal.timeout(60_000) }
+          { signal: AbortSignal.timeout(300_000) }
         )
         const usedModel = response.model || model || 'gpt-5.4'
         const inputTokens = response.usage?.prompt_tokens || 0
@@ -673,7 +673,7 @@ router.post(
             messages: [{ role: 'user', content: userPrompt }],
             temperature,
           },
-          { signal: AbortSignal.timeout(60_000) }
+          { signal: AbortSignal.timeout(300_000) }
         )
         const textBlock = response.content.find((block) => block.type === 'text')
         let jsonContent = textBlock?.type === 'text' ? textBlock.text : ''
@@ -705,7 +705,7 @@ router.post(
             messages: [{ role: 'user', content: judgeUserPrompt }],
             temperature: 0.0,
           },
-          { signal: AbortSignal.timeout(60_000) }
+          { signal: AbortSignal.timeout(300_000) }
         )
         const textBlock = response.content.find((block) => block.type === 'text')
         let jsonContent = textBlock?.type === 'text' ? textBlock.text : ''
@@ -1429,7 +1429,7 @@ router.post(
               type: 'json_schema',
               json_schema: EXTRACTION_JSON_SCHEMA,
             },
-            max_tokens: aiConfig.maxTokens,
+            max_completion_tokens: aiConfig.maxTokens,
             temperature: aiConfig.temperature,
           },
           { signal: AbortSignal.timeout(Math.max(fallbackTimeout, 10_000)) }

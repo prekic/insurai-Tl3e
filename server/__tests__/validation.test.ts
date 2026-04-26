@@ -100,7 +100,7 @@ describe('Validation Middleware', () => {
   describe('sanitizeModelName', () => {
     it('should allow valid model names', () => {
       expect(sanitizeModelName('gpt-4o')).toBe('gpt-4o')
-      expect(sanitizeModelName('claude-sonnet-4-20250514')).toBe('claude-sonnet-4-20250514')
+      expect(sanitizeModelName('claude-3-5-sonnet-20241022')).toBe('claude-3-5-sonnet-20241022')
     })
 
     it('should remove special characters', () => {

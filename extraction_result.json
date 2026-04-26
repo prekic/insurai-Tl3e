@@ -1,0 +1,107 @@
+{
+  "success": true,
+  "policy": {
+    "id": "9205b1d8-25a7-408c-bc4e-05268fed1b45",
+    "policyNumber": "TRF-2024-005678",
+    "provider": "AXA Sigorta",
+    "logo": "🔴",
+    "type": "traffic",
+    "typeTr": "Trafik Sigortası",
+    "coverage": 100000,
+    "premium": 1200,
+    "monthlyPremium": 100,
+    "deductible": 0,
+    "startDate": "2024-03-01",
+    "expiryDate": "2025-03-01",
+    "status": "active",
+    "uploadDate": "2026-04-26",
+    "fileName": "axa_trafik_2024.pdf",
+    "documentType": "pdf",
+    "insuredPerson": "Elif Kaya",
+    "location": "Ankara",
+    "policyTerm": "12 months",
+    "paymentFrequency": "Annual",
+    "insuranceLine": "traffic",
+    "coverages": [
+      {
+        "name": "Bodily Injury",
+        "nameTr": "Bedensel Zarar",
+        "limit": 50000,
+        "deductible": 0,
+        "included": true
+      },
+      {
+        "name": "Property Damage",
+        "nameTr": "Maddi Hasar",
+        "limit": 50000,
+        "deductible": 0,
+        "included": true
+      }
+    ],
+    "exclusions": [
+      "Own vehicle damage",
+      "Unauthorized use"
+    ],
+    "specialConditions": [
+      "Mandatory by Turkish law"
+    ],
+    "aiConfidence": 0.5,
+    "aiInsights": [
+      "Standard mandatory coverage - no gaps detected",
+      "Premium is at market average"
+    ],
+    "marketComparison": {
+      "averagePremium": 1200,
+      "averageCoverage": 100000,
+      "percentile": 50
+    },
+    "documentUrl": "blob:nodedata:102fa4a5-1b22-468c-84bf-32b2e21399f9"
+  },
+  "extractedData": {
+    "policyNumber": null,
+    "provider": null,
+    "policyType": null,
+    "insuredName": null,
+    "insuredAddress": null,
+    "startDate": null,
+    "endDate": null,
+    "premium": null,
+    "currency": null,
+    "paymentFrequency": null,
+    "coverages": [],
+    "specialConditions": [],
+    "exclusions": [],
+    "amendmentInfo": {
+      "isAmendment": false,
+      "amendmentNumber": null,
+      "amendmentDate": null,
+      "basePolicyNumber": null,
+      "amendmentReason": null,
+      "premiumDifference": null
+    },
+    "vehicleMake": null,
+    "vehicleModel": null,
+    "vehicleYear": null,
+    "vehiclePlate": null,
+    "vin": null,
+    "tcKimlik": null,
+    "vkn": null,
+    "insuredEntityType": null,
+    "vehicleUsage": null,
+    "discounts": {
+      "ncdDiscount": null,
+      "groupDiscount": null,
+      "otherDiscountPct": null,
+      "evidence": null
+    },
+    "confidence": {
+      "overall": 0,
+      "policyNumber": 0,
+      "provider": 0,
+      "dates": 0,
+      "premium": 0,
+      "coverages": 0
+    }
+  },
+  "source": "fallback"
+}
