@@ -1,7 +1,7 @@
 # Session Handoff — April 26, 2026 — Production-Grade Pipeline Finalization & Gemini SDK Integration
 
-> **Session type**: Stabilization, Feature Integration, & Data Repair. Finalized the KASKO insurance extraction pipeline for production readiness. Upgraded legacy LLMs to state-of-the-art models (gpt-5.4, claude-sonnet-4-6). Integrated the Gemini 2.5 Flash SDK via `@google/genai` to serve as a tertiary AI provider and multimodal OCR engine (`POST /api/ai/ocr/gemini`). Hardened extraction mappings to eliminate developer artifacts, removed free-trial bottlenecks, implemented `typeof` guards against runtime crashes, fixed a 10x premium inflation bug, and enforced mandatory IMM extraction rules.
-> Also ran `npm run qa:extraction`, revealing 69/70 kasko policies in production were missing vehicle info. Traced the root cause to `scripts/pilot-batch-ingest.ts` discarding PDF text. Built a diagnose-then-backfill toolchain and repaired 53/70 rows.
+> **Session type**: Stabilization, Feature Integration, Data Repair, & Model Benchmarking. Finalized the KASKO insurance extraction pipeline for production readiness. Upgraded legacy LLMs to state-of-the-art models (gpt-5.4, claude-sonnet-4-6). Integrated the Gemini 2.5 Flash SDK via `@google/genai` to serve as a tertiary AI provider and multimodal OCR engine (`POST /api/ai/ocr/gemini`). Hardened extraction mappings to eliminate developer artifacts, removed free-trial bottlenecks, implemented `typeof` guards against runtime crashes, fixed a 10x premium inflation bug, and enforced mandatory IMM extraction rules.
+> We also conducted rigorous benchmarking against flagship alternatives (Claude Opus 4.7, GPT-5.5, Gemini 3.1 Pro) and resolved strict formatting and typing issues within the benchmarking utility itself. We addressed test noise related to `File.prototype.arrayBuffer` missing in Vitest environments.
 
 ## 🎯 Immediate Next Steps for the Next Agent
 
@@ -15,8 +15,7 @@ Update the frontend OCR orchestrator to conditionally use `/api/ai/ocr/gemini` a
 Run a pilot extraction batch to compare Gemini OCR quality against the existing Document AI pipeline. If unit tests for the extraction route are added, ensure they mock the `GoogleGenAI` client using the established factory pattern (`getGeminiClient()`).
 
 ### Priority 4: PR and Review
-Open + merge a PR for this session's work if not already done.
-
+Open + merge a PR for this session's work if not already done. The current branch contains recent test fixes for `arrayBuffer` and benchmarking type resolution.
 
 **Files added/modified**:
 - `docs/adr/021-gemini-multimodal-ocr-integration.md` — ADR documenting the move to Gemini Flash 2.5.
@@ -31,8 +30,12 @@ Open + merge a PR for this session's work if not already done.
 - `src/lib/policy-evaluation/evaluator.ts` — Updated to safely cap evaluation scores based on critical vs provisional compliance state.
 - `src/lib/free-trial.test.ts` — Updated free trial upload limits in test logic.
 - `src/test_do_ocr.test.ts` — Fixed to properly `skip` integration-testing against live endpoints.
+- `benchmark-models.ts` — Resolved TypeScript strict typing with `ConfidenceWeights` and adapted to evaluate SOTA model variants (Sonnet 4.6, Opus 4.7, GPT-5.5, Gemini 3.1 Pro) preventing 32k stream truncation.
+- `test-anthropic.ts` — Updated the legacy test script to enforce stream API scaling for Opus 4.7 truncation prevention.
+- `server/services/config-service.ts` & `src/lib/config/types.ts` — Updated the global extraction fallback models to specifically target `claude-sonnet-4-6`.
+- `package.json` & `package-lock.json` — Added the legacy `@google/generative-ai` SDK (`^0.24.1`) purely to support backward compatibility in the ad-hoc benchmark scripts, while core production routes strictly use the new `@google/genai` package.
+- `src/lib/ai/__tests__/qa-pdf-golden.test.ts` — Fixed `File.prototype.arrayBuffer` missing in Vitest to suppress unhandled rejections and clean up logs.
 - `CLAUDE.md`, `SESSION_HANDOFF.md`, `.env.example` — Documentation and Gotcha synchronization.
-- Test suites across `shared/`, `server/`, and `src/` to validate schema expansion and pipeline stability.
 
 ## Current State
 
@@ -58,12 +61,18 @@ Resolved multiple critical extraction issues:
 ### Phase 3 — Evaluation Tests & Scoring Integrity
 Corrected `hasUntrustedBenchmark` logic to use the `isProvisional` state in `evaluation-scoring-sample-data.test.ts`. Test suites now accurately reflect the real-world weighting and compliance capping rules.
 
-### Phase 4 — Documentation Audit & Reconciliation
+### Phase 4 — Benchmarking & Typing Fixes
+- Added `ConfidenceWeights` strict types to `buildAnthropicSchemaPrompt` preventing `benchmark-models.ts` typing failures.
+- Fixed `File.prototype.arrayBuffer` polyfill/omissions during tests handling large PDF buffers.
+- Streamed SOTA models output preventing premature truncation for files pushing 32k token limits.
+
+### Phase 5 — Documentation Audit & Reconciliation
 Conducted a rigorous audit between `git log` and `CLAUDE.md`.
 Identified and corrected documentation misses:
 - Injected `GEMINI_API_KEY` into `.env.example` and the `CLAUDE.md` env block.
 - Explicitly documented Vitest integration-test skips (`test.skip`) for live endpoints.
 - Highlighted the manual Railway deployment sync required when adding new API keys.
+- Addressed `File.prototype.arrayBuffer` test omissions and `buildAnthropicSchemaPrompt` strict schema prompt integrations to `CLAUDE.md` gotchas.
 
 ## Non-Negotiable Rules (Carry Forward — Unchanged)
 

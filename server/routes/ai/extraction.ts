@@ -665,16 +665,16 @@ router.post(
       }
 
       const workerCaller = async (userPrompt: string, temperature: number) => {
-        const response = await client.messages.create(
+        const response = await client.messages.stream(
           {
             model: model || aiConfig.anthropicExtractionModel,
-            max_tokens: aiConfig.maxTokens,
+            max_tokens: Math.max(aiConfig.maxTokens, 32768),
             system: finalSystemPrompt,
             messages: [{ role: 'user', content: userPrompt }],
             temperature,
           },
           { signal: AbortSignal.timeout(300_000) }
-        )
+        ).finalMessage()
         const textBlock = response.content.find((block) => block.type === 'text')
         let jsonContent = textBlock?.type === 'text' ? textBlock.text : ''
         const jsonMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)```/)
@@ -697,7 +697,7 @@ router.post(
 
       const judgeCaller = async (documentTextStr: string, workerContent: string) => {
         const judgeUserPrompt = `Original Document:\n\n${documentTextStr}\n\nExtraction Result:\n\n${workerContent}\n\nPlease output the JSON containing stepByStepAnalysis, score, pass, and qualitativeFeedback as instructed.`
-        const response = await client.messages.create(
+        const response = await client.messages.stream(
           {
             model: model || aiConfig.anthropicExtractionModel,
             max_tokens: aiConfig.maxTokens,
@@ -706,7 +706,7 @@ router.post(
             temperature: 0.0,
           },
           { signal: AbortSignal.timeout(300_000) }
-        )
+        ).finalMessage()
         const textBlock = response.content.find((block) => block.type === 'text')
         let jsonContent = textBlock?.type === 'text' ? textBlock.text : ''
         const jsonMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)```/)
@@ -1087,15 +1087,15 @@ router.post(
           timeoutMs: primaryTimeout,
         })
         try {
-          const response = await anthropicClient.messages.create(
+          const response = await anthropicClient.messages.stream(
             {
               model: model || aiConfig.anthropicExtractionModel,
-              max_tokens: aiConfig.maxTokens,
+              max_tokens: Math.max(aiConfig.maxTokens, 32768),
               system: anthropicSystemPrompt,
               messages: [{ role: 'user', content: finalUserPrompt }],
             },
             { signal: AbortSignal.timeout(primaryTimeout) }
-          )
+          ).finalMessage()
 
           const textBlock = response.content.find((block) => block.type === 'text')
           if (!textBlock || textBlock.type !== 'text') {
