@@ -138,11 +138,12 @@ Extract these additional vehicle-specific fields:
   - Sel/Su Baskını = Flood (category: supplementary)
   - Hırsızlık = Theft (category: supplementary)
   - Cam Kırılması = Glass breakage (category: supplementary)
-  - Ferdi Kaza = Personal accident (category: liability)
+  - Ferdi Kaza = Personal accident (category: liability). Do NOT collapse sub-limits! Extract Death/Disability, Medical Expenses, Driver, Passenger as separate line items.
   - Asistans = Roadside assistance (category: assistance)
   - İkame Araç = Replacement vehicle (category: assistance)
   - Artan Mali Sorumluluk = Increased liability (category: liability)
   - Hukuki Koruma = Legal protection (category: legal)
+  - Kasa/Tank, Römork = Vehicle accessories/add-ons (category: supplementary). Must be extracted as separate items, do not sum with main vehicle value.
 
 - **Common Turkish Terms**:
   - Araç Sahibi = Vehicle Owner
