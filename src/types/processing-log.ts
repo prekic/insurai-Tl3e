@@ -13,6 +13,7 @@ export type ProcessingStage =
   | 'ocr_decision' // OCR Decision Engine analysis (language, policy type, quality)
   | 'ocr_check' // Legacy: Density check to determine if OCR needed
   | 'ocr_processing' // OCR via Document AI/Vision/Tesseract
+  | 'gemini_ocr' // Gemini multimodal OCR fallback (when Document AI + pdf.js both fail)
   | 'text_preprocessing' // Text normalization, OCR cleanup
   | 'ai_extraction' // GPT-4o/Claude structured extraction
   | 'form_field_enhancement' // Document AI form fields applied
@@ -241,6 +242,15 @@ export const STAGE_CONFIGS: Record<ProcessingStage, StageConfig> = {
     icon: 'ScanLine',
     color: 'violet',
   },
+  gemini_ocr: {
+    name: 'gemini_ocr',
+    label: 'Gemini OCR',
+    labelTr: 'Gemini OCR',
+    description: 'Multimodal OCR fallback using Gemini 2.5 Flash',
+    descriptionTr: 'Gemini 2.5 Flash ile çoklu ortam OCR yedek işlemi',
+    icon: 'Sparkles',
+    color: 'cyan',
+  },
   text_preprocessing: {
     name: 'text_preprocessing',
     label: 'Text Preprocessing',
@@ -333,6 +343,7 @@ export const PIPELINE_STAGES: ProcessingStage[] = [
   'ocr_decision',
   'ocr_check', // Legacy - kept for backwards compatibility
   'ocr_processing',
+  'gemini_ocr',
   'text_preprocessing',
   'ai_extraction',
   'form_field_enhancement',

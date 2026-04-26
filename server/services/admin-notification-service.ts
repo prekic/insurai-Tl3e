@@ -74,8 +74,16 @@ export async function createNotification(
     .single()
 
   if (error) {
-    // Log as fallback
-    log.error('Failed to save notification', { error: String(error) })
+    // Log with actionable context — common causes are RLS policy misconfiguration
+    // or missing migration (008a_admin_notifications.sql)
+    log.error('Failed to save notification', {
+      error: String(error),
+      hint: error.message?.includes('does not exist')
+        ? 'Table missing — run migration 008a_admin_notifications.sql'
+        : error.message?.includes('new row violates') || error.code === '42501'
+          ? 'RLS policy blocking insert — check admin_notifications_service_role policy'
+          : undefined,
+    })
     log.error(`${notification.type.toUpperCase()} ${notification.title}: ${notification.message}`)
     return null
   }

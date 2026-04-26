@@ -665,16 +665,18 @@ router.post(
       }
 
       const workerCaller = async (userPrompt: string, temperature: number) => {
-        const response = await client.messages.stream(
-          {
-            model: model || aiConfig.anthropicExtractionModel,
-            max_tokens: Math.max(aiConfig.maxTokens, 32768),
-            system: finalSystemPrompt,
-            messages: [{ role: 'user', content: userPrompt }],
-            temperature,
-          },
-          { signal: AbortSignal.timeout(300_000) }
-        ).finalMessage()
+        const response = await client.messages
+          .stream(
+            {
+              model: model || aiConfig.anthropicExtractionModel,
+              max_tokens: Math.max(aiConfig.maxTokens, 32768),
+              system: finalSystemPrompt,
+              messages: [{ role: 'user', content: userPrompt }],
+              temperature,
+            },
+            { signal: AbortSignal.timeout(300_000) }
+          )
+          .finalMessage()
         const textBlock = response.content.find((block) => block.type === 'text')
         let jsonContent = textBlock?.type === 'text' ? textBlock.text : ''
         const jsonMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)```/)
@@ -697,16 +699,18 @@ router.post(
 
       const judgeCaller = async (documentTextStr: string, workerContent: string) => {
         const judgeUserPrompt = `Original Document:\n\n${documentTextStr}\n\nExtraction Result:\n\n${workerContent}\n\nPlease output the JSON containing stepByStepAnalysis, score, pass, and qualitativeFeedback as instructed.`
-        const response = await client.messages.stream(
-          {
-            model: model || aiConfig.anthropicExtractionModel,
-            max_tokens: aiConfig.maxTokens,
-            system: JUDGE_SYSTEM_PROMPT,
-            messages: [{ role: 'user', content: judgeUserPrompt }],
-            temperature: 0.0,
-          },
-          { signal: AbortSignal.timeout(300_000) }
-        ).finalMessage()
+        const response = await client.messages
+          .stream(
+            {
+              model: model || aiConfig.anthropicExtractionModel,
+              max_tokens: aiConfig.maxTokens,
+              system: JUDGE_SYSTEM_PROMPT,
+              messages: [{ role: 'user', content: judgeUserPrompt }],
+              temperature: 0.0,
+            },
+            { signal: AbortSignal.timeout(300_000) }
+          )
+          .finalMessage()
         const textBlock = response.content.find((block) => block.type === 'text')
         let jsonContent = textBlock?.type === 'text' ? textBlock.text : ''
         const jsonMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)```/)
@@ -977,6 +981,53 @@ router.post(
   async (req: Request, res: Response) => {
     const requestId = `ext-${Date.now()}`
     const startTime = Date.now()
+
+    // ── SSE Keepalive Mode ──────────────────────────────────────────────
+    // Railway (and similar PaaS) reverse proxies kill idle HTTP connections
+    // after ~30s. AI extraction can take 60-120s. When the client sends
+    // Accept: text/event-stream, we switch to SSE mode:
+    //   1. Set Content-Type: text/event-stream + disable buffering
+    //   2. Send `:keepalive\n\n` comment every 10s to keep connection alive
+    //   3. Monkey-patch res.json() to send the final payload as an SSE
+    //      `data:` event, then close the stream
+    // Clients without this header get the same JSON response as before.
+    const useSSE = req.headers.accept?.includes('text/event-stream')
+    let keepaliveInterval: ReturnType<typeof setInterval> | null = null
+
+    if (useSSE) {
+      res.setHeader('Content-Type', 'text/event-stream')
+      res.setHeader('Cache-Control', 'no-cache, no-transform')
+      res.setHeader('Connection', 'keep-alive')
+      res.setHeader('X-Accel-Buffering', 'no') // Disable nginx/Railway buffering
+      res.flushHeaders()
+
+      // Send keepalive pings every 10s
+      keepaliveInterval = setInterval(() => {
+        if (!res.writableEnded) {
+          res.write(`:keepalive ${Date.now()}\n\n`)
+        }
+      }, 10_000)
+
+      // Monkey-patch res.json to wrap in SSE event format
+      const _originalJson = res.json.bind(res)
+      const _originalStatus = res.status.bind(res)
+      res.json = function sseJson(body: unknown) {
+        if (keepaliveInterval) clearInterval(keepaliveInterval)
+        if (res.writableEnded) return res
+        const statusCode = res.statusCode || 200
+        // Send the HTTP status as a separate event so the client can distinguish errors
+        res.write(`event: status\ndata: ${statusCode}\n\n`)
+        res.write(`event: result\ndata: ${JSON.stringify(body)}\n\n`)
+        res.end()
+        return res
+      } as typeof res.json
+      // Ensure status().json() still works — status just sets statusCode
+      res.status = function sseStatus(code: number) {
+        res.statusCode = code
+        return res
+      } as typeof res.status
+    }
+
     // Total request budget: hard cap to prevent client-side timeout race.
     // Client timeout is 150s; we must respond well before that.
     // Defaults: REQUEST_BUDGET_MS=125_000, PRIMARY=65_000, FALLBACK=55_000
@@ -1087,15 +1138,17 @@ router.post(
           timeoutMs: primaryTimeout,
         })
         try {
-          const response = await anthropicClient.messages.stream(
-            {
-              model: model || aiConfig.anthropicExtractionModel,
-              max_tokens: Math.max(aiConfig.maxTokens, 32768),
-              system: anthropicSystemPrompt,
-              messages: [{ role: 'user', content: finalUserPrompt }],
-            },
-            { signal: AbortSignal.timeout(primaryTimeout) }
-          ).finalMessage()
+          const response = await anthropicClient.messages
+            .stream(
+              {
+                model: model || aiConfig.anthropicExtractionModel,
+                max_tokens: Math.max(aiConfig.maxTokens, 32768),
+                system: anthropicSystemPrompt,
+                messages: [{ role: 'user', content: finalUserPrompt }],
+              },
+              { signal: AbortSignal.timeout(primaryTimeout) }
+            )
+            .finalMessage()
 
           const textBlock = response.content.find((block) => block.type === 'text')
           if (!textBlock || textBlock.type !== 'text') {

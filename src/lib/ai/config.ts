@@ -295,7 +295,11 @@ export async function extractViaProxy(
     })
 
     // Use unified endpoint with automatic fallback
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      // Request SSE mode to keep Railway/PaaS connections alive with keepalive pings
+      Accept: 'text/event-stream',
+    }
     if (userId) headers['x-user-id'] = userId
     const timeoutSignal = AbortSignal.timeout(FETCH_TIMEOUT_MS)
     const effectiveSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal
@@ -311,6 +315,116 @@ export async function extractViaProxy(
     })
 
     const elapsedMs = Math.round(performance.now() - fetchStartMs)
+    const contentType = response.headers.get('content-type') || ''
+
+    // ── SSE Response Handling ────────────────────────────────────────
+    // When the server supports SSE, it sends:
+    //   :keepalive <timestamp>     ← periodic pings (ignored)
+    //   event: status\ndata: 200   ← HTTP status code
+    //   event: result\ndata: {...} ← final JSON payload
+    // This keeps Railway's 30s gateway timeout from killing the connection.
+    if (contentType.includes('text/event-stream') && response.body) {
+      console.warn('[extractViaProxy] Using SSE mode for long-lived extraction')
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let sseStatus = 200
+      let resultData: string | null = null
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+
+        // Process complete SSE events (terminated by \n\n)
+        let eventEnd: number
+        while ((eventEnd = buffer.indexOf('\n\n')) !== -1) {
+          const eventBlock = buffer.slice(0, eventEnd)
+          buffer = buffer.slice(eventEnd + 2)
+
+          // Skip keepalive comments (lines starting with :)
+          if (eventBlock.startsWith(':')) continue
+
+          // Parse SSE event
+          const lines = eventBlock.split('\n')
+          let eventType = ''
+          let eventData = ''
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              eventType = line.slice(7)
+            } else if (line.startsWith('data: ')) {
+              eventData = line.slice(6)
+            }
+          }
+
+          if (eventType === 'status') {
+            sseStatus = parseInt(eventData, 10) || 200
+          } else if (eventType === 'result') {
+            resultData = eventData
+          }
+        }
+      }
+
+      // Process the final result
+      if (!resultData) {
+        console.error('[extractViaProxy] SSE stream ended without result event')
+        return { success: false, error: 'Server stream ended without sending results' }
+      }
+
+      const result = JSON.parse(resultData)
+      console.warn('[extractViaProxy] SSE result:', {
+        success: result.success,
+        hasData: !!result.data,
+        provider: result.provider,
+        sseStatus,
+        elapsedMs: Math.round(performance.now() - fetchStartMs),
+      })
+
+      if (sseStatus >= 400 || !result.success) {
+        let errorMsg = ''
+        if (sseStatus === 502 || sseStatus === 504) {
+          errorMsg = `Server timed out or is busy (${sseStatus}). If you are using a free tier hosting provider, the AI extraction may have exceeded the execution limit. Try a shorter document.`
+        } else {
+          errorMsg = result.details
+            ? `${result.error || 'Server error'}: ${result.details}`
+            : result.error || `HTTP ${sseStatus}`
+        }
+        return {
+          success: false,
+          error: errorMsg,
+          errorCode: result.code,
+          requestId: result.requestId,
+          serverPhaseTiming: result.phaseTiming,
+          serverElapsedMs: result.elapsedMs,
+          fallbackChain: result.fallbackChain,
+        }
+      }
+
+      if (!result.data) {
+        return {
+          success: false,
+          error: 'Server returned success but no data',
+          requestId: result.requestId,
+          serverElapsedMs: result.elapsedMs,
+        }
+      }
+
+      return {
+        success: true,
+        data: result.data,
+        provider: result.provider,
+        fallback: result.fallback,
+        ...(result.fallbackReason && { fallbackReason: result.fallbackReason }),
+        usage: result.usage,
+        requestId: result.requestId,
+        route: result.route,
+        fallbackChain: result.fallbackChain,
+        serverPhaseTiming: result.phaseTiming,
+        serverElapsedMs: result.elapsedMs,
+      }
+    }
+
+    // ── Plain JSON Response (fallback / no SSE support) ──────────────
     console.warn('[extractViaProxy] Response status:', response.status, response.statusText, {
       elapsedMs,
     })

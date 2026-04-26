@@ -20,6 +20,7 @@ import type { AnalyzedPolicy, PolicyType } from '@/types/policy'
 import {
   AI_CONFIG,
   getConfiguredProviders,
+  getProxyUrl,
   isAIConfigured,
   isProxyConfigured,
   type AIProvider,
@@ -289,7 +290,7 @@ export async function extractPolicyFromDocument(
   let ocrFormFields: FormField[] = []
   let ocrTables: Table[] = []
   let usedOCR = false
-  let extractionMethod: 'document-ai' | 'pdf.js' | 'none' = 'none'
+  let extractionMethod: 'document-ai' | 'pdf.js' | 'gemini-ocr' | 'none' = 'none'
   let pageCount = 0
   // Store full Document AI data for result object (when available)
   let documentAIOcrData: {
@@ -445,27 +446,119 @@ export async function extractPolicyFromDocument(
       })
     } else {
       console.error('[PolicyExtractor] pdf.js ALSO FAILED:', pdfResult.error.message)
-      // Both Document AI and pdf.js failed
+      // Both Document AI and pdf.js failed — try Gemini multimodal OCR as last resort
       logger?.failStage(`pdf.js extraction also failed: ${pdfResult.error.message}`)
 
-      if (useFallback) {
-        console.error(
-          '[PolicyExtractor] FALLBACK TRIGGERED: Both Document AI and pdf.js text extraction failed'
-        )
-        return createFallbackResult(file)
-      }
+      // ── Gemini OCR fallback (third attempt) ──────────────────────────
+      // When both Document AI and pdf.js fail (e.g. AXA Sigorta font corruption),
+      // send the raw PDF to Gemini 2.5 Flash for multimodal OCR. Gemini reads
+      // the PDF as an image and extracts text directly, bypassing font encoding.
+      if (isProxyConfigured()) {
+        const geminiStart = performance.now()
+        console.warn('[PolicyExtractor] Attempting Gemini multimodal OCR fallback...')
+        logger?.startStage('gemini_ocr', {
+          filename: file.name,
+          file_size: file.size,
+          fallback_reason: 'document-ai-and-pdfjs-failed',
+        })
 
-      return {
-        success: false,
-        error: {
-          code: 'OCR_ERROR',
-          message: documentAIAvailable
-            ? `Document AI failed and pdf.js fallback also failed: ${pdfResult.error.message}`
-            : `Document AI not configured and pdf.js extraction failed: ${pdfResult.error.message}`,
-          details:
-            'Ensure the backend server is running with Document AI configured, or the PDF contains extractable text',
-        },
-        fallbackAvailable: true,
+        try {
+          // Convert file to base64 for the Gemini OCR endpoint
+          const arrayBuffer = await file.arrayBuffer()
+          const uint8Array = new Uint8Array(arrayBuffer)
+          let binary = ''
+          for (let i = 0; i < uint8Array.length; i++) {
+            binary += String.fromCharCode(uint8Array[i])
+          }
+          const imageBase64 = btoa(binary)
+
+          const geminiResp = await fetch(`${getProxyUrl()}/api/ai/ocr/gemini`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageBase64 }),
+            signal: AbortSignal.timeout(90_000), // 90s timeout for OCR
+          })
+
+          if (geminiResp.ok) {
+            const geminiResult = await geminiResp.json()
+            markClientPhase('geminiOCR_ms', geminiStart)
+
+            if (geminiResult.success && geminiResult.data?.text?.length > 50) {
+              documentText = geminiResult.data.text
+              pageCount = geminiResult.data.pageCount || 1
+              extractionMethod = 'gemini-ocr'
+              usedOCR = true
+              console.warn(
+                `[PolicyExtractor] Gemini OCR SUCCESS: ${pageCount} pages, ${documentText.length} chars (${clientPhaseTiming['geminiOCR_ms']}ms)`
+              )
+
+              logger?.setOCRUsed('gemini-ocr')
+              logger?.setPageCount(pageCount)
+              logger?.completeStage({
+                output: {
+                  text_length: documentText.length,
+                  text_preview: documentText.substring(0, 500) + '...',
+                  page_count: pageCount,
+                  confidence: geminiResult.data.confidence,
+                  processing_time_ms: geminiResult.data.processingTimeMs,
+                },
+                full_output_text: documentText,
+              })
+            } else {
+              throw new Error(
+                `Gemini OCR returned insufficient text (${geminiResult.data?.text?.length || 0} chars)`
+              )
+            }
+          } else {
+            const errBody = await geminiResp.json().catch(() => ({ error: 'Unknown' }))
+            throw new Error(errBody.error || `Gemini OCR HTTP ${geminiResp.status}`)
+          }
+        } catch (geminiErr) {
+          markClientPhase('geminiOCR_ms', geminiStart)
+          const geminiMsg = geminiErr instanceof Error ? geminiErr.message : String(geminiErr)
+          console.error('[PolicyExtractor] Gemini OCR also FAILED:', geminiMsg)
+          logger?.failStage(`Gemini OCR also failed: ${geminiMsg}`)
+
+          // All three OCR methods failed — give up
+          if (useFallback) {
+            console.error(
+              '[PolicyExtractor] FALLBACK TRIGGERED: All OCR methods failed (Document AI, pdf.js, Gemini)'
+            )
+            return createFallbackResult(file)
+          }
+
+          return {
+            success: false,
+            error: {
+              code: 'OCR_ERROR',
+              message: `All text extraction methods failed. Document AI: ${documentAIAvailable ? 'failed' : 'not configured'}. pdf.js: ${pdfResult.error.message}. Gemini OCR: ${geminiMsg}`,
+              details:
+                'The document may have corrupted fonts or contain only images that no OCR service could read',
+            },
+            fallbackAvailable: true,
+          }
+        }
+      } else {
+        // No proxy — can't try Gemini OCR
+        if (useFallback) {
+          console.error(
+            '[PolicyExtractor] FALLBACK TRIGGERED: Both Document AI and pdf.js text extraction failed'
+          )
+          return createFallbackResult(file)
+        }
+
+        return {
+          success: false,
+          error: {
+            code: 'OCR_ERROR',
+            message: documentAIAvailable
+              ? `Document AI failed and pdf.js fallback also failed: ${pdfResult.error.message}`
+              : `Document AI not configured and pdf.js extraction failed: ${pdfResult.error.message}`,
+            details:
+              'Ensure the backend server is running with Document AI configured, or the PDF contains extractable text',
+          },
+          fallbackAvailable: true,
+        }
       }
     }
   }

@@ -50,6 +50,7 @@ import {
   Lightbulb,
   Target,
   Calculator,
+  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type {
@@ -72,6 +73,7 @@ const STAGE_ICONS: Record<ProcessingStage, LucideIcon> = {
   ocr_decision: BrainCog,
   ocr_check: Search,
   ocr_processing: ScanLine,
+  gemini_ocr: Sparkles,
   text_preprocessing: Wand2,
   ai_extraction: Brain,
   form_field_enhancement: FormInput,
@@ -106,6 +108,11 @@ const STAGE_LABELS: Record<ProcessingStage, { en: string; tr: string; descriptio
     en: 'OCR Processing',
     tr: 'OCR İşleme',
     description: 'Optical character recognition for scanned documents',
+  },
+  gemini_ocr: {
+    en: 'Gemini OCR',
+    tr: 'Gemini OCR',
+    description: 'Multimodal OCR fallback using Gemini 2.5 Flash (for font-corrupted PDFs)',
   },
   text_preprocessing: {
     en: 'Text Preprocessing',

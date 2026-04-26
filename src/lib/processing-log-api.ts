@@ -49,8 +49,8 @@ export async function updateProcessingLog(
   documentId: string,
   updates: Partial<DocumentProcessingLog>
 ): Promise<DocumentProcessingLog | null> {
-  const maxRetries = 1
-  const retryDelayMs = 500
+  const maxRetries = 3
+  const baseDelayMs = 500 // Exponential: 500ms → 1s → 2s
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -60,12 +60,13 @@ export async function updateProcessingLog(
         body: JSON.stringify(updates),
       })
 
-      // Retry once on 404 — the CREATE may not have committed yet
+      // Retry with exponential backoff on 404 — the CREATE may not have committed yet
       if (response.status === 404 && attempt < maxRetries) {
+        const delay = baseDelayMs * Math.pow(2, attempt) // 500ms → 1000ms → 2000ms
         console.warn(
-          `[ProcessingLogAPI] Update 404 for ${documentId}, retrying in ${retryDelayMs}ms...`
+          `[ProcessingLogAPI] Update 404 for ${documentId}, retry ${attempt + 1}/${maxRetries} in ${delay}ms...`
         )
-        await new Promise((resolve) => setTimeout(resolve, retryDelayMs))
+        await new Promise((resolve) => setTimeout(resolve, delay))
         continue
       }
 
