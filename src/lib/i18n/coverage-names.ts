@@ -67,6 +67,15 @@ export const COVERAGE_NAMES_EN_TO_TR: Record<string, string> = {
   'Permanent Disability': 'Sürekli Sakatlık',
   'Death Benefit': 'Vefat Teminatı',
   'Critical Illness': 'Kritik Hastalık',
+  'Personal Accident – Death/Disability': 'Ferdi Kaza – Vefat/Sakatlık',
+  'Personal Accident – Medical Expenses': 'Ferdi Kaza – Tedavi Masrafları',
+  'Vehicle-Related Personal Accident': 'Araç İçi Ferdi Kaza',
+  'Driver-Related Personal Accident': 'Sürücü Ferdi Kaza',
+  'Strike/Lockout/Civil Commotion/Terror': 'Grev/Lokavt/Kargaşa/Halk Hareketleri/Terör',
+  'Strike/Lockout/Civil Commotion/Terror (GLKHHT)':
+    'GLKHHT (Grev/Lokavt/Kargaşa/Halk Hareketleri/Terör)',
+  'Flood/Water Damage': 'Sel/Su Baskını Hasarı',
+  'Body/Tank Coverage': 'Kasa/Tank Teminatı',
 
   // Personal Belongings
   'Personal Belongings': 'Kişisel Eşya',

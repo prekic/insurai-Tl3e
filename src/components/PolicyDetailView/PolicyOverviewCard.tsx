@@ -31,14 +31,20 @@ export function PolicyOverviewCard({ policy }: { policy: AnalyzedPolicy }) {
             <p className="text-xs text-blue-600 font-medium mb-1">{t.policy.coverageLabel}</p>
             <p className="text-lg sm:text-xl font-bold text-blue-700 truncate">
               {policy.type === 'kasko'
-                ? policy.vehicleUsage === 'commercial' && policy.sigortaBedeli
+                ? policy.sigortaBedeli
                   ? formatConverted(policy.sigortaBedeli)
-                  : t.policy.vehicleMarketValue
+                  : policy.coverage > 0
+                    ? formatConverted(policy.coverage)
+                    : t.policy.vehicleMarketValue
                 : formatConverted(policy.coverage)}
             </p>
             {policy.type === 'kasko' &&
-              (policy.vehicleUsage === 'commercial' && policy.sigortaBedeli ? (
+              (policy.sigortaBedeli ? (
                 <p className="text-[10px] text-blue-500 mt-0.5">Sigorta Bedeli</p>
+              ) : policy.coverage > 0 ? (
+                <p className="text-[10px] text-blue-500 mt-0.5">
+                  {locale === 'tr' ? 'Araç Değeri' : 'Vehicle Value'}
+                </p>
               ) : (
                 <p className="text-[10px] text-blue-500 mt-0.5">{t.policy.marketValueHelp}</p>
               ))}

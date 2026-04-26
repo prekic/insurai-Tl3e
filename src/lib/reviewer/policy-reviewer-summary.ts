@@ -561,7 +561,7 @@ export function buildPolicyReviewerSummary(
  * — mirrors the niche-vehicle detection in evaluator.ts but returns a ternary.
  */
 export function deriveVehicleUsage(policy: AnalyzedPolicy): 'commercial' | 'private' | 'unknown' {
-  const signals = [policy.vehicleInfo?.vehicleClass, policy.vehicleInfo?.usage]
+  const signals = [policy.vehicleUsage, policy.vehicleInfo?.vehicleClass, policy.vehicleInfo?.usage]
     .filter((s): s is string => typeof s === 'string' && s.length > 0)
     .map((s) => s.toLowerCase())
   if (signals.length === 0) return 'unknown'

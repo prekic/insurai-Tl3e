@@ -14,7 +14,8 @@ export function MobileEvaluationCard(props: any) {
   const [scoreBreakdownExpanded, setScoreBreakdownExpanded] = useState(false)
   const [recommendationsExpanded, setRecommendationsExpanded] = useState(false)
   /* Policy Evaluation - Mobile only (high priority) */
-  if (!evaluation || isEvaluationLoading) return null
+  // Suppress the entire card when unverified to avoid showing misleading "−/100"
+  if (!evaluation || isEvaluationLoading || isUnverified) return null
   return (
     <Card className="lg:hidden">
       {isUnverified && (
@@ -353,7 +354,8 @@ export function MobileInsightsCard(props: any) {
 export function DesktopEvaluationCard(props: any) {
   const { evaluation, isEvaluationLoading, isUnverified, locale, t } = props
   /* Policy Evaluation */
-  if (!evaluation || isEvaluationLoading) return null
+  // Suppress the entire card when unverified to avoid showing misleading "−/100"
+  if (!evaluation || isEvaluationLoading || isUnverified) return null
   return (
     <Card>
       {isUnverified && (

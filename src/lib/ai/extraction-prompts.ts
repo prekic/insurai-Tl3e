@@ -140,6 +140,27 @@ Extract these additional vehicle-specific fields:
   - Cam Kırılması = Glass breakage (category: supplementary)
   - Ferdi Kaza = Personal accident (category: liability). Do NOT collapse sub-limits! Extract Death/Disability, Medical Expenses, Driver, Passenger as separate line items.
 
+- **CRITICAL — Coverage Granularity Rules**:
+  - **Ferdi Kaza (Personal Accident) sub-limits**: You MUST extract FOUR separate coverage line items:
+    1. "Personal Accident – Death/Disability" (Vefat/Sakatlık) with its per-seat limit (e.g. 500,000)
+    2. "Personal Accident – Medical Expenses" (Tedavi Masrafları) with its limit (e.g. 50,000)
+    3. "Vehicle-Related Personal Accident" (Araç İçi Ferdi Kaza) with its limit (e.g. 50,000)
+    4. "Driver-Related Personal Accident" (Sürücü Ferdi Kaza) with its limit (e.g. 50,000)
+    Do NOT collapse these into a single "Personal Accident" line. Each has a different limit.
+  - **Strike/Lockout/Civil Commotion/Terror (GLKHHT)**: Extract as a SEPARATE supplementary coverage line item with its own limit (often 100% of sum insured). Do NOT merge into main vehicle coverage.
+  - **Natural Disasters**: Extract as a SEPARATE supplementary coverage line item. Look for "Doğal Afetler" or "Deprem/Sel/Fırtına" clauses with their own limits.
+  - **Flood/Water Damage (Sel/Su Baskını)**: Extract as a SEPARATE supplementary coverage line item if it has a distinct limit or clause.
+  - **Kasa/Tank**: In commercial KASKO, "Kasa" and "Tank" refer to the vehicle's body/tank/trailer structure. Extract as "Body/Tank Coverage" (NOT "Cargo Coverage"). Cargo (emtia) is a separate Nakliyat insurance line.
+
+- **Fleet Detection** (IMPORTANT for AI Insights):
+  If the policy contains any of these fleet markers, include a structured insight:
+  - "POLİÇE ADET KONTROL KLOZU" (policy count control clause)
+  - "filo indirimi" or "filo poliçesi" (fleet discount/policy)
+  - "toplu poliçe" (group policy)
+  - "Bağlı Pol No" or "bağlı poliçe" (linked/parent policy number)
+  - References to a master policy or multiple vehicle schedule
+  Count the number of "özel kloz" (special clauses) if visible. Note the fleet size if stated. Mark this as an insight for the reviewer.
+
 - **Exclusion Extraction** (CRITICAL):
   - Do NOT extract standard "General Conditions" (Genel Şartlar) as exclusions, such as "alkollü sürüş" (drunk driving), "ehliyetsiz kullanım" (unauthorized driving), or standard "çekme/kurtarma" (towing) rules unless they are specifically highlighted as extra exclusions beyond standard law.
   - Target specific sections labeled "UYARI", "Teminat Dışında Kalan Haller", "Özel Şartlar", or "Hariç" for true policy-specific exclusions.

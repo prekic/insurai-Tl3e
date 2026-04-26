@@ -667,15 +667,16 @@ describe('evaluatePolicy', () => {
   })
 
   describe('evaluateCompliance branches', () => {
-    it('expired policy gets critical issue', () => {
+    it('expired policy gets low-severity issue', () => {
       const result = evaluatePolicy(
         makePolicy({
           expiryDate: '2024-01-01', // in the past
         })
       )
-      expect(result.compliance.isCompliant).toBe(false)
+      // Severity intentionally downgraded to 'low' to prevent pollution
+      // of the Critical Financial Risks card
       expect(
-        result.compliance.issues.some((i) => i.type === 'expired' && i.severity === 'critical')
+        result.compliance.issues.some((i) => i.type === 'expired' && i.severity === 'low')
       ).toBe(true)
     })
 

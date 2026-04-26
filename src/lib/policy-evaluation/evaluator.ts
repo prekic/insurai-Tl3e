@@ -1247,10 +1247,10 @@ function evaluateCompliance(policy: Policy, config: EvaluationConfig): Complianc
   const daysUntilExpiry = Math.floor((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
   if (daysUntilExpiry < 0) {
-    score -= 40
+    score -= 10
     issues.push({
       type: 'expired',
-      severity: 'critical',
+      severity: 'low',
       description: 'Policy has expired',
       descriptionTR: 'Poliçe süresi dolmuş',
     })
@@ -1777,24 +1777,39 @@ function generateRecommendations(
     let specificTitle = 'Address Compliance Issue'
     let specificTitleTR = 'Uyumluluk Sorununu Giderin'
 
-    if (issue.type === 'expired') {
-      // Distinguish recently-expired from historically-expired policies
-      const expiryDate = new Date(policy.expiryDate)
-      const now = new Date()
-      const yearsExpired = (now.getTime() - expiryDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25)
-
-      if (yearsExpired > 2) {
-        specificTitle = 'Historical Policy — For Reference Only'
-        specificTitleTR = 'Tarihsel Poliçe — Yalnızca Referans Amaçlı'
-        issue.description = `Policy expired ${Math.floor(yearsExpired)} years ago. This analysis is for archival/reference purposes only.`
-        issue.descriptionTR = `Poliçe ${Math.floor(yearsExpired)} yıl önce sona ermiş. Bu analiz yalnızca arşiv/referans amacıyla yapılmıştır.`
-      } else {
-        specificTitle = 'Renew Expired Policy Immediately'
-        specificTitleTR = 'Süresi Dolan Poliçeyi Hemen Yenileyin'
-      }
-    } else if (issue.type === 'below_minimum') {
+    if (issue.type === 'below_minimum') {
       specificTitle = 'Increase Coverage to Meet Legal Minimums'
       specificTitleTR = 'Yasal Asgari Limitleri Karşılamak İçin Teminatı Artırın'
+    }
+
+    recommendations.push({
+      priority: 'critical',
+      type: 'compliance',
+      title: specificTitle,
+      titleTR: specificTitleTR,
+      description: issue.description,
+      descriptionTR: issue.descriptionTR,
+    })
+  }
+
+  // Expired policy recommendations — severity is 'low' (informational)
+  // but we still surface renewal/archival guidance
+  for (const issue of complianceIssues.filter((i) => i.type === 'expired')) {
+    const expiryDate = new Date(policy.expiryDate)
+    const now = new Date()
+    const yearsExpired = (now.getTime() - expiryDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25)
+
+    let specificTitle: string
+    let specificTitleTR: string
+
+    if (yearsExpired > 2) {
+      specificTitle = 'Historical Policy — For Reference Only'
+      specificTitleTR = 'Tarihsel Poliçe — Yalnızca Referans Amaçlı'
+      issue.description = `Policy expired ${Math.floor(yearsExpired)} years ago. This analysis is for archival/reference purposes only.`
+      issue.descriptionTR = `Poliçe ${Math.floor(yearsExpired)} yıl önce sona ermiş. Bu analiz yalnızca arşiv/referans amacıyla yapılmıştır.`
+    } else {
+      specificTitle = 'Renew Expired Policy Immediately'
+      specificTitleTR = 'Süresi Dolan Poliçeyi Hemen Yenileyin'
     }
 
     recommendations.push({
