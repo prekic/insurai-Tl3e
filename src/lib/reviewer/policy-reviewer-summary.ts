@@ -492,20 +492,22 @@ export function buildPolicyReviewerSummary(
     groupedWithSubLimits[category] = sortByImportance(grouped)
   }
 
-  const isCommercial =
-    (policy.type as string) === 'commercial_property' ||
-    (policy.type as string) === 'commercial_auto'
-  const groupedExclusions = analyzeExclusionsComprehensive(
-    policy.exclusions,
-    policy.exclusionsEn || [],
-    isCommercial
-  )
-
   // Bug #10 — entity + vehicle-usage branching for summary labels
   const entityType = detectInsuredEntityType(policy.insuredPerson)
   const vehicleUsage = deriveVehicleUsage(policy)
   const typeLabel = buildTypeLabel(policy, vehicleUsage, locale)
   const entityLabel = buildEntityLabel(entityType, locale)
+
+  const isCommercial =
+    (policy.type as string) === 'commercial_property' ||
+    (policy.type as string) === 'commercial_auto' ||
+    vehicleUsage === 'commercial'
+
+  const groupedExclusions = analyzeExclusionsComprehensive(
+    policy.exclusions,
+    policy.exclusionsEn || [],
+    isCommercial
+  )
 
   return {
     policyNumber: policy.policyNumber,
