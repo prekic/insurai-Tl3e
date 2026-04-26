@@ -1,48 +1,64 @@
-Skip to main contentNow viewing: Policy
-
-
-
+Skip to main content
+Now viewing: Policy
 PU
 UNVERIFIED AI OUTPUT — AI output has not yet received human expert verification. Please review results carefully.
-
 Kasko
-AXA Sigorta
-🚗 67 LJ 968
 
+AXA Sigorta
+
+🚗 67 LJ 968
 
 Policy Summary
 Expired
+
 Coverage
+
 Vehicle Market Value
+
 Market value is estimated based on current average prices.
+
 Premium:
+
 TRY 10,806
+
 Deductible
+
 Conditional / requires review
+
 DISCOUNTS / EXTRA BENEFITS
 
 No Claims Discount
 %30
 Group/Corporate Discount
 %15
+
 Insured
+
 EREĞLİ DEMİR VE ÇELİK FAB.T.A.Ş.
+
 Kurumsal
+
 Policy Number
+
 462661051
+
 Start: 01/01/2024
 End: 01/01/2025
 Critical Financial Risks
 
 Policy has expired
+
 This significantly weakens the policy protection capability.
+
 Scores are preliminary — pending human review
 Policy Evaluation
 -
 /100
 Draft
 Fair
+
 This rating is based on current internal model thresholds and may be recalibrated as benchmark coverage improves.
+
 AI Insights
 75%
 Comprehensive KASKO coverage up to market value
@@ -50,48 +66,69 @@ IMM (voluntary liability) included at TRY 100,000
 Policy has expired — renewal strongly recommended
 +1 More Insights
 Vehicle Information
+
 Commercial Vehicle Policy
+
 As this is a commercial vehicle, market benchmark and price analyses are disabled to avoid misleading representations.
+
 Plate
+
 67 LJ 968
+
 Make
+
 FORD
+
 Model
+
 TRANSIT
+
 Model Year
+
 2020
+
 Usage Type
+
 commercial
+
 Vehicle Class
+
 Minibüs
 
 Coverage Details
 7
 Core Comprehensive Coverages (Included)
+
 Collision, Theft, Fire, and Natural Disasters (earthquake, flood, hail, storm) are covered up to the vehicle market value.
 
 Please check your policy for deductibles, depreciation, and special conditions.
-
 Liability Coverage
 1
 
 IMM
+
 TRY 100,000
 
 Supplementary Coverage
 6
 
 Collision
+
 TRY 350,000
 
 Theft
-TRY 350,000
-+4 More
 
+TRY 350,000
+
++4 More
 Exclusions & Questions
 3
+
 Exclusions limit what is covered. It is important to know these.
+
 Documents
 Upload
+
 No documents uploaded yet
+
 Click Upload to add policy documents
