@@ -26,8 +26,10 @@ export interface ExtractedPolicyData {
   // Entity Details
   insuredEntityType?: 'individual' | 'corporate' | null
   vehicleUsage?: 'private' | 'commercial' | null
+  bağlıPolNo?: string | null
 
   // Coverage information
+  sigortaBedeli?: number | null
   coverages: ExtractedCoverage[]
 
   // Special conditions and exclusions
