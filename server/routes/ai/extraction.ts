@@ -1009,8 +1009,6 @@ router.post(
       }, 10_000)
 
       // Monkey-patch res.json to wrap in SSE event format
-      const _originalJson = res.json.bind(res)
-      const _originalStatus = res.status.bind(res)
       res.json = function sseJson(body: unknown) {
         if (keepaliveInterval) clearInterval(keepaliveInterval)
         if (res.writableEnded) return res
