@@ -289,9 +289,11 @@ export async function convertToAnalyzedPolicy(
   }
 
   // Calculate total coverage based on policy type
-  // For kasko: use vehicle value (main coverage or market value), NOT sum of all limits
-  // For other types: use the main coverage or sum of main coverages
-  let totalCoverage = calculateMainCoverage(policyType, coverages)
+  // For kasko: use explicit sigortaBedeli if provided by LLM, otherwise calculate
+  let totalCoverage =
+    data.sigortaBedeli && data.sigortaBedeli > 0
+      ? data.sigortaBedeli
+      : calculateMainCoverage(policyType, coverages)
 
   // Sigorta Bedeli raw text fallback for kasko/nakliyat — the AI may miss the
   // sum insured when it appears in free-text paragraphs rather than structured
@@ -438,11 +440,13 @@ export async function convertToAnalyzedPolicy(
   const basePolicy: AnalyzedPolicy = {
     id: crypto.randomUUID(),
     policyNumber,
+    bagliPolNo: data.bağlıPolNo ?? undefined,
     type: policyType,
     typeTr: typeInfo.labelTr,
     provider,
     logo: '', // Would need to be mapped from provider name
     coverage: totalCoverage,
+    sigortaBedeli: data.sigortaBedeli ?? undefined,
     premium: premiumValue,
     monthlyPremium: premiumValue / 12,
     deductible: coverages.length > 0 ? Math.max(0, ...coverages.map((c) => c.deductible ?? 0)) : 0,
@@ -523,6 +527,14 @@ export async function convertToAnalyzedPolicy(
       if (data.clauseGraph?.edges?.some((e) => e.isCandidate || !e.targetId)) {
         conf = Math.max(0, conf * 0.85)
       }
+
+      // ── Fleet Policy Confidence Penalty ───────────────────────────────
+      // If a linked policy (Bağlı Pol No) is present, penalize confidence
+      // to mandate human review for complex fleet rules/deductibles.
+      if (data.bağlıPolNo) {
+        conf = Math.min(conf - 0.15, 0.75)
+      }
+
       return conf
     })(),
     aiInsights: [],
@@ -1278,6 +1290,13 @@ export function classifyExclusions(exclusions: string[]): {
 
   for (let i = 0; i < exclusions.length; i++) {
     const text = exclusions[i]
+
+    // Ignore explicit "YOK" (none) deductibles to avoid false positive risk flags
+    const tUpper = text.trim().toUpperCase()
+    if (tUpper === 'YOK' || tUpper === 'YOKTUR' || /MUAFIYET\s*(:\s*|-?\s*)?YOK/i.test(text)) {
+      continue
+    }
+
     const isConditional = conditionalPatterns.some((p) => p.test(text))
     if (!isConditional) {
       trueExclusions.push(text)

@@ -28,6 +28,11 @@ export const EXTRACTION_JSON_SCHEMA = {
         type: ['string', 'null'],
         description: 'The unique policy number/identifier',
       },
+      bağlıPolNo: {
+        type: ['string', 'null'],
+        description:
+          'Linked Policy Number (Bağlı Pol No). Used to detect fleet policies or continuations.',
+      },
       provider: {
         type: ['string', 'null'],
         description: 'Insurance company name (e.g., Allianz, Axa, Mapfre)',
@@ -99,6 +104,11 @@ export const EXTRACTION_JSON_SCHEMA = {
         type: ['number', 'null'],
         description:
           'Total premium amount (Prim/Ödenecek Prim). DO NOT confuse with vehicle market value (Rayiç Bedel) which is usually in the millions.',
+      },
+      sigortaBedeli: {
+        type: ['number', 'null'],
+        description:
+          'Sum Insured / Sigorta Bedeli. Explicit contractual maximum payout limit. Do not extract market value (Rayiç Değer) text here, only a specific numeric limit if one is provided.',
       },
       currency: {
         type: ['string', 'null'],
@@ -471,6 +481,7 @@ export const EXTRACTION_JSON_SCHEMA = {
     // break extraction quality for Turkish KASKO docs that need them.
     required: [
       'policyNumber',
+      'bağlıPolNo',
       'provider',
       'policyType',
       'insuredName',
@@ -487,6 +498,7 @@ export const EXTRACTION_JSON_SCHEMA = {
       'tcKimlik',
       'vkn',
       'premium',
+      'sigortaBedeli',
       'currency',
       'paymentFrequency',
       'discounts',

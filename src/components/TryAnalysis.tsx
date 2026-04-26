@@ -99,7 +99,6 @@ export function TryAnalysis() {
     const locationState = location.state as LocationState | null
     const hasNewFile = !!locationState?.file
 
-    const existingResult = getTrialResult()
     const exhaustedUploads = hasUsedFreeTrial()
 
     if (hasNewFile && exhaustedUploads) {
@@ -110,20 +109,10 @@ export function TryAnalysis() {
 
     if (hasNewFile && !exhaustedUploads) {
       // User has a new file and still has uploads remaining — let them proceed
-      // (don't redirect to old result)
       return
     }
 
-    if (existingResult) {
-      // No new file — redirect to PolicyDetailView with the saved result
-      navigate('/policy/trial', {
-        state: {
-          policy: existingResult.policy,
-          isTrialResult: true,
-        },
-        replace: true,
-      })
-    } else if (exhaustedUploads) {
+    if (exhaustedUploads) {
       setState('trial-used')
     }
   }, [navigate, location.state])
@@ -776,7 +765,6 @@ export function TryAnalysis() {
                     <span>{t.tryAnalysis.aiPowered}</span>
                   </div>
                 </div>
-                <span className="text-gray-400">{t.tryAnalysis.oneFreeAnalysis}</span>
               </div>
             </div>
           )}
