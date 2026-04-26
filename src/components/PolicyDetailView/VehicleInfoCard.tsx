@@ -10,11 +10,12 @@ interface VehicleInfoCardProps {
 export function VehicleInfoCard({ policy }: VehicleInfoCardProps) {
   const { t, locale } = useI18n()
 
-  if (policy.type !== 'kasko' || !policy.vehicleInfo) {
+  if (policy.type !== 'kasko' && policy.type !== 'traffic') {
     return null
   }
 
-  const isCommercial = policy.vehicleInfo.usage?.toLowerCase() === 'commercial'
+  const vehicleInfo = policy.vehicleInfo || {}
+  const isCommercial = vehicleInfo.usage?.toLowerCase() === 'commercial'
 
   // Headline vehicle fields are rendered UNCONDITIONALLY so a parsing failure
   // surfaces as an explicit "Cannot Verify" row rather than silently missing.
@@ -69,13 +70,12 @@ export function VehicleInfoCard({ policy }: VehicleInfoCardProps) {
       </CardHeader>
       <CardContent>
         <div className="grid md:grid-cols-2 gap-4">
-          {renderField(t.policy.plate, policy.vehicleInfo.plate)}
-          {renderField(t.policy.make, policy.vehicleInfo.make)}
-          {renderField(t.policy.model, policy.vehicleInfo.model)}
-          {renderField(t.policy.modelYear, policy.vehicleInfo.year)}
-          {policy.vehicleInfo.usage && renderField(t.policy.usageType, policy.vehicleInfo.usage)}
-          {policy.vehicleInfo.vehicleClass &&
-            renderField(t.policy.vehicleClass, policy.vehicleInfo.vehicleClass)}
+          {renderField(t.policy.plate, vehicleInfo.plate)}
+          {renderField(t.policy.make, vehicleInfo.make)}
+          {renderField(t.policy.model, vehicleInfo.model)}
+          {renderField(t.policy.modelYear, vehicleInfo.year)}
+          {vehicleInfo.usage && renderField(t.policy.usageType, vehicleInfo.usage)}
+          {vehicleInfo.vehicleClass && renderField(t.policy.vehicleClass, vehicleInfo.vehicleClass)}
         </div>
       </CardContent>
     </Card>
