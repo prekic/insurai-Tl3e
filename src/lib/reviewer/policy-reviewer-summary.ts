@@ -509,6 +509,14 @@ export function buildPolicyReviewerSummary(
     isCommercial
   )
 
+  if (import.meta.env.DEV) {
+    console.log('[Trace: Exclusions Pipeline] Raw Exclusions:', policy.exclusions?.length)
+    console.log(
+      '[Trace: Exclusions Pipeline] Output Grouped:',
+      groupedExclusions.exclusions?.length
+    )
+  }
+
   return {
     policyNumber: policy.policyNumber,
     provider: policy.provider,

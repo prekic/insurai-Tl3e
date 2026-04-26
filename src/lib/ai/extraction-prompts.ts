@@ -174,6 +174,7 @@ Extract these additional vehicle-specific fields:
   - "Bağlı Pol No" or "bağlı poliçe" (linked/parent policy number)
   - References to a master policy or multiple vehicle schedule
   Count the number of "özel kloz" (special clauses) if visible. Note the fleet size if stated. Mark this as an insight for the reviewer.
+  CRITICAL: Do not summarize evidence. Extract and retain each distinct clause fully.
 
 - **Exclusion Extraction** (CRITICAL):
   - Do NOT extract standard "General Conditions" (Genel Şartlar) as exclusions, such as "alkollü sürüş" (drunk driving), "ehliyetsiz kullanım" (unauthorized driving), or standard "çekme/kurtarma" (towing) rules unless they are specifically highlighted as extra exclusions beyond standard law.

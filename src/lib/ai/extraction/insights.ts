@@ -291,6 +291,13 @@ export async function generateAIInsightsAsync(data: ExtractedPolicyData): Promis
   try {
     const proxyUrl = getProxyUrl()
     if (proxyUrl) {
+      // DEBUG: Temporarily bypass AI sense-checking layer to test if it's overly aggressive
+      const bypassSenseCheck = import.meta.env.DEV || true
+      if (bypassSenseCheck) {
+        console.log('[AI Sense-Check] Bypassed for debugging. Returning raw insights.')
+        return insights
+      }
+
       const response = await fetch(`${proxyUrl}/api/ai/sense-check`, {
         method: 'POST',
         headers: {

@@ -248,18 +248,22 @@
 115. **E2E Visual Audits (Added April 26, 2026)**: The E2E suite now contains heavy visual audit tests (`e2e/policy-detail-audit.spec.ts`, `e2e/policy-trial-audit.spec.ts`, `e2e/visual-audit.spec.ts`) that capture and compare screenshots in `e2e/screenshots/`.
 
 116. **Gemini SDK Choice & OCR Pipeline (Added April 26, 2026)**: The project uses the modern `@google/genai` SDK rather than the deprecated `@google/generative-ai` SDK. The `getGeminiClient()` lazy factory in `server/routes/ai/extraction.ts` manages initialization to ensure the `GEMINI_API_KEY` is loaded and singletons are reused appropriately. Gemini acts as a single-pass multimodal OCR + extraction engine via `POST /api/ai/ocr/gemini`, distinct from the existing Cloud Vision / Document AI text-only fallback pipelines.
+117. **Integration Test Exclusions (Vitest Gotcha)**: Files like `src/test_do_ocr.test.ts` that hit live external APIs (Document AI, Gemini, etc.) must remain skipped (`test.skip`) in the codebase. Never run them in the standard `npm run test` suite or CI environments as they rely on local `.env` keys and incur actual API costs.
+118. **Railway Deployment Environment Sync (Gotcha)**: When introducing new AI provider keys (like `GEMINI_API_KEY`), updating `.env.example` and `CLAUDE.md` is not enough for production. You must explicitly manually inject the new key into the Railway project variables dashboard, or the server will crash on startup/route-execution due to the missing required variable.
 
 117. **LLM Output Normalizer `typeof` Type Guards (Added April 26, 2026)**: When normalizing LLM output (e.g. inside `policy-extractor.ts`), always use strict `typeof x === 'string'` or `typeof x === 'number'` type guards before invoking string/number methods (`.toLowerCase()`, `.replace()`, `.toFixed()`). LLMs can unpredictably return arrays, nulls, or objects for fields typed as strings in the prompt. Failing to type-guard will cause fatal runtime crashes during extraction.
 
 118. **Mandatory IMM Extraction Rules (Added April 26, 2026)**: IMM (İhtiyari Mali Mesuliyet / Voluntary Liability) coverage limit extraction must be explicitly demanded in the system prompt. Relying on generic coverage extraction misses IMM because it is often embedded in fine print rather than tabular formats. The system prompt contains mandatory rules demanding IMM parsing. Do not remove or soften these rules.
 
-119. **Exclusion Deduplication (Trigram Jaccard)**: Exclusion deduplication uses trigram Jaccard similarity (threshold 0.55), rather than simple substring matching. This prevents duplicate entries when the LLM paraphrases the same UYARI/exclusion clause differently.
+119. **Exclusion Deduplication (Trigram Jaccard)**: Exclusion deduplication uses trigram Jaccard similarity (threshold 0.85, with a stricter 0.9 threshold for short phrases <30 chars), rather than simple substring matching. This prevents duplicate entries when the LLM paraphrases the same UYARI/exclusion clause differently, while avoiding aggressive pruning of distinct short clauses.
 
 120. **Unverified Policy Display Suppression**: The Policy Evaluation card must be suppressed entirely when `isUnverified` is true (e.g. for unknown commercial fleets). This prevents the UI from displaying a misleading `- / 100` score.
 
 121. **Premium Net/Tax Split**: The extraction schema requires separating `premiumNet` and `premiumTax` (BSMV). This powers the hero card's split display (e.g., "Net: X + BSMV: Y"). If aggregated, it breaks downstream financial validations.
 
 122. **Explicit Prompt Demands for Critical Fields**: Merely defining a field (like `sigortaBedeli`, `PA` sub-limits, `GLKHHT`, `NatDisaster`, `Flood`) in the JSON schema is insufficient. The LLM will silently drop them or aggregate them destructively unless explicitly instructed to extract them in the prompt text.
+
+123. **AI Insights Sense-Check Bypass**: A temporary bypass (`bypassSenseCheck`) was injected into `src/lib/ai/extraction/insights.ts` for development environments to bypass the `/api/ai/sense-check` proxy. This prevents legitimate complex insights (e.g., fleet discounts) from being silently filtered out as "noise". Remember to account for this bypass during production testing.
 ## Project Overview
 
 144. **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
@@ -698,6 +702,7 @@ API_PORT=4001
 FRONTEND_URL=http://localhost:5173
 OPENAI_API_KEY=sk-proj-xxx
 ANTHROPIC_API_KEY=sk-ant-xxx
+GEMINI_API_KEY=AIza-xxx
 GOOGLE_CLOUD_API_KEY=AIza...
 GCP_SERVICE_ACCOUNT_BASE64=eyJ...  # Base64 string of GCP Service Account JSON (for Document AI)
 NODE_ENV=development

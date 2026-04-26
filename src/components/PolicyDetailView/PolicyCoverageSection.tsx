@@ -620,9 +620,14 @@ function ExclusionsSection({
                     // Other text is longer and contains current text? This is a subset, hide it.
                     if (otherText.length > currentText.length && otherText.includes(currentText))
                       return true
-                    // Trigram Jaccard similarity >0.55? These are likely paraphrases.
+                    // Trigram Jaccard similarity >0.85? These are likely paraphrases.
                     // Keep the LONGER version (more informative).
-                    if (jaccardSimilarity(currentText, otherText) > 0.55) {
+                    // Also ensure we don't deduplicate very short phrases unless they are highly similar (>0.9)
+                    const similarity = jaccardSimilarity(currentText, otherText)
+                    const isShort = currentText.length < 30 || otherText.length < 30
+                    const threshold = isShort ? 0.9 : 0.85
+
+                    if (similarity > threshold) {
                       // If the other is longer or equal and appears earlier, this one is the dup
                       return otherText.length >= currentText.length && otherIndex < index
                         ? true
