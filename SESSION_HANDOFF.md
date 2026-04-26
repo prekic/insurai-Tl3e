@@ -19,7 +19,8 @@ Open + merge a PR for this session's work if not already done. The current branc
 
 **Files added/modified**:
 - `docs/adr/021-gemini-multimodal-ocr-integration.md` — ADR documenting the move to Gemini Flash 2.5.
-- `server/routes/ai/extraction.ts` — Integrated `@google/genai` via lazy `getGeminiClient()` factory for the new multimodal OCR endpoint.
+- `server/routes/ai/extraction.ts` — Integrated `@google/genai` via lazy `getGeminiClient()` factory for the new multimodal OCR endpoint, implemented SSE keepalive to bypass Railway 30s timeout, removed unused vars.
+- `server/services/admin-notification-service.ts` — Updated to provide actionable hints for RLS policy/missing migration errors.
 - `server/routes/admin/cost.ts`, `server/routes/admin/operations.ts`, `server/middleware/cost-control.ts` — Updated to handle Gemini costs and OCR rate limits.
 - `src/lib/ai/policy-converter.ts` — Fixed the 10x premium inflation bug (sanity checking the magnitude).
 - `src/components/PolicyDetailView/PolicyCoverageSection.tsx` — Increased Trigram Jaccard similarity threshold for exclusion deduplication (0.55 -> 0.85/0.9) to prevent aggressive pruning.
@@ -35,6 +36,12 @@ Open + merge a PR for this session's work if not already done. The current branc
 - `server/services/config-service.ts` & `src/lib/config/types.ts` — Updated the global extraction fallback models to specifically target `claude-sonnet-4-6`.
 - `package.json` & `package-lock.json` — Added the legacy `@google/generative-ai` SDK (`^0.24.1`) purely to support backward compatibility in the ad-hoc benchmark scripts, while core production routes strictly use the new `@google/genai` package.
 - `src/lib/ai/__tests__/qa-pdf-golden.test.ts` — Fixed `File.prototype.arrayBuffer` missing in Vitest to suppress unhandled rejections and clean up logs.
+- `src/__tests__/integration/z-final-pipeline-e2e.test.ts` — Added real PDF pipeline integration test.
+- `src/components/admin/DocumentJourneyViewer.tsx` — Updated to handle 'gemini_ocr' processing stage.
+- `src/lib/ai/config.ts` — Updated to include 'gemini_ocr' processing stage.
+- `src/lib/ai/policy-extractor.ts` — Wired Gemini multimodal OCR as third fallback in client extraction chain.
+- `src/lib/processing-log-api.ts` — Fixed processing log race condition with exponential backoff on retry.
+- `src/types/processing-log.ts` — Updated to handle 'gemini_ocr' processing stage.
 - `CLAUDE.md`, `SESSION_HANDOFF.md`, `.env.example` — Documentation and Gotcha synchronization.
 
 ## Current State
@@ -57,6 +64,10 @@ Resolved multiple critical extraction issues:
 - Hardened `PolicyDetailView` UI components to safely handle missing or partial LLM data (`typeof` string/number checks to prevent runtime crashes).
 - Enforced strict prompt instructions for IMM (Voluntary Liability) to guarantee reliable detection.
 - Scaled `sigortaBedeli` and `bağlıPolNo` as top-level schema requirements.
+- Wired Gemini multimodal OCR as a third fallback in the client extraction chain.
+- Implemented SSE keepalive wrapping for the extraction endpoint to gracefully bypass Railway 30s gateway timeouts.
+- Fixed Supabase processing log race condition via an exponential backoff retry strategy.
+- Added a full end-to-end pipeline integration test against real PDFs (`z-final-pipeline-e2e.test.ts`).
 
 ### Phase 3 — Evaluation Tests & Scoring Integrity
 Corrected `hasUntrustedBenchmark` logic to use the `isProvisional` state in `evaluation-scoring-sample-data.test.ts`. Test suites now accurately reflect the real-world weighting and compliance capping rules.
