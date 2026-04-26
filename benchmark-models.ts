@@ -71,14 +71,20 @@ async function testAnthropic(text: string) {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const schemaPrompt = buildAnthropicSchemaPrompt({});
   try {
-    const response = await client.messages.create({
+    const stream = await client.messages.stream({
       model: 'claude-opus-4-7',
-      max_tokens: 8192,
+      max_tokens: 32768,
       system: schemaPrompt,
       messages: [{ role: 'user', content: text }],
     });
-    const textBlock = response.content.find((block) => block.type === 'text');
-    let jsonContent = textBlock?.type === 'text' ? textBlock.text : '';
+    
+    let jsonContent = '';
+    for await (const chunk of stream) {
+      if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+        jsonContent += chunk.delta.text;
+      }
+    }
+    
     const match = jsonContent.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (match) jsonContent = match[1].trim();
     
@@ -145,9 +151,9 @@ async function run() {
   const text = await extractTextWithPdfjs(path.join(process.cwd(), 'upload/real-kasko-pdf/KASKO POLİÇESİ.pdf'));
   console.log("PDF length:", text.length);
 
-  await testOpenAI(text);
+  // await testOpenAI(text);
   await testAnthropic(text);
-  await testGemini(text);
+  // await testGemini(text);
 }
 
 run();
