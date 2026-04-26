@@ -69,7 +69,7 @@ async function testAnthropic(text: string) {
     return;
   }
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const schemaPrompt = buildAnthropicSchemaPrompt({});
+  const schemaPrompt = buildAnthropicSchemaPrompt({} as any);
   try {
     const stream = await client.messages.stream({
       model: 'claude-opus-4-7',
@@ -147,13 +147,56 @@ async function testGemini(text: string) {
   }
 }
 
+async function testSonnet(text: string) {
+  console.log("\n--- Testing Anthropic (claude-sonnet-4-6) [OUR DEFAULT] ---");
+  const startTime = Date.now();
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.log("No Anthropic Key");
+    return;
+  }
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const schemaPrompt = buildAnthropicSchemaPrompt({} as any);
+  try {
+    const stream = await client.messages.stream({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 32768,
+      system: schemaPrompt,
+      messages: [{ role: 'user', content: text }],
+    });
+    
+    let jsonContent = '';
+    for await (const chunk of stream) {
+      if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+        jsonContent += chunk.delta.text;
+      }
+    }
+    
+    const match = jsonContent.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (match) jsonContent = match[1].trim();
+    
+    const duration = Date.now() - startTime;
+    console.log(`Sonnet Duration: ${duration}ms`);
+    console.log("Sonnet length:", jsonContent.length);
+    console.log("Sonnet ends with:", jsonContent.substring(jsonContent.length - 100).replace(/\n/g, ' '));
+    try {
+      JSON.parse(jsonContent);
+      console.log("Sonnet Output: VALID JSON");
+    } catch(e) {
+      console.log("Sonnet Output: INVALID JSON");
+    }
+  } catch(e: any) {
+    console.error("Sonnet Error:", e.message);
+  }
+}
+
 async function run() {
   const text = await extractTextWithPdfjs(path.join(process.cwd(), 'upload/real-kasko-pdf/KASKO POLİÇESİ.pdf'));
   console.log("PDF length:", text.length);
 
-  // await testOpenAI(text);
+  await testSonnet(text);
+  await testOpenAI(text);
   await testAnthropic(text);
-  // await testGemini(text);
+  await testGemini(text);
 }
 
 run();
