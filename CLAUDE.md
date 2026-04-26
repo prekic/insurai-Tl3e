@@ -248,7 +248,6 @@
 115. **E2E Visual Audits (Added April 26, 2026)**: The E2E suite now contains heavy visual audit tests (`e2e/policy-detail-audit.spec.ts`, `e2e/policy-trial-audit.spec.ts`, `e2e/visual-audit.spec.ts`) that capture and compare screenshots in `e2e/screenshots/`.
 
 116. **Gemini SDK Choice & OCR Pipeline (Added April 26, 2026)**: The project uses the modern `@google/genai` SDK rather than the deprecated `@google/generative-ai` SDK. The `getGeminiClient()` lazy factory in `server/routes/ai/extraction.ts` manages initialization to ensure the `GEMINI_API_KEY` is loaded and singletons are reused appropriately. Gemini acts as a single-pass multimodal OCR + extraction engine via `POST /api/ai/ocr/gemini`, distinct from the existing Cloud Vision / Document AI text-only fallback pipelines.
-
 ## Project Overview
 
 144. **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
