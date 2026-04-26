@@ -508,9 +508,9 @@ export async function convertToAnalyzedPolicy(
       }
     })(),
     coverages,
-    exclusions: data.exclusions,
-    exclusionsEn: ensureExclusionsEn(data.exclusions, data.exclusionsEn),
-    specialConditions: data.specialConditions,
+    exclusions: Array.from(new Set(data.exclusions)),
+    exclusionsEn: ensureExclusionsEn(Array.from(new Set(data.exclusions)), data.exclusionsEn),
+    specialConditions: Array.from(new Set(data.specialConditions)),
     insuranceLine: typeInfo.label,
     // Currency might be in data.currency, data.premium.currency, or snake_case
     currency:

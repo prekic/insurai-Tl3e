@@ -576,6 +576,11 @@ export function deriveVehicleUsage(policy: AnalyzedPolicy): 'commercial' | 'priv
     /\bt[iı]car[iı]\b/i,
     /\bf[iı]lo\b/i,
     /\bçek[iı]c[iı]\b/i,
+    /\by[uü]k\s*taş[ıi]ma\b/i,
+    /\bağ[ıi]r\s*vas[ıi]ta\b/i,
+    /\bloj[iı]st[iı]k\b/i,
+    /\btrakt[öo]r\b/i,
+    /\btransport\b/i,
   ]
   const PRIVATE_PATTERNS: RegExp[] = [/\bhusus[iı]\b/i, /\bb[iı]nek\b/i, /\botomob[iı]l\b/i]
 

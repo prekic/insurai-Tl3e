@@ -93,6 +93,7 @@ export const COVERAGE_NAMES_EN_TO_TR: Record<string, string> = {
   'Roadside Assist': 'Yol Yardım',
   Towing: 'Çekici Hizmeti',
   'Towing Service': 'Çekici Hizmeti',
+  'Towing and Rescue (Domestic)': 'Çekme ve Kurtarma (Yurt İçi)',
   'Replacement Vehicle': 'İkame Araç',
   'Rental Car': 'Kiralık Araç',
   'Anadolu Service': 'Anadolu Hizmet Paketi',

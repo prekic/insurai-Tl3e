@@ -32,7 +32,8 @@ export function analyzeTemporalGaps(
       subCategory: 'documentation_gap',
       title: 'Missing Expiry Date',
       titleTr: 'Bitiş Tarihi Eksik',
-      description: 'Policy expiry date could not be determined. This may indicate incomplete documentation.',
+      description:
+        'Policy expiry date could not be determined. This may indicate incomplete documentation.',
       descriptionTr: 'Poliçe bitiş tarihi belirlenemedi. Bu, eksik belgelemeyi gösterebilir.',
       severity: 'medium',
       severityScore: 50,
@@ -79,8 +80,8 @@ export function analyzeTemporalGaps(
       titleTr: 'Poliçe Süresi Dolmuş',
       description: `This policy expired ${Math.abs(daysToExpiry)} days ago on ${formatDate(expiryDate)}. You currently have no coverage.`,
       descriptionTr: `Bu poliçenin süresi ${Math.abs(daysToExpiry)} gün önce ${formatDateTr(expiryDate)} tarihinde doldu. Şu anda teminatınız yok.`,
-      severity: 'critical',
-      severityScore: 100,
+      severity: 'info',
+      severityScore: 20,
       financialImpact: {
         potentialLoss: policy.coverage || 500000,
         probability: 0.1, // 10% chance of incident during lapse
@@ -242,10 +243,11 @@ export function analyzeTemporalGaps(
   // Check for retroactive date issues (for liability policies)
   if (policy.type === 'business' || policy.type === 'health') {
     // Check if policy mentions retroactive limitations
-    const hasRetroactiveLimitation = policy.specialConditions?.some(condition =>
-      condition.toLowerCase().includes('retroaktif') ||
-      condition.toLowerCase().includes('retroactive') ||
-      condition.toLowerCase().includes('geçmişe dönük')
+    const hasRetroactiveLimitation = policy.specialConditions?.some(
+      (condition) =>
+        condition.toLowerCase().includes('retroaktif') ||
+        condition.toLowerCase().includes('retroactive') ||
+        condition.toLowerCase().includes('geçmişe dönük')
     )
 
     if (hasRetroactiveLimitation) {
@@ -255,8 +257,10 @@ export function analyzeTemporalGaps(
         subCategory: 'retroactive_gap',
         title: 'Retroactive Date Limitation',
         titleTr: 'Geçmişe Dönük Tarih Kısıtlaması',
-        description: 'This policy has retroactive date limitations which may exclude claims for incidents that occurred before a certain date.',
-        descriptionTr: 'Bu poliçede geçmişe dönük tarih kısıtlamaları var, belirli bir tarihten önce gerçekleşen olaylar için talepleri dışlayabilir.',
+        description:
+          'This policy has retroactive date limitations which may exclude claims for incidents that occurred before a certain date.',
+        descriptionTr:
+          'Bu poliçede geçmişe dönük tarih kısıtlamaları var, belirli bir tarihten önce gerçekleşen olaylar için talepleri dışlayabilir.',
         severity: 'medium',
         severityScore: 45,
         financialImpact: {
