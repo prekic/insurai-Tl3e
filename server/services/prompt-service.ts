@@ -150,7 +150,7 @@ const FALLBACK_PROMPTS: Record<string, PromptTemplate> = {
     isActive: true,
     variables: ['document_text'],
     defaultProvider: 'openai',
-    defaultModel: 'gpt-4o',
+    defaultModel: 'gpt-5.4',
     parameters: { temperature: 0.1, maxTokens: 4096 },
     systemPrompt: `You are an expert insurance document analyst specializing in Turkish insurance policies.
 
@@ -388,7 +388,7 @@ Return only: kasko, traffic, home, health, life, dask, business, or nakliyat`,
     isActive: true,
     variables: ['guidelines', 'policy_data', 'raw_insights'],
     defaultProvider: 'anthropic',
-    defaultModel: 'claude-3-5-sonnet-20240620',
+    defaultModel: 'claude-sonnet-4-6',
     parameters: { temperature: 0.1, maxTokens: 1024 },
     systemPrompt: `You are an expert insurance AI assistant for the Turkish market.
 You will be given a list of raw insights (warnings, strengths, gaps) and the extracted policy data.

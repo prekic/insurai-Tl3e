@@ -3,12 +3,13 @@
 > Context file for Claude Code sessions on the insurai project
 
 ## ⚠️ Next Session Instructions
-1. **Monitor Trial Upload Limit**: The free trial usage limit was adjusted to 100 (`TRIAL_MAX_UPLOADS = 100` in `src/lib/free-trial.ts`). Monitor server resources and API costs to ensure this raised limit doesn't lead to abuse or excessive billing.
-2. **Verify E2E Suite in CI**: The `real-user-proof.spec.ts` test suite has been fortified with strict `FORBIDDEN` checks against "Cannot Verify" texts on the policy detail page. Ensure these pass consistently on CI. If any test fails, it means the extraction pipeline failed to map critical vehicle data (make, model, year, plate) to the frontend.
-3. **Implement Self-Healing Loop Architecture**: The self-healing loop architecture design (planned earlier) is now ready to implement since this pipeline merge is complete. Focus on creating the LLM-as-a-Judge system to automatically retry and correct extraction failures.
-4. **Phase E Production Monitoring**: The KASKO pilot pipeline is hardened, deduplicated, and calibrated with real data. Ready for Phase E production operations. No active blockers.
-5. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
-6. **🚨 QA GATE BEFORE SHIPPING EXTRACTION/DISPLAY CHANGES 🚨**: Before claiming any fix complete that touches `aiConfidence`, `extractionIncomplete`, the display-mode gate, or vehicle/coverage extraction, run `npm run qa:extraction` and confirm the relevant check moved. See gotcha #102, runbook 07, ADR-020.
+1. **Environment Setup**: Add `GEMINI_API_KEY` to the production/Railway environment. It is distinct from GCP service account credentials.
+2. **Frontend Orchestration**: Update the frontend OCR orchestrator to conditionally use `/api/ai/ocr/gemini` as an alternative to Cloud Vision.
+3. **Validation**: Run a pilot extraction batch to compare Gemini OCR quality against the existing Document AI pipeline.
+4. **Tests**: If unit tests for the extraction route are added, ensure they mock the `GoogleGenAI` client using the established factory pattern.
+5. **Phase E Production Monitoring**: The KASKO pilot pipeline is hardened, deduplicated, and calibrated with real data. Ready for Phase E production operations. No active blockers.
+6. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
+7. **🚨 QA GATE BEFORE SHIPPING EXTRACTION/DISPLAY CHANGES 🚨**: Before claiming any fix complete that touches `aiConfidence`, `extractionIncomplete`, the display-mode gate, or vehicle/coverage extraction, run `npm run qa:extraction` and confirm the relevant check moved. See gotcha #102, runbook 07, ADR-020.
 
 ---
 
@@ -245,6 +246,8 @@
 114. **Supabase UI Error Leaking (Added April 26, 2026)**: Never render raw Supabase/database error messages into the UI (e.g., in `PolicyActuarialHistoryChart`). Trap them, log via `console.warn` (suppressed from UI), and return `null` or a generic fallback to prevent leaking internal DB schemas or paths.
 
 115. **E2E Visual Audits (Added April 26, 2026)**: The E2E suite now contains heavy visual audit tests (`e2e/policy-detail-audit.spec.ts`, `e2e/policy-trial-audit.spec.ts`, `e2e/visual-audit.spec.ts`) that capture and compare screenshots in `e2e/screenshots/`.
+
+116. **Gemini SDK Choice & OCR Pipeline (Added April 26, 2026)**: The project uses the modern `@google/genai` SDK rather than the deprecated `@google/generative-ai` SDK. The `getGeminiClient()` lazy factory in `server/routes/ai/extraction.ts` manages initialization to ensure the `GEMINI_API_KEY` is loaded and singletons are reused appropriately. Gemini acts as a single-pass multimodal OCR + extraction engine via `POST /api/ai/ocr/gemini`, distinct from the existing Cloud Vision / Document AI text-only fallback pipelines.
 
 ## Project Overview
 

@@ -60,9 +60,15 @@ export interface AIUsageCost {
   timestamp: string
 }
 
-// Cost per 1000 tokens (in USD) - Updated January 2026
+// Cost per 1000 tokens (in USD) - Updated April 2026
 // Used as sync fallback when DB config is unavailable
 const DEFAULT_COST_PER_1K_TOKENS: Record<string, { input: number; output: number }> = {
+  // Current models (April 2026)
+  'gpt-5.4': { input: 0.003, output: 0.012 },
+  'claude-sonnet-4-6': { input: 0.003, output: 0.015 },
+  'claude-haiku-4-5': { input: 0.001, output: 0.005 },
+  'gemini-2.5-flash': { input: 0.0003, output: 0.0025 },
+  // Legacy models (retained for historical cost tracking)
   // OpenAI
   'gpt-4o': { input: 0.0025, output: 0.01 },
   'gpt-4o-mini': { input: 0.00015, output: 0.0006 },
@@ -850,7 +856,7 @@ export function estimateTokensFromRequest(req: Request): { inputTokens: number; 
   const inputTokens = messageTokens + contextTokens + historyTokens
 
   // Determine model
-  const model = body.model || (req.path.includes('anthropic') ? 'claude-3-5-haiku' : 'gpt-4o-mini')
+  const model = body.model || (req.path.includes('anthropic') ? 'claude-haiku-4-5' : 'gpt-4o-mini')
 
   return { inputTokens, model }
 }

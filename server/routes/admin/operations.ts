@@ -601,7 +601,7 @@ appConfigs.set('ai.default_provider', {
 })
 appConfigs.set('ai.chat_model', { value: 'gpt-4o-mini', type: 'string', description: 'Chat model' })
 appConfigs.set('ai.extraction_model', {
-  value: 'gpt-4o',
+  value: 'gpt-5.4',
   type: 'string',
   description: 'Extraction model',
 })

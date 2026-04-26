@@ -27,6 +27,7 @@ export interface AIConfig {
   openaiBackupModel: string
   anthropicExtractionModel: string
   anthropicBackupModel: string
+  geminiModel: string
   maxTokens: number
   temperature: number
   chatTemperature: number
@@ -133,10 +134,11 @@ export interface CostConfig {
 // =============================================================================
 
 const DEFAULT_AI_CONFIG: AIConfig = {
-  openaiExtractionModel: 'gpt-4o',
+  openaiExtractionModel: 'gpt-5.4',
   openaiBackupModel: 'gpt-4o-mini',
-  anthropicExtractionModel: 'claude-sonnet-4-20250514',
-  anthropicBackupModel: 'claude-3-5-haiku-latest',
+  anthropicExtractionModel: 'claude-sonnet-4-6',
+  anthropicBackupModel: 'claude-haiku-4-5',
+  geminiModel: 'gemini-2.5-flash',
   maxTokens: 4096,
   temperature: 0.1,
   chatTemperature: 0.7,
@@ -194,6 +196,12 @@ const DEFAULT_WEBHOOKS_CONFIG: WebhooksConfig = {
 
 const DEFAULT_COST_CONFIG: CostConfig = {
   tokenPricing: {
+    // Current models (April 2026)
+    'gpt-5.4': { input: 0.003, output: 0.012 },
+    'claude-sonnet-4-6': { input: 0.003, output: 0.015 },
+    'claude-haiku-4-5': { input: 0.001, output: 0.005 },
+    'gemini-2.5-flash': { input: 0.0003, output: 0.0025 },
+    // Legacy models (retained for historical cost tracking)
     'gpt-4o': { input: 0.0025, output: 0.01 },
     'gpt-4o-mini': { input: 0.00015, output: 0.0006 },
     'gpt-4-turbo': { input: 0.01, output: 0.03 },
