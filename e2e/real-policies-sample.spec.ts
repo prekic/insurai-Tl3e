@@ -144,10 +144,10 @@ async function runFixture(
       return
     }
 
-    // Two opposite definitive signals: a real score (digits/100 or "puan") OR an explicit retry/failure UI.
-    // Loose tokens like "error" alone are ambiguous (page may show transient banners).
+    // Strict end-state SUCCESS tokens only — these only appear AFTER extraction completes.
+    // Header labels like "Sigortalı" / "Insured" were too eager (matched mid-OCR scaffolding).
     const successSignal = page.locator(
-      'text=/(\\d{1,3}\\s*\\/\\s*100|Toplam Puan|Overall Score|Teminatlar|Coverages|Sigortalı|Insured)/i'
+      'text=/(\\d{1,3}\\s*\\/\\s*100|Toplam Puan|Overall Score|Teminatlar|Coverages)/i'
     )
     const failureSignal = page.locator(
       'text=/(Tekrar Dene|Try Again|Extraction Failed|Çıkarım Başarısız|Bir hata oluştu|Could not extract)/i'

@@ -9,7 +9,63 @@
 
 ---
 
-## Per-PDF Outcome (3 runs against production)
+## Post-Merge Verification Run (Run #4 — added 2026-04-27 12:50 UTC)
+
+After the user merged `claude/load-project-context-9weNz` into `main`, Railway redeployed. During the deploy window, **production returned HTTP 503 "DNS cache overflow" for ~30 seconds** at the edge proxy (verified by `curl /api/health` polling — first 503 at 12:50:07, recovered to 200 at 12:50:23). Real users hitting the site during that window would have seen a generic 503 page.
+
+After recovery, ran the full sample spec (with the SUCCESS-locator tightened — see F6) against the freshly deployed version:
+
+| PDF | Run #4 outcome | Wall time | Notable |
+|---|---|---|---|
+| `ANADOLU.PDF` | inconclusive (test-side false-positive on `Coverages` locator; backend healthy) | 22.4 s | Doc AI 200, 12pp split into chunk 1/2, in-flight OCR when test bailed |
+| `allianz-police-0001021024147152-TR.pdf` | **EXTRACTION_BROKEN_END_TO_END** | 67.7 s | Doc AI returned **500 OCR_FAILED "Request timed out"** at 61 s; pdf.js fallback then **also failed** because the unpkg worker URL was CORS-blocked. User stays on "PDF Extraction…" indefinitely. |
+| `KASKO_ERDEMİR_Ereğli_462660767_67TY932_2024.12-2025.12.pdf` | **NAVIGATION_TIMEOUT** (3rd consecutive run) | 34.6 s | Confirmed bug: file selected, no navigation, no API call |
+
+### F0 — Allianz extraction is fully broken post-deploy  *(severity: CRITICAL — NEW)*
+
+Sequence from `e2e/proof/real-policies/allianz-peugeot.log` (run #4):
+
+```
+[PolicyExtractor] Attempting Document AI extraction...
+[Document AI] PDF has 9 pages (limit: 10)
+[error] Failed to load resource: the server responded with a status of 500
+[PolicyExtractor] Document AI result success: false (61456ms)
+[PolicyExtractor] Document AI FAILED: Request timed out, please try again
+[PolicyExtractor] Document AI error code: OCR_FAILED
+[PolicyExtractor] Will try pdf.js fallback...
+[PolicyExtractor] Starting pdf.js fallback extraction...
+[error] Access to script at 'https://unpkg.com/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs' ... blocked by CORS policy
+[PDF.js] Worker error detected (failure count: 1): Setting up fake worker failed
+[PDF.js] Attempt 1/3 failed with WORKER_ERROR
+```
+
+**Both extraction paths failed**:
+1. **Primary (Document AI)** returned 500 with `OCR_FAILED` after 61 seconds (server-side `Request timed out`). This is new — Allianz returned 200 in 21 s during pre-merge runs.
+2. **Fallback (pdf.js client-side)** failed because the worker URL `https://unpkg.com/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs` was CORS-blocked. Unlike the resolver path (which has a `unpkg → jsdelivr` cascade), the **runtime worker setup path doesn't cascade** — it just retries the same URL up to 3 times. CORS doesn't get better on retry.
+
+**End-user impact**: an anonymous user uploading an Allianz KASKO PDF post-merge sees the page sit at "PDF Extraction…" forever (no error toast, no retry button, no navigation away).
+
+**Possible root causes (need server-log correlation)**:
+- Document AI quota or auth regression after the redeploy. The merge didn't change the GCP service account, but it could have shifted env-var loading order. Check `GCP_SERVICE_ACCOUNT_BASE64` decoding in the `getDocumentAIClient()` factory.
+- Document AI cold-start: the first OCR call after a deploy can be much slower than steady-state. The 61 s timeout is right at Railway's 30 s gateway timeout doubled — could be a streaming/SSE issue (gotcha #130).
+- Real GCP-side outage during the deploy window. Check the GCP status page for `2026-04-27T12:51 UTC ± 5 min` for `us-central1` Document AI.
+
+**Where to look in code**:
+- `server/routes/ai/extraction.ts` — Document AI invocation, error mapping to `OCR_FAILED`
+- `src/lib/ai/pdf-parser.ts` — pdf.js fallback path; the worker resolver does cascade (gotcha #50, "PDF.js Worker error detected") but the actual `getDocument()` call uses whatever worker URL was set globally and re-uses it on retry without re-resolving.
+- Server logs around `2026-04-27T12:51:15Z` (Allianz request start) for the Document AI call's actual exception.
+
+### F0a — Erdemir landing-page upload bug confirmed reproducible  *(now 3/3 runs)*
+
+Run #4 makes it three consecutive failures (run #2, #3, #4) of the Erdemir 289 KB multi-vehicle KASKO upload to navigate from `/` to `/try`. The bug from F1 below is **not flaky — it is persistent**.
+
+### F0b — Railway 503 "DNS cache overflow" during deploy window  *(severity: MEDIUM — informational)*
+
+When the user merged the branch and Railway deployed, the edge proxy returned HTTP 503 with body `DNS cache overflow` for at least 16 seconds (12:50:07 → 12:50:23 UTC). This is a Railway-side phenomenon, likely the edge proxy struggling to resolve the new build's container — but it surfaces to real users as a generic 503. Worth flagging to Railway support if it persists across future deploys.
+
+---
+
+## Per-PDF Outcome (4 runs against production)
 
 | PDF | Bytes | Pages | Run #2 (post-cert-fix) | Run #3 (final) |
 |---|---|---|---|---|
