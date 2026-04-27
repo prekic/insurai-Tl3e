@@ -158,10 +158,16 @@ describe('ConfigurationService', () => {
   beforeEach(() => {
     ConfigurationService.resetInstance()
     vi.clearAllMocks()
+    // Plan A added a localStorage cache layer — clear it between tests so
+    // a successful fetch in one test doesn't leak into another's expectations
+    // (e.g. tests asserting "returns default" would otherwise pick up a cached
+    // value from a prior test).
+    localStorage.clear()
   })
 
   afterEach(() => {
     vi.clearAllMocks()
+    localStorage.clear()
   })
 
   // =========================================================================
@@ -1816,6 +1822,194 @@ describe('ConfigurationService', () => {
 
       expect(callCount).toBe(2)
       expect(result).toEqual({ min_confidence: 0.6 })
+    })
+  })
+
+  // ========================================================================
+  // localStorage fallback when retries exhaust — Plan A from runbook 08
+  // ========================================================================
+  describe('localStorage fallback when retries exhaust', () => {
+    beforeEach(() => {
+      service = ConfigurationService.getInstance({ enableCache: false })
+      localStorage.clear()
+    })
+    afterEach(() => {
+      localStorage.clear()
+    })
+
+    // ── get() ─────────────────────────────────────────────────────────────
+
+    it('get() returns localStorage value after 3 thrown failures', async () => {
+      // Pre-populate localStorage with a fresh entry.
+      localStorage.setItem(
+        'insurai_config_ai__min_confidence',
+        JSON.stringify({ version: 1, timestamp: Date.now(), value: 0.55 })
+      )
+      mockSingle.mockImplementation(() => Promise.reject(new TypeError('Failed to fetch')))
+      mockEq.mockReturnValue({
+        eq: mockEq,
+        single: mockSingle,
+        maybeSingle: mockMaybeSingle,
+        order: mockOrder,
+      })
+      mockSelect.mockReturnValue({ eq: mockEq, order: mockOrder })
+      mockFrom.mockReturnValue({ select: mockSelect, upsert: mockUpsert })
+
+      const result = await service.get('ai', 'min_confidence', 0.99)
+      expect(result).toBe(0.55)
+    })
+
+    it('get() falls back to default when localStorage is empty AND retries fail', async () => {
+      // No localStorage entry. The 3-retry path should exhaust and the
+      // default kicks in.
+      mockSingle.mockImplementation(() => Promise.reject(new TypeError('Failed to fetch')))
+      mockEq.mockReturnValue({
+        eq: mockEq,
+        single: mockSingle,
+        maybeSingle: mockMaybeSingle,
+        order: mockOrder,
+      })
+      mockSelect.mockReturnValue({ eq: mockEq, order: mockOrder })
+      mockFrom.mockReturnValue({ select: mockSelect, upsert: mockUpsert })
+
+      const result = await service.get('ai', 'min_confidence', 0.99)
+      expect(result).toBe(0.99) // hardcoded default
+    })
+
+    it('get() returns localStorage value after 3 SDK transport-error responses (no error.code)', async () => {
+      localStorage.setItem(
+        'insurai_config_ai__min_confidence',
+        JSON.stringify({ version: 1, timestamp: Date.now(), value: 0.77 })
+      )
+      mockSingle.mockImplementation(() =>
+        Promise.resolve({
+          data: null,
+          error: { message: 'TypeError: Failed to fetch' }, // no `code` → retried
+        })
+      )
+      mockEq.mockReturnValue({
+        eq: mockEq,
+        single: mockSingle,
+        maybeSingle: mockMaybeSingle,
+        order: mockOrder,
+      })
+      mockSelect.mockReturnValue({ eq: mockEq, order: mockOrder })
+      mockFrom.mockReturnValue({ select: mockSelect, upsert: mockUpsert })
+
+      const result = await service.get('ai', 'min_confidence', 0.99)
+      expect(result).toBe(0.77)
+    })
+
+    it('get() ignores stale localStorage entries (>7 days) and returns default', async () => {
+      const stale = Date.now() - 8 * 24 * 60 * 60 * 1000 // 8 days ago
+      const storageKey = 'insurai_config_ai__min_confidence'
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({ version: 1, timestamp: stale, value: 0.11 })
+      )
+      mockSingle.mockImplementation(() => Promise.reject(new TypeError('Failed to fetch')))
+      mockEq.mockReturnValue({
+        eq: mockEq,
+        single: mockSingle,
+        maybeSingle: mockMaybeSingle,
+        order: mockOrder,
+      })
+      mockSelect.mockReturnValue({ eq: mockEq, order: mockOrder })
+      mockFrom.mockReturnValue({ select: mockSelect, upsert: mockUpsert })
+
+      const result = await service.get('ai', 'min_confidence', 0.99)
+      expect(result).toBe(0.99) // stale entry rejected → fall through to default
+      expect(localStorage.getItem(storageKey)).toBeNull() // self-healed
+    })
+
+    it('get() ignores wrong-version localStorage entries and returns default', async () => {
+      const storageKey = 'insurai_config_ai__min_confidence'
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({ version: 999, timestamp: Date.now(), value: 0.11 })
+      )
+      mockSingle.mockImplementation(() => Promise.reject(new TypeError('Failed to fetch')))
+      mockEq.mockReturnValue({
+        eq: mockEq,
+        single: mockSingle,
+        maybeSingle: mockMaybeSingle,
+        order: mockOrder,
+      })
+      mockSelect.mockReturnValue({ eq: mockEq, order: mockOrder })
+      mockFrom.mockReturnValue({ select: mockSelect, upsert: mockUpsert })
+
+      const result = await service.get('ai', 'min_confidence', 0.99)
+      expect(result).toBe(0.99)
+      expect(localStorage.getItem(storageKey)).toBeNull()
+    })
+
+    it('get() writes successful fetches to localStorage', async () => {
+      mockSingle.mockResolvedValue({ data: { value: 0.88 }, error: null })
+      mockEq.mockReturnValue({
+        eq: mockEq,
+        single: mockSingle,
+        maybeSingle: mockMaybeSingle,
+        order: mockOrder,
+      })
+      mockSelect.mockReturnValue({ eq: mockEq, order: mockOrder })
+      mockFrom.mockReturnValue({ select: mockSelect, upsert: mockUpsert })
+
+      const result = await service.get('ai', 'min_confidence', 0.0)
+      expect(result).toBe(0.88)
+
+      const cached = localStorage.getItem('insurai_config_ai__min_confidence')
+      expect(cached).not.toBeNull()
+      const parsed = JSON.parse(cached as string)
+      expect(parsed.value).toBe(0.88)
+      expect(parsed.version).toBe(1)
+    })
+
+    // ── getCategory() ─────────────────────────────────────────────────────
+
+    it('getCategory() returns localStorage value after 3 thrown failures', async () => {
+      localStorage.setItem(
+        'insurai_config_category__ai',
+        JSON.stringify({
+          version: 1,
+          timestamp: Date.now(),
+          value: { min_confidence: 0.55, max_tokens: 8192 },
+        })
+      )
+      mockOrder.mockImplementation(() => Promise.reject(new TypeError('Failed to fetch')))
+      mockEq.mockReturnValue({
+        eq: mockEq,
+        single: mockSingle,
+        maybeSingle: mockMaybeSingle,
+        order: mockOrder,
+      })
+      mockSelect.mockReturnValue({ eq: mockEq, order: mockOrder })
+      mockFrom.mockReturnValue({ select: mockSelect, upsert: mockUpsert })
+
+      const result = await service.getCategory('ai')
+      expect(result).toEqual({ min_confidence: 0.55, max_tokens: 8192 })
+    })
+
+    it('getCategory() writes successful fetches to localStorage', async () => {
+      mockOrder.mockResolvedValue({
+        data: [{ key: 'min_confidence', value: 0.66 }],
+        error: null,
+      })
+      mockEq.mockReturnValue({
+        eq: mockEq,
+        single: mockSingle,
+        maybeSingle: mockMaybeSingle,
+        order: mockOrder,
+      })
+      mockSelect.mockReturnValue({ eq: mockEq, order: mockOrder })
+      mockFrom.mockReturnValue({ select: mockSelect, upsert: mockUpsert })
+
+      const result = await service.getCategory('ai')
+      expect(result).toEqual({ min_confidence: 0.66 })
+
+      const cached = localStorage.getItem('insurai_config_category__ai')
+      expect(cached).not.toBeNull()
+      const parsed = JSON.parse(cached as string)
+      expect(parsed.value).toEqual({ min_confidence: 0.66 })
     })
   })
 })
