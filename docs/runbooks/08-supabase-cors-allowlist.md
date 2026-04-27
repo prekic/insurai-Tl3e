@@ -111,7 +111,20 @@ Three attempts total, 200 ms / 500 ms backoff, total worst-case extra latency ~7
 | 2 | 14 % |
 | 3 | **5 %** |
 
-**Important**: the helper retries only on **thrown exceptions** (network errors, CORS-blocked preflights — these manifest as `TypeError: Failed to fetch`). It does NOT retry on SDK error responses (e.g. RLS `401`, missing-table `404`) since those are real and won't recover. Tests in `src/lib/config/__tests__/configuration-service.test.ts` ("Cloudflare 503 retry on Supabase preflight failure" describe block) verify all four behaviors.
+**Important — handles both Supabase SDK failure shapes**:
+
+The Supabase JS SDK does NOT throw on transport-level fetch failures. It catches them internally and returns `{ data: null, error: { message: 'TypeError: Failed to fetch' } }` with NO PostgREST `code`. So the retry helper inspects both:
+
+1. **Thrown exceptions** (rare with @supabase/supabase-js but possible in some proxy setups) — caught by the surrounding `try/catch`.
+2. **Resolved-with-error transport responses** — when `result.error` exists but has no `code` field, the helper treats it as a transport-level failure and retries.
+
+Does NOT retry on:
+- SDK error responses with a PostgREST `code` (e.g. `PGRST116` = no rows found, `PGRST301` = JWT expired, `42501` = RLS rejection) — these are real and won't recover.
+- Clean success responses.
+
+Tests in `src/lib/config/__tests__/configuration-service.test.ts` ("Cloudflare 503 retry on Supabase preflight failure" describe block, 5 cases) verify all behaviors.
+
+This fix landed in two phases — the original Apr 27 commit only handled the thrown-exception case; the empirical post-deploy verification (using `route.abort()` against production) revealed the SDK was eating the rejection, and the same-day follow-up commit added the resolved-with-transport-error inspection that made the retry actually fire in production.
 
 Other Supabase fetch sites in `ConfigurationService` (e.g. `getRegionalFactors`, `getMarketBenchmarks`, `getInsuranceProviders`) are called less frequently and aren't yet wrapped — easy follow-up if the same symptoms appear there.
 

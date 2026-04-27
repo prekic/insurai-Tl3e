@@ -251,7 +251,10 @@ describe('ConfigurationService', () => {
     })
 
     it('should record success event for cache miss returning default', async () => {
-      setupSingleQuery({ data: null, error: { message: 'not found' } })
+      // PGRST116 = "Results contain 0 rows" — a real PostgREST not-found,
+      // not a transport error. Distinguishing the two became necessary
+      // when withRetry started inspecting result.error.code (Apr 27 2026).
+      setupSingleQuery({ data: null, error: { message: 'not found', code: 'PGRST116' } })
       await service.get('ai', 'key', 'val')
       expect(configPerformanceMonitor.record).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -417,7 +420,10 @@ describe('ConfigurationService', () => {
     })
 
     it('should record success on cache miss returning empty', async () => {
-      setupOrderQuery({ data: null, error: { message: 'not found' } })
+      // Real PostgREST "no rows" error (has `code`), not a transport error.
+      // Without the code, withRetry would interpret this as transport-level
+      // and retry up to 3× (Apr 27 2026 fix).
+      setupOrderQuery({ data: null, error: { message: 'not found', code: 'PGRST116' } })
       await service.getCategory('ai')
       expect(configPerformanceMonitor.record).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1727,6 +1733,36 @@ describe('ConfigurationService', () => {
 
       expect(callCount).toBe(3) // exactly 3 attempts (initial + 2 retries)
       expect(result).toBe(0.42) // falls back to provided default
+    })
+
+    it('get() retries when SDK returns a transport error (no error.code)', async () => {
+      // The Supabase SDK catches fetch() rejections and returns them as a
+      // result with `error.message` set but NO `error.code`. This is the
+      // production failure mode for CORS-blocked Cloudflare 503 preflights.
+      let callCount = 0
+      mockSingle.mockImplementation(() => {
+        callCount += 1
+        if (callCount === 1) {
+          return Promise.resolve({
+            data: null,
+            error: { message: 'TypeError: Failed to fetch' }, // no `code`
+          })
+        }
+        return Promise.resolve({ data: { value: 0.55 }, error: null })
+      })
+      mockEq.mockReturnValue({
+        eq: mockEq,
+        single: mockSingle,
+        maybeSingle: mockMaybeSingle,
+        order: mockOrder,
+      })
+      mockSelect.mockReturnValue({ eq: mockEq, order: mockOrder })
+      mockFrom.mockReturnValue({ select: mockSelect, upsert: mockUpsert })
+
+      const result = await service.get('ai', 'min_confidence', 0.7)
+
+      expect(callCount).toBe(2) // first attempt was a transport error → retry → success
+      expect(result).toBe(0.55)
     })
 
     it('get() does NOT retry when SDK returns a clean error (e.g. RLS)', async () => {

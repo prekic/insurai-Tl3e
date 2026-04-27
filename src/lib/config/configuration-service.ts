@@ -46,39 +46,64 @@ const getSupabase = () => import('@/lib/supabase/client').then((m) => m.supabase
  * Designed to absorb the intermittent Cloudflare-edge HTTP 503 ("DNS cache
  * overflow") that hits Supabase OPTIONS preflights in production (~30-40 %
  * failure rate observed in Apr 27 audit — see docs/runbooks/08-supabase-cors-allowlist.md).
- * The 503 propagates as a thrown TypeError from `fetch()` because the browser
- * blocks the response without the ACAO header.
  *
- * Retries on:
- *  - any thrown exception (network error, CORS-blocked preflight, etc.)
- * Does NOT retry on:
- *  - SDK error returns (e.g. 401 RLS, 404 missing) — those are real and
- *    won't get better on retry. The caller's existing `if (error)` branch
- *    handles those.
+ * Two failure modes need to be handled:
+ *
+ *  1. **Thrown exception**: rare with @supabase/supabase-js, but some
+ *     environments / proxies do propagate the underlying TypeError when the
+ *     browser blocks a CORS-failed response.
+ *  2. **SDK-caught transport error**: this is the common case in production.
+ *     The Supabase SDK wraps `fetch()` in its own try/catch and resolves
+ *     with `{ data: null, error: { message: 'TypeError: Failed to fetch' } }`
+ *     (no PostgREST `code`). The caller's existing `if (error)` branch
+ *     handles it as a normal SDK error, so the retry helper has to inspect
+ *     the resolved value to detect this case.
+ *
+ * Retries fire when:
+ *  - any thrown exception (mode 1), OR
+ *  - the resolved value has `error` but `error.code` is absent (mode 2 —
+ *    transport failure, no PostgREST status to attribute it to).
+ *
+ * Does NOT retry when:
+ *  - the resolved value has `error.code` set (e.g. PGRST301 = JWT, 42501 =
+ *    RLS) — these are real and won't recover.
+ *  - the resolved value is a clean success (no error).
  *
  * Defaults: 3 attempts total, 200 ms / 500 ms backoff between them.
- * Worst-case extra latency on a complete network failure: ~700 ms before
- * the third attempt completes, after which the caller's catch block falls
- * back to defaults the same way it would have without retry.
+ * Worst-case extra latency on a complete failure: ~700 ms before the
+ * caller's existing fallback kicks in.
  *
  * Probability math (37 % per-attempt failure rate from real diagnostic):
- *   - Single attempt: 37 % failure
- *   - 2 attempts:     14 %
- *   - 3 attempts:      5 %
+ *  - 1 attempt:  37 %
+ *  - 2 attempts: 14 %
+ *  - 3 attempts:  5 %
  */
 async function withRetry<T>(fn: () => Promise<T>, attempts: number = 3): Promise<T> {
+  let lastResult: T | undefined
   let lastErr: unknown
   for (let i = 0; i < attempts; i++) {
     try {
-      return await fn()
+      const result = await fn()
+      // Mode 2: SDK-caught transport error surfaces as `result.error` with
+      // no PostgREST `code`. Inspect via narrow type assertion.
+      const errish = (result as unknown as { error?: { code?: string | null } | null })?.error
+      if (errish && !errish.code) {
+        lastResult = result
+        if (i === attempts - 1) break
+        const delayMs = i === 0 ? 200 : 500
+        await new Promise((r) => setTimeout(r, delayMs))
+        continue
+      }
+      return result
     } catch (e) {
+      // Mode 1: rare, but possible.
       lastErr = e
       if (i === attempts - 1) break
-      // 200 ms after attempt 1, 500 ms after attempt 2.
       const delayMs = i === 0 ? 200 : 500
       await new Promise((r) => setTimeout(r, delayMs))
     }
   }
+  if (lastResult !== undefined) return lastResult
   throw lastErr
 }
 
