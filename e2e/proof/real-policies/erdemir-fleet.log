@@ -1,17 +1,17 @@
 # KASKO_ERDEMİR_Ereğli_462660767_67TY932_2024.12-2025.12.pdf
-startedAt: 2026-04-27T17:22:19.846Z
-wallTimeMs: 33910
+startedAt: 2026-04-27T18:42:15.792Z
+wallTimeMs: 24251
 finalUrl: https://insurai-production.up.railway.app/
 outcome: NAVIGATION_TIMEOUT
-detail: URL still https://insurai-production.up.railway.app/ after upload
+detail: Page failed to load InsurAI app after 4 attempts (probable Cloudflare 503 window — runbook 08)
 extractStatus: n/a
 extractEndpoint: n/a
 
 ## Console errors / warnings
-[warning] Sentry DSN not configured. Error tracking disabled.
-[error] An SSL certificate error occurred when fetching the script.
-[error] [PWA] Service worker registration failed: SecurityError: Failed to register a ServiceWorker for scope ('https://insurai-production.up.railway.app/') with script ('https://insurai-production.up.railway.app/sw.js'): An SSL certificate error occurred when fetching the script.
-[warning] The resource https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+[error] Failed to load resource: the server responded with a status of 503 ()
+[error] Failed to load resource: the server responded with a status of 503 ()
+[error] Failed to load resource: the server responded with a status of 503 ()
+[error] Failed to load resource: the server responded with a status of 503 ()
 
 ## Failed network requests
 (none)
