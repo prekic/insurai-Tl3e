@@ -1772,27 +1772,47 @@ router.post('/ocr', validateJSON, ocrLimiter, validateOCR, async (req: Request, 
       log.info('Vision OCR: using API key authentication')
     }
 
-    // Call Vision OCR with 60-second timeout to prevent hanging
-    const controller = new AbortController()
-    const fetchTimeout = setTimeout(() => controller.abort(), 60000)
+    // Resolve OCR timeout from config (DB-overridable). Same key drives
+    // Document AI and Vision OCR — both have similar cold-start profiles.
+    const aiCfgVision = await getAIConfig()
+    const ocrFetchTimeoutMs = aiCfgVision.ocrFetchTimeoutMs
+
+    const visionRequestBody = JSON.stringify({
+      requests: [
+        {
+          image: { content: imageBase64 },
+          features: [{ type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }],
+          imageContext: { languageHints: ['tr', 'en'] },
+        },
+      ],
+    })
+
+    const callVision = async (): Promise<globalThis.Response> => {
+      const controller = new AbortController()
+      const fetchTimeout = setTimeout(() => controller.abort(), ocrFetchTimeoutMs)
+      try {
+        return await fetch(url, {
+          method: 'POST',
+          headers,
+          signal: controller.signal,
+          body: visionRequestBody,
+        })
+      } finally {
+        clearTimeout(fetchTimeout)
+      }
+    }
+
+    // ONE retry on AbortError (timeout) — see comment on the Document AI path
+    // for rationale.
     let response: globalThis.Response
     try {
-      response = await fetch(url, {
-        method: 'POST',
-        headers,
-        signal: controller.signal,
-        body: JSON.stringify({
-          requests: [
-            {
-              image: { content: imageBase64 },
-              features: [{ type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }],
-              imageContext: { languageHints: ['tr', 'en'] },
-            },
-          ],
-        }),
-      })
-    } finally {
-      clearTimeout(fetchTimeout)
+      response = await callVision()
+    } catch (err) {
+      const isAbort =
+        err instanceof Error && (err.name === 'AbortError' || err.message?.includes('aborted'))
+      if (!isAbort) throw err
+      log.warn('[OCR] cold-start retry: vision', { ocrFetchTimeoutMs })
+      response = await callVision()
     }
 
     if (!response.ok) {
@@ -1953,45 +1973,76 @@ router.post(
       // Build Document AI endpoint
       const endpoint = `https://${GCP_CONFIG.location}-documentai.googleapis.com/v1/projects/${GCP_CONFIG.projectId}/locations/${GCP_CONFIG.location}/processors/${GCP_CONFIG.processorId}:process`
 
+      // Resolve timeout from config (DB-overridable, defaults to 90 s).
+      // Replaces the hardcoded 60 000 ms ceiling that aborted Allianz at
+      // exactly 60.057 s in production. See migration 044 and findings F0.
+      const aiCfg = await getAIConfig()
+      const ocrFetchTimeoutMs = aiCfg.ocrFetchTimeoutMs
+
       log.info('Calling Document AI API', {
         location: GCP_CONFIG.location,
         project: GCP_CONFIG.projectId,
         processor: GCP_CONFIG.processorId,
         setupMs: Date.now() - startTime,
+        ocrFetchTimeoutMs,
       })
 
-      // Call Document AI with 60-second timeout to prevent hanging
-      const controller = new AbortController()
-      const fetchTimeout = setTimeout(() => controller.abort(), 60000)
+      const requestBody = JSON.stringify({
+        rawDocument: {
+          content: documentBase64,
+          mimeType,
+        },
+        skipHumanReview: true,
+        // Note: enableImagelessMode is only available on Enterprise Document OCR processors
+        // Standard OCR processors have a 15-page limit
+        // For documents >15 pages, the fallback to pdf.js will be used
+        processOptions: {
+          ocrConfig: {
+            hints: {
+              languageHints: languageHints || ['tr', 'en'],
+            },
+          },
+        },
+      })
+
+      // Single attempt against Document AI. Aborts on the configured timeout.
+      // Throws AbortError when the timeout fires; any other rejection (network,
+      // GCP 5xx surfacing as fetch error) is rethrown unchanged.
+      const callDocumentAI = async (): Promise<globalThis.Response> => {
+        const controller = new AbortController()
+        const fetchTimeout = setTimeout(() => controller.abort(), ocrFetchTimeoutMs)
+        try {
+          return await fetch(endpoint, {
+            method: 'POST',
+            signal: controller.signal,
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: requestBody,
+          })
+        } finally {
+          clearTimeout(fetchTimeout)
+        }
+      }
+
+      // ONE retry on AbortError (timeout). Document AI cold-starts can spike
+      // well past the steady-state latency, and the second attempt almost
+      // always succeeds because the processor is warm. We do NOT retry on
+      // genuine HTTP 4xx/5xx (those aren't cold-start), and we do NOT retry
+      // beyond once (would compound latency unacceptably for the user).
       let response: globalThis.Response
       try {
-        response = await fetch(endpoint, {
-          method: 'POST',
-          signal: controller.signal,
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            rawDocument: {
-              content: documentBase64,
-              mimeType,
-            },
-            skipHumanReview: true,
-            // Note: enableImagelessMode is only available on Enterprise Document OCR processors
-            // Standard OCR processors have a 15-page limit
-            // For documents >15 pages, the fallback to pdf.js will be used
-            processOptions: {
-              ocrConfig: {
-                hints: {
-                  languageHints: languageHints || ['tr', 'en'],
-                },
-              },
-            },
-          }),
+        response = await callDocumentAI()
+      } catch (err) {
+        const isAbort =
+          err instanceof Error && (err.name === 'AbortError' || err.message?.includes('aborted'))
+        if (!isAbort) throw err
+        log.warn('[OCR] cold-start retry: document-ai', {
+          firstAttemptMs: Date.now() - startTime,
+          ocrFetchTimeoutMs,
         })
-      } finally {
-        clearTimeout(fetchTimeout)
+        response = await callDocumentAI()
       }
 
       if (!response.ok) {

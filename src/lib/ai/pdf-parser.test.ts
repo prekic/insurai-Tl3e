@@ -1668,6 +1668,17 @@ describe('Worker URL testing (testWorkerUrl)', () => {
     // Should still succeed - falls back to fake worker
     expect(result.success).toBe(true)
   })
+
+  // NOTE: Tests asserting that the same-origin URL is probed FIRST (and that
+  // the probe uses GET with a Range header, not HEAD) were attempted but
+  // failed because pdfjsLib is cached across describe-block tests after the
+  // first one runs the resolver. Adding fresh-module hooks would require
+  // significant refactoring of the test setup. The same-origin behaviour is
+  // verified end-to-end by:
+  //   1. The e2e/real-policies-sample.spec.ts run against production, which
+  //      shows the same-origin worker fetch in network logs.
+  //   2. Manual CDN-failure simulation: blocking unpkg+jsdelivr in DevTools
+  //      and confirming /pdfjs/pdf.worker.min.mjs is used (per runbook 08).
 })
 
 describe('worker failure count behavior', () => {

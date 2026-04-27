@@ -49,6 +49,12 @@ export interface AIConfig {
   fallbackProviderTimeoutMs: number
   clientFetchTimeoutMs: number
   trialExtractionTimeoutMs: number
+  // Per-fetch timeout for the server-side OCR call to Document AI / Vision.
+  // Distinct from primaryProviderTimeoutMs (chat extraction) — OCR has its
+  // own latency profile (cold-start in particular) and should be tunable
+  // independently. Default 90 s gives Doc AI cold-start headroom; we observed
+  // Allianz hitting exactly 60 s on the previous hardcoded ceiling.
+  ocrFetchTimeoutMs: number
 }
 
 export interface RateLimitsConfig {
@@ -160,6 +166,7 @@ const DEFAULT_AI_CONFIG: AIConfig = {
   fallbackProviderTimeoutMs: 55000,
   clientFetchTimeoutMs: 135000,
   trialExtractionTimeoutMs: 150000,
+  ocrFetchTimeoutMs: 90000,
 }
 
 const DEFAULT_FX_CONFIG: FXConfig = {
@@ -301,6 +308,7 @@ const AI_KEY_MAP: Record<string, keyof AIConfig> = {
   fallback_provider_timeout_ms: 'fallbackProviderTimeoutMs',
   client_fetch_timeout_ms: 'clientFetchTimeoutMs',
   trial_extraction_timeout_ms: 'trialExtractionTimeoutMs',
+  ocr_fetch_timeout_ms: 'ocrFetchTimeoutMs',
 }
 
 const FX_KEY_MAP: Record<string, keyof FXConfig> = {

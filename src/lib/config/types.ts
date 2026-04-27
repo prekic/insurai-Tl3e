@@ -110,6 +110,10 @@ export interface AIConfig {
   fallbackProviderTimeoutMs: number
   clientFetchTimeoutMs: number
   trialExtractionTimeoutMs: number
+  // Per-fetch timeout for the server-side OCR call to Document AI / Vision.
+  // See migration 044 and gotcha-table entry on the 60-second hardcoded
+  // ceiling that broke Allianz extraction in production.
+  ocrFetchTimeoutMs: number
 }
 
 export const DEFAULT_AI_CONFIG: AIConfig = {
@@ -138,6 +142,7 @@ export const DEFAULT_AI_CONFIG: AIConfig = {
   fallbackProviderTimeoutMs: 55000,
   clientFetchTimeoutMs: 135000,
   trialExtractionTimeoutMs: 150000,
+  ocrFetchTimeoutMs: 90000,
 }
 
 // =============================================================================

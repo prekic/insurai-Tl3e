@@ -287,4 +287,32 @@ test.describe('Real-World Policy Sample (Investigation)', () => {
       await runFixture(page, fixture, testInfo)
     })
   }
+
+  // CORS smoke check — guards against gotcha #3 from findings (Supabase REST CORS regression).
+  // The frontend ConfigurationService falls back to defaults silently when this header is absent,
+  // which means admin-tunable values stop reaching the running app without any visible failure.
+  // Independent of E2E_BASE_URL — this is a Supabase-side allowlist check.
+  test('supabase cors allowlist includes production origin', async ({ request }) => {
+    const PROD_ORIGIN = 'https://insurai-production.up.railway.app'
+    const SUPABASE_REST = 'https://exykhfulkbwzatpesruv.supabase.co/rest/v1/app_settings'
+    const params = '?select=key%2Cvalue&category=eq.ocr&order=display_order.asc'
+
+    const response = await request.fetch(SUPABASE_REST + params, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: PROD_ORIGIN,
+        'Access-Control-Request-Method': 'GET',
+        'Access-Control-Request-Headers': 'apikey,authorization,content-type',
+      },
+    })
+
+    const acao = response.headers()['access-control-allow-origin']
+    expect(
+      acao,
+      `Supabase CORS allowlist must include "${PROD_ORIGIN}". ` +
+        `Without this header, the production frontend silently falls back to ` +
+        `DEFAULT_*_CONFIG and admin-tunable settings never reach the client. ` +
+        `Fix: Supabase Project Settings → API → CORS allowed origins.`
+    ).toMatch(new RegExp(`${PROD_ORIGIN.replace(/\./g, '\\.')}|\\*`))
+  })
 })

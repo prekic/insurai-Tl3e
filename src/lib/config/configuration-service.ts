@@ -119,6 +119,7 @@ const AI_KEY_MAP: Record<string, keyof AIConfig> = {
   fallback_provider_timeout_ms: 'fallbackProviderTimeoutMs',
   client_fetch_timeout_ms: 'clientFetchTimeoutMs',
   trial_extraction_timeout_ms: 'trialExtractionTimeoutMs',
+  ocr_fetch_timeout_ms: 'ocrFetchTimeoutMs',
 }
 
 const EVALUATION_KEY_MAP: Record<string, keyof EvaluationConfig> = {

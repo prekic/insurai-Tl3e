@@ -8,6 +8,11 @@ dist-server/
 # Bundle analysis
 stats.html
 
+# Copied at install time by scripts/copy-pdfjs-worker.mjs (postinstall hook).
+# Kept out of git because it's a derived artifact of pdfjs-dist and would drift
+# whenever that package is bumped.
+public/pdfjs/
+
 # TypeScript
 *.tsbuildinfo
 

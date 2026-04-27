@@ -15,7 +15,7 @@ interface UploadWidgetProps {
 export function UploadWidget({
   compact = false,
   buttonText = 'Upload your policy',
-  loadingText = 'Uploading...'
+  loadingText = 'Uploading...',
 }: UploadWidgetProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -36,10 +36,31 @@ export function UploadWidget({
   }
 
   const handleFiles = async (files: File[]) => {
+    // Diagnostic instrumentation — gated behind VITE_DEBUG_LOGS to keep production silent.
+    // When enabled (set in Railway env or .env), every gate on the upload path emits a
+    // [UploadWidget] line so we can identify exactly where uploads silently bail
+    // (e.g. the Erdemir multi-vehicle KASKO PDF case from findings F1).
+    const debug = import.meta.env.VITE_DEBUG_LOGS === 'true'
+    if (debug) {
+      console.warn('[UploadWidget] handleFiles entered', {
+        fileCount: files.length,
+        files: files.map((f) => ({ name: f.name, size: f.size, type: f.type })),
+      })
+    }
+
     setError(null)
 
     // Validate files
     const { valid, errors } = validateFiles(files)
+
+    if (debug) {
+      console.warn('[UploadWidget] validateFiles result', {
+        validCount: valid.length,
+        errorCount: errors.length,
+        errorCodes: errors.map((e) => e.code),
+        errorDetails: errors.map((e) => e.details),
+      })
+    }
 
     // Show error messages for invalid files
     if (errors.length > 0) {
@@ -53,18 +74,29 @@ export function UploadWidget({
 
       // If no valid files, show inline error and return
       if (valid.length === 0) {
+        if (debug) {
+          console.warn('[UploadWidget] bailing — no valid files after validation')
+        }
         setError(t.landing.uploadNoValidFiles)
         return
       }
     }
 
     setIsUploading(true)
+    if (debug) console.warn('[UploadWidget] isUploading=true, starting 500ms UX delay')
 
     try {
       // Brief delay for UX feedback
       await new Promise((resolve) => setTimeout(resolve, 500))
 
       setIsUploading(false)
+      if (debug) {
+        console.warn('[UploadWidget] navigate firing', {
+          target: user ? '/upload?autoOpen=true' : '/try',
+          fileName: valid[0]?.name,
+          isAuthenticated: !!user,
+        })
+      }
       // Navigate to appropriate page with file data
       // For anonymous users, pass file via router state to TryAnalysis
       // For logged-in users, pass to PolicyUpload
@@ -74,7 +106,14 @@ export function UploadWidget({
         // Pass file to TryAnalysis - it will handle the analysis
         navigate('/try', { state: { file: valid[0] } })
       }
+      if (debug) console.warn('[UploadWidget] navigate returned (post-call)')
     } catch (err) {
+      if (debug) {
+        console.warn('[UploadWidget] caught exception in try block', {
+          error: err instanceof Error ? err.message : String(err),
+          stack: err instanceof Error ? err.stack : undefined,
+        })
+      }
       setIsUploading(false)
       const message = err instanceof Error ? err.message : t.landing.uploadFailed
       setError(message)
@@ -125,7 +164,10 @@ export function UploadWidget({
 
   return (
     <div
-      onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+      onDragOver={(e) => {
+        e.preventDefault()
+        setIsDragging(true)
+      }}
       onDragLeave={() => setIsDragging(false)}
       onDrop={handleDrop}
       className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all ${
@@ -173,7 +215,8 @@ export function UploadWidget({
             <p className="text-sm text-gray-500 mt-1">{t.landing.uploadOrClick}</p>
           </div>
           <p className="text-xs text-gray-500">
-            {FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(', ')} {t.landing.uploadMaxSize.replace('{size}', String(FILE_CONSTRAINTS.MAX_SIZE_MB))}
+            {FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(', ')}{' '}
+            {t.landing.uploadMaxSize.replace('{size}', String(FILE_CONSTRAINTS.MAX_SIZE_MB))}
           </p>
           <input
             type="file"

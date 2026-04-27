@@ -1074,6 +1074,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     percentComplete: '% complete',
     aiAnalyzing: 'AI is analyzing your policy...',
     preparingToAnalyze: 'Preparing to analyze your policy...',
+    retryingFallback: 'Retrying with alternate method…',
     elapsed: 'Elapsed',
     detectedPages: '{count} pages',
     detectedProvider: 'AI: {provider}',
