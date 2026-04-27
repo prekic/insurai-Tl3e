@@ -12,24 +12,10 @@ Analyze Your Policy
 
 Upload a PDF policy document for instant AI-powered analysis
 
-ANADOLU.PDF
+Analysis Failed
 
-90 KB
+Failed to extract policy data: All AI providers failed: Request was aborted.
 
-Elapsed 0:13
-
-OCR Processing…
-
-Upload
-937ms
-PDF Extraction
-OCR Processing
-Text Preprocessing
-AI Extraction
-Table Parsing
-Validation
-Save
-
-💡 Your insured value is being matched against current market rayiç data.
+Try Again
 
 Already have an account? Sign In

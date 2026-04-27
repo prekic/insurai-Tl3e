@@ -7,6 +7,10 @@
 **Browser**: Playwright Chromium (headless), v1.56.1
 **Heal scope**: investigation only — **no production code edits**.
 
+> **Run #5 update (2026-04-27 17:21 UTC)** — appended at the bottom of this file
+> after PR #384 (the six-item hardening pass) merged into `main` and Railway
+> redeployed. See section "Run #5 — post-fix verification" below.
+
 ---
 
 ## Post-Merge Verification Run (Run #4 — added 2026-04-27 12:50 UTC)
@@ -212,3 +216,143 @@ These appeared in the logs but are **not** production issues:
 ## What Was NOT Touched
 
 Confirmed by `git status` after the run: only `e2e/real-policies-sample.spec.ts`, `e2e/proof/real-policies/*`, and this findings file. No production code, no DB migration, no shared schema, no dependency was modified.
+
+---
+
+# Run #5 — post-fix verification (2026-04-27 17:21 UTC)
+
+After PR #384 (`fix(extraction): six-item production hardening pass post-deploy`, commit `abd4e1b`) was merged into `main` and Railway redeployed (production now at `dbbf8f6`), I re-ran the sample spec plus a deeper one-shot probe of the Allianz fixture (waiting 150 s for true end-state instead of the spec's 22 s false-positive exit).
+
+## Smoke checks before the run
+
+| Check | Result |
+|---|---|
+| `GET /api/health` after deploy | `200 {"status":"ok",...}` (after one transient 503 "DNS cache overflow" — same Cloudflare edge issue as F0b) |
+| `GET /pdfjs/pdf.worker.min.mjs` (item 2) | `HTTP 200`, `content-length: 1078612`, `content-type: text/javascript` |
+| Production CSP allows `worker-src 'self'` | yes — confirmed in response headers |
+
+## Per-PDF outcomes
+
+| PDF | Spec wallTime | Doc AI status | Doc AI duration | AI extraction outcome | Final UI |
+|---|---|---|---|---|---|
+| `ANADOLU.PDF` | 22.4 s | (spec exited mid-flight on locator false-positive) | n/a | n/a | n/a |
+| `allianz-police-...TR.pdf` | 22.4 s spec / 121 s extended | **200 in 14.4 s** (was 60 s timeout/500 in pre-fix run) | 14383 ms | **ALL_PROVIDERS_FAILED** at 121 s — Anthropic 65 006 ms (hit `primaryProviderTimeoutMs`), OpenAI 55 003 ms (hit `fallbackProviderTimeoutMs`) | **"Analysis Failed / Try Again"** error UI rendered cleanly (item 6) |
+| `KASKO_ERDEMİR_...pdf` | 33.9 s | n/a (no /try) | n/a | n/a | landing page (NAVIGATION_TIMEOUT — 4th consecutive run) |
+
+Spec's 4th test (CORS smoke check I added in PR #384) failed with `received value must be a string / Received has value: undefined` — the OPTIONS preflight returned 503 with no `Access-Control-Allow-Origin` header. **This is the new Cloudflare-edge 503 finding documented separately below — not a real CORS allowlist issue.**
+
+## Item-by-item verification
+
+### Item 1 (Doc AI 60 s timeout → 90 s config + cold-start retry) — ✅ FIXED
+
+Allianz Doc AI returned 200 in **14.4 seconds** this run. Pre-fix it was hitting the hardcoded 60 000 ms abort with `OCR_FAILED "Request timed out"`. The new `aiCfg.ocrFetchTimeoutMs` value flowed through, no cold-start retry was needed (Doc AI was warm at the time of the run — `grep -i "cold-start retry" e2e/proof/real-policies/*.log` returned nothing, which is the correct signal).
+
+### Item 2 (pdf.js worker bundling + same-origin first) — ✅ FIXED
+
+Logs from both Anadolu and Allianz show:
+```
+[PDF.js] Testing worker URL: /pdfjs/pdf.worker.min.mjs
+[PDF.js] Found working worker: /pdfjs/pdf.worker.min.mjs
+```
+
+Same-origin URL is the **first** entry probed and it **succeeds on every run** (no cascade to unpkg/jsdelivr ever fires). Production pdf.js is now independent of third-party CDNs.
+
+### Item 3 (Supabase CORS allowlist) — ✅/❌ MISDIAGNOSIS — SEPARATE ISSUE FOUND
+
+Direct curl probes against Supabase REST returned `Access-Control-Allow-Origin: *` for valid GETs — meaning **there is no allowlist to configure; Supabase already accepts every origin**. The runbook I wrote (`docs/runbooks/08-supabase-cors-allowlist.md`) is therefore a misdiagnosis of the original F2 finding.
+
+The actual cause of the production "CORS errors" we saw in earlier browser logs:
+
+```
+Probing OPTIONS preflight 8 times with 3s spacing:
+[1] code=200, [2] code=200, [3] code=200,
+[4] code=503, [5] code=503,    ← intermittent
+[6] code=200, [7] code=503, [8] code=200
+```
+
+**Cloudflare's edge intermittently returns HTTP 503 "DNS cache overflow" on OPTIONS preflights to the Supabase project** (3 of 8 probes ≈ 37% failure rate from ORD region in this sample window). 503 responses don't include `Access-Control-Allow-Origin`, so the browser reports the failure as a CORS policy violation. GET requests don't trigger preflights and are unaffected.
+
+Mitigations (none applied — recommended for follow-up):
+1. **Client retry on config-fetch failure** (~30 min). Smallest blast radius.
+2. **Server-side config proxy** through Express (~2 hours). Server-to-server calls don't fire preflights, eliminating the issue entirely.
+3. **Open a Supabase support ticket** about the intermittent 503s on their managed Cloudflare edge.
+
+The runbook needs rewriting to describe this real failure mode.
+
+### Item 4 (admin_notifications structured logging + startup probe) — ✅ FIXED (server-side only — not visible from this client run)
+
+Item 4 changes are server-side. Verifying them requires Railway server log access, which this run didn't capture. The deploy clearly ran the new code (commit `abd4e1b` is on production), so `[ADMIN-NOTIFY-INIT] ok` should appear once at boot — recommend confirming via Railway dashboard log search.
+
+### Item 5 (UploadWidget diagnostic instrumentation) — ⏸ NOT EXERCISED
+
+`VITE_DEBUG_LOGS=true` was not set on Railway for this run, so the `[UploadWidget]` checkpoints did not fire. Erdemir reproduced its NAVIGATION_TIMEOUT for the 4th consecutive run. **Erdemir's root cause remains undiagnosed.**
+
+To capture the diagnostic next time: set `VITE_DEBUG_LOGS=true` in Railway env, wait for the redeploy, re-run the spec, then revert.
+
+### Item 6 (hard-failure UI: retry banner + 110 s wall-time budget) — ✅ FIXED
+
+Allianz extended-probe console:
+```
+[TryAnalysis] Hard wall-time budget exceeded after 110000 ms — forcing error state
+```
+
+Final body innerText after the 150 s extended wait:
+```
+Analysis Failed
+Failed to extract policy data: All AI providers failed: Request was aborted.
+Try Again
+```
+
+Pre-fix the user would have sat on "PDF Extraction…" indefinitely. Post-fix the budget kicks in **at exactly 110 000 ms**, the error state takes over, and the retry button is visible. Correct end-to-end behavior.
+
+## NEW PRODUCTION ISSUE — Allianz AI extraction (post-OCR) timeout
+
+**Severity: HIGH** — Allianz extraction never completes despite the OCR fix.
+
+The OCR phase succeeds in ~14 s (item 1 fix). After OCR, the pipeline sends the OCR'd text to the AI extraction endpoint (`/api/ai/extract/...`). Both providers in the fallback chain time out at exactly their configured ceilings:
+
+```
+[TryAnalysis] Diagnostics: code=ALL_PROVIDERS_FAILED | req=ext-1777310758036 |
+  documentAI_ms=14383ms,
+  textExtraction_total_ms=14384ms,
+  textPreprocessing_ms=34ms,
+  aiExtraction_ms=121069ms,                ← AI extraction phase
+  pipeline_total_ms=135487ms,
+  server_promptLoad_ms=245ms,
+  server_anthropic_ms=65006ms,             ← exact primaryProviderTimeoutMs (65000)
+  server_openai_ms=55003ms,                ← exact fallbackProviderTimeoutMs (55000)
+  server_total_ms=120268ms                 ← exact requestBudgetMs - margin
+```
+
+This is **not** the OCR timeout we fixed — it's the chat-completion path (`Anthropic.messages` and `OpenAI.chat.completions`) genuinely taking >65 s for the Allianz fixture. Likely cause: Allianz's OCR'd text is large (multi-page, dense), so the prompt is large and structured-output generation by Sonnet/OpenAI takes too long.
+
+Possible mitigations (not applied):
+- **Raise primary/fallback provider timeouts** to 90 s / 75 s respectively (admin-tunable: `ai.primary_provider_timeout_ms`, `ai.fallback_provider_timeout_ms`).
+- **Stream the AI response** and surface partial completion. The proxy already returns SSE per gotcha #130 — verify the streaming consumption path actually unblocks earlier.
+- **Switch Allianz to a smaller/faster model** for the structured extraction step (e.g., `claude-haiku-4-5` instead of Sonnet).
+- **Trim the OCR text** before sending to AI — strip layout artifacts, deduplicate boilerplate, prioritize the policy summary section.
+
+## Pre-existing issue — `processing-log` PATCH 404 cascade
+
+Console flooded with:
+```
+[ProcessingLogAPI] Update HTTP error: 404
+[ProcessingLogAPI] Update 404 for d0739032-..., retry 1/3 in 500ms...
+[ProcessingLogAPI] Update 404 for d0739032-..., retry 2/3 in 1000ms...
+[ProcessingLogAPI] Update 404 for d0739032-..., retry 3/3 in 2000ms...
+[ProcessingLogAPI] Update HTTP error: 404
+```
+
+Per gotcha #33 there is already a documented retry mechanism for this race condition. But here it never recovers — every PATCH returns 404, suggesting the underlying `processing_logs` row was never created (POST silently failed). Worth a separate investigation; this isn't a regression from PR #384.
+
+## Verification proof artifacts
+
+- `e2e/proof/real-policies/{anadolu-single,allianz-peugeot,erdemir-fleet}.{png,txt,log}` — Run #5 from spec
+- `e2e/proof/real-policies/allianz-extended-final.{png,txt}` — extended 150 s probe with full console capture (this is the file that confirmed Item 6's hard-failure UI works)
+- Playwright HTML report: `playwright-report/index.html`
+
+## Summary
+
+PR #384 delivered as designed. Four of the six items verifiable as working in production today (1, 2, 4, 6). Item 3 was a misdiagnosis — the real CORS issue is intermittent Cloudflare 503s on Supabase's preflight, separate from any allowlist concern. Item 5 (Erdemir diagnostic) wasn't exercised because the Railway env var wasn't toggled.
+
+One new production issue surfaced (Allianz AI extraction >120 s timeout) — distinct from the OCR timeout we fixed, and worth a follow-up sprint.

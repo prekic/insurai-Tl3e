@@ -1,6 +1,6 @@
 # ANADOLU.PDF
-startedAt: 2026-04-27T12:50:52.576Z
-wallTimeMs: 22377
+startedAt: 2026-04-27T17:21:34.770Z
+wallTimeMs: 22393
 finalUrl: https://insurai-production.up.railway.app/try
 outcome: UI_CRASH
 detail: winner=success but body has no recognizable result or error tokens
@@ -11,14 +11,8 @@ extractEndpoint: https://insurai-production.up.railway.app/api/ai/ocr/document-a
 [warning] Sentry DSN not configured. Error tracking disabled.
 [error] An SSL certificate error occurred when fetching the script.
 [error] [PWA] Service worker registration failed: SecurityError: Failed to register a ServiceWorker for scope ('https://insurai-production.up.railway.app/') with script ('https://insurai-production.up.railway.app/sw.js'): An SSL certificate error occurred when fetching the script.
-[error] Access to fetch at 'https://exykhfulkbwzatpesruv.supabase.co/rest/v1/app_settings?select=key%2Cvalue&category=eq.ocr&order=display_order.asc' from origin 'https://insurai-production.up.railway.app' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource.
-[error] Failed to load resource: net::ERR_FAILED
-[error] Access to fetch at 'https://exykhfulkbwzatpesruv.supabase.co/rest/v1/app_settings?select=key%2Cvalue&category=eq.ui&order=display_order.asc' from origin 'https://insurai-production.up.railway.app' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource.
-[error] Failed to load resource: net::ERR_FAILED
-[warning] [PDF.js] Testing worker URL: https://unpkg.com/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs
-[warning] [PDF.js] Found working worker: https://unpkg.com/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs
-[error] Access to fetch at 'https://exykhfulkbwzatpesruv.supabase.co/rest/v1/app_settings?select=key%2Cvalue&category=eq.ai&order=display_order.asc' from origin 'https://insurai-production.up.railway.app' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource.
-[error] Failed to load resource: net::ERR_FAILED
+[warning] [PDF.js] Testing worker URL: /pdfjs/pdf.worker.min.mjs
+[warning] [PDF.js] Found working worker: /pdfjs/pdf.worker.min.mjs
 [warning] [PolicyExtractor] Attempting Document AI extraction...
 [warning] [Document AI] PDF has 12 pages (limit: 10)
 [warning] [Document AI] PDF exceeds 10-page limit, splitting into chunks...
@@ -30,7 +24,4 @@ extractEndpoint: https://insurai-production.up.railway.app/api/ai/ocr/document-a
 [warning] The resource https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
 
 ## Failed network requests
-GET https://exykhfulkbwzatpesruv.supabase.co/rest/v1/app_settings?select=key%2Cvalue&category=eq.ocr&order=display_order.asc — net::ERR_FAILED
-GET https://exykhfulkbwzatpesruv.supabase.co/rest/v1/app_settings?select=key%2Cvalue&category=eq.ui&order=display_order.asc — net::ERR_FAILED
-HEAD https://unpkg.com/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs — net::ERR_ABORTED
-GET https://exykhfulkbwzatpesruv.supabase.co/rest/v1/app_settings?select=key%2Cvalue&category=eq.ai&order=display_order.asc — net::ERR_FAILED
+(none)
