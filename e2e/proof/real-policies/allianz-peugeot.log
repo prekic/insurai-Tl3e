@@ -1,0 +1,17 @@
+# allianz-police-0001021024147152-TR.pdf
+startedAt: 2026-04-27T11:54:07.631Z
+wallTimeMs: 15672
+finalUrl: https://insurai-production.up.railway.app/
+outcome: UI_CRASH
+detail: locator.waitFor: Timeout 15000ms exceeded.
+Call log:
+[2m  - waiting for locator('input[type="file"][accept*="pdf"]').or(locator('input[type="file"]')).first()[22m
+
+extractStatus: n/a
+extractEndpoint: n/a
+
+## Console errors / warnings
+[error] Failed to load resource: the server responded with a status of 503 ()
+
+## Failed network requests
+(none)

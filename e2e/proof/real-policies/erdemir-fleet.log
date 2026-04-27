@@ -1,0 +1,17 @@
+# KASKO_ERDEMİR_Ereğli_462660767_67TY932_2024.12-2025.12.pdf
+startedAt: 2026-04-27T11:54:23.375Z
+wallTimeMs: 15325
+finalUrl: https://insurai-production.up.railway.app/
+outcome: UI_CRASH
+detail: locator.waitFor: Timeout 15000ms exceeded.
+Call log:
+[2m  - waiting for locator('input[type="file"][accept*="pdf"]').or(locator('input[type="file"]')).first()[22m
+
+extractStatus: n/a
+extractEndpoint: n/a
+
+## Console errors / warnings
+[error] Failed to load resource: the server responded with a status of 503 ()
+
+## Failed network requests
+(none)
