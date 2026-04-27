@@ -1,47 +1,26 @@
 # allianz-police-0001021024147152-TR.pdf
-startedAt: 2026-04-27T12:51:15.079Z
-wallTimeMs: 67651
+startedAt: 2026-04-27T17:21:57.316Z
+wallTimeMs: 22409
 finalUrl: https://insurai-production.up.railway.app/try
 outcome: UI_CRASH
 detail: winner=success but body has no recognizable result or error tokens
-extractStatus: 500
+extractStatus: 200
 extractEndpoint: https://insurai-production.up.railway.app/api/ai/ocr/document-ai
 
 ## Console errors / warnings
 [warning] Sentry DSN not configured. Error tracking disabled.
 [error] An SSL certificate error occurred when fetching the script.
 [error] [PWA] Service worker registration failed: SecurityError: Failed to register a ServiceWorker for scope ('https://insurai-production.up.railway.app/') with script ('https://insurai-production.up.railway.app/sw.js'): An SSL certificate error occurred when fetching the script.
-[error] Access to fetch at 'https://exykhfulkbwzatpesruv.supabase.co/rest/v1/app_settings?select=key%2Cvalue&category=eq.ocr&order=display_order.asc' from origin 'https://insurai-production.up.railway.app' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource.
-[error] Failed to load resource: net::ERR_FAILED
 [error] Access to fetch at 'https://exykhfulkbwzatpesruv.supabase.co/rest/v1/app_settings?select=key%2Cvalue&category=eq.ui&order=display_order.asc' from origin 'https://insurai-production.up.railway.app' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource.
 [error] Failed to load resource: net::ERR_FAILED
-[warning] [PDF.js] Testing worker URL: https://unpkg.com/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs
-[warning] [PDF.js] Found working worker: https://unpkg.com/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs
-[error] Access to fetch at 'https://exykhfulkbwzatpesruv.supabase.co/rest/v1/app_settings?select=key%2Cvalue&category=eq.ai&order=display_order.asc' from origin 'https://insurai-production.up.railway.app' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+[error] Access to fetch at 'https://exykhfulkbwzatpesruv.supabase.co/rest/v1/app_settings?select=key%2Cvalue&category=eq.ocr&order=display_order.asc' from origin 'https://insurai-production.up.railway.app' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource.
 [error] Failed to load resource: net::ERR_FAILED
+[warning] [PDF.js] Testing worker URL: /pdfjs/pdf.worker.min.mjs
+[warning] [PDF.js] Found working worker: /pdfjs/pdf.worker.min.mjs
 [warning] [PolicyExtractor] Attempting Document AI extraction...
 [warning] [Document AI] PDF has 9 pages (limit: 10)
 [warning] The resource https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
-[error] Failed to load resource: the server responded with a status of 500 ()
-[warning] [PolicyExtractor] Document AI result success: false (61456ms)
-[warning] [PolicyExtractor] Document AI FAILED: Request timed out, please try again
-[warning] [PolicyExtractor] Document AI error code: OCR_FAILED
-[warning] [PolicyExtractor] Document AI error details: undefined
-[warning] [PolicyExtractor] Will try pdf.js fallback...
-[warning] [PolicyExtractor] extractionMethod after Document AI attempt: none
-[warning] [PolicyExtractor] Starting pdf.js fallback extraction...
-[warning] Warning: Setting up fake worker.
-[error] Access to script at 'https://unpkg.com/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs' from origin 'https://insurai-production.up.railway.app' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
-[error] Failed to load resource: net::ERR_FAILED
-[warning] [PDF.js] Worker error detected (failure count: 1): Setting up fake worker failed: "Failed to fetch dynamically imported module: https://unpkg.com/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs".
-[warning] [PDF.js] Attempt 1/3 failed with WORKER_ERROR: PDF processing worker failed. Will retry with fallback method.
-[warning] [PDF.js] Worker error (count: 1), resetting worker setup
-[warning] [PDF.js] Waiting 1000ms before retry 2/3
 
 ## Failed network requests
-GET https://exykhfulkbwzatpesruv.supabase.co/rest/v1/app_settings?select=key%2Cvalue&category=eq.ocr&order=display_order.asc — net::ERR_FAILED
 GET https://exykhfulkbwzatpesruv.supabase.co/rest/v1/app_settings?select=key%2Cvalue&category=eq.ui&order=display_order.asc — net::ERR_FAILED
-HEAD https://unpkg.com/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs — net::ERR_ABORTED
-GET https://exykhfulkbwzatpesruv.supabase.co/rest/v1/app_settings?select=key%2Cvalue&category=eq.ai&order=display_order.asc — net::ERR_FAILED
-GET https://unpkg.com/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs — net::ERR_FAILED
-GET https://unpkg.com/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs — net::ERR_FAILED
+GET https://exykhfulkbwzatpesruv.supabase.co/rest/v1/app_settings?select=key%2Cvalue&category=eq.ocr&order=display_order.asc — net::ERR_FAILED

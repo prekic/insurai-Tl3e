@@ -16,12 +16,12 @@ allianz-police-0001021024147152-TR.pdf
 
 157 KB
 
-Elapsed 1:02
+Elapsed 0:16
 
-PDF Extraction…
+OCR Processing…
 
 Upload
-889ms
+1.3s
 PDF Extraction
 OCR Processing
 Text Preprocessing
@@ -30,6 +30,6 @@ Table Parsing
 Validation
 Save
 
-💡 Your insured value is being matched against current market rayiç data.
+💡 We never store your document beyond this session unless you sign up.
 
 Already have an account? Sign In
