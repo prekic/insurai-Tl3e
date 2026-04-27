@@ -188,18 +188,32 @@ export function AnalysisProgressCard({
 
   // Find currently running stage (banner content)
   const runningStage = visibleStages.find((s) => stageStatusMap.get(s)?.status === 'running')
+
+  // Fallback signal: when there's no running stage but the last stage transition
+  // was a failure, the orchestrator is likely between attempts (e.g. Document AI
+  // failed → pdf.js fallback retry queued, or pdf.js worker error → next CDN
+  // probe). Without this branch the banner falls through to the static
+  // "Preparing to analyze…" label, which is misleading and makes the card look
+  // frozen even though work is still in progress.
+  const hasFailedStageButNoRunning =
+    !runningStage &&
+    visibleStages.some((s) => stageStatusMap.get(s)?.status === 'failed') &&
+    state !== 'uploading'
+
   const activeStage: ProcessingStage | undefined =
     runningStage || (state === 'uploading' ? 'upload' : undefined)
 
   const activeStageConfig = activeStage ? STAGE_CONFIGS[activeStage] : null
   const activeIconName = activeStageConfig?.icon || 'FileText'
   const ActiveIcon = STAGE_ICON_MAP[activeIconName] || FileText
-  const activeColor = activeStageConfig?.color || 'blue'
-  const activeLabel = activeStageConfig
-    ? locale === 'tr'
-      ? activeStageConfig.labelTr
-      : activeStageConfig.label
-    : t.tryAnalysis.preparingToAnalyze
+  const activeColor = hasFailedStageButNoRunning ? 'amber' : activeStageConfig?.color || 'blue'
+  const activeLabel = hasFailedStageButNoRunning
+    ? t.tryAnalysis.retryingFallback
+    : activeStageConfig
+      ? locale === 'tr'
+        ? activeStageConfig.labelTr
+        : activeStageConfig.label
+      : t.tryAnalysis.preparingToAnalyze
 
   // Early-win chips
   const pageCount = log?.page_count

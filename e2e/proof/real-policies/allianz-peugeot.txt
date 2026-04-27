@@ -1,1 +1,35 @@
-DNS cache overflow
+Skip to main content
+Now viewing: Home
+InsurAI
+Policy Analysis Platform
+Dashboard
+Compare
+Chat
+Upload
+Sign In
+Free Policy Analysis
+Analyze Your Policy
+
+Upload a PDF policy document for instant AI-powered analysis
+
+allianz-police-0001021024147152-TR.pdf
+
+157 KB
+
+Elapsed 1:02
+
+PDF Extraction…
+
+Upload
+889ms
+PDF Extraction
+OCR Processing
+Text Preprocessing
+AI Extraction
+Table Parsing
+Validation
+Save
+
+💡 Your insured value is being matched against current market rayiç data.
+
+Already have an account? Sign In

@@ -16,12 +16,12 @@ ANADOLU.PDF
 
 90 KB
 
-Elapsed 0:12
+Elapsed 0:14
 
 OCR Processing…
 
 Upload
-884ms
+911ms
 PDF Extraction
 OCR Processing
 Text Preprocessing

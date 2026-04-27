@@ -58,10 +58,22 @@ async function _loadPdfConfig(): Promise<void> {
 _loadPdfConfig()
 
 /**
- * CDN sources for PDF.js worker (in order of preference)
- * Multiple fallbacks to handle CDN outages
+ * Worker source preferences, evaluated in order. Same-origin first because:
+ *  - Browsers don't apply CORS to same-origin module imports.
+ *  - It survives third-party CDN outages.
+ *  - It eliminates the HEAD/GET asymmetry that broke production:
+ *    HEAD against unpkg succeeded (passing the probe) but the actual
+ *    dynamic-import GET failed CORS, leaving the worker unset.
+ *
+ * The CDN entries remain as a backstop in case the same-origin file is
+ * misconfigured (e.g. a misbehaving reverse proxy returns 404 for
+ * /pdfjs/pdf.worker.min.mjs). The first entry is version-agnostic because
+ * the file is copied from node_modules at install time (see
+ * scripts/copy-pdfjs-worker.mjs) and its content matches whatever pdfjs-dist
+ * version the app imports.
  */
 const WORKER_CDN_SOURCES = [
+  (_version: string) => '/pdfjs/pdf.worker.min.mjs',
   (version: string) => `https://unpkg.com/pdfjs-dist@${version}/build/pdf.worker.min.mjs`,
   (version: string) =>
     `https://cdn.jsdelivr.net/npm/pdfjs-dist@${version}/build/pdf.worker.min.mjs`,
@@ -70,7 +82,13 @@ const WORKER_CDN_SOURCES = [
 ]
 
 /**
- * Test if a worker URL is accessible
+ * Test if a worker URL is reachable.
+ *
+ * Uses GET (with a tiny range request) instead of HEAD because some CDNs
+ * (notably unpkg) honor CORS preflight on HEAD but reject the dynamic-import
+ * GET that pdf.js actually performs to load the worker. HEAD-passes-but-GET-fails
+ * is the production failure mode observed in the Apr 27 audit; switching to GET
+ * makes the probe represent the operation pdf.js will perform.
  */
 async function testWorkerUrl(url: string, timeout: number = 5000): Promise<boolean> {
   try {
@@ -78,12 +96,18 @@ async function testWorkerUrl(url: string, timeout: number = 5000): Promise<boole
     const timeoutId = setTimeout(() => controller.abort(), timeout)
 
     const response = await fetch(url, {
-      method: 'HEAD',
+      method: 'GET',
+      // Range request so we don't transfer the full ~1 MB worker just to
+      // probe reachability. Servers that don't support Range fall back to a
+      // 200 with full body — we abort before reading anything either way.
+      headers: { Range: 'bytes=0-0' },
       signal: controller.signal,
     })
 
     clearTimeout(timeoutId)
-    return response.ok
+    // Accept 200 (full body) or 206 (range honored). Either proves the GET
+    // pdf.js will perform would succeed.
+    return response.ok || response.status === 206
   } catch {
     return false
   }

@@ -196,6 +196,7 @@ const DEFAULT_AI_CONFIG = {
   fallbackProviderTimeoutMs: 55000,
   clientFetchTimeoutMs: 135000,
   trialExtractionTimeoutMs: 150000,
+  ocrFetchTimeoutMs: 90000,
 }
 
 // =============================================================================

@@ -1004,6 +1004,7 @@ export const SKELETON_TRANSLATIONS: TranslationDictionary = {
     percentComplete: '',
     aiAnalyzing: '',
     preparingToAnalyze: '',
+    retryingFallback: '',
     elapsed: '',
     detectedPages: '',
     detectedProvider: '',

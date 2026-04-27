@@ -1088,6 +1088,7 @@ export interface TranslationDictionary {
     percentComplete: string
     aiAnalyzing: string
     preparingToAnalyze: string
+    retryingFallback: string
     elapsed: string
     detectedPages: string
     detectedProvider: string

@@ -1084,6 +1084,7 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     percentComplete: '% tamamlandı',
     aiAnalyzing: 'Yapay zeka poliçenizi analiz ediyor...',
     preparingToAnalyze: 'Poliçeniz analize hazırlanıyor...',
+    retryingFallback: 'Alternatif yöntemle yeniden deneniyor…',
     elapsed: 'Geçen süre',
     detectedPages: '{count} sayfa',
     detectedProvider: 'AI: {provider}',

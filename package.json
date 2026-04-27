@@ -39,7 +39,8 @@
     "lighthouse:collect": "lhci collect",
     "lighthouse:assert": "lhci assert",
     "lighthouse:upload": "lhci upload",
-    "prepare": "husky"
+    "prepare": "husky",
+    "postinstall": "node scripts/copy-pdfjs-worker.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",

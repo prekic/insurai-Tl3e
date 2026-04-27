@@ -53,12 +53,14 @@ export function TryAnalysis() {
   const extractionInFlightRef = useRef(false)
   const lastFileRef = useRef<File | null>(null)
   const retryCountRef = useRef(0)
+  const hardBudgetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     return () => {
       isMounted.current = false
       if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current)
       if (intervalIdRef.current) clearInterval(intervalIdRef.current)
+      if (hardBudgetTimerRef.current) clearTimeout(hardBudgetTimerRef.current)
       // Detach the live-progress listener if still attached
       if (unsubscribeStageRef.current) {
         unsubscribeStageRef.current()
@@ -152,6 +154,41 @@ export function TryAnalysis() {
       // Mark extraction as in-flight for visibility change detection
       extractionInFlightRef.current = true
       lastFileRef.current = file
+
+      // Hard wall-time budget — if extraction hasn't resolved by this point,
+      // force the error UI. Prevents users from sitting on a frozen
+      // "PDF Extraction…" card for >2 minutes when both primary (Document AI)
+      // and fallback (pdf.js client-side) paths are stuck retrying. The
+      // background extraction may still complete and persist via
+      // saveTrialResult(); on next visit the effect at the top of this file
+      // picks that up. See findings F0 and the AnalysisProgressCard
+      // retryingFallback banner.
+      const HARD_EXTRACTION_BUDGET_MS = 110_000
+      if (hardBudgetTimerRef.current) clearTimeout(hardBudgetTimerRef.current)
+      hardBudgetTimerRef.current = setTimeout(() => {
+        if (!extractionInFlightRef.current || !isMounted.current) return
+        console.warn(
+          '[TryAnalysis] Hard wall-time budget exceeded after',
+          HARD_EXTRACTION_BUDGET_MS,
+          'ms — forcing error state'
+        )
+        extractionInFlightRef.current = false
+        try {
+          logger.fail('Extraction wall-time budget exceeded', {
+            error_type: 'BudgetExceededError',
+            source: 'try_analysis',
+            budget_ms: HARD_EXTRACTION_BUDGET_MS,
+          })
+        } catch {
+          // Logger may already be in a terminal state; ignore.
+        }
+        if (unsubscribeStageRef.current) {
+          unsubscribeStageRef.current()
+          unsubscribeStageRef.current = null
+        }
+        setError(`${t.tryAnalysis.analysisTimedOut} ${t.tryAnalysis.pleaseWait}`)
+        setState('error')
+      }, HARD_EXTRACTION_BUDGET_MS)
 
       // Start analysis
       setSelectedFile(file)
@@ -378,6 +415,10 @@ export function TryAnalysis() {
 
         // Always save the result locally — even if the user navigated away.
         extractionInFlightRef.current = false
+        if (hardBudgetTimerRef.current) {
+          clearTimeout(hardBudgetTimerRef.current)
+          hardBudgetTimerRef.current = null
+        }
         saveTrialResult(policyWithDefaults, fileName)
 
         // BACKGROUND SYNC: Fire and forget to the anonymous persistence API
@@ -442,6 +483,10 @@ export function TryAnalysis() {
         }
 
         extractionInFlightRef.current = false
+        if (hardBudgetTimerRef.current) {
+          clearTimeout(hardBudgetTimerRef.current)
+          hardBudgetTimerRef.current = null
+        }
 
         // Don't update state or show toasts if component was unmounted
         if (!isMounted.current) return

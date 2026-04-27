@@ -40,6 +40,7 @@ import { initServerSentry, setupSentryErrorHandler, captureServerError } from '.
 import logger from './lib/logger.js'
 import { apiMetrics } from './middleware/api-metrics.js'
 import { initializeDefaultAlertRules } from './middleware/monitoring.js'
+import { probeAdminNotifications } from './services/admin-notification-service.js'
 
 const log = logger.child('Server')
 
@@ -426,6 +427,13 @@ configureWebPush()
 
 // Ensure monitoring alert rules are initialized
 initializeDefaultAlertRules()
+
+// Verify admin_notifications writability at boot (fire-and-forget; never throws).
+// Surfaces RLS / env-var / migration-not-applied issues as a clear log line at startup
+// instead of letting them hide until the first alert fires.
+probeAdminNotifications().catch(() => {
+  // probeAdminNotifications already logs internally; nothing more to do here.
+})
 
 // Start server
 // eslint-disable-next-line prefer-const -- server declared above for graceful shutdown handling

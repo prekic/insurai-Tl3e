@@ -74,15 +74,20 @@ export async function createNotification(
     .single()
 
   if (error) {
-    // Log with actionable context — common causes are RLS policy misconfiguration
-    // or missing migration (008a_admin_notifications.sql)
+    // Surface the full PostgrestError shape (code/message/details/hint) instead of the
+    // opaque String(error) coercion that masked the real cause in production logs.
     log.error('Failed to save notification', {
-      error: String(error),
-      hint: error.message?.includes('does not exist')
+      pgCode: error.code ?? null,
+      pgMessage: error.message ?? null,
+      pgDetails: error.details ?? null,
+      pgHint: error.hint ?? null,
+      diagnosticHint: error.message?.includes('does not exist')
         ? 'Table missing — run migration 008a_admin_notifications.sql'
         : error.message?.includes('new row violates') || error.code === '42501'
-          ? 'RLS policy blocking insert — check admin_notifications_service_role policy'
-          : undefined,
+          ? 'RLS policy blocking insert — check admin_notifications_service_role policy from migration 041'
+          : error.code === 'PGRST301' || error.message?.includes('JWT')
+            ? 'Service role key invalid or expired — verify SUPABASE_SERVICE_ROLE_KEY env var'
+            : undefined,
     })
     log.error(`${notification.type.toUpperCase()} ${notification.title}: ${notification.message}`)
     return null
@@ -299,4 +304,52 @@ export async function notifyPerformanceAlert(
     message,
     details,
   })
+}
+
+/**
+ * Startup probe — verify the service can write to admin_notifications at boot,
+ * not on the first alert fire. Surfaces env-var and migration-not-applied issues
+ * immediately as a clear log line rather than silently failing later.
+ *
+ * Probe semantics:
+ *   - 'ok': can read the table (RLS + key + migration all healthy)
+ *   - 'unconfigured': SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY missing
+ *   - 'failed': Supabase reachable but the read errored (logged with full PostgrestError shape)
+ *
+ * Call once at server startup; fire-and-forget. Never throws.
+ */
+export async function probeAdminNotifications(): Promise<'ok' | 'unconfigured' | 'failed'> {
+  const client = getSupabase()
+  if (!client) {
+    log.warn(
+      '[ADMIN-NOTIFY-INIT] unconfigured — SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY missing. ' +
+        'Alerts will be logged but not persisted.'
+    )
+    return 'unconfigured'
+  }
+
+  const { error } = await client
+    .from('admin_notifications')
+    .select('id', { count: 'exact', head: true })
+    .limit(1)
+
+  if (error) {
+    log.error('[ADMIN-NOTIFY-INIT] failed', {
+      pgCode: error.code ?? null,
+      pgMessage: error.message ?? null,
+      pgDetails: error.details ?? null,
+      pgHint: error.hint ?? null,
+      diagnosticHint: error.message?.includes('does not exist')
+        ? 'Table missing — apply migration 008a_admin_notifications.sql'
+        : error.code === '42501' || error.message?.includes('permission denied')
+          ? 'RLS policy rejecting service_role read — verify migration 041 applied'
+          : error.code === 'PGRST301' || error.message?.includes('JWT')
+            ? 'Service role key invalid or expired — verify SUPABASE_SERVICE_ROLE_KEY env var'
+            : undefined,
+    })
+    return 'failed'
+  }
+
+  log.info('[ADMIN-NOTIFY-INIT] ok')
+  return 'ok'
 }
