@@ -107,6 +107,113 @@ async function withRetry<T>(fn: () => Promise<T>, attempts: number = 3): Promise
   throw lastErr
 }
 
+/**
+ * Dynamically import getProxyUrl. Lazy because src/lib/ai/config.ts pulls in
+ * provider SDKs (anthropic, openai) which are heavy. We only need
+ * `getProxyUrl()` and `isProxyConfigured()` here, both of which are tiny
+ * env reads.
+ */
+async function resolveProxyUrl(): Promise<string | null> {
+  try {
+    const { getProxyUrl } = await import('@/lib/ai/proxy-utils')
+    return getProxyUrl()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Fetch a single config key via the Express proxy (Plan B from runbook 08).
+ * Returns the same `{ data, error }` shape as the Supabase SDK so the
+ * existing `withRetry` helper's logic (which inspects `error.code`) applies
+ * unchanged.
+ *
+ * - 200 with `{ success: true }` → `{ data: { value: ... }, error: null }`.
+ * - 200 with `{ success: false }` → terminal API error, no retry.
+ * - 4xx                          → terminal HTTP error, no retry.
+ * - 5xx                          → transport-level, retry.
+ * - thrown (network down, etc.)  → transport-level, retry.
+ */
+async function fetchProxyKey(
+  proxyUrl: string,
+  category: string,
+  key: string
+): Promise<{
+  data: { value: unknown } | null
+  error: { code: string | null; message: string } | null
+}> {
+  try {
+    const url = `${proxyUrl}/api/config/${encodeURIComponent(category)}/${encodeURIComponent(key)}`
+    const resp = await fetch(url)
+    if (!resp.ok) {
+      const code = resp.status >= 500 ? null : `HTTP_${resp.status}`
+      return { data: null, error: { code, message: `HTTP ${resp.status}` } }
+    }
+    const json = (await resp.json()) as {
+      success: boolean
+      value?: unknown
+      error?: string
+    }
+    if (!json.success) {
+      return {
+        data: null,
+        error: { code: 'API_ERROR', message: json.error || 'API error' },
+      }
+    }
+    if (json.value === null || json.value === undefined) {
+      // Server says: row not seeded. Treat as "use code default" — no retry.
+      return {
+        data: null,
+        error: { code: 'NOT_FOUND', message: 'no row' },
+      }
+    }
+    return { data: { value: json.value }, error: null }
+  } catch (e) {
+    return {
+      data: null,
+      error: { code: null, message: e instanceof Error ? e.message : String(e) },
+    }
+  }
+}
+
+/**
+ * Fetch a full category via the Express proxy. Same shape contract as
+ * `fetchProxyKey` above.
+ */
+async function fetchProxyCategory(
+  proxyUrl: string,
+  category: string
+): Promise<{
+  data: Record<string, unknown> | null
+  error: { code: string | null; message: string } | null
+}> {
+  try {
+    const url = `${proxyUrl}/api/config/${encodeURIComponent(category)}`
+    const resp = await fetch(url)
+    if (!resp.ok) {
+      const code = resp.status >= 500 ? null : `HTTP_${resp.status}`
+      return { data: null, error: { code, message: `HTTP ${resp.status}` } }
+    }
+    const json = (await resp.json()) as {
+      success: boolean
+      data?: Record<string, unknown>
+      error?: string
+    }
+    if (!json.success) {
+      return {
+        data: null,
+        error: { code: 'API_ERROR', message: json.error || 'API error' },
+      }
+    }
+    return { data: json.data ?? {}, error: null }
+  } catch (e) {
+    return {
+      data: null,
+      error: { code: null, message: e instanceof Error ? e.message : String(e) },
+    }
+  }
+}
+
 import {
   DEFAULT_AI_CONFIG,
   DEFAULT_EVALUATION_CONFIG,
@@ -431,20 +538,43 @@ export class ConfigurationService {
     }
 
     try {
-      const supabase = await getSupabase()
-      // Retry the fetch to absorb Cloudflare-edge 503s on the OPTIONS
-      // preflight (runbook 08). The retry is a no-op for healthy preflights
-      // and recovers ~95 % of the 1-in-3 transient failures with <700 ms
-      // worst-case extra latency.
-      const { data, error } = await withRetry(async () =>
-        supabase
-          .from('app_settings')
-          .select('value')
-          .eq('category', category)
-          .eq('key', key)
-          .single()
-      )
+      // Plan B from runbook 08: prefer the Express proxy when available.
+      // Server-to-server fetch with the service-role key has no CORS
+      // preflight, eliminating the Cloudflare-edge 503 failure mode that
+      // hits direct Supabase REST. Falls back to direct Supabase when the
+      // proxy isn't configured (e.g. static deploys without a backend) —
+      // those still benefit from withRetry + localStorage from Plan A.
+      const proxyUrl = await resolveProxyUrl()
 
+      let result: {
+        data: { value: unknown } | null
+        error: { code: string | null; message: string } | null
+      }
+
+      if (proxyUrl) {
+        result = await withRetry(async () => fetchProxyKey(proxyUrl, category, key))
+      } else {
+        const supabase = await getSupabase()
+        const sbResult = await withRetry(async () =>
+          supabase
+            .from('app_settings')
+            .select('value')
+            .eq('category', category)
+            .eq('key', key)
+            .single()
+        )
+        result = {
+          data: sbResult.data ? { value: (sbResult.data as { value: unknown }).value } : null,
+          error: sbResult.error
+            ? {
+                code: (sbResult.error as { code?: string | null }).code ?? null,
+                message: (sbResult.error as { message?: string }).message ?? 'unknown',
+              }
+            : null,
+        }
+      }
+
+      const { data, error } = result
       const latencyMs = Math.round((performance.now() - startTime) * 100) / 100
 
       if (error || !data) {
@@ -541,18 +671,51 @@ export class ConfigurationService {
     }
 
     try {
-      const supabase = await getSupabase()
-      // Retry the fetch to absorb Cloudflare-edge 503s on the OPTIONS
-      // preflight (runbook 08). Same rationale as the per-key get() above —
-      // this is the hot path called by getAIConfig() / getOCRConfig() etc.
-      const { data, error } = await withRetry(async () =>
-        supabase
-          .from('app_settings')
-          .select('key, value')
-          .eq('category', category)
-          .order('display_order', { ascending: true })
-      )
+      // Plan B: prefer the Express proxy when configured. Same falls-back-to-
+      // Supabase semantics as get() above.
+      const proxyUrl = await resolveProxyUrl()
 
+      let result: {
+        data: Record<string, unknown> | null
+        error: { code: string | null; message: string } | null
+      }
+
+      if (proxyUrl) {
+        result = await withRetry(async () => fetchProxyCategory(proxyUrl, category))
+      } else {
+        const supabase = await getSupabase()
+        const sbResult = await withRetry(async () =>
+          supabase
+            .from('app_settings')
+            .select('key, value')
+            .eq('category', category)
+            .order('display_order', { ascending: true })
+        )
+        if (sbResult.error || !sbResult.data) {
+          result = {
+            data: null,
+            error: sbResult.error
+              ? {
+                  code: (sbResult.error as { code?: string | null }).code ?? null,
+                  message: (sbResult.error as { message?: string }).message ?? 'unknown',
+                }
+              : null,
+          }
+        } else {
+          // Reduce the [{key, value}] array shape into a flat object — same
+          // shape the proxy already returns.
+          const flat = (sbResult.data as Array<{ key: string; value: unknown }>).reduce(
+            (acc, { key, value }) => {
+              acc[key] = value
+              return acc
+            },
+            {} as Record<string, unknown>
+          )
+          result = { data: flat, error: null }
+        }
+      }
+
+      const { data, error } = result
       const latencyMs = Math.round((performance.now() - startTime) * 100) / 100
 
       if (error || !data) {
@@ -579,19 +742,15 @@ export class ConfigurationService {
         return {}
       }
 
-      const result = data.reduce(
-        (acc, { key, value }) => {
-          acc[key] = value
-          return acc
-        },
-        {} as Record<string, unknown>
-      )
+      // `data` is already the flat key→value object (proxy returns it that
+      // way; supabase branch above pre-reduced it).
+      const flatData = data
 
       // Update cache (in-memory + localStorage).
       if (this.enableCache) {
-        setInCache(cacheKey, result, this.cacheTtlMs)
+        setInCache(cacheKey, flatData, this.cacheTtlMs)
       }
-      setLocalCachedConfig(category, result)
+      setLocalCachedConfig(category, flatData)
 
       configPerformanceMonitor.record({
         category,
@@ -601,7 +760,7 @@ export class ConfigurationService {
         success: true,
       })
 
-      return result
+      return flatData
     } catch (err) {
       // Plan A: localStorage last-known-good fallback before {}.
       const fromLocal = getLocalCachedConfig<Record<string, unknown>>(category)

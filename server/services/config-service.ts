@@ -474,9 +474,16 @@ function getClient(): SupabaseClient | null {
 // =============================================================================
 
 /**
- * Get all settings for a category from database
+ * Get all settings for a category from database.
+ *
+ * INTERNAL accessor — returns ALL rows for the category, including any that
+ * are flagged `is_sensitive=true`. Callers (typed accessors below: getAIConfig,
+ * getOCRConfig, etc.) project specific known keys via *_KEY_MAP, so sensitive
+ * rows with non-mapped keys are never surfaced. Do NOT use this in any code
+ * path that returns the raw object to anonymous clients — use
+ * `getPublicCategorySettings()` below for that.
  */
-async function getCategorySettings(category: string): Promise<Record<string, unknown>> {
+export async function getCategorySettings(category: string): Promise<Record<string, unknown>> {
   const cacheKey = `category:${category}`
   const start = performance.now()
 
@@ -537,6 +544,100 @@ async function getCategorySettings(category: string): Promise<Record<string, unk
     )
 
     // Cache the result
+    setInCache(cacheKey, result)
+    recordServerConfigFetch(
+      category,
+      Math.round((performance.now() - start) * 100) / 100,
+      false,
+      true
+    )
+    return result
+  } catch {
+    recordServerConfigFetch(
+      category,
+      Math.round((performance.now() - start) * 100) / 100,
+      false,
+      false
+    )
+    return {}
+  }
+}
+
+/**
+ * PUBLIC accessor — same shape as `getCategorySettings` but filters out any
+ * rows flagged `is_sensitive=true`. Used by the `/api/config/:category` proxy
+ * route (Plan B from runbook 08) to avoid leaking sensitive admin settings
+ * (e.g. SMTP credentials, even hypothetically) to anonymous clients.
+ *
+ * Today the answer is "no rows in any of the 14 served categories are
+ * sensitive," so the filter is purely defensive — protects future admins who
+ * mark a row sensitive and forget to audit clients.
+ *
+ * Cached separately from `getCategorySettings` so the two caches don't
+ * collide: cache key prefix `category-public:` instead of `category:`.
+ */
+export async function getPublicCategorySettings(
+  category: string
+): Promise<Record<string, unknown>> {
+  const cacheKey = `category-public:${category}`
+  const start = performance.now()
+
+  const cached = getFromCache<Record<string, unknown>>(cacheKey)
+  if (cached !== null) {
+    recordServerConfigFetch(
+      category,
+      Math.round((performance.now() - start) * 100) / 100,
+      true,
+      true
+    )
+    return cached
+  }
+
+  const db = getClient()
+  if (!db) {
+    recordServerConfigFetch(
+      category,
+      Math.round((performance.now() - start) * 100) / 100,
+      false,
+      false
+    )
+    return {}
+  }
+
+  try {
+    const queryPromise = Promise.resolve(
+      db
+        .from('app_settings')
+        .select('key, value, is_sensitive')
+        .eq('category', category)
+        .eq('is_sensitive', false)
+    )
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`Config query timed out after ${DB_QUERY_TIMEOUT_MS}ms`)),
+        DB_QUERY_TIMEOUT_MS
+      )
+    )
+
+    const { data, error } = await Promise.race([queryPromise, timeoutPromise])
+    if (error || !data) {
+      recordServerConfigFetch(
+        category,
+        Math.round((performance.now() - start) * 100) / 100,
+        false,
+        false
+      )
+      return {}
+    }
+
+    const result = data.reduce(
+      (acc, row) => {
+        acc[row.key as string] = row.value
+        return acc
+      },
+      {} as Record<string, unknown>
+    )
+
     setInCache(cacheKey, result)
     recordServerConfigFetch(
       category,

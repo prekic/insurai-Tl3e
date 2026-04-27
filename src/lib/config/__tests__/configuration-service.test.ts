@@ -2012,6 +2012,137 @@ describe('ConfigurationService', () => {
       expect(parsed.value).toEqual({ min_confidence: 0.66 })
     })
   })
+
+  // ========================================================================
+  // Proxy fetch path — Plan B from runbook 08
+  // ========================================================================
+  describe('proxy fetch path (Plan B)', () => {
+    const PROXY_URL = 'http://localhost:4001'
+    let originalFetch: typeof globalThis.fetch | undefined
+    let mockFetch: ReturnType<typeof vi.fn>
+
+    beforeEach(async () => {
+      service = ConfigurationService.getInstance({ enableCache: false })
+      localStorage.clear()
+      // Stub the lightweight proxy-utils module to advertise a proxy URL.
+      vi.doMock('@/lib/ai/proxy-utils', () => ({
+        getProxyUrl: () => PROXY_URL,
+        isProxyConfigured: () => true,
+      }))
+      // Reset modules so the dynamic import inside resolveProxyUrl picks
+      // up the stubbed module.
+      vi.resetModules()
+      const fresh = await import('../configuration-service')
+      service = fresh.ConfigurationService.getInstance({ enableCache: false })
+
+      mockFetch = vi.fn()
+      originalFetch = globalThis.fetch
+      globalThis.fetch = mockFetch as unknown as typeof globalThis.fetch
+    })
+
+    afterEach(() => {
+      if (originalFetch) globalThis.fetch = originalFetch
+      vi.doUnmock('@/lib/ai/proxy-utils')
+      localStorage.clear()
+    })
+
+    function jsonResponse(body: unknown, status = 200): Response {
+      return new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      })
+    }
+
+    it('get() reads value from the proxy on success', async () => {
+      mockFetch.mockResolvedValue(jsonResponse({ success: true, value: 0.75 }))
+
+      const result = await service.get('ai', 'min_confidence', 0.0)
+
+      expect(result).toBe(0.75)
+      const calledUrl = mockFetch.mock.calls[0]?.[0] as string
+      expect(calledUrl).toBe(`${PROXY_URL}/api/config/ai/min_confidence`)
+    })
+
+    it('getCategory() reads data from the proxy on success', async () => {
+      mockFetch.mockResolvedValue(
+        jsonResponse({
+          success: true,
+          category: 'ai',
+          data: { min_confidence: 0.75, max_tokens: 8192 },
+        })
+      )
+
+      const result = await service.getCategory('ai')
+
+      expect(result).toEqual({ min_confidence: 0.75, max_tokens: 8192 })
+      const calledUrl = mockFetch.mock.calls[0]?.[0] as string
+      expect(calledUrl).toBe(`${PROXY_URL}/api/config/ai`)
+    })
+
+    it('get() retries 3× on 503 then falls through to default', async () => {
+      // 503 → withRetry retries (no error.code → transport-level)
+      mockFetch.mockResolvedValue(new Response('boom', { status: 503 }))
+
+      const result = await service.get('ai', 'min_confidence', 0.99)
+
+      expect(result).toBe(0.99) // default
+      expect(mockFetch).toHaveBeenCalledTimes(3) // initial + 2 retries
+    })
+
+    it('get() does NOT retry on 400 (terminal HTTP error)', async () => {
+      mockFetch.mockResolvedValue(new Response('bad', { status: 400 }))
+
+      const result = await service.get('ai', 'min_confidence', 0.99)
+
+      expect(result).toBe(0.99)
+      expect(mockFetch).toHaveBeenCalledTimes(1) // no retries
+    })
+
+    it('get() retries on thrown fetch (network error)', async () => {
+      let calls = 0
+      mockFetch.mockImplementation(() => {
+        calls += 1
+        if (calls === 1) return Promise.reject(new TypeError('Failed to fetch'))
+        return Promise.resolve(jsonResponse({ success: true, value: 0.42 }))
+      })
+
+      const result = await service.get('ai', 'min_confidence', 0.0)
+
+      expect(result).toBe(0.42)
+      expect(calls).toBe(2) // first throw triggered a retry
+    })
+
+    it('get() falls through to localStorage when proxy returns 503 thrice', async () => {
+      localStorage.setItem(
+        'insurai_config_ai__min_confidence',
+        JSON.stringify({ version: 1, timestamp: Date.now(), value: 0.55 })
+      )
+      mockFetch.mockResolvedValue(new Response('boom', { status: 503 }))
+
+      const result = await service.get('ai', 'min_confidence', 0.99)
+
+      expect(result).toBe(0.55) // from localStorage, not default
+    })
+
+    it('get() returns default when proxy responds success:false', async () => {
+      // Server validated and refused — no retry, treat as terminal.
+      mockFetch.mockResolvedValue(jsonResponse({ success: false, error: 'something went wrong' }))
+
+      const result = await service.get('ai', 'min_confidence', 0.99)
+
+      expect(result).toBe(0.99)
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+    })
+
+    it('get() returns default when proxy responds value:null (key not seeded)', async () => {
+      // Missing-key is normal: not every TS-default has a DB row seeded.
+      mockFetch.mockResolvedValue(jsonResponse({ success: true, value: null }))
+
+      const result = await service.get('ai', 'min_confidence', 0.42)
+
+      expect(result).toBe(0.42)
+    })
+  })
 })
 
 // =========================================================================
