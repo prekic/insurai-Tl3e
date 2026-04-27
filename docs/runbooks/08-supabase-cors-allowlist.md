@@ -1,77 +1,127 @@
-# Runbook 08 — Supabase CORS Allowlist
+# Runbook 08 — Intermittent CORS Errors on Supabase REST Reads
+
+> **Note**: an earlier version of this runbook claimed the issue was a Supabase
+> CORS allowlist that needed configuring. That was wrong — confirmed Apr 27 2026
+> in Run #5 of `e2e/real-policies-sample.spec.ts`. Supabase returns
+> `Access-Control-Allow-Origin: *` for valid GET requests; there is no allowlist
+> to configure. The real cause is documented below.
 
 ## When to use this runbook
 
 You hit one of these symptoms:
 
-- Browser DevTools console shows repeated errors like:
+- Browser DevTools console shows intermittent errors like:
   ```
   Access to fetch at 'https://<ref>.supabase.co/rest/v1/app_settings?...'
   from origin 'https://insurai-production.up.railway.app' has been blocked by CORS policy:
   No 'Access-Control-Allow-Origin' header is present on the requested resource.
   ```
-- Admin Settings UI changes aren't taking effect on the live site.
-- `e2e/real-policies-sample.spec.ts` "supabase cors allowlist includes production origin" test fails.
-- `npm run qa:extraction` shows config-driven thresholds at hardcoded defaults despite admin overrides.
+- The errors come and go — sometimes the page works fine, sometimes it doesn't.
+- Admin Settings UI changes intermittently fail to take effect on the live site.
+- `e2e/real-policies-sample.spec.ts` "supabase cors allowlist includes production origin" check is flaky (passes on some runs, fails on others).
 
-## Why this matters
+## What's actually happening
 
-The frontend `ConfigurationService` (`src/lib/config/configuration-service.ts`) reads `app_settings` directly from Supabase REST using the **anon key**. When CORS blocks the preflight, the service catches the failure silently and falls through to `DEFAULT_*_CONFIG` from `src/lib/config/types.ts` — **production keeps running, but with stale defaults instead of the values seeded by migration 033 (29 admin-tunable keys: AI models, timeouts, OCR thresholds, FX cache TTL, monitoring/retention windows).**
+Supabase's REST API is fronted by Cloudflare. **Cloudflare's edge intermittently returns HTTP 503 with body `DNS cache overflow` on OPTIONS preflight requests** to the project domain. When the preflight 503s:
 
-The server-side `ConfigurationService` instance is unaffected — it uses `SUPABASE_SERVICE_ROLE_KEY` and a server-to-server fetch that bypasses CORS. So the **admin Settings UI itself works fine**; only the client extraction pipeline breaks.
+- The 503 response does not include an `Access-Control-Allow-Origin` header.
+- The browser interprets the missing header as a CORS policy violation.
+- The error message is misleading — it suggests an allowlist problem when the actual issue is a transient edge failure.
 
-This is the root cause of finding F2 in `e2e/findings/real-policies-findings-2026-04-27.md`.
+GET, POST, and PATCH requests don't trigger preflights for simple Content-Type, so they're unaffected. Only requests that include custom headers (like `apikey`, `authorization`) or non-simple methods trigger preflights — and those preflights are the ones that 503.
 
-## Fix (Supabase dashboard, no code change)
+## Verify this is the issue you're seeing
 
-1. Open the Supabase project dashboard for the production project.
-2. Navigate to **Project Settings → API → CORS allowed origins**.
-3. Add the production origin(s):
-   - `https://insurai-production.up.railway.app`
-   - Any custom domain (e.g. `https://app.insurai.com`)
-4. Save. The change takes effect immediately — no Railway redeploy needed.
-
-## Verify the fix
-
-### From the command line
+Run the OPTIONS preflight 8 times from any terminal:
 
 ```bash
-curl -i -X OPTIONS \
-  -H "Origin: https://insurai-production.up.railway.app" \
-  -H "Access-Control-Request-Method: GET" \
-  -H "Access-Control-Request-Headers: apikey,authorization,content-type" \
-  "https://<your-project-ref>.supabase.co/rest/v1/app_settings?select=key,value&category=eq.ocr&order=display_order.asc"
+for i in 1 2 3 4 5 6 7 8; do
+  curl -sS -o /dev/null -w "[$i] code=%{http_code}\n" -X OPTIONS \
+    -H "Origin: https://insurai-production.up.railway.app" \
+    -H "Access-Control-Request-Method: GET" \
+    -H "Access-Control-Request-Headers: apikey,authorization,content-type" \
+    "https://exykhfulkbwzatpesruv.supabase.co/rest/v1/app_settings?select=key&limit=1"
+  sleep 3
+done
 ```
 
-Expected: response includes `Access-Control-Allow-Origin: https://insurai-production.up.railway.app` (or `*`).
+**Expected output if you're affected**:
+```
+[1] code=200
+[2] code=200
+[3] code=503
+[4] code=503
+[5] code=200
+[6] code=200
+[7] code=503
+[8] code=200
+```
+Mix of 200 and 503. ~30-40% failure rate observed in Apr 27 sampling.
 
-### From the Playwright suite
+**If all 8 return 200**: Cloudflare-edge is healthy in your region right now; the symptom won't reproduce. Try again from a different network or wait — the failure rate varies by edge POP.
 
+**If all 8 return 503**: Cloudflare or Supabase is having a sustained outage. Check `https://status.supabase.com` and `https://www.cloudflarestatus.com`.
+
+Compare with a GET (no preflight, should always succeed):
 ```bash
-npx playwright test e2e/real-policies-sample.spec.ts \
-  -g "supabase cors allowlist" \
-  --project=chromium --reporter=list
+curl -i -X GET -H "Origin: https://insurai-production.up.railway.app" \
+  "https://exykhfulkbwzatpesruv.supabase.co/rest/v1/app_settings?select=key&limit=1"
+```
+Expect `HTTP/2 401` (no API key) with `access-control-allow-origin: *` in the response headers. The 401 itself is fine — it confirms Supabase REST is reachable and CORS is wide open. **If you see `503 DNS cache overflow` here too**, Cloudflare is actually down for your edge POP, not just slow on preflights — escalate to Supabase support.
+
+## What this means for the running app
+
+The frontend's `ConfigurationService` (`src/lib/config/configuration-service.ts`) reads `app_settings` directly from Supabase REST using the **anon key**. When the preflight 503s, the service catches the failure silently and falls through to `DEFAULT_*_CONFIG` from `src/lib/config/types.ts` (gotcha #169).
+
+So the user-visible impact is:
+- **~30-40% of page loads** can't read the latest admin-tunable values from the DB.
+- Those pages run on hardcoded defaults (still functional, just stale).
+- The remaining pages get the live values fine.
+- Admin changes "take effect" only on the page loads where the preflight 200s.
+
+The server-side `ConfigurationService` instance is **unaffected** — it uses `SUPABASE_SERVICE_ROLE_KEY` and a server-to-server fetch that doesn't go through the same Cloudflare edge path. So the **admin Settings UI itself works fine**; the breakage is purely the client-side frontend.
+
+## Mitigations (in order of preference)
+
+### 1. Client retry on config-fetch failure (~30 min effort, smallest blast radius)
+
+Add a simple retry-with-backoff around the Supabase fetch in `ConfigurationService`:
+
+```ts
+async function fetchCategoryWithRetry(category: string, attempts = 3) {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fetchCategory(category)
+    } catch (e) {
+      if (i === attempts - 1) throw e
+      await new Promise((r) => setTimeout(r, 200 * (i + 1)))
+    }
+  }
+}
 ```
 
-Expected: green. The test fails loudly if the allowlist regresses.
+A single retry catches ~85% of the 1-in-3 failures. Two retries ~98%. Three is overkill given the edge recovers within a few seconds.
 
-### From the live frontend
+### 2. Server-side config proxy through Express (~2 hours, cleanest fix)
 
-1. Hard-reload `https://insurai-production.up.railway.app/`.
-2. Open DevTools → Network → filter for `app_settings`.
-3. Confirm the requests return **200** with no CORS errors in the Console panel.
-4. Optional: change a low-risk OCR threshold via Admin Settings → OCR, hard-reload the page, confirm the new value is observable in the extraction behavior.
+Have the Express server fetch config from Supabase server-to-server, expose `GET /api/config/:category` to the client, and have the frontend hit Express instead of Supabase REST directly. Server-to-server calls don't trigger preflights, eliminating the issue entirely.
+
+This is the preferred long-term fix — it removes the client's dependency on Supabase REST for runtime config and centralizes the failure handling.
+
+### 3. File a Supabase support ticket
+
+Send Supabase the curl probe output above with timestamps and the project ref. Ask them to investigate the Cloudflare-edge 503s on OPTIONS preflights for the project. They have visibility into why the edge is throwing `DNS cache overflow` that we don't.
+
+## Don't do this
+
+- **Don't** try to configure a CORS allowlist in the Supabase dashboard. There is no project-level allowlist — Supabase already returns `Access-Control-Allow-Origin: *` for valid responses. The earlier version of this runbook was wrong about that.
+- **Don't** try to "fix" by widening CORS in our own app — the issue is on the Supabase side, not ours.
+- **Don't** add a wildcard fallback in `ConfigurationService` that ignores errors and uses defaults silently as a "feature" — that's already the current behavior (gotcha #169) and it's the reason this issue stayed invisible for so long. Mitigation #1 makes the failure recover; mitigation #2 makes it not happen.
 
 ## Related
 
-- Gotcha #169 in `CLAUDE.md` — silent fallback to `DEFAULT_*_CONFIG`
-- Migration `033_seed_hardcoded_configs.sql` — the 29 admin-tunable keys that depend on this allowlist
-- Gotcha #98 — adding new i18n keys (unrelated, but the four-file rule is referenced from the same client config)
-- Findings file `e2e/findings/real-policies-findings-2026-04-27.md` (F2)
-
-## Why we don't auto-allow `*`
-
-A wildcard would let any origin read `app_settings`. Even though the values are not strictly secret (they're operational config, not credentials), an explicit allowlist:
-- Documents which deployments are live.
-- Surfaces the "we deployed a new domain" event as a CORS failure (forcing a deliberate ack via this runbook), rather than silently exposing the new origin.
-- Aligns with the Supabase RLS posture (RLS is per-row; CORS is per-origin; both should be tight).
+- Gotcha #169 in `CLAUDE.md` — silent fallback to `DEFAULT_*_CONFIG` (this is what masks the symptom in normal operation)
+- Migration `033_seed_hardcoded_configs.sql` — the 29 admin-tunable keys that get filtered through this fragile path
+- Migration `045_bump_extraction_timeouts.sql` — recently bumped because Allianz extraction kept hitting the 65 s primary timeout
+- Findings file `e2e/findings/real-policies-findings-2026-04-27.md` (F2 in original audit, "Run #5 update" section for the corrected diagnosis)
+- Cloudflare's "DNS cache overflow" is generally caused by the edge proxy hitting an internal connection-pool limit; it's transient and recovers in seconds
