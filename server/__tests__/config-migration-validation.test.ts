@@ -121,12 +121,16 @@ describe('Migration 033 SQL values match TypeScript defaults', () => {
   })
 
   it('AI timeout values match TypeScript defaults', () => {
+    // Bumped Apr 27 2026 in response to Run #5 finding (Allianz extraction
+    // hit ALL_PROVIDERS_FAILED at the previous 65 s / 55 s ceilings). See
+    // migration 045 for the corresponding UPDATE applied to existing
+    // production deployments.
     const values = parseMigrationValues()
-    expect(values.get('ai.request_budget_ms')).toBe('125000')
-    expect(values.get('ai.primary_provider_timeout_ms')).toBe('65000')
-    expect(values.get('ai.fallback_provider_timeout_ms')).toBe('55000')
-    expect(values.get('ai.client_fetch_timeout_ms')).toBe('135000')
-    expect(values.get('ai.trial_extraction_timeout_ms')).toBe('150000')
+    expect(values.get('ai.request_budget_ms')).toBe('175000')
+    expect(values.get('ai.primary_provider_timeout_ms')).toBe('90000')
+    expect(values.get('ai.fallback_provider_timeout_ms')).toBe('75000')
+    expect(values.get('ai.client_fetch_timeout_ms')).toBe('185000')
+    expect(values.get('ai.trial_extraction_timeout_ms')).toBe('200000')
   })
 
   it('contains all expected FX keys', () => {

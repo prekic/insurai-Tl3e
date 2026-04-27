@@ -163,7 +163,12 @@ export function TryAnalysis() {
       // saveTrialResult(); on next visit the effect at the top of this file
       // picks that up. See findings F0 and the AnalysisProgressCard
       // retryingFallback banner.
-      const HARD_EXTRACTION_BUDGET_MS = 110_000
+      //
+      // Budget must exceed the server's worst-case timing
+      // (requestBudgetMs 175 s + Doc AI 14-30 s OCR + pipeline overhead).
+      // 220 s gives ~30 s of headroom past the server's hard ceiling so we
+      // don't kill legitimate extractions that are about to land.
+      const HARD_EXTRACTION_BUDGET_MS = 220_000
       if (hardBudgetTimerRef.current) clearTimeout(hardBudgetTimerRef.current)
       hardBudgetTimerRef.current = setTimeout(() => {
         if (!extractionInFlightRef.current || !isMounted.current) return

@@ -36,11 +36,17 @@ export function UploadWidget({
   }
 
   const handleFiles = async (files: File[]) => {
-    // Diagnostic instrumentation — gated behind VITE_DEBUG_LOGS to keep production silent.
-    // When enabled (set in Railway env or .env), every gate on the upload path emits a
-    // [UploadWidget] line so we can identify exactly where uploads silently bail
+    // Diagnostic instrumentation — opt-in either via the Railway env var or via
+    // a URL query param. The query-param path lets us debug a specific upload
+    // failure on a deployed environment without redeploying with a new env var
     // (e.g. the Erdemir multi-vehicle KASKO PDF case from findings F1).
-    const debug = import.meta.env.VITE_DEBUG_LOGS === 'true'
+    // Visit `https://insurai-production.up.railway.app/?debug=upload` and the
+    // [UploadWidget] checkpoints fire for that one session.
+    const envFlag = import.meta.env.VITE_DEBUG_LOGS === 'true'
+    const queryFlag =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('debug') === 'upload'
+    const debug = envFlag || queryFlag
     if (debug) {
       console.warn('[UploadWidget] handleFiles entered', {
         fileCount: files.length,

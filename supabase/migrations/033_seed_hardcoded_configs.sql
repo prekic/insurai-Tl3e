@@ -7,11 +7,11 @@
 -- =============================================================================
 INSERT INTO public.app_settings (category, key, value, value_type, description, is_sensitive)
 VALUES
-  ('ai', 'request_budget_ms', '125000', 'number', 'Total extraction time budget in milliseconds', false),
-  ('ai', 'primary_provider_timeout_ms', '65000', 'number', 'Primary AI provider timeout in milliseconds', false),
-  ('ai', 'fallback_provider_timeout_ms', '55000', 'number', 'Fallback AI provider timeout in milliseconds', false),
-  ('ai', 'client_fetch_timeout_ms', '135000', 'number', 'Client-side fetch timeout for extraction proxy calls in milliseconds', false),
-  ('ai', 'trial_extraction_timeout_ms', '150000', 'number', 'Umbrella timeout for trial page extraction in milliseconds', false)
+  ('ai', 'request_budget_ms', '175000', 'number', 'Total extraction time budget in milliseconds', false),
+  ('ai', 'primary_provider_timeout_ms', '90000', 'number', 'Primary AI provider timeout in milliseconds', false),
+  ('ai', 'fallback_provider_timeout_ms', '75000', 'number', 'Fallback AI provider timeout in milliseconds', false),
+  ('ai', 'client_fetch_timeout_ms', '185000', 'number', 'Client-side fetch timeout for extraction proxy calls in milliseconds', false),
+  ('ai', 'trial_extraction_timeout_ms', '200000', 'number', 'Umbrella timeout for trial page extraction in milliseconds', false)
 ON CONFLICT (category, key) DO NOTHING;
 
 -- =============================================================================
