@@ -32,6 +32,7 @@ import policyRoutes from './routes/policy.js'
 
 import driftRoutes from './routes/drift.js'
 import translationRoutes from './routes/translations.js'
+import configRoutes from './routes/config.js'
 import notificationRoutes from './routes/notifications.js'
 import { configureWebPush } from './services/notification-service.js'
 import { generalLimiter, healthLimiter, rateLimitConfig } from './middleware/rate-limit.js'
@@ -353,6 +354,11 @@ app.use('/api/email', emailRoutes)
 
 // Translation routes (public GET + admin CRUD)
 app.use('/api/translations', translationRoutes)
+
+// Public config proxy (Plan B from runbook 08) — frontend reads app_settings
+// here instead of directly from Supabase REST, eliminating the Cloudflare-edge
+// 503 OPTIONS-preflight failure mode.
+app.use('/api/config', configRoutes)
 
 // Push notification subscription routes (Web Push API / VAPID)
 app.use('/api/notifications', notificationRoutes)
