@@ -40,6 +40,48 @@ import type {
 // Helper to dynamically import supabase to avoid eager loading in the main bundle
 const getSupabase = () => import('@/lib/supabase/client').then((m) => m.supabase)
 
+/**
+ * Retry a Supabase fetch up to N times with exponential backoff.
+ *
+ * Designed to absorb the intermittent Cloudflare-edge HTTP 503 ("DNS cache
+ * overflow") that hits Supabase OPTIONS preflights in production (~30-40 %
+ * failure rate observed in Apr 27 audit — see docs/runbooks/08-supabase-cors-allowlist.md).
+ * The 503 propagates as a thrown TypeError from `fetch()` because the browser
+ * blocks the response without the ACAO header.
+ *
+ * Retries on:
+ *  - any thrown exception (network error, CORS-blocked preflight, etc.)
+ * Does NOT retry on:
+ *  - SDK error returns (e.g. 401 RLS, 404 missing) — those are real and
+ *    won't get better on retry. The caller's existing `if (error)` branch
+ *    handles those.
+ *
+ * Defaults: 3 attempts total, 200 ms / 500 ms backoff between them.
+ * Worst-case extra latency on a complete network failure: ~700 ms before
+ * the third attempt completes, after which the caller's catch block falls
+ * back to defaults the same way it would have without retry.
+ *
+ * Probability math (37 % per-attempt failure rate from real diagnostic):
+ *   - Single attempt: 37 % failure
+ *   - 2 attempts:     14 %
+ *   - 3 attempts:      5 %
+ */
+async function withRetry<T>(fn: () => Promise<T>, attempts: number = 3): Promise<T> {
+  let lastErr: unknown
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn()
+    } catch (e) {
+      lastErr = e
+      if (i === attempts - 1) break
+      // 200 ms after attempt 1, 500 ms after attempt 2.
+      const delayMs = i === 0 ? 200 : 500
+      await new Promise((r) => setTimeout(r, delayMs))
+    }
+  }
+  throw lastErr
+}
+
 import {
   DEFAULT_AI_CONFIG,
   DEFAULT_EVALUATION_CONFIG,
@@ -363,12 +405,19 @@ export class ConfigurationService {
     }
 
     try {
-      const { data, error } = await (await getSupabase())
-        .from('app_settings')
-        .select('value')
-        .eq('category', category)
-        .eq('key', key)
-        .single()
+      const supabase = await getSupabase()
+      // Retry the fetch to absorb Cloudflare-edge 503s on the OPTIONS
+      // preflight (runbook 08). The retry is a no-op for healthy preflights
+      // and recovers ~95 % of the 1-in-3 transient failures with <700 ms
+      // worst-case extra latency.
+      const { data, error } = await withRetry(async () =>
+        supabase
+          .from('app_settings')
+          .select('value')
+          .eq('category', category)
+          .eq('key', key)
+          .single()
+      )
 
       const latencyMs = Math.round((performance.now() - startTime) * 100) / 100
 
@@ -435,11 +484,17 @@ export class ConfigurationService {
     }
 
     try {
-      const { data, error } = await (await getSupabase())
-        .from('app_settings')
-        .select('key, value')
-        .eq('category', category)
-        .order('display_order', { ascending: true })
+      const supabase = await getSupabase()
+      // Retry the fetch to absorb Cloudflare-edge 503s on the OPTIONS
+      // preflight (runbook 08). Same rationale as the per-key get() above —
+      // this is the hot path called by getAIConfig() / getOCRConfig() etc.
+      const { data, error } = await withRetry(async () =>
+        supabase
+          .from('app_settings')
+          .select('key, value')
+          .eq('category', category)
+          .order('display_order', { ascending: true })
+      )
 
       const latencyMs = Math.round((performance.now() - startTime) * 100) / 100
 

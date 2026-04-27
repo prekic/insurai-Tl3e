@@ -356,3 +356,94 @@ Per gotcha #33 there is already a documented retry mechanism for this race condi
 PR #384 delivered as designed. Four of the six items verifiable as working in production today (1, 2, 4, 6). Item 3 was a misdiagnosis — the real CORS issue is intermittent Cloudflare 503s on Supabase's preflight, separate from any allowlist concern. Item 5 (Erdemir diagnostic) wasn't exercised because the Railway env var wasn't toggled.
 
 One new production issue surfaced (Allianz AI extraction >120 s timeout) — distinct from the OCR timeout we fixed, and worth a follow-up sprint.
+
+---
+
+# Run #6 — final verification (2026-04-27 18:10 UTC)
+
+After PR #386 (timeout bump + corrected runbook + URL-param diagnostic gate) merged into `main` and migration `045_bump_extraction_timeouts.sql` was applied to production Supabase, I re-ran two targeted probes:
+
+## Probe A — Erdemir filename A/B test
+
+To resolve the persistent Erdemir NAVIGATION_TIMEOUT (4 consecutive failures), I ran a single-page A/B test: same file content, two different filenames, same input element on the live production site.
+
+| Filename | input.files state after setInputFiles | Navigation result |
+|---|---|---|
+| `KASKO_ERDEMİR_Ereğli_462660767_67TY932_2024.12-2025.12.pdf` (Turkish) | `fileCount: 0` | **No navigation** — URL stayed at `/?debug=upload` for 10 s |
+| `/tmp/KASKO_ERDEMIR_Eregli_462660767_67TY932_2024_12-2025_12.pdf` (ASCII, identical bytes) | `fileCount: 0` (handler had already cleared `e.target.value`) | **`/try` at t=1 s** ✅ |
+
+**Conclusion**: the Erdemir bug is a **Playwright `setInputFiles` test artifact, NOT a user-facing bug**. The Chromium DevTools Protocol command `DOM.setFileInputFiles` fails to attach the file when the path contains UTF-8 multi-byte characters (Turkish `İ`, `ğ`, etc.) in the filename. Real users picking files via the OS file picker don't hit this — Chromium handles Unicode filenames natively at that surface.
+
+Bonus discovery during this probe: the Playwright spec selector `page.locator('input[type="file"]').first()` actually picks **input[0] in the GlobalNavigation top bar**, not the UploadWidget. The page has 3 file inputs:
+
+| Index | Parent element | Component |
+|---|---|---|
+| 0 | `<nav>` | `GlobalNavigation.tsx:328` "Upload" button |
+| 1 | `<label>` | `UploadWidget.tsx:114` compact "Analyze Your Policy Free" button |
+| 2 | `<div>` | `UploadWidget.tsx:139` drag-drop area |
+
+The `[UploadWidget]` instrumentation I added in PR #384 was on the wrong component — it never fired in any spec run because the spec was hitting GlobalNavigation. **Action**: the spec should use a more specific selector like `page.getByLabel('Analyze Your Policy Free')` to test the actual landing-widget behavior. The GlobalNavigation flow is also production-relevant but is exercised by a different code path (it dispatches a `filesSelected` CustomEvent and navigates to `/upload`, which redirects anonymous users to `/try`).
+
+The `?debug=upload` query-param gate added in PR #386 works correctly — it just wasn't exercised because the wrong input was being used.
+
+## Probe B — Allianz extraction with bumped timeouts
+
+Set Allianz on input[0] (which actually triggers the same end-to-end pipeline since /upload→/try redirects anonymous users), waited 220 s for end-state. **Result: full extraction succeeds end-to-end**.
+
+Captured output (`e2e/proof/real-policies/allianz-postfix-final.{png,txt}`):
+
+```
+Allianz / 🚗 34 GM 6461
+Policy Summary: Expired
+Premium: TRY 1,660
+Deductible: TRY 5
+No Claims Discount: %30
+Other Discounts: %6.5
+Insured: NACİYE PREKA (Bireysel)
+Policy Number: 0001-0210-24147152
+Start: 09/15/2018
+End: 09/15/2019
+Vehicle:
+  Plate: 34 GM 6461
+  Make: PEUGEOT
+  Model: 308 COMFORT 1.6 VTI (120) 5 KAPI OV
+  Model Year: 2010
+AI Confidence: 96%
+TASLAK / DRAFT — İnsan İncelemesi Gerekli / Human Review Required
+12 özel kloz tespit edildi — koşulların geçerliliği doğrulanmalı
+21 exclusions identified
+```
+
+Key observations:
+- **Make: PEUGEOT** — confirms gotcha #103 (inverted-label parsing) is still working post-deploy.
+- **AI confidence 96%** — high quality structured output.
+- **Premium TRY 1,660 + 30% NCD + 6.5% other discounts** — full financial detail.
+- **TASLAK/DRAFT banner** — correct gating per gotcha #24.
+- **"View Source Quote" links visible** — evidence-quote pipeline functional.
+
+The previous run's `aiExtraction_ms: 121069` failure (Run #5 Allianz hitting both providers' 65 s/55 s ceilings) is fixed by the bumped timeouts. Migration 045's UPDATEs landed on the production DB, the new 90 s primary / 75 s fallback ceilings are in effect, and Allianz's chat-completion phase now completes within budget.
+
+## Final state across all six original PR #384 items
+
+| # | Item | Status | Verified by |
+|---|---|---|---|
+| 1 | Doc AI 60 s → 90 s + retry | ✅ Working in production | Allianz Doc AI 14 s success (was timeout) — Run #5 |
+| 2 | pdf.js worker bundling | ✅ Working in production | `/pdfjs/pdf.worker.min.mjs` 200 + logs show same-origin first — Run #5 |
+| 3 | Supabase CORS allowlist | ❌ Misdiagnosis — runbook 08 rewritten in PR #386 | Direct curl probe showed Supabase returns ACAO `*`; real cause is intermittent Cloudflare 503s — Run #5 |
+| 4 | admin_notifications structured logging | ✅ Working server-side | Code paths verified; Railway log access required to confirm `[ADMIN-NOTIFY-INIT] ok` printed at boot |
+| 5 | Erdemir UploadWidget instrumentation | ❌ Wrong component instrumented — see Probe A | Erdemir bug is a Playwright test artifact, not user-facing |
+| 6 | Hard-failure UI + 110 s wall-time budget | ✅ Working in production | Allianz Run #5 hit budget cleanly, "Try Again" UI rendered |
+
+Plus the PR #386 follow-ups:
+| # | Item | Status |
+|---|---|---|
+| A | Bump primary/fallback/budget timeouts | ✅ Verified — Allianz now extracts successfully (Probe B above) |
+| B | Rewrite runbook 08 | ✅ Documented in `docs/runbooks/08-supabase-cors-allowlist.md` |
+| C | URL-param Erdemir diagnostic gate | ✅ Working but moot — bug is a test artifact, not a production issue |
+
+## Recommended next sprint priorities
+
+1. **Fix the e2e spec selector** — switch from `input[type="file"]` (which picks GlobalNavigation's input) to a specific selector for the UploadWidget so the spec actually tests the landing-page upload UX. Renaming Turkish-filename fixtures to ASCII at test-setup time is the second part of the fix.
+2. **Address the intermittent Cloudflare 503s** on Supabase preflight — implement the client-retry pattern from the rewritten runbook 08, or stand up the server-side config proxy.
+3. **Pull a Railway server log slice** to confirm Item 4's `[ADMIN-NOTIFY-INIT]` startup probe is logging cleanly (this is the only PR #384 item not yet client-side verifiable).
+4. **Investigate the processing-log POST silent failure** that causes the PATCH 404 cascade documented in Run #5.

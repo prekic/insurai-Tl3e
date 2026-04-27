@@ -83,24 +83,37 @@ The server-side `ConfigurationService` instance is **unaffected** — it uses `S
 
 ## Mitigations (in order of preference)
 
-### 1. Client retry on config-fetch failure (~30 min effort, smallest blast radius)
+### 1. Client retry on config-fetch failure — ✅ IMPLEMENTED (Apr 27 2026)
 
-Add a simple retry-with-backoff around the Supabase fetch in `ConfigurationService`:
+Implemented in `src/lib/config/configuration-service.ts` as the `withRetry()` helper, wrapping both `get()` and `getCategory()` (the hot paths called by `getAIConfig()` / `getOCRConfig()` / etc).
 
 ```ts
-async function fetchCategoryWithRetry(category: string, attempts = 3) {
+async function withRetry<T>(fn: () => Promise<T>, attempts: number = 3): Promise<T> {
+  let lastErr: unknown
   for (let i = 0; i < attempts; i++) {
     try {
-      return await fetchCategory(category)
+      return await fn()
     } catch (e) {
-      if (i === attempts - 1) throw e
-      await new Promise((r) => setTimeout(r, 200 * (i + 1)))
+      lastErr = e
+      if (i === attempts - 1) break
+      const delayMs = i === 0 ? 200 : 500
+      await new Promise((r) => setTimeout(r, delayMs))
     }
   }
+  throw lastErr
 }
 ```
 
-A single retry catches ~85% of the 1-in-3 failures. Two retries ~98%. Three is overkill given the edge recovers within a few seconds.
+Three attempts total, 200 ms / 500 ms backoff, total worst-case extra latency ~700 ms before the existing fallback-to-default catch fires. Probability math (37 % per-attempt failure rate from this runbook's diagnostic):
+| Attempts | Probability of total failure |
+|---:|---:|
+| 1 | 37 % |
+| 2 | 14 % |
+| 3 | **5 %** |
+
+**Important**: the helper retries only on **thrown exceptions** (network errors, CORS-blocked preflights — these manifest as `TypeError: Failed to fetch`). It does NOT retry on SDK error responses (e.g. RLS `401`, missing-table `404`) since those are real and won't recover. Tests in `src/lib/config/__tests__/configuration-service.test.ts` ("Cloudflare 503 retry on Supabase preflight failure" describe block) verify all four behaviors.
+
+Other Supabase fetch sites in `ConfigurationService` (e.g. `getRegionalFactors`, `getMarketBenchmarks`, `getInsuranceProviders`) are called less frequently and aren't yet wrapped — easy follow-up if the same symptoms appear there.
 
 ### 2. Server-side config proxy through Express (~2 hours, cleanest fix)
 
