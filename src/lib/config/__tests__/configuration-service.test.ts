@@ -138,10 +138,14 @@ function setupCategoryQuery(rows: Array<{ key: string; value: unknown }>) {
 }
 
 /**
- * Set up mock that throws an exception
+ * Set up mock that throws an exception. Uses mockImplementation (not Once)
+ * because get() and getCategory() now retry up to 3 times via withRetry()
+ * to absorb Cloudflare-edge 503s on the Supabase preflight (runbook 08).
+ * The semantic is "this query always throws"; the retries don't affect
+ * whether the final outcome is the recorded error.
  */
 function setupThrowingQuery() {
-  mockFrom.mockImplementationOnce(() => {
+  mockFrom.mockImplementation(() => {
     throw new Error('Connection refused')
   })
 }
@@ -273,7 +277,8 @@ describe('ConfigurationService', () => {
     })
 
     it('should handle non-Error exceptions in error message', async () => {
-      mockFrom.mockImplementationOnce(() => {
+      // Always-throw because get() retries up to 3× via withRetry().
+      mockFrom.mockImplementation(() => {
         throw 'string error'
       })
       const result = await service.get('ai', 'key', 'default')
@@ -424,7 +429,8 @@ describe('ConfigurationService', () => {
     })
 
     it('should handle non-Error exception in getCategory', async () => {
-      mockFrom.mockImplementationOnce(() => {
+      // Always-throw because getCategory() retries up to 3× via withRetry().
+      mockFrom.mockImplementation(() => {
         throw 42
       })
       const result = await service.getCategory('ai')
@@ -1662,6 +1668,118 @@ describe('ConfigurationService', () => {
       const { getEmailConfigForUser } = await import('../configuration-service')
       const config = await getEmailConfigForUser('user-1')
       expect(config.defaultMarketingEnabled).toBe(false)
+    })
+  })
+
+  // ========================================================================
+  // RETRY BEHAVIOR — Cloudflare-edge 503 mitigation per runbook 08
+  // ========================================================================
+  describe('Cloudflare 503 retry on Supabase preflight failure', () => {
+    // Use real timers — the 200/500 ms backoff is fast enough not to slow
+    // tests meaningfully, and fake timers tangle with the Promise chain
+    // inside withRetry() (microtask deadlock).
+    beforeEach(() => {
+      service = ConfigurationService.getInstance({ enableCache: false })
+    })
+
+    it('get() retries the fetch when the first call throws and recovers on retry', async () => {
+      // First call: thrown TypeError (simulates browser blocking due to 503
+      // preflight with no ACAO header). Second call: success.
+      let callCount = 0
+      mockSingle.mockImplementation(() => {
+        callCount += 1
+        if (callCount === 1) {
+          return Promise.reject(new TypeError('Failed to fetch'))
+        }
+        return Promise.resolve({ data: { value: 0.5 }, error: null })
+      })
+      mockEq.mockReturnValue({
+        eq: mockEq,
+        single: mockSingle,
+        maybeSingle: mockMaybeSingle,
+        order: mockOrder,
+      })
+      mockSelect.mockReturnValue({ eq: mockEq, order: mockOrder })
+      mockFrom.mockReturnValue({ select: mockSelect, upsert: mockUpsert })
+
+      const result = await service.get('ai', 'min_confidence', 0.7)
+
+      expect(callCount).toBe(2)
+      expect(result).toBe(0.5)
+    })
+
+    it('get() falls back to default after 3 consecutive thrown failures', async () => {
+      let callCount = 0
+      mockSingle.mockImplementation(() => {
+        callCount += 1
+        return Promise.reject(new TypeError('Failed to fetch'))
+      })
+      mockEq.mockReturnValue({
+        eq: mockEq,
+        single: mockSingle,
+        maybeSingle: mockMaybeSingle,
+        order: mockOrder,
+      })
+      mockSelect.mockReturnValue({ eq: mockEq, order: mockOrder })
+      mockFrom.mockReturnValue({ select: mockSelect, upsert: mockUpsert })
+
+      const result = await service.get('ai', 'min_confidence', 0.42)
+
+      expect(callCount).toBe(3) // exactly 3 attempts (initial + 2 retries)
+      expect(result).toBe(0.42) // falls back to provided default
+    })
+
+    it('get() does NOT retry when SDK returns a clean error (e.g. RLS)', async () => {
+      // SDK error responses (e.g. 401 RLS) are not transient — they shouldn't
+      // benefit from retry and we don't want to delay the fallback.
+      let callCount = 0
+      mockSingle.mockImplementation(() => {
+        callCount += 1
+        return Promise.resolve({
+          data: null,
+          error: { code: 'PGRST301', message: 'JWT expired' },
+        })
+      })
+      mockEq.mockReturnValue({
+        eq: mockEq,
+        single: mockSingle,
+        maybeSingle: mockMaybeSingle,
+        order: mockOrder,
+      })
+      mockSelect.mockReturnValue({ eq: mockEq, order: mockOrder })
+      mockFrom.mockReturnValue({ select: mockSelect, upsert: mockUpsert })
+
+      const result = await service.get('ai', 'min_confidence', 0.99)
+
+      expect(callCount).toBe(1) // only one attempt, no retry
+      expect(result).toBe(0.99) // falls back to provided default
+    })
+
+    it('getCategory() retries the order() query when it throws', async () => {
+      let callCount = 0
+      mockOrder.mockImplementation(() => {
+        callCount += 1
+        if (callCount === 1) {
+          return Promise.reject(new TypeError('Failed to fetch'))
+        }
+        return Promise.resolve({
+          data: [{ key: 'min_confidence', value: 0.6 }],
+          error: null,
+        })
+      })
+      mockEq.mockReturnValue({
+        eq: mockEq,
+        single: mockSingle,
+        maybeSingle: mockMaybeSingle,
+        order: mockOrder,
+      })
+      mockSelect.mockReturnValue({ eq: mockEq, order: mockOrder })
+      mockFrom.mockReturnValue({ select: mockSelect, upsert: mockUpsert })
+
+      const result = await service.getCategory('ai')
+
+      expect(callCount).toBe(2)
+      expect(result).toEqual({ min_confidence: 0.6 })
     })
   })
 })
