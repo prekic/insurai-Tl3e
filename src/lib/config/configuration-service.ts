@@ -127,6 +127,7 @@ import {
 import { configPerformanceMonitor } from './config-performance-monitor'
 import { mergeWithUserPreferences, isUserOverridableCategory } from './user-overridable'
 import { computeRolloutBucket } from './rollout-hash'
+import { getLocalCachedConfig, setLocalCachedConfig } from './local-cache'
 
 // =============================================================================
 // CACHE IMPLEMENTATION
@@ -447,6 +448,21 @@ export class ConfigurationService {
       const latencyMs = Math.round((performance.now() - startTime) * 100) / 100
 
       if (error || !data) {
+        // Network exhausted (or row missing). Try localStorage as a
+        // last-known-good fallback before giving up to hardcoded defaults.
+        // Plan A — runbook 08, defense in depth.
+        const fromLocal = getLocalCachedConfig<T>(category, key)
+        if (fromLocal !== null) {
+          configPerformanceMonitor.record({
+            category,
+            method: 'get',
+            latencyMs,
+            cacheHit: false,
+            success: true,
+            errorMessage: 'served-from-localstorage',
+          })
+          return fromLocal
+        }
         configPerformanceMonitor.record({
           category,
           method: 'get',
@@ -459,10 +475,12 @@ export class ConfigurationService {
 
       const value = data.value as T
 
-      // Update cache
+      // Update cache (in-memory + localStorage). localStorage write is
+      // best-effort — quota errors are swallowed inside setLocalCachedConfig.
       if (this.enableCache) {
         setInCache(cacheKey, value, this.cacheTtlMs)
       }
+      setLocalCachedConfig(category, value, key)
 
       configPerformanceMonitor.record({
         category,
@@ -474,6 +492,20 @@ export class ConfigurationService {
 
       return value
     } catch (err) {
+      // Same fallback chain as the if-error branch above — try localStorage
+      // before falling through to the caller-provided default.
+      const fromLocal = getLocalCachedConfig<T>(category, key)
+      if (fromLocal !== null) {
+        configPerformanceMonitor.record({
+          category,
+          method: 'get',
+          latencyMs: Math.round((performance.now() - startTime) * 100) / 100,
+          cacheHit: false,
+          success: true,
+          errorMessage: 'served-from-localstorage',
+        })
+        return fromLocal
+      }
       configPerformanceMonitor.record({
         category,
         method: 'get',
@@ -524,6 +556,19 @@ export class ConfigurationService {
       const latencyMs = Math.round((performance.now() - startTime) * 100) / 100
 
       if (error || !data) {
+        // Plan A: localStorage last-known-good fallback before {}.
+        const fromLocal = getLocalCachedConfig<Record<string, unknown>>(category)
+        if (fromLocal !== null) {
+          configPerformanceMonitor.record({
+            category,
+            method: 'getCategory',
+            latencyMs,
+            cacheHit: false,
+            success: true,
+            errorMessage: 'served-from-localstorage',
+          })
+          return fromLocal
+        }
         configPerformanceMonitor.record({
           category,
           method: 'getCategory',
@@ -542,10 +587,11 @@ export class ConfigurationService {
         {} as Record<string, unknown>
       )
 
-      // Update cache
+      // Update cache (in-memory + localStorage).
       if (this.enableCache) {
         setInCache(cacheKey, result, this.cacheTtlMs)
       }
+      setLocalCachedConfig(category, result)
 
       configPerformanceMonitor.record({
         category,
@@ -557,6 +603,19 @@ export class ConfigurationService {
 
       return result
     } catch (err) {
+      // Plan A: localStorage last-known-good fallback before {}.
+      const fromLocal = getLocalCachedConfig<Record<string, unknown>>(category)
+      if (fromLocal !== null) {
+        configPerformanceMonitor.record({
+          category,
+          method: 'getCategory',
+          latencyMs: Math.round((performance.now() - startTime) * 100) / 100,
+          cacheHit: false,
+          success: true,
+          errorMessage: 'served-from-localstorage',
+        })
+        return fromLocal
+      }
       configPerformanceMonitor.record({
         category,
         method: 'getCategory',
