@@ -1,1 +1,35 @@
-DNS resolution failure
+Skip to main content
+Now viewing: Home
+InsurAI
+Policy Analysis Platform
+Dashboard
+Compare
+Chat
+Upload
+Sign In
+Free Policy Analysis
+Analyze Your Policy
+
+Upload a PDF policy document for instant AI-powered analysis
+
+KASKO_ERDEMIR_Eregli_462660767_67TY932_2024.12-2025.12.pdf
+
+282 KB
+
+Elapsed 0:13
+
+OCR Processing…
+
+Upload
+889ms
+PDF Extraction
+OCR Processing
+Text Preprocessing
+AI Extraction
+Table Parsing
+Validation
+Save
+
+💡 Your insured value is being matched against current market rayiç data.
+
+Already have an account? Sign In
