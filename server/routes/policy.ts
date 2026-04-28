@@ -123,15 +123,34 @@ router.post(
         res.status(500).json({ success: false, error: 'Failed to store document' })
         return
       }
-      // 3. Insert the Policy record into the database
-      const policyData = {
+      // 3. Insert the Policy record into the database.
+      // The frontend sends an `AnalyzedPolicy` (camelCase). Map it onto the
+      // `policies` table schema (snake_case + required NOT NULL columns from
+      // migration 001). The full extracted blob lives in `raw_data` JSONB —
+      // NOT a separate `policy_data` column (that name was a stub in this
+      // route's original draft and produced PGRST204 in production).
+      const policy = extractionResult as Record<string, unknown>
+      const today = new Date().toISOString().split('T')[0]
+      const insertPayload = {
         user_id: userId,
-        policy_data: extractionResult,
+        policy_number: typeof policy.policyNumber === 'string' ? policy.policyNumber : 'UNKNOWN',
+        provider: typeof policy.provider === 'string' ? policy.provider : 'Unknown',
+        type: typeof policy.type === 'string' ? policy.type : 'kasko',
+        type_tr: typeof policy.typeTr === 'string' ? policy.typeTr : 'Kasko',
+        coverage: typeof policy.coverage === 'number' ? policy.coverage : 0,
+        premium: typeof policy.premium === 'number' ? policy.premium : 0,
+        deductible: typeof policy.deductible === 'number' ? policy.deductible : 0,
+        start_date:
+          typeof policy.startDate === 'string' && policy.startDate ? policy.startDate : today,
+        expiry_date:
+          typeof policy.expiryDate === 'string' && policy.expiryDate ? policy.expiryDate : today,
+        insured_person:
+          typeof policy.insuredPerson === 'string' ? policy.insuredPerson : 'Anonymous',
         status: 'active',
-        // Depending on your database schema, you might need to supply other fields
+        raw_data: extractionResult,
       }
 
-      const { error: policyInsertError } = await supabase.from('policies').insert(policyData)
+      const { error: policyInsertError } = await supabase.from('policies').insert(insertPayload)
 
       if (policyInsertError) {
         log.error('Failed to insert anonymous policy', pgErr(policyInsertError))
