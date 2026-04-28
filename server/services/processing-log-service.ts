@@ -9,6 +9,32 @@ import { logger } from '../lib/logger.js'
 
 const log = logger.child('ProcessingLogService')
 
+/**
+ * Expand a Supabase PostgrestError into structured log fields. The previous
+ * `error: String(err)` pattern reduced these to the literal string
+ * "[object Object]" in Railway logs, hiding the actual `code`, `message`,
+ * `details`, and `hint`. Same pattern as admin-notification-service.ts (PR #384).
+ *
+ * Apr 28 2026: production logs surfaced repeated `Failed to update processing
+ * log` errors with `error: "[object Object]"`. Real cause was invisible until
+ * this helper landed. Once deployed, the next log slice exposes the actual
+ * pgCode and we can fix the underlying schema/RLS/etc issue.
+ */
+function pgErr(err: unknown): Record<string, unknown> {
+  const e = err as {
+    code?: string | null
+    message?: string | null
+    details?: string | null
+    hint?: string | null
+  } | null
+  return {
+    pgCode: e?.code ?? null,
+    pgMessage: e?.message ?? null,
+    pgDetails: e?.details ?? null,
+    pgHint: e?.hint ?? null,
+  }
+}
+
 // Import types - use relative path to avoid module issues
 interface ProcessingStageRecord {
   stage: string
@@ -147,7 +173,7 @@ export async function updateProcessingLog(
     .maybeSingle()
 
   if (error) {
-    log.error('Failed to update processing log', { documentId, error: String(error) })
+    log.error('Failed to update processing log', { documentId, ...pgErr(error) })
     return null
   }
 
@@ -177,7 +203,7 @@ export async function addProcessingStage(
     .single()
 
   if (fetchError) {
-    log.error('Failed to fetch log for stage update', { error: String(fetchError) })
+    log.error('Failed to fetch log for stage update', { documentId, ...pgErr(fetchError) })
     return false
   }
 
@@ -193,7 +219,7 @@ export async function addProcessingStage(
     .eq('document_id', documentId)
 
   if (updateError) {
-    log.error('Failed to add stage', { error: String(updateError) })
+    log.error('Failed to add stage', { documentId, ...pgErr(updateError) })
     return false
   }
 
@@ -214,7 +240,7 @@ export async function getProcessingLog(documentId: string): Promise<DocumentProc
     .single()
 
   if (error) {
-    log.error('Failed to get log', { error: String(error) })
+    log.error('Failed to get log', pgErr(error))
     return null
   }
 
@@ -238,7 +264,7 @@ export async function getProcessingLogByPolicyId(
 
   if (error && error.code !== 'PGRST116') {
     // PGRST116 = no rows returned
-    log.error('Failed to get log by policy', { error: String(error) })
+    log.error('Failed to get log by policy', pgErr(error))
     return null
   }
 
@@ -287,7 +313,7 @@ export async function listProcessingLogs(
   const { data, error, count } = await query
 
   if (error) {
-    log.error('Failed to list logs', { error: String(error) })
+    log.error('Failed to list logs', pgErr(error))
     return { logs: [], total: 0 }
   }
 
@@ -323,7 +349,7 @@ export async function getProcessingStats(days: number = 30): Promise<ProcessingL
     .gte('started_at', fromDate.toISOString())
 
   if (error) {
-    log.error('Failed to get stats', { error: String(error) })
+    log.error('Failed to get stats', pgErr(error))
     return {
       total: 0,
       completed: 0,
@@ -381,8 +407,8 @@ export async function deleteProcessingLogs(documentIds: string[]): Promise<numbe
 
   if (error) {
     log.error('Failed to delete processing logs', {
-      error: String(error),
       count: documentIds.length,
+      ...pgErr(error),
     })
     return 0
   }
@@ -417,7 +443,7 @@ export async function deleteAllProcessingLogs(options?: {
   const { data, error } = await query.select('id')
 
   if (error) {
-    log.error('Failed to delete all processing logs', { error: String(error), options })
+    log.error('Failed to delete all processing logs', { options, ...pgErr(error) })
     return 0
   }
 
@@ -441,7 +467,7 @@ export async function deleteOldLogs(daysOld: number = 90): Promise<number> {
     .select('id')
 
   if (error) {
-    log.error('Failed to delete old logs', { error: String(error) })
+    log.error('Failed to delete old logs', pgErr(error))
     return 0
   }
 

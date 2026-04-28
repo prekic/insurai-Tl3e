@@ -320,9 +320,16 @@ describe('processing-log-service branch coverage', () => {
       const result = await svc.updateProcessingLog('doc-1', { status: 'completed' } as any)
 
       expect(result).toBeNull()
+      // After Apr 28 2026 fix, errors are logged as structured PostgrestError
+      // fields (pgCode, pgMessage, pgDetails, pgHint) instead of opaque
+      // String(error) which produced "[object Object]" in production logs.
       expect(mockLogError).toHaveBeenCalledWith(
         'Failed to update processing log',
-        expect.objectContaining({ error: expect.any(String) })
+        expect.objectContaining({
+          documentId: 'doc-1',
+          pgCode: '42P01',
+          pgMessage: 'relation does not exist',
+        })
       )
     })
 
@@ -528,7 +535,7 @@ describe('processing-log-service branch coverage', () => {
       expect(result).toBeNull()
       expect(mockLogError).toHaveBeenCalledWith(
         'Failed to get log',
-        expect.objectContaining({ error: expect.any(String) })
+        expect.objectContaining({ pgCode: '42P01', pgMessage: 'table missing' })
       )
     })
 
@@ -585,7 +592,7 @@ describe('processing-log-service branch coverage', () => {
       expect(result).toBeNull()
       expect(mockLogError).toHaveBeenCalledWith(
         'Failed to get log by policy',
-        expect.objectContaining({ error: expect.any(String) })
+        expect.objectContaining({ pgCode: '42501', pgMessage: 'permission denied' })
       )
     })
 
