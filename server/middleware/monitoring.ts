@@ -974,13 +974,16 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
  */
 export function initializeDefaultAlertRules(): void {
   // High response time alert
+  // Raised from 5000ms after observing real extraction workloads land at
+  // 18-30s end-to-end (Document AI OCR + Anthropic). The old threshold fired
+  // on every successful extraction.
   if (!Array.from(alertRules.values()).find((r) => r.metric === 'response_time')) {
     createAlertRule({
       name: 'High Response Time',
-      description: 'Alert when response time exceeds 5 seconds',
+      description: 'Alert when response time exceeds 60 seconds',
       metric: 'response_time',
       condition: 'gt',
-      threshold: 5000,
+      threshold: 60000,
       severity: 'warning',
       enabled: true,
       cooldownMinutes: 5,
@@ -989,6 +992,9 @@ export function initializeDefaultAlertRules(): void {
   }
 
   // Critical response time alert
+  // Raised from 10000ms — heavy-document extractions legitimately take
+  // 60-90s. The old threshold fired on every successful run and fed
+  // category='performance' rows into admin_notifications constantly.
   if (
     !Array.from(alertRules.values()).find(
       (r) => r.metric === 'response_time' && r.severity === 'critical'
@@ -996,10 +1002,10 @@ export function initializeDefaultAlertRules(): void {
   ) {
     createAlertRule({
       name: 'Critical Response Time',
-      description: 'Alert when response time exceeds 10 seconds',
+      description: 'Alert when response time exceeds 90 seconds',
       metric: 'response_time',
       condition: 'gt',
-      threshold: 10000,
+      threshold: 90000,
       severity: 'critical',
       enabled: true,
       cooldownMinutes: 1,

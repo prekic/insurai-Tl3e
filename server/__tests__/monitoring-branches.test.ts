@@ -144,22 +144,22 @@ describe('monitoring.ts branch coverage', () => {
       expect(countAfter).toBe(countBefore)
     })
 
-    it('creates response_time warning rule with threshold 5000', () => {
+    it('creates response_time warning rule with threshold 60000', () => {
       const rule = getAlertRules().find(
         (r) => r.metric === 'response_time' && r.severity === 'warning'
       )
       expect(rule).toBeDefined()
-      expect(rule!.threshold).toBe(5000)
+      expect(rule!.threshold).toBe(60000)
       expect(rule!.condition).toBe('gt')
       expect(rule!.enabled).toBe(true)
     })
 
-    it('creates response_time critical rule with threshold 10000', () => {
+    it('creates response_time critical rule with threshold 90000', () => {
       const rule = getAlertRules().find(
         (r) => r.metric === 'response_time' && r.severity === 'critical'
       )
       expect(rule).toBeDefined()
-      expect(rule!.threshold).toBe(10000)
+      expect(rule!.threshold).toBe(90000)
       expect(rule!.cooldownMinutes).toBe(1)
     })
 
@@ -699,13 +699,9 @@ describe('monitoring.ts branch coverage', () => {
       recordRequest(makeMetric({ responseTime: 100 }))
 
       // Second request should be in cooldown
-      const alertsBeforeSecond = getActiveAlerts().filter(
-        (a) => a.ruleId === testRule.id
-      ).length
+      const alertsBeforeSecond = getActiveAlerts().filter((a) => a.ruleId === testRule.id).length
       recordRequest(makeMetric({ responseTime: 100 }))
-      const alertsAfterSecond = getActiveAlerts().filter(
-        (a) => a.ruleId === testRule.id
-      ).length
+      const alertsAfterSecond = getActiveAlerts().filter((a) => a.ruleId === testRule.id).length
       expect(alertsAfterSecond).toBe(alertsBeforeSecond)
     })
 
@@ -1087,9 +1083,30 @@ describe('monitoring.ts branch coverage', () => {
   describe('getEndpointStats', () => {
     it('aggregates stats per endpoint', () => {
       // Record some metrics
-      recordRequest(makeMetric({ endpoint: '/api/stats-test', method: 'GET', statusCode: 200, responseTime: 50 }))
-      recordRequest(makeMetric({ endpoint: '/api/stats-test', method: 'GET', statusCode: 200, responseTime: 100 }))
-      recordRequest(makeMetric({ endpoint: '/api/stats-test', method: 'GET', statusCode: 500, responseTime: 200 }))
+      recordRequest(
+        makeMetric({
+          endpoint: '/api/stats-test',
+          method: 'GET',
+          statusCode: 200,
+          responseTime: 50,
+        })
+      )
+      recordRequest(
+        makeMetric({
+          endpoint: '/api/stats-test',
+          method: 'GET',
+          statusCode: 200,
+          responseTime: 100,
+        })
+      )
+      recordRequest(
+        makeMetric({
+          endpoint: '/api/stats-test',
+          method: 'GET',
+          statusCode: 500,
+          responseTime: 200,
+        })
+      )
 
       const stats = getEndpointStats()
       const testStats = stats.find((s) => s.endpoint === '/api/stats-test' && s.method === 'GET')
