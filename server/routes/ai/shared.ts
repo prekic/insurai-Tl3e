@@ -1,4 +1,5 @@
 import log from '../../lib/logger.js'
+import { pgErr } from '../../lib/pg-err.js'
 import {
   aiRequests,
   policyOperations,
@@ -114,7 +115,8 @@ export function recordExtractionEvent(event: ExtractionEvent): void {
     document_length: event.documentLength,
   }).catch((err) =>
     log.warn('Failed to persist extraction metric to DB', {
-      error: err instanceof Error ? err.message : String(err),
+      ...pgErr(err),
+      thrown: err instanceof Error ? err.message : String(err),
     })
   )
 

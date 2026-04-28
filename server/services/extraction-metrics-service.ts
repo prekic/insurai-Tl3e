@@ -8,6 +8,7 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { logger } from '../lib/logger.js'
+import { pgErr } from '../lib/pg-err.js'
 
 const svcLog = logger.child('extraction-metrics')
 
@@ -57,13 +58,14 @@ export async function persistExtractionEvent(event: ExtractionMetricRecord): Pro
     })
 
     if (error) {
-      svcLog.warn('Failed to persist extraction metric', { error: error.message })
+      svcLog.warn('Failed to persist extraction metric', pgErr(error))
       return false
     }
     return true
   } catch (err) {
     svcLog.warn('Failed to persist extraction metric', {
-      error: err instanceof Error ? err.message : String(err),
+      ...pgErr(err),
+      thrown: err instanceof Error ? err.message : String(err),
     })
     return false
   }

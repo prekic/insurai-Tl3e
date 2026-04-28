@@ -3,6 +3,7 @@ import multer from 'multer'
 import crypto from 'crypto'
 import { getSupabaseWithError } from '../middleware/admin-auth.js'
 import { logger } from '../lib/logger.js'
+import { pgErr } from '../lib/pg-err.js'
 import { generalLimiter } from '../middleware/rate-limit.js'
 
 const log = logger.child('Policy')
@@ -133,7 +134,7 @@ router.post(
       const { error: policyInsertError } = await supabase.from('policies').insert(policyData)
 
       if (policyInsertError) {
-        log.error('Failed to insert anonymous policy', { error: policyInsertError.message })
+        log.error('Failed to insert anonymous policy', pgErr(policyInsertError))
         res.status(500).json({ success: false, error: 'Failed to insert policy' })
         return
       }
