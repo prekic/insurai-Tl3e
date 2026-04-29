@@ -43,9 +43,14 @@ jobs:
       - name: Run kasko smoke
         id: smoke
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          SMOKE_UPLOAD_URL: ${{ secrets.SMOKE_UPLOAD_URL }}
+          # Map onto the smoke script's expected names. Where the repo already
+          # has a secret (PROD_SUPABASE_URL, PRODUCTION_SERVER_URL), reuse it.
+          # Two NEW secrets are required:
+          #   - PROD_SUPABASE_SERVICE_KEY (service-role key, NOT anon)
+          #   - SMOKE_AUTH_TOKEN          (any non-empty string for now)
+          SUPABASE_URL: ${{ secrets.PROD_SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_KEY }}
+          SMOKE_UPLOAD_URL: ${{ secrets.PRODUCTION_SERVER_URL }}/api/policy/save-anonymous
           SMOKE_AUTH_TOKEN: ${{ secrets.SMOKE_AUTH_TOKEN }}
         run: |
           set -o pipefail

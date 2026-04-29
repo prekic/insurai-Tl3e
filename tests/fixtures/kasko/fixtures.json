@@ -1,25 +1,32 @@
 {
   "fixtures": [
     {
-      "file": "axa-peugeot.pdf",
+      "file": "allianz-peugeot.pdf",
       "expectedMake": "PEUGEOT",
-      "expectedModel": "208",
-      "insurer": "AXA Sigorta",
-      "notes": "Inverted layout regression target (gotcha #103) — value precedes label"
-    },
-    {
-      "file": "anadolu-renault.pdf",
-      "expectedMake": "RENAULT",
-      "expectedModel": "MEGANE",
-      "insurer": "Anadolu Sigorta",
-      "notes": "Standard tabular Marka/Tip layout"
-    },
-    {
-      "file": "allianz-ford.pdf",
-      "expectedMake": "FORD",
-      "expectedModel": "FOCUS",
+      "expectedModel": "308",
       "insurer": "Allianz",
-      "notes": "Multi-page format with Aracın Markası labels"
+      "notes": "Inverted layout regression target (gotcha #103) — value precedes label. Plate 34 GM 6461, year 2010."
+    },
+    {
+      "file": "anadolu-renault-clio.pdf",
+      "expectedMake": "RENAULT",
+      "expectedModel": "CLIO",
+      "insurer": "Anadolu Sigorta",
+      "notes": "Standard tabular Marka/Tip layout. Plate 35 G 0001, year 2018."
+    },
+    {
+      "file": "anadolu-volkswagen-tiguan.pdf",
+      "expectedMake": "VOLKSWAGEN",
+      "expectedModel": "TIGUAN",
+      "insurer": "Anadolu Sigorta",
+      "notes": "Eriş Ambalaj fleet policy. Plate 34 RZ 9511, year 2016."
+    },
+    {
+      "file": "anadolu-volkswagen-golf.pdf",
+      "expectedMake": "VOLKSWAGEN",
+      "expectedModel": "GOLF",
+      "insurer": "Anadolu Sigorta",
+      "notes": "Plate 35 PR 962, year 2001. Mirrors qa-pdf-golden 'ANADOLU.PDF' fixture."
     }
   ]
 }
