@@ -270,29 +270,31 @@ without manual upload + SQL.
 ### Running locally
 
 ```bash
-SUPABASE_URL=https://...supabase.co \
-SUPABASE_SERVICE_KEY=<service-role-key> \
-SMOKE_UPLOAD_URL=https://insurai-production.up.railway.app/api/policy/save-anonymous \
-SMOKE_AUTH_TOKEN=<bearer-token> \
+SMOKE_BASE_URL=https://insurai-production.up.railway.app \
 npm run smoke:kasko
 ```
 
-For each PDF in `tests/fixtures/kasko/` the script POSTs the file to
-`SMOKE_UPLOAD_URL`, polls Supabase for the resulting policy row (≤ 30s),
-checks `raw_data.vehicleInfo.make` / `.model`, and asserts the make matches the
-expected value declared in `tests/fixtures/kasko/fixtures.json`.
+For each PDF in `tests/fixtures/kasko/`, the script:
+
+1. Base64-encodes the PDF
+2. POSTs to `${SMOKE_BASE_URL}/api/ai/ocr/document-ai` → extracted text
+3. POSTs to `${SMOKE_BASE_URL}/api/ai/extract/anthropic` → `ExtractedPolicyData`
+4. Asserts `data.vehicle.make` / `.model` are populated and match the expected
+   value declared in `tests/fixtures/kasko/fixtures.json`
 
 Pass criteria: ≥ 80% of fixtures must pass. Exit codes: 0 pass, 1 fail, 2 setup
 error (missing env, no fixtures, unparseable manifest).
+
+This is a **direct extraction-quality smoke** — it doesn't go through the
+persistence layer (the route tests in `server/__tests__` cover that). It
+verifies that PR #399's prompt mandate held in production: Anthropic returns
+`vehicle.make/.model` for real Turkish kasko docs.
 
 ### Required env vars
 
 | Variable | Purpose |
 |---|---|
-| `SUPABASE_URL` | Supabase project URL — same value the server uses |
-| `SUPABASE_SERVICE_KEY` | Service-role key (bypasses RLS for the poll) |
-| `SMOKE_UPLOAD_URL` | Full URL of the upload endpoint |
-| `SMOKE_AUTH_TOKEN` | Bearer token sent on the upload request |
+| `SMOKE_BASE_URL` | Origin of the production server. Falls back to `PRODUCTION_SERVER_URL` if unset. |
 
 ### Adding a new fixture
 
@@ -337,20 +339,13 @@ recent merged PR with the smoke output tail and a link to the run.
 
 ### GitHub Secrets required
 
-The workflow reuses existing repo secrets where possible, so you only need to
-**add 2 new secrets**:
+The workflow needs **only one** existing repo secret:
 
 | Secret | Purpose | Already exists? |
 |---|---|---|
-| `PROD_SUPABASE_URL` | Supabase project URL | ✅ already in repo |
-| `PROD_SUPABASE_SERVICE_KEY` | Service-role key (NOT anon) — bypasses RLS for the poll | ❌ **must add** |
 | `PRODUCTION_SERVER_URL` | Railway origin (e.g. `https://insurai-production.up.railway.app`) | ✅ already in repo |
-| `SMOKE_AUTH_TOKEN` | Bearer token sent on the upload request | ❌ **must add** (any non-empty string for now — `/api/policy/save-anonymous` doesn't enforce it yet) |
 
-The workflow constructs `SMOKE_UPLOAD_URL` automatically as
-`${PRODUCTION_SERVER_URL}/api/policy/save-anonymous`. If you later add a
-dedicated `/api/policy/upload-and-extract` endpoint, change the path in
-`.github/workflows/smoke-kasko.yml`.
+No new secrets to add. (Earlier versions of this smoke required `PROD_SUPABASE_SERVICE_KEY` and `SMOKE_AUTH_TOKEN` for a DB-poll path; that approach was replaced with a direct AI-endpoint check that doesn't need them.)
 
 ---
 

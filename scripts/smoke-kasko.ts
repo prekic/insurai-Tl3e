@@ -2,17 +2,22 @@
 /**
  * Kasko Vehicle Extraction Smoke Test
  *
- * Uploads each PDF fixture in tests/fixtures/kasko/ to the production upload
- * endpoint, polls Supabase for the resulting policy row (≤ 30s), and asserts
- * vehicleInfo.make / .model are populated and match an expected value declared
- * per fixture. Prints per-fixture pass/fail with extracted values, then a
- * summary pass rate. Exits 0 if pass rate ≥ 80, else 1.
+ * For each PDF fixture in tests/fixtures/kasko/:
+ *   1. Base64-encode the PDF
+ *   2. POST to {SMOKE_BASE_URL}/api/ai/ocr/document-ai → text
+ *   3. POST to {SMOKE_BASE_URL}/api/ai/extract/anthropic → ExtractedPolicyData
+ *   4. Assert data.vehicle.make / .model are populated and match expected
+ *
+ * Direct extraction-quality smoke — does NOT exercise the persistence layer
+ * (route tests cover that). Verifies that the production AI pipeline,
+ * including the prompt mandate from PR #399, returns vehicle.make/.model
+ * for real Turkish kasko policies.
  *
  * Required env vars:
- *   SUPABASE_URL          — Supabase project URL
- *   SUPABASE_SERVICE_KEY  — service-role key (bypasses RLS for the poll)
- *   SMOKE_UPLOAD_URL      — full URL of the upload endpoint
- *   SMOKE_AUTH_TOKEN      — Bearer token sent on the upload request
+ *   SMOKE_BASE_URL   — origin of the production server (e.g.
+ *                      https://insurai-production.up.railway.app). Falls
+ *                      back to PRODUCTION_SERVER_URL if SMOKE_BASE_URL
+ *                      is unset.
  *
  * Exit codes:
  *   0  pass rate ≥ PASS_THRESHOLD
@@ -23,11 +28,9 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 const PASS_THRESHOLD = 80
-const POLL_TIMEOUT_MS = 30_000
-const POLL_INTERVAL_MS = 2_000
+const REQUEST_TIMEOUT_MS = 90_000
 const FIXTURES_DIR = path.resolve('tests/fixtures/kasko')
 
 interface Fixture {
@@ -60,10 +63,15 @@ function exitSetupError(msg: string): never {
   process.exit(2)
 }
 
-function envOrFail(name: string): string {
-  const v = process.env[name]
-  if (!v || !v.trim()) exitSetupError(`Missing env var: ${name}`)
-  return v
+function getBaseUrl(): string {
+  const v = process.env.SMOKE_BASE_URL || process.env.PRODUCTION_SERVER_URL
+  if (!v || !v.trim()) {
+    exitSetupError(
+      'Missing env var: set SMOKE_BASE_URL or PRODUCTION_SERVER_URL ' +
+        '(e.g. https://insurai-production.up.railway.app)'
+    )
+  }
+  return v.replace(/\/+$/, '')
 }
 
 function loadFixtures(): Fixture[] {
@@ -119,66 +127,84 @@ function loadFixtures(): Fixture[] {
   return present
 }
 
-async function uploadFixture(
-  uploadUrl: string,
-  authToken: string,
-  pdfPath: string,
-  uniqueName: string
-): Promise<{ ok: boolean; status: number; body: string }> {
-  const buffer = fs.readFileSync(pdfPath)
-  const form = new FormData()
-  const blob = new Blob([buffer], { type: 'application/pdf' })
-  form.append('file', blob, uniqueName)
-  const res = await fetch(uploadUrl, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${authToken}` },
-    body: form,
-  })
-  const body = await res.text()
-  return { ok: res.ok, status: res.status, body }
-}
-
-async function pollForRow(
-  supabase: SupabaseClient,
-  uniqueFilenamePart: string,
-  startMs: number
-): Promise<Record<string, unknown> | null> {
-  const deadline = startMs + POLL_TIMEOUT_MS
-  while (Date.now() < deadline) {
-    const { data, error } = await supabase
-      .from('policies')
-      .select('id, raw_data, created_at')
-      .eq('type', 'kasko')
-      .gte('created_at', new Date(startMs - 60_000).toISOString())
-      .order('created_at', { ascending: false })
-      .limit(20)
-    if (!error && Array.isArray(data)) {
-      const match = data.find((r) => {
-        const raw = r.raw_data as Record<string, unknown> | null
-        const fn = raw && typeof raw === 'object' ? raw.fileName : null
-        return typeof fn === 'string' && fn.includes(uniqueFilenamePart)
-      })
-      if (match) return match as Record<string, unknown>
+async function postJson<T>(
+  url: string,
+  body: Record<string, unknown>,
+  timeoutMs: number
+): Promise<{ ok: boolean; status: number; data: T | null; raw: string }> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+    const raw = await res.text()
+    let data: T | null = null
+    try {
+      data = JSON.parse(raw) as T
+    } catch {
+      data = null
     }
-    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS))
+    return { ok: res.ok, status: res.status, data, raw }
+  } finally {
+    clearTimeout(timer)
   }
-  return null
 }
 
-function checkExtraction(row: Record<string, unknown>, fixture: Fixture): FixtureResult {
-  const raw = (row.raw_data as Record<string, unknown> | null) ?? {}
-  const vi = (raw.vehicleInfo as Record<string, unknown> | null) ?? {}
-  const make = typeof vi.make === 'string' ? vi.make : ''
-  const model = typeof vi.model === 'string' ? vi.model : ''
-  const confidenceRaw = raw.aiConfidence
-  const confidence = typeof confidenceRaw === 'number' ? confidenceRaw : 0
+async function ocrPdf(baseUrl: string, pdfBuffer: Buffer): Promise<string> {
+  const documentBase64 = pdfBuffer.toString('base64')
+  const result = await postJson<{ success: boolean; data?: { text?: string }; error?: string }>(
+    `${baseUrl}/api/ai/ocr/document-ai`,
+    { documentBase64 },
+    REQUEST_TIMEOUT_MS
+  )
+  if (!result.ok || !result.data?.success) {
+    throw new Error(
+      `OCR failed: HTTP ${result.status} — ${result.data?.error ?? result.raw.slice(0, 200)}`
+    )
+  }
+  const text = result.data.data?.text ?? ''
+  if (!text.trim()) throw new Error('OCR returned empty text')
+  return text
+}
+
+async function extractAnthropic(
+  baseUrl: string,
+  documentText: string
+): Promise<Record<string, unknown>> {
+  const result = await postJson<{
+    success: boolean
+    data?: Record<string, unknown>
+    error?: string
+  }>(
+    `${baseUrl}/api/ai/extract/anthropic`,
+    { documentText, policyType: 'kasko' },
+    REQUEST_TIMEOUT_MS
+  )
+  if (!result.ok || !result.data?.success || !result.data.data) {
+    throw new Error(
+      `Extract failed: HTTP ${result.status} — ${result.data?.error ?? result.raw.slice(0, 200)}`
+    )
+  }
+  return result.data.data
+}
+
+function checkExtraction(extractedData: Record<string, unknown>, fixture: Fixture): FixtureResult {
+  const vehicle = extractedData.vehicle as Record<string, unknown> | null | undefined
+  const make = typeof vehicle?.make === 'string' ? vehicle.make : ''
+  const model = typeof vehicle?.model === 'string' ? vehicle.model : ''
+  const qs = extractedData.qualityScore as Record<string, unknown> | undefined
+  const confidence = typeof qs?.total === 'number' ? qs.total / 100 : 0
   const extracted: ExtractedValues = { make, model, confidence }
 
   if (!make.trim()) {
-    return { fixture, status: 'fail', reason: 'vehicleInfo.make is empty', extracted }
+    return { fixture, status: 'fail', reason: 'data.vehicle.make is empty', extracted }
   }
   if (!model.trim()) {
-    return { fixture, status: 'fail', reason: 'vehicleInfo.model is empty', extracted }
+    return { fixture, status: 'fail', reason: 'data.vehicle.model is empty', extracted }
   }
   if (!make.toLowerCase().includes(fixture.expectedMake.toLowerCase())) {
     return {
@@ -199,44 +225,31 @@ function checkExtraction(row: Record<string, unknown>, fixture: Fixture): Fixtur
   return { fixture, status: 'pass', extracted }
 }
 
+async function runFixture(baseUrl: string, fixture: Fixture): Promise<FixtureResult> {
+  const pdfPath = path.join(FIXTURES_DIR, fixture.file)
+  const pdfBuffer = fs.readFileSync(pdfPath)
+  const text = await ocrPdf(baseUrl, pdfBuffer)
+  const extractedData = await extractAnthropic(baseUrl, text)
+  return checkExtraction(extractedData, fixture)
+}
+
 async function main(): Promise<void> {
   console.log('► Kasko vehicle extraction smoke test')
-  const supabaseUrl = envOrFail('SUPABASE_URL')
-  const supabaseKey = envOrFail('SUPABASE_SERVICE_KEY')
-  const uploadUrl = envOrFail('SMOKE_UPLOAD_URL')
-  const authToken = envOrFail('SMOKE_AUTH_TOKEN')
+  const baseUrl = getBaseUrl()
+  console.log(`► Target: ${baseUrl}`)
 
   const fixtures = loadFixtures()
   console.log(`► Loaded ${fixtures.length} fixture(s) from ${FIXTURES_DIR}`)
-  console.log(`► Pass threshold: ${PASS_THRESHOLD}%, poll timeout: ${POLL_TIMEOUT_MS / 1000}s`)
+  console.log(`► Pass threshold: ${PASS_THRESHOLD}%`)
 
-  const supabase = createClient(supabaseUrl, supabaseKey)
   const results: FixtureResult[] = []
 
   for (const fixture of fixtures) {
-    const pdfPath = path.join(FIXTURES_DIR, fixture.file)
-    const smokeId = `smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    const uniqueName = `${smokeId}-${fixture.file}`
-    const startMs = Date.now()
     console.log(
       `\n┄ ${fixture.insurer} (${fixture.file}) — expecting make ~ "${fixture.expectedMake}"`
     )
     try {
-      const upload = await uploadFixture(uploadUrl, authToken, pdfPath, uniqueName)
-      if (!upload.ok) {
-        const reason = `upload failed: HTTP ${upload.status} — ${upload.body.slice(0, 200)}`
-        results.push({ fixture, status: 'fail', reason })
-        console.log(`  ✗ ${reason}`)
-        continue
-      }
-      const row = await pollForRow(supabase, smokeId, startMs)
-      if (!row) {
-        const reason = `no policy row appeared in ${POLL_TIMEOUT_MS / 1000}s (filtered by raw_data.fileName containing "${smokeId}")`
-        results.push({ fixture, status: 'fail', reason })
-        console.log(`  ✗ ${reason}`)
-        continue
-      }
-      const result = checkExtraction(row, fixture)
+      const result = await runFixture(baseUrl, fixture)
       results.push(result)
       if (result.status === 'pass' && result.extracted) {
         console.log(
