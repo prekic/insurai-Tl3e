@@ -1,0 +1,9 @@
+# Real customer policies often contain personal data. Default to ignoring all
+# PDFs in this directory; force-add (`git add -f`) only PDFs that have been
+# redacted or synthesized.
+*.pdf
+
+# Manifest, README, and this gitignore are always tracked.
+!fixtures.json
+!README.md
+!.gitignore
