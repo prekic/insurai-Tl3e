@@ -337,11 +337,20 @@ recent merged PR with the smoke output tail and a link to the run.
 
 ### GitHub Secrets required
 
-Configure under **Repo Settings → Secrets and variables → Actions**:
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_KEY`
-- `SMOKE_UPLOAD_URL`
-- `SMOKE_AUTH_TOKEN`
+The workflow reuses existing repo secrets where possible, so you only need to
+**add 2 new secrets**:
+
+| Secret | Purpose | Already exists? |
+|---|---|---|
+| `PROD_SUPABASE_URL` | Supabase project URL | ✅ already in repo |
+| `PROD_SUPABASE_SERVICE_KEY` | Service-role key (NOT anon) — bypasses RLS for the poll | ❌ **must add** |
+| `PRODUCTION_SERVER_URL` | Railway origin (e.g. `https://insurai-production.up.railway.app`) | ✅ already in repo |
+| `SMOKE_AUTH_TOKEN` | Bearer token sent on the upload request | ❌ **must add** (any non-empty string for now — `/api/policy/save-anonymous` doesn't enforce it yet) |
+
+The workflow constructs `SMOKE_UPLOAD_URL` automatically as
+`${PRODUCTION_SERVER_URL}/api/policy/save-anonymous`. If you later add a
+dedicated `/api/policy/upload-and-extract` endpoint, change the path in
+`.github/workflows/smoke-kasko.yml`.
 
 ---
 
