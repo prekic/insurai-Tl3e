@@ -5,22 +5,19 @@
  * For each PDF fixture in tests/fixtures/kasko/:
  *   1. Base64-encode the PDF
  *   2. POST to {SMOKE_BASE_URL}/api/ai/ocr/document-ai → text
- *   3. POST to {SMOKE_BASE_URL}/api/ai/extract/anthropic → ExtractedPolicyData
- *   4. Assert data.vehicle.make / .model are populated and match expected
+ *   3. POST to {SMOKE_BASE_URL}/api/ai/extract (SSE keepalive) → ExtractedPolicyData
+ *   4. Assert data.vehicleMake / .vehicleModel are populated and match expected
  *
  * Direct extraction-quality smoke — does NOT exercise the persistence layer
- * (route tests cover that). Verifies that the production AI pipeline,
- * including the prompt mandate from PR #399, returns vehicle.make/.model
- * for real Turkish kasko policies.
+ * (route tests cover that). Verifies that the production AI pipeline returns
+ * vehicle make/model for real Turkish kasko policies.
  *
  * Required env vars:
- *   SMOKE_BASE_URL   — origin of the production server (e.g.
- *                      https://insurai-production.up.railway.app). Falls
- *                      back to PRODUCTION_SERVER_URL if SMOKE_BASE_URL
- *                      is unset.
+ *   SMOKE_BASE_URL   — origin of the production server. Falls back to
+ *                      PRODUCTION_SERVER_URL if SMOKE_BASE_URL is unset.
  *
  * Exit codes:
- *   0  pass rate ≥ PASS_THRESHOLD
+ *   0  pass rate ≥ PASS_THRESHOLD (skipped fixtures excluded from denominator)
  *   1  pass rate < PASS_THRESHOLD
  *   2  setup error (missing env, no fixtures, manifest unparseable)
  *
@@ -30,7 +27,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 const PASS_THRESHOLD = 80
-const REQUEST_TIMEOUT_MS = 90_000
+const REQUEST_TIMEOUT_MS = 180_000 // SSE keepalive holds the connection; AI extractions land 60-120s
 const FIXTURES_DIR = path.resolve('tests/fixtures/kasko')
 
 interface Fixture {
@@ -53,7 +50,7 @@ interface ExtractedValues {
 
 interface FixtureResult {
   fixture: Fixture
-  status: 'pass' | 'fail'
+  status: 'pass' | 'fail' | 'skip'
   reason?: string
   extracted?: ExtractedValues
 }
@@ -154,6 +151,61 @@ async function postJson<T>(
   }
 }
 
+/**
+ * POST with Accept: text/event-stream. The /api/ai/extract endpoint streams
+ * `:keepalive` comments every 10s while the AI runs (Railway has a 30s edge
+ * timeout) and then sends one final `data: <json>` SSE event with the result.
+ */
+async function postSse<T>(
+  url: string,
+  body: Record<string, unknown>,
+  timeoutMs: number
+): Promise<{ ok: boolean; status: number; data: T | null; raw: string }> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+    const raw = await res.text()
+    if (!res.ok) {
+      return { ok: false, status: res.status, data: null, raw }
+    }
+    // Pull the last `data: ...` line and parse its JSON payload.
+    const lines = raw.split(/\r?\n/)
+    let payload: T | null = null
+    let last = ''
+    for (const line of lines) {
+      if (line.startsWith('data:')) {
+        last = line.slice(5).trim()
+      }
+    }
+    if (last) {
+      try {
+        payload = JSON.parse(last) as T
+      } catch {
+        payload = null
+      }
+    } else {
+      // Fallback: server didn't honor the Accept header and returned plain JSON
+      try {
+        payload = JSON.parse(raw) as T
+      } catch {
+        payload = null
+      }
+    }
+    return { ok: true, status: res.status, data: payload, raw }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 async function ocrPdf(baseUrl: string, pdfBuffer: Buffer): Promise<string> {
   const documentBase64 = pdfBuffer.toString('base64')
   const result = await postJson<{ success: boolean; data?: { text?: string }; error?: string }>(
@@ -162,49 +214,46 @@ async function ocrPdf(baseUrl: string, pdfBuffer: Buffer): Promise<string> {
     REQUEST_TIMEOUT_MS
   )
   if (!result.ok || !result.data?.success) {
-    throw new Error(
-      `OCR failed: HTTP ${result.status} — ${result.data?.error ?? result.raw.slice(0, 200)}`
-    )
+    const errMsg = result.data?.error ?? result.raw.slice(0, 200)
+    throw new Error(`OCR failed: HTTP ${result.status} — ${errMsg}`)
   }
   const text = result.data.data?.text ?? ''
   if (!text.trim()) throw new Error('OCR returned empty text')
   return text
 }
 
-async function extractAnthropic(
+async function extractUnified(
   baseUrl: string,
   documentText: string
 ): Promise<Record<string, unknown>> {
-  const result = await postJson<{
+  const result = await postSse<{
     success: boolean
     data?: Record<string, unknown>
     error?: string
-  }>(
-    `${baseUrl}/api/ai/extract/anthropic`,
-    { documentText, policyType: 'kasko' },
-    REQUEST_TIMEOUT_MS
-  )
+  }>(`${baseUrl}/api/ai/extract`, { documentText, policyType: 'kasko' }, REQUEST_TIMEOUT_MS)
   if (!result.ok || !result.data?.success || !result.data.data) {
-    throw new Error(
-      `Extract failed: HTTP ${result.status} — ${result.data?.error ?? result.raw.slice(0, 200)}`
-    )
+    const errMsg = result.data?.error ?? result.raw.slice(0, 200)
+    throw new Error(`Extract failed: HTTP ${result.status} — ${errMsg}`)
   }
   return result.data.data
 }
 
 function checkExtraction(extractedData: Record<string, unknown>, fixture: Fixture): FixtureResult {
-  const vehicle = extractedData.vehicle as Record<string, unknown> | null | undefined
-  const make = typeof vehicle?.make === 'string' ? vehicle.make : ''
-  const model = typeof vehicle?.model === 'string' ? vehicle.model : ''
+  // The /api/ai/extract response uses FLAT top-level fields per the canonical
+  // EXTRACTION_JSON_SCHEMA (vehicleMake, vehicleModel, vehicleYear, vehiclePlate),
+  // NOT a nested `vehicle: { make, model }` object. The comprehensive parser
+  // uses the nested shape, but that's a different code path.
+  const make = typeof extractedData.vehicleMake === 'string' ? extractedData.vehicleMake : ''
+  const model = typeof extractedData.vehicleModel === 'string' ? extractedData.vehicleModel : ''
   const qs = extractedData.qualityScore as Record<string, unknown> | undefined
-  const confidence = typeof qs?.total === 'number' ? qs.total / 100 : 0
+  const confidence = typeof qs?.total === 'number' ? qs.total : 0
   const extracted: ExtractedValues = { make, model, confidence }
 
   if (!make.trim()) {
-    return { fixture, status: 'fail', reason: 'data.vehicle.make is empty', extracted }
+    return { fixture, status: 'fail', reason: 'vehicleMake is empty', extracted }
   }
   if (!model.trim()) {
-    return { fixture, status: 'fail', reason: 'data.vehicle.model is empty', extracted }
+    return { fixture, status: 'fail', reason: 'vehicleModel is empty', extracted }
   }
   if (!make.toLowerCase().includes(fixture.expectedMake.toLowerCase())) {
     return {
@@ -228,8 +277,21 @@ function checkExtraction(extractedData: Record<string, unknown>, fixture: Fixtur
 async function runFixture(baseUrl: string, fixture: Fixture): Promise<FixtureResult> {
   const pdfPath = path.join(FIXTURES_DIR, fixture.file)
   const pdfBuffer = fs.readFileSync(pdfPath)
-  const text = await ocrPdf(baseUrl, pdfBuffer)
-  const extractedData = await extractAnthropic(baseUrl, text)
+  let text: string
+  try {
+    text = await ocrPdf(baseUrl, pdfBuffer)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    // Treat the Document AI 15-page limit as a SKIP rather than a FAIL — it's
+    // an OCR-side limitation, not a vehicle-extraction regression. Production
+    // splits oversized PDFs client-side via pdf-splitter.ts; the smoke
+    // intentionally does not duplicate that splitting logic.
+    if (msg.includes('page limit') || msg.includes('15 or fewer pages')) {
+      return { fixture, status: 'skip', reason: 'PDF exceeds 15-page Document AI limit' }
+    }
+    throw err
+  }
+  const extractedData = await extractUnified(baseUrl, text)
   return checkExtraction(extractedData, fixture)
 }
 
@@ -240,7 +302,7 @@ async function main(): Promise<void> {
 
   const fixtures = loadFixtures()
   console.log(`► Loaded ${fixtures.length} fixture(s) from ${FIXTURES_DIR}`)
-  console.log(`► Pass threshold: ${PASS_THRESHOLD}%`)
+  console.log(`► Pass threshold: ${PASS_THRESHOLD}% (skipped fixtures excluded from denominator)`)
 
   const results: FixtureResult[] = []
 
@@ -255,6 +317,8 @@ async function main(): Promise<void> {
         console.log(
           `  ✓ make="${result.extracted.make}" model="${result.extracted.model}" confidence=${result.extracted.confidence.toFixed(2)}`
         )
+      } else if (result.status === 'skip') {
+        console.log(`  ⊘ skip: ${result.reason}`)
       } else {
         console.log(`  ✗ ${result.reason}`)
         if (result.extracted) {
@@ -269,10 +333,11 @@ async function main(): Promise<void> {
   }
 
   const passed = results.filter((r) => r.status === 'pass').length
-  const total = results.length
-  const passRate = total > 0 ? (passed / total) * 100 : 0
+  const skipped = results.filter((r) => r.status === 'skip').length
+  const evaluated = results.length - skipped
+  const passRate = evaluated > 0 ? (passed / evaluated) * 100 : 0
   console.log('\n━ Summary')
-  console.log(`  ${passed}/${total} pass (${passRate.toFixed(1)}%)`)
+  console.log(`  ${passed}/${evaluated} pass (${passRate.toFixed(1)}%) — skipped ${skipped}`)
   console.log(`  Threshold: ${PASS_THRESHOLD}% — ${passRate >= PASS_THRESHOLD ? 'PASS' : 'FAIL'}`)
 
   process.exit(passRate >= PASS_THRESHOLD ? 0 : 1)
