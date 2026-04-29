@@ -1,0 +1,25 @@
+{
+  "fixtures": [
+    {
+      "file": "axa-peugeot.pdf",
+      "expectedMake": "PEUGEOT",
+      "expectedModel": "208",
+      "insurer": "AXA Sigorta",
+      "notes": "Inverted layout regression target (gotcha #103) — value precedes label"
+    },
+    {
+      "file": "anadolu-renault.pdf",
+      "expectedMake": "RENAULT",
+      "expectedModel": "MEGANE",
+      "insurer": "Anadolu Sigorta",
+      "notes": "Standard tabular Marka/Tip layout"
+    },
+    {
+      "file": "allianz-ford.pdf",
+      "expectedMake": "FORD",
+      "expectedModel": "FOCUS",
+      "insurer": "Allianz",
+      "notes": "Multi-page format with Aracın Markası labels"
+    }
+  ]
+}

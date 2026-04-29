@@ -262,6 +262,89 @@ Features:
 
 ---
 
+## Smoke Tests
+
+A post-deploy smoke test verifies vehicle extraction quality on real kasko PDFs
+without manual upload + SQL.
+
+### Running locally
+
+```bash
+SUPABASE_URL=https://...supabase.co \
+SUPABASE_SERVICE_KEY=<service-role-key> \
+SMOKE_UPLOAD_URL=https://insurai-production.up.railway.app/api/policy/save-anonymous \
+SMOKE_AUTH_TOKEN=<bearer-token> \
+npm run smoke:kasko
+```
+
+For each PDF in `tests/fixtures/kasko/` the script POSTs the file to
+`SMOKE_UPLOAD_URL`, polls Supabase for the resulting policy row (≤ 30s),
+checks `raw_data.vehicleInfo.make` / `.model`, and asserts the make matches the
+expected value declared in `tests/fixtures/kasko/fixtures.json`.
+
+Pass criteria: ≥ 80% of fixtures must pass. Exit codes: 0 pass, 1 fail, 2 setup
+error (missing env, no fixtures, unparseable manifest).
+
+### Required env vars
+
+| Variable | Purpose |
+|---|---|
+| `SUPABASE_URL` | Supabase project URL — same value the server uses |
+| `SUPABASE_SERVICE_KEY` | Service-role key (bypasses RLS for the poll) |
+| `SMOKE_UPLOAD_URL` | Full URL of the upload endpoint |
+| `SMOKE_AUTH_TOKEN` | Bearer token sent on the upload request |
+
+### Adding a new fixture
+
+1. Drop a PDF into `tests/fixtures/kasko/` named `<insurer>-<make>.pdf`.
+2. Add an entry to `tests/fixtures/kasko/fixtures.json`:
+   ```json
+   {
+     "file": "axa-peugeot.pdf",
+     "expectedMake": "PEUGEOT",
+     "expectedModel": "208",
+     "insurer": "AXA Sigorta",
+     "notes": "Inverted layout regression target"
+   }
+   ```
+3. Run `npm run smoke:kasko` to verify it passes against current production.
+4. If the PDF is safe to commit (redacted or synthesized), force-add it
+   (`git add -f tests/fixtures/kasko/...pdf`). PDFs are gitignored by default
+   to keep customer data out of the repo. See
+   `tests/fixtures/kasko/README.md` for full conventions.
+
+### CI integration
+
+`.github/workflows/smoke-kasko.yml` runs the smoke on three triggers:
+
+1. **`workflow_dispatch`** — manual button in the Actions UI
+2. **`repository_dispatch` with type `railway-deploy-success`** — preferred:
+   Railway pings GitHub after a successful deploy. Wire it once with:
+   ```bash
+   curl -X POST https://api.github.com/repos/<owner>/<repo>/dispatches \
+     -H "Authorization: Bearer <github-pat-with-repo-scope>" \
+     -H "Accept: application/vnd.github+json" \
+     -d '{"event_type":"railway-deploy-success"}'
+   ```
+   Configure that as a Railway post-deploy webhook (Railway docs:
+   <https://docs.railway.com/reference/webhooks>).
+3. **`push` to `main`** — fallback trigger that sleeps 150s before running
+   so Railway's autodeploy has time to finish. Use this until the
+   `repository_dispatch` webhook is wired up; remove later if redundant.
+
+On failure (push trigger only) the workflow auto-comments on the most
+recent merged PR with the smoke output tail and a link to the run.
+
+### GitHub Secrets required
+
+Configure under **Repo Settings → Secrets and variables → Actions**:
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_KEY`
+- `SMOKE_UPLOAD_URL`
+- `SMOKE_AUTH_TOKEN`
+
+---
+
 ## Contributing
 
 Personal project by Erdem. See `CLAUDE.md` for development conventions.
