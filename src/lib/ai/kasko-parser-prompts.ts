@@ -70,6 +70,7 @@ NON-NEGOTIABLE RULES:
 4) Ensure Vehicle Make and Model are actual automotive brands (e.g. FORD, RENAULT, COROLLA). Do NOT extract repair clauses like "Yetkili" or "Serviste Onar" as Make/Model.
 5) Output must be structured, readable, and auditable. Provide citations for all critical fields.
 6) MANDATORY: You must explicitly extract "İhtiyari Mali Sorumluluk" (IMM) veya "Mali Mesuliyet" as a coverage in the JSON coverages array if it appears in the text, and correctly assign its limit. If the text says "Mali Sorumluluk Bedeni ve Maddi", extract it as IMM.
+7) MANDATORY VEHICLE FIELDS: For every kasko or traffic policy you MUST populate \`vehicle.make\`, \`vehicle.model\`, \`vehicle.year\`, and \`vehicle.plate\` whenever they are present anywhere in the document — including labelled blocks ("Marka", "Tip", "Aracın Markası", "Model Yılı", "İmal Yılı", "Plaka"), tabular rows, and inverted "value-then-label" layouts (e.g. AXA Peugeot format where the value precedes the label on the same line). Do NOT return \`vehicle: null\` if any of these fields are visible. Do NOT collapse make+model into one field — split them. If only the make is found, still return the make and set the missing fields to null individually.
 
 OUTPUT FORMAT (MUST FOLLOW EXACTLY):
 

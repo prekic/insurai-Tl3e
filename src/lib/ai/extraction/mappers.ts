@@ -5,7 +5,7 @@ import type { AnalyzedPolicy, Coverage } from '@/types/policy'
 import { deriveDiscountsFromStructured } from '../discount-deriver'
 import { translateInsightsToTr } from '../insight-translator'
 import { calculateMainCoverage } from '../policy-converter'
-import { parseTurkishDate } from '../turkish-utils'
+import { extractVehicleInfoFromText, parseTurkishDate } from '../turkish-utils'
 import type { ComprehensiveExtractionResult } from '../policy-extractor'
 
 export function comprehensiveToAnalyzedPolicy(
@@ -98,17 +98,38 @@ export function comprehensiveToAnalyzedPolicy(
     ),
     extractedText: rawText,
     processedText,
-    vehicleInfo: data.vehicle
-      ? {
-          make: data.vehicle.make,
-          model: data.vehicle.model,
-          year: data.vehicle.year,
-          plate: data.vehicle.plate,
-          chassisNo: data.vehicle.chassisNumber ?? undefined,
-          engineNo: data.vehicle.engineNumber ?? undefined,
-          usage: data.vehicle.usageType,
-        }
-      : undefined,
+    // Merge LLM-returned vehicle fields with regex fallback recovered from
+    // raw text. Production data showed kasko extractions consistently land
+    // with `vehicleInfo.make = NULL` because the LLM omits the field even
+    // though the document contains it. The regex extractor handles the
+    // common Turkish layouts (Marka:, Aracın Markası:, inverted AXA layout).
+    // LLM value wins when present and non-empty; regex fills the gaps.
+    // Empty string / 0 / null all count as "missing" — the LLM frequently
+    // returns these when it can't find a field.
+    vehicleInfo: (() => {
+      const fromText = rawText ? extractVehicleInfoFromText(rawText) : undefined
+      const fromLlm = data.vehicle
+      if (!fromLlm && !fromText) return undefined
+      const pickStr = (a: unknown, b: unknown): string | undefined => {
+        if (typeof a === 'string' && a.trim()) return a
+        if (typeof b === 'string' && b.trim()) return b
+        return undefined
+      }
+      const pickNum = (a: unknown, b: unknown): number | undefined => {
+        if (typeof a === 'number' && a > 0) return a
+        if (typeof b === 'number' && b > 0) return b
+        return undefined
+      }
+      return {
+        make: pickStr(fromLlm?.make, fromText?.make),
+        model: pickStr(fromLlm?.model, fromText?.model),
+        year: pickNum(fromLlm?.year, fromText?.year),
+        plate: pickStr(fromLlm?.plate, fromText?.plate),
+        chassisNo: pickStr(fromLlm?.chassisNumber, fromText?.chassisNo),
+        engineNo: pickStr(fromLlm?.engineNumber, fromText?.engineNo),
+        usage: fromLlm?.usageType,
+      }
+    })(),
     discounts: data.discounts ?? deriveDiscountsFromStructured(data),
   }
 
