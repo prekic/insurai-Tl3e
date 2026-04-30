@@ -65,6 +65,12 @@ export function comprehensiveToAnalyzedPolicy(
     typeTr: 'Kasko',
     provider: data.policy.provider,
     logo: '',
+    // Bundle detection (P1 #4): derive from product name. Comprehensive parser
+    // already captures `productName`, so we don't need to ask the LLM again —
+    // just substring-match for "Birleşik" / "Combined".
+    isBundle: data.policy.productName
+      ? /\bbirleşik\b|\bcombined\b/i.test(data.policy.productName)
+      : undefined,
     coverage: totalCoverage,
     premium: data.premium.totalPremium,
     monthlyPremium: data.premium.totalPremium / 12,

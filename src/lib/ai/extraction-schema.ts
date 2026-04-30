@@ -10,6 +10,12 @@ export interface ExtractedPolicyData {
   provider: string | null
   policyType: PolicyType | null
 
+  // Bundle detection — true when policy is a multi-product "Birleşik" / "Combined"
+  // policy. Populated by the live AI prompt; consumed by PolicyOverviewCard to
+  // render a Bundle badge + product list.
+  isBundle?: boolean | null
+  bundleProducts?: string[] | null
+
   // Policyholder information
   insuredName: string | null
   insuredAddress: string | null

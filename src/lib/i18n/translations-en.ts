@@ -469,6 +469,8 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     rayicBedeliLabel: 'Rayiç Değer (Market Value at Loss)',
     rayicBedeliHelp:
       'Vehicle rayiç at time of loss, determined by the insurer via the 3-quote emsal methodology.',
+    bundleBadge: 'Bundle Policy',
+    bundleHelp: 'This is a bundled policy combining multiple insurance products.',
     verifyImportantFields: 'Review this policy carefully before purchasing.',
     coreKaskoCoverages: 'Core Comprehensive Coverages (Included)',
     coreKaskoCoveragesDesc:

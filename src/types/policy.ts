@@ -214,6 +214,14 @@ export interface Policy {
   insuredEntityType?: 'individual' | 'corporate' | null
   /** Usage Type */
   vehicleUsage?: 'private' | 'commercial' | null
+  /**
+   * True when the policy is a bundled multi-product policy (title contains
+   * "Birleşik" / "Combined", or the cover page lists multiple separately-priced
+   * products). Drives the Bundle badge + product list on PolicyOverviewCard.
+   */
+  isBundle?: boolean | null
+  /** Bundled product names as written on the policy (when isBundle=true). */
+  bundleProducts?: string[] | null
   /** Currency code for this policy (TRY, USD, EUR, GBP) - defaults to TRY */
   currency?: string
   /** Amendment information - populated if document has Zeyilname markers */

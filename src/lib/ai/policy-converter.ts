@@ -477,6 +477,11 @@ export async function convertToAnalyzedPolicy(
     insuredAddress: data.insuredAddress ?? data.insured_address ?? undefined,
     insuredEntityType: data.insuredEntityType ?? undefined,
     vehicleUsage: data.vehicleUsage ?? undefined,
+    isBundle: data.isBundle ?? undefined,
+    bundleProducts:
+      Array.isArray(data.bundleProducts) && data.bundleProducts.length > 0
+        ? data.bundleProducts
+        : undefined,
     discounts: data.discounts ?? undefined,
     // Extract vehicle metadata from raw text for kasko/traffic policies.
     // The standard ExtractedPolicyData schema does not request vehicle fields,

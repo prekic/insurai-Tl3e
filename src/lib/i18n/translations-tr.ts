@@ -474,6 +474,8 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     vehicleMarketValue: 'Araç Piyasa Değeri',
     rayicBedeliLabel: 'Rayiç Değer (Hasar Anındaki Piyasa Değeri)',
     rayicBedeliHelp: 'Hasar anındaki rayiç, sigortacı tarafından 3 emsal yöntemiyle belirlenir.',
+    bundleBadge: 'Birleşik Poliçe',
+    bundleHelp: 'Bu poliçe birden fazla sigorta ürününü tek pakette bir araya getiriyor.',
     verifyImportantFields: 'Satın almadan önce bu poliçeyi dikkatlice inceleyin.',
     coreKaskoCoverages: 'Temel Kasko Teminatları (Dahil)',
     coreKaskoCoveragesDesc:

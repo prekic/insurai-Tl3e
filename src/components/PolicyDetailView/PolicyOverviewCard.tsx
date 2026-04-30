@@ -1,4 +1,4 @@
-import { Shield, Briefcase, Users } from 'lucide-react'
+import { Shield, Briefcase, Users, Layers } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatDate } from '@/lib/utils'
@@ -31,9 +31,21 @@ export function PolicyOverviewCard({ policy }: { policy: AnalyzedPolicy }) {
             <Shield className="text-blue-600 flex-shrink-0" size={16} />
             <span className="truncate">{t.policy.policySummary}</span>
           </span>
-          <Badge variant={getStatusVariant(policy.status)} className="text-xs flex-shrink-0">
-            {getStatusLabel(policy.status, t)}
-          </Badge>
+          <span className="flex items-center gap-1.5 flex-shrink-0">
+            {policy.isBundle && (
+              <Badge
+                variant="default"
+                className="text-xs bg-purple-100 text-purple-800 hover:bg-purple-100 flex items-center gap-1"
+                title={t.policy.bundleHelp}
+              >
+                <Layers size={12} />
+                {t.policy.bundleBadge}
+              </Badge>
+            )}
+            <Badge variant={getStatusVariant(policy.status)} className="text-xs">
+              {getStatusLabel(policy.status, t)}
+            </Badge>
+          </span>
         </CardTitle>
       </CardHeader>
       <CardContent className="p-3 sm:p-6">
@@ -64,6 +76,28 @@ export function PolicyOverviewCard({ policy }: { policy: AnalyzedPolicy }) {
                 <p className="text-[10px] text-blue-500 mt-0.5">{t.policy.marketValueHelp}</p>
               ))}
           </div>
+
+          {policy.isBundle && policy.bundleProducts && policy.bundleProducts.length > 0 && (
+            <div
+              data-testid="bundle-products-block"
+              className="col-span-2 p-2.5 sm:p-3 bg-purple-50 rounded-lg border border-purple-100 overflow-hidden"
+            >
+              <p className="text-[10px] sm:text-xs text-purple-700 font-medium mb-1.5 flex items-center gap-1.5">
+                <Layers size={12} />
+                {t.policy.bundleHelp}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {policy.bundleProducts.map((product, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-xs bg-white border border-purple-200 text-purple-900 font-medium"
+                  >
+                    {product}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           <PolicyKeyMetricsAndDiscounts policy={policy} />
 

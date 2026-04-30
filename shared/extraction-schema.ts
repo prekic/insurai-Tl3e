@@ -42,6 +42,17 @@ export const EXTRACTION_JSON_SCHEMA = {
         enum: ['kasko', 'traffic', 'home', 'health', 'life', 'dask', 'business', 'nakliyat', null],
         description: 'Type of insurance policy',
       },
+      isBundle: {
+        type: ['boolean', 'null'],
+        description:
+          'True when the policy is a bundled multi-product policy. Detect by looking at the title/product name for "Birleşik" (Turkish) or "Combined" (English), OR when the policy explicitly lists multiple separately-priced products on its cover page. False or null otherwise.',
+      },
+      bundleProducts: {
+        type: ['array', 'null'],
+        items: { type: 'string' },
+        description:
+          'When isBundle=true, the bundled product names exactly as written on the policy (e.g. ["Genişletilmiş Kasko", "Koltuk Ferdi Kaza", "Artan Mali Sorumluluk", "Hukuksal Koruma"]). Null when isBundle is false or null.',
+      },
       insuredName: {
         type: ['string', 'null'],
         description: 'Name of the insured person or entity',
@@ -484,6 +495,8 @@ export const EXTRACTION_JSON_SCHEMA = {
       'bağlıPolNo',
       'provider',
       'policyType',
+      'isBundle',
+      'bundleProducts',
       'insuredName',
       'insuredAddress',
       'insuredEntityType',
