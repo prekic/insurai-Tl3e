@@ -44,6 +44,18 @@ interface Fixture {
   expectedMake: string
   expectedModel?: string
   insurer: string
+  /**
+   * Cross-insurer state-leak guard (reviewer Test A, Apr 30 2026).
+   * Insurer-specific terminology that MUST NOT appear in this fixture's
+   * extraction output. E.g. an Anadolu policy should never produce text
+   * containing "CASU" (AXA's contracted glass-network brand). Catches:
+   *   - AI hallucinating cross-insurer terms
+   *   - Hardcoded strings re-introduced anywhere in the pipeline
+   *   - Future code paths injecting brand-specific text
+   * Match is case-insensitive substring against the JSON-serialized
+   * extracted policy data.
+   */
+  forbiddenPhrases?: string[]
   notes?: string
 }
 
@@ -138,26 +150,38 @@ async function postJson<T>(
   body: Record<string, unknown>,
   timeoutMs: number
 ): Promise<{ ok: boolean; status: number; data: T | null; raw: string }> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    })
-    const raw = await res.text()
-    let data: T | null = null
+  // One retry on transient 5xx (Railway gateway flakes; gotcha #130 territory).
+  // Single retry only — we don't want to mask real production instability.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
     try {
-      data = JSON.parse(raw) as T
-    } catch {
-      data = null
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      })
+      const raw = await res.text()
+      let data: T | null = null
+      try {
+        data = JSON.parse(raw) as T
+      } catch {
+        data = null
+      }
+      // Retry on 5xx; succeed/fail-fast on everything else.
+      if (res.status >= 500 && res.status < 600 && attempt === 0) {
+        await new Promise((r) => setTimeout(r, 2000))
+        continue
+      }
+      return { ok: res.ok, status: res.status, data, raw }
+    } finally {
+      clearTimeout(timer)
     }
-    return { ok: res.ok, status: res.status, data, raw }
-  } finally {
-    clearTimeout(timer)
   }
+  // Unreachable — both attempts either returned or threw, but TS can't see that.
+  /* istanbul ignore next */
+  return { ok: false, status: 0, data: null, raw: 'retry loop exhausted' }
 }
 
 /**
@@ -322,6 +346,22 @@ function checkExtraction(extractedData: Record<string, unknown>, fixture: Fixtur
       status: 'fail',
       reason: `model mismatch: expected "${fixture.expectedModel}", got "${model}"`,
       extracted,
+    }
+  }
+  // Cross-insurer state-leak guard (reviewer Test A). Serialize the full
+  // extracted JSON and search for forbidden insurer-specific terms. A hit
+  // indicates either AI hallucination or a hardcoded string from another
+  // insurer's pipeline bleeding into this fixture's output.
+  if (fixture.forbiddenPhrases?.length) {
+    const haystack = JSON.stringify(extractedData).toLowerCase()
+    const hits = fixture.forbiddenPhrases.filter((p) => haystack.includes(p.toLowerCase()))
+    if (hits.length > 0) {
+      return {
+        fixture,
+        status: 'fail',
+        reason: `cross-insurer leak: forbidden phrase(s) ${hits.map((h) => `"${h}"`).join(', ')} appeared in extracted output`,
+        extracted,
+      }
     }
   }
   return { fixture, status: 'pass', extracted }
