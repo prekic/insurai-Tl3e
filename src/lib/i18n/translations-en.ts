@@ -403,6 +403,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     askInsurerDesc: 'You can ask these questions to your agent to fully understand your coverage.',
     clarifyWithInsurer: 'We recommend clarifying these with your insurer.',
     notSpecifiedInPolicy: 'Not specified in policy',
+    addressedByPolicy: 'Addressed in policy',
     rawText: 'Raw Text',
     documentText: 'Document Text',
     processed: 'Processed',

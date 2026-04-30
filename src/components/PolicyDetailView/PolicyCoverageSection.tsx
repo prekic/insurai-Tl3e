@@ -734,7 +734,8 @@ function ExclusionsSection({
 
       {/* Clarification Needed */}
       {(analysis.clarificationNeeded.length > 0 ||
-        analysis.missingImportantExclusions.length > 0) && (
+        analysis.missingImportantExclusions.length > 0 ||
+        (analysis.addressedByPolicy?.length ?? 0) > 0) && (
         <Card className="border-blue-200 bg-blue-50/50">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base text-blue-900">
@@ -760,6 +761,34 @@ function ExclusionsSection({
                   </div>
                 </div>
               ))}
+
+              {/* Sprint 2 #11B — template questions whose answers are
+                  pre-filled from the policy itself (conditionalDeductibles,
+                  exclusions, or coverage carveOuts). Render with a green
+                  "Addressed in policy" badge plus the verbatim matched
+                  string as the answer. */}
+              {(analysis.addressedByPolicy ?? [])
+                .filter((item) => item.importance === 'high')
+                .map((item, i) => (
+                  <div
+                    key={`addressed-${i}`}
+                    data-testid="ask-insurer-addressed"
+                    className="p-3 bg-white rounded-lg border border-emerald-100 shadow-sm"
+                  >
+                    <div className="flex justify-between items-start gap-2">
+                      <span className="text-sm font-semibold text-gray-900">
+                        {locale === 'tr' ? item.name : item.nameEn || item.name}
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="shrink-0 text-[11px] py-0.5 px-2 text-emerald-700 border-emerald-300 bg-emerald-50 whitespace-nowrap"
+                      >
+                        {t.policy.addressedByPolicy}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-emerald-900 mt-1.5 italic">{item.answer}</p>
+                  </div>
+                ))}
 
               {/* Important topics not mentioned in exclusions */}
               {analysis.missingImportantExclusions

@@ -1811,11 +1811,22 @@ describe('analyzeExclusionsComprehensive', () => {
       expect(alcoholFound).toBeUndefined()
     })
 
-    it('should NOT match partial substrings of keywords', () => {
-      // 'alkol' is NOT the same as keyword 'alkollü' — won't match
+    it('matches partial substrings of explicit keywords (P1 #11B broadened matching)', () => {
+      // Sprint 2 #11B intentionally broadened keyword matching: each
+      // COMMON_EXCLUSIONS_TO_CHECK entry now carries an explicit `keywords`
+      // array that includes shorter stems ("alkol" instead of "alkollü").
+      // "Alkol düzeyi kontrolleri" now matches the Alcohol Limit template
+      // via the "alkol" stem and lands in addressedByPolicy with the
+      // verbatim source as the answer (was: previously this fell through
+      // to missingImportantExclusions because the keyword derivation was
+      // narrower).
       const result = analyzeExclusionsComprehensive(['Alkol düzeyi kontrolleri'])
-      const alcoholFound = result.missingImportantExclusions.find((e) => e.name.includes('Alkol'))
-      expect(alcoholFound).toBeDefined() // Still listed as missing
+      const alcoholAddressed = result.addressedByPolicy.find((e) => e.name.includes('Alkol'))
+      expect(alcoholAddressed).toBeDefined()
+      expect(alcoholAddressed!.answer).toBe('Alkol düzeyi kontrolleri')
+      // And it should NO LONGER appear in missingImportantExclusions.
+      const alcoholMissing = result.missingImportantExclusions.find((e) => e.name.includes('Alkol'))
+      expect(alcoholMissing).toBeUndefined()
     })
 
     it('should have question and importance for missing exclusions', () => {

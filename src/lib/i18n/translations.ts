@@ -413,6 +413,7 @@ export interface TranslationDictionary {
     askInsurerDesc: string
     clarifyWithInsurer: string
     notSpecifiedInPolicy: string
+    addressedByPolicy: string
     rawText: string
     documentText: string
     processed: string

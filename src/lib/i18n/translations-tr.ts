@@ -407,6 +407,7 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     askInsurerDesc: 'Poliçenizin tam kapsamını anlamak için acentenize bu soruları sorabilirsiniz.',
     clarifyWithInsurer: 'Bu konuları sigorta şirketinizle netleştirmenizi öneririz.',
     notSpecifiedInPolicy: 'Poliçede belirtilmemiş',
+    addressedByPolicy: 'Poliçede ele alınmış',
     rawText: 'Ham Metin',
     documentText: 'Poliçe Metni',
     processed: 'İşlenmiş',

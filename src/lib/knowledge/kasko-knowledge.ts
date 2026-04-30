@@ -1370,6 +1370,12 @@ export const KASKO_EXCLUSION_EXPLANATIONS: Record<
  * Common exclusions that users SHOULD know about but may not be in their policy
  * These are important items to clarify with insurance
  */
+// `keywords` (added Sprint 2 #11B) drives the addressedByPolicy matcher in
+// analyzeExclusionsComprehensive(). Listed in lowercase; substring match
+// against exclusions + conditionalDeductibles + carveOuts. The previous
+// implementation derived keywords from `name.toLowerCase().split(/[\s/]+/)`
+// which was too narrow ("Ticari Kullanım" gave only ["ticari", "kullanım"]
+// and missed Anadolu's "Kullanım Şekli" klozu).
 export const COMMON_EXCLUSIONS_TO_CHECK = [
   {
     name: 'Vale Hırsızlığı/Hasarı',
@@ -1379,6 +1385,7 @@ export const COMMON_EXCLUSIONS_TO_CHECK = [
     importance: 'high',
     affectsPrivate: true,
     affectsCommercial: false,
+    keywords: ['vale', 'anahtarın ele geçir', 'anahtar üzerinde', 'valet'],
   },
   {
     name: 'Alkollü Sürücü Limiti',
@@ -1388,6 +1395,7 @@ export const COMMON_EXCLUSIONS_TO_CHECK = [
     importance: 'high',
     affectsPrivate: true,
     affectsCommercial: true,
+    keywords: ['alkol', 'promil', 'içkili', 'sarhoş', 'alcohol', 'intoxicated'],
   },
   {
     name: 'Yedek Sürücü',
@@ -1397,6 +1405,14 @@ export const COMMON_EXCLUSIONS_TO_CHECK = [
     importance: 'high',
     affectsPrivate: true,
     affectsCommercial: true,
+    keywords: [
+      'yedek sürücü',
+      'belirtilen sürücü',
+      'ehliyet süresi',
+      'sürücü yaşı',
+      'named driver',
+      'additional driver',
+    ],
   },
   {
     name: 'Yurt Dışı Kullanımı',
@@ -1406,6 +1422,7 @@ export const COMMON_EXCLUSIONS_TO_CHECK = [
     importance: 'medium',
     affectsPrivate: true,
     affectsCommercial: true,
+    keywords: ['yurt dışı', 'yurtdışı', 'sınır dışı', 'abroad', 'international use', 'ülke dışı'],
   },
   {
     name: 'Ticari Kullanım',
@@ -1415,6 +1432,18 @@ export const COMMON_EXCLUSIONS_TO_CHECK = [
     importance: 'high',
     affectsPrivate: true,
     affectsCommercial: false,
+    keywords: [
+      'ticari',
+      'rent-a-car',
+      'rent a car',
+      'kurye',
+      'taksi',
+      'uygulama taşımacı',
+      'kullanım şekli',
+      'rideshare',
+      'uber',
+      'commercial use',
+    ],
   },
   {
     name: 'Modifikasyon',
@@ -1424,6 +1453,17 @@ export const COMMON_EXCLUSIONS_TO_CHECK = [
     importance: 'medium',
     affectsPrivate: true,
     affectsCommercial: true,
+    keywords: [
+      'modifikasyon',
+      'jant',
+      'cam filmi',
+      'ses sistemi',
+      'ilave donanım',
+      'aksesuar',
+      'lpg',
+      'cng',
+      'modification',
+    ],
   },
 ]
 
@@ -1461,6 +1501,22 @@ export interface ExclusionAnalysisResult {
     questionEn?: string
     importance: string
   }>
+  /**
+   * Sprint 2 #11B — template questions whose answers ARE addressed somewhere
+   * in the policy (exclusions, conditionalDeductibles, or coverage carveOuts).
+   * Renderer surfaces these with a green "Addressed in policy" badge plus the
+   * verbatim matched string as the pre-filled answer, instead of the blue
+   * "Not specified in policy" fallback used for `missingImportantExclusions`.
+   */
+  addressedByPolicy: Array<{
+    name: string
+    nameEn: string
+    question: string
+    questionEn?: string
+    importance: string
+    /** Verbatim string from the policy that matched a keyword for this template question. */
+    answer: string
+  }>
 }
 
 /**
@@ -1472,13 +1528,18 @@ export interface ExclusionAnalysisResult {
 export function analyzeExclusionsComprehensive(
   exclusions: string[],
   exclusionsEn: string[] = [],
-  isCommercial: boolean = false
+  isCommercial: boolean = false,
+  // Sprint 2 #11B — additional sources to scan for template-question answers.
+  // Optional + default to [] for backwards compatibility with existing callers.
+  conditionalDeductibles: string[] = [],
+  coverageCarveOuts: string[] = []
 ): ExclusionAnalysisResult {
   const result: ExclusionAnalysisResult = {
     exclusions: [],
     coveragesInExclusions: [],
     clarificationNeeded: [],
     missingImportantExclusions: [],
+    addressedByPolicy: [],
   }
 
   // Must have a limit word OR a currency symbol so we don't grab "35" from "35%"
@@ -1570,17 +1631,49 @@ export function analyzeExclusionsComprehensive(
     result.exclusions.push(analyzed)
   }
 
-  // Check for important exclusions that SHOULD be mentioned but aren't
-  const mentionedTopics = exclusions.map((e) => e.toLowerCase()).join(' ')
+  // Sprint 2 #11B — scan three sources: exclusions, conditional deductibles,
+  // and per-coverage carve-outs. Build a SOURCES array so that when a keyword
+  // hits we can also report the verbatim matching string as the pre-filled
+  // answer to the template question (renderer shows it under "Addressed in
+  // policy" instead of "Not specified").
+  const sources: string[] = [
+    ...exclusions.filter((s): s is string => typeof s === 'string'),
+    ...conditionalDeductibles.filter((s): s is string => typeof s === 'string'),
+    ...coverageCarveOuts.filter((s): s is string => typeof s === 'string'),
+  ]
 
   for (const check of COMMON_EXCLUSIONS_TO_CHECK) {
     if (isCommercial && check.affectsCommercial === false) continue
     if (!isCommercial && check.affectsPrivate === false) continue
 
-    const keywords = check.name.toLowerCase().split(/[\s/]+/)
-    const isMentioned = keywords.some((kw) => mentionedTopics.includes(kw))
+    // Each entry now carries an explicit `keywords` list (added in this PR).
+    // Older entries that lack `keywords` fall back to the legacy split — we
+    // keep the fallback for forward-compat.
+    const keywords =
+      Array.isArray((check as { keywords?: string[] }).keywords) &&
+      (check as { keywords: string[] }).keywords.length > 0
+        ? (check as { keywords: string[] }).keywords.map((k) => k.toLowerCase())
+        : check.name.toLowerCase().split(/[\s/]+/)
 
-    if (!isMentioned) {
+    let matchedAnswer: string | null = null
+    for (const source of sources) {
+      const lower = source.toLowerCase()
+      if (keywords.some((kw) => lower.includes(kw))) {
+        matchedAnswer = source
+        break
+      }
+    }
+
+    if (matchedAnswer) {
+      result.addressedByPolicy.push({
+        name: check.name,
+        nameEn: check.nameEn,
+        question: check.question,
+        questionEn: check.questionEn,
+        importance: check.importance,
+        answer: matchedAnswer,
+      })
+    } else {
       result.missingImportantExclusions.push({
         name: check.name,
         nameEn: check.nameEn,

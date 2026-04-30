@@ -361,6 +361,7 @@ export const SKELETON_TRANSLATIONS: TranslationDictionary = {
     askInsurerDesc: '',
     clarifyWithInsurer: '',
     notSpecifiedInPolicy: '',
+    addressedByPolicy: '',
     rawText: '',
     documentText: '',
     processed: '',

@@ -503,10 +503,23 @@ export function buildPolicyReviewerSummary(
     (policy.type as string) === 'commercial_auto' ||
     vehicleUsage === 'commercial'
 
+  // Sprint 2 #11B — feed conditionalDeductibles + flattened coverage
+  // carveOuts into the analyzer so template questions can pre-fill answers
+  // when the policy addresses them (e.g. Anadolu's "Kullanım Şekli %80"
+  // klozu answers the "Commercial Use" template question).
+  const conditionalDeductibles = Array.isArray(policy.conditionalDeductibles)
+    ? policy.conditionalDeductibles.filter((s): s is string => typeof s === 'string')
+    : []
+  const coverageCarveOuts = (policy.coverages ?? [])
+    .flatMap((c) => (c as { carveOuts?: string[] | null }).carveOuts ?? [])
+    .filter((s): s is string => typeof s === 'string')
+
   const groupedExclusions = analyzeExclusionsComprehensive(
     policy.exclusions,
     policy.exclusionsEn || [],
-    isCommercial
+    isCommercial,
+    conditionalDeductibles,
+    coverageCarveOuts
   )
 
   if (import.meta.env.DEV) {
