@@ -423,6 +423,8 @@ export const SKELETON_TRANSLATIONS: TranslationDictionary = {
     vehicleClass: '',
     vehicleInfoTitle: '',
     vehicleMarketValue: '',
+    rayicBedeliLabel: '',
+    rayicBedeliHelp: '',
     verifyImportantFields: '',
     coreKaskoCoverages: '',
     coreKaskoCoveragesDesc: '',

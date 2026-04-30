@@ -475,6 +475,8 @@ export interface TranslationDictionary {
     vehicleClass: string
     vehicleInfoTitle: string
     vehicleMarketValue: string
+    rayicBedeliLabel: string
+    rayicBedeliHelp: string
     verifyImportantFields: string
     coreKaskoCoverages: string
     coreKaskoCoveragesDesc: string

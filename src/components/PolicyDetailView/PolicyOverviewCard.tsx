@@ -12,6 +12,17 @@ export function PolicyOverviewCard({ policy }: { policy: AnalyzedPolicy }) {
   const { t, locale } = useI18n()
   const { formatConverted } = useDisplayCurrency()
 
+  // Rayiç vs fixed-bedeli detection: when sigortaBedeli is missing AND a main
+  // kasko coverage is flagged isMarketValue, treat the policy as Rayiç Değer
+  // (insurer determines value at time of loss via 3-quote emsal methodology).
+  // The previous fallback rendered the generic "Vehicle Market Value" label
+  // alongside a misleading "estimated based on current average prices"
+  // disclaimer that contradicts the actual rayiç convention.
+  const isRayicBedeli =
+    policy.type === 'kasko' &&
+    !policy.sigortaBedeli &&
+    !!policy.coverages?.some((c) => c.category === 'main' && c.isMarketValue)
+
   return (
     <Card className="overflow-hidden w-full">
       <CardHeader className="py-2 px-3 sm:py-4 sm:px-6 bg-gradient-to-r from-blue-50 to-blue-100/50">
@@ -33,14 +44,18 @@ export function PolicyOverviewCard({ policy }: { policy: AnalyzedPolicy }) {
               {policy.type === 'kasko'
                 ? policy.sigortaBedeli
                   ? formatConverted(policy.sigortaBedeli)
-                  : policy.coverage > 0
-                    ? formatConverted(policy.coverage)
-                    : t.policy.vehicleMarketValue
+                  : isRayicBedeli
+                    ? t.policy.rayicBedeliLabel
+                    : policy.coverage > 0
+                      ? formatConverted(policy.coverage)
+                      : t.policy.vehicleMarketValue
                 : formatConverted(policy.coverage)}
             </p>
             {policy.type === 'kasko' &&
               (policy.sigortaBedeli ? (
                 <p className="text-[10px] text-blue-500 mt-0.5">Sigorta Bedeli</p>
+              ) : isRayicBedeli ? (
+                <p className="text-[10px] text-blue-500 mt-0.5">{t.policy.rayicBedeliHelp}</p>
               ) : policy.coverage > 0 ? (
                 <p className="text-[10px] text-blue-500 mt-0.5">
                   {locale === 'tr' ? 'Araç Değeri' : 'Vehicle Value'}

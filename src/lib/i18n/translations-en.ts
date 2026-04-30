@@ -466,6 +466,9 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     vehicleClass: 'Vehicle Class',
     vehicleInfoTitle: 'Vehicle Information',
     vehicleMarketValue: 'Vehicle Market Value',
+    rayicBedeliLabel: 'Rayiç Değer (Market Value at Loss)',
+    rayicBedeliHelp:
+      'Vehicle rayiç at time of loss, determined by the insurer via the 3-quote emsal methodology.',
     verifyImportantFields: 'Review this policy carefully before purchasing.',
     coreKaskoCoverages: 'Core Comprehensive Coverages (Included)',
     coreKaskoCoveragesDesc:
