@@ -106,6 +106,60 @@ function matchesIMMPattern(text: string | undefined | null): boolean {
 }
 
 /**
+ * Sprint 2 #7 — parse a conditional-deductible scenario string and bucket it
+ * by deductible percentage. The strings are emitted by gotcha #93's
+ * `NAMED_DEDUCTIBLE_SCENARIOS` table in the format "Scenario name: %N"
+ * (e.g. "Anlaşmalı olmayan servis: %35", "Kullanım Şekli: %80"). Some legacy
+ * entries may carry the percentage as a trailing token without a colon.
+ *
+ * Severity bucketing:
+ *   ≥ 80%  → critical (Kullanım Şekli, undeclared LPG fire — practically
+ *                       partial exclusions)
+ *   30-79% → high     (Anlaşmalı olmayan servis %35, Pert Araç %35)
+ *   ≤ 29% OR no %     → medium (İlk cam hasarı %20, lock-replacement caps,
+ *                                non-percentage scenarios)
+ */
+function bucketConditionalDeductibleSeverity(scenario: string): {
+  severity: ComplianceIssue['severity']
+  percent: number | null
+} {
+  const m = scenario.match(/%\s*(\d{1,3})(?!\d)/)
+  if (!m) return { severity: 'medium', percent: null }
+  const percent = Math.min(100, Math.max(0, parseInt(m[1], 10)))
+  if (percent >= 80) return { severity: 'critical', percent }
+  if (percent >= 30) return { severity: 'high', percent }
+  return { severity: 'medium', percent }
+}
+
+/**
+ * Sprint 2 #7 — translate a Turkish conditional-deductible scenario string to
+ * English for the `description` field. Tries known scenario stems
+ * (servis, pert, kullanım, lpg, vale, sürücü yaşı, ehliyet, ilk cam) and
+ * falls back to the original string when no known stem matches. Keep the
+ * percentage in the output regardless.
+ */
+function translateConditionalDeductibleEN(scenario: string): string {
+  const lower = scenario.toLowerCase()
+  const pct = scenario.match(/%\s*\d{1,3}/)?.[0] ?? ''
+  const tail = pct ? ` ${pct}` : ''
+  if (lower.includes('anlaşmalı olmayan servis') || lower.includes('out-of-network'))
+    return `Out-of-network repair deductible:${tail}`
+  if (lower.includes('pert araç') || lower.includes('pert')) return `Pert Araç deductible:${tail}`
+  if (lower.includes('kullanım şekli') || lower.includes('rideshare') || lower.includes('rent'))
+    return `Misuse / commercial-use deductible (rideshare/rental/test drive):${tail}`
+  if (lower.includes('lpg') || lower.includes('cng'))
+    return `Undeclared LPG/CNG fire deductible:${tail}`
+  if (lower.includes('vale')) return `Valet-handling theft deductible:${tail}`
+  if (lower.includes('sürücü yaşı') || lower.includes('driver age'))
+    return `Young-driver deductible:${tail}`
+  if (lower.includes('ehliyet süresi') || lower.includes('license tenure'))
+    return `Short-licensed driver deductible:${tail}`
+  if (lower.includes('ilk cam') || lower.includes('first glass'))
+    return `First glass-replacement deductible:${tail}`
+  return scenario
+}
+
+/**
  * Location keywords that indicate the canonical Artan Mali Sorumluluk
  * Sınırsız carve-out: unlimited in theory, capped (typically 2.500.000 TL
  * per event) in specific high-exposure environments.
@@ -1361,14 +1415,31 @@ function evaluateCompliance(policy: Policy, config: EvaluationConfig): Complianc
   if (hasConditionalDeductibles || hasImmSublimits) {
     if (hasConditionalDeductibles) {
       score -= 15
-      issues.push({
-        type: 'regulatory',
-        severity: 'high',
-        description: 'Policy contains conditional deductibles requiring review',
-        descriptionTR: 'Poliçe inceleme gerektiren koşullu muafiyetler içeriyor',
-      })
-      textIssues.push('Contains conditional deductibles')
-      textIssuesTR.push('Koşullu muafiyet içeriyor')
+      // Sprint 2 #7 — emit ONE Issue per named conditional deductible scenario
+      // (was: a single generic "Policy contains conditional deductibles
+      // requiring review" warning that the reviewer correctly flagged as
+      // useless to users). The data is already classified by named scenario
+      // per gotcha #93; we just surface each entry with severity bucketed by
+      // the deductible percentage. Score deduction stays at a single -15 to
+      // avoid compounding across many conditional rows.
+      // Defensive — the field is typed `string[]` but legacy test fixtures
+      // and older extractions occasionally put objects in here. Filter to
+      // strings to keep .match() / .toLowerCase() from blowing up.
+      const scenarios = (analyzedPolicy.conditionalDeductibles ?? []).filter(
+        (s): s is string => typeof s === 'string' && s.trim().length > 0
+      )
+      for (const scenario of scenarios) {
+        const { severity, percent } = bucketConditionalDeductibleSeverity(scenario)
+        issues.push({
+          type: 'regulatory',
+          severity,
+          description: translateConditionalDeductibleEN(scenario),
+          descriptionTR: scenario,
+        })
+        const shortLabel = percent ? `${percent}% deductible` : 'Conditional deductible'
+        textIssues.push(`${shortLabel}: ${scenario}`)
+        textIssuesTR.push(scenario)
+      }
     }
 
     if (hasImmSublimits) {
@@ -1381,6 +1452,25 @@ function evaluateCompliance(policy: Policy, config: EvaluationConfig): Complianc
       })
       textIssues.push('Contains IMM sublimits')
       textIssuesTR.push('İMM alt limitleri içeriyor')
+    }
+  }
+
+  // Sprint 2 #7 — surface Coverage.carveOuts[] as individual Issues. These
+  // are per-coverage caveats populated at extraction time (gotcha #94 — IMM
+  // 2.5M TL airport/port/fuel-depot cap, etc.) that the previous generic
+  // financial-risks panel never reached. Each carve-out becomes its own
+  // medium-severity Issue so the user sees the specific exposure.
+  for (const coverage of policy.coverages) {
+    const carveOuts = (coverage as { carveOuts?: string[] | null }).carveOuts
+    if (!Array.isArray(carveOuts) || carveOuts.length === 0) continue
+    for (const carveOut of carveOuts) {
+      if (typeof carveOut !== 'string' || !carveOut.trim()) continue
+      issues.push({
+        type: 'regulatory',
+        severity: 'medium',
+        description: `${coverage.name}: ${carveOut}`,
+        descriptionTR: `${coverage.nameTr || coverage.name}: ${carveOut}`,
+      })
     }
   }
 

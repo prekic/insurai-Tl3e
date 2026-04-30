@@ -204,7 +204,11 @@ describe('Bug #4: Deductible score caps when conditionalDeductibles present', ()
   }
 
   it('scores ≤ 80 when conditional deductibles exist', () => {
-    const policy = makePolicy([{ condition: 'Glass repairs outside AXA network', rate: '20%' }])
+    // conditionalDeductibles is typed as string[] per the schema (gotcha
+    // #93). Pre-Sprint-2-#7 the evaluator never iterated the array so an
+    // object slipped through; now that we emit one Issue per entry the
+    // input must be schema-correct strings.
+    const policy = makePolicy(['Glass repairs outside AXA network: %20'])
     const result = evaluatePolicy(policy)
     const dedScore = result.scoreBreakdown.deductible
     expect(dedScore).toBeDefined()
