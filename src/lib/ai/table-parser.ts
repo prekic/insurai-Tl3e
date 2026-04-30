@@ -525,6 +525,7 @@ function translateCoverageName(turkishName: string): string {
     'ferdi kaza': 'Personal Accident',
     'mali sorumluluk': 'Liability',
     'hukuki koruma': 'Legal Protection',
+    'hukuksal koruma': 'Legal Protection', // Anadolu spelling variant (-sal suffix)
     'yol yardım': 'Roadside Assistance',
     'ikame araç': 'Replacement Vehicle',
     çekici: 'Towing',
