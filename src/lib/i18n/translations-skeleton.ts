@@ -388,6 +388,7 @@ export const SKELETON_TRANSLATIONS: TranslationDictionary = {
       end: '',
     },
     deductibleLabel: '',
+    deductibleConditional: '',
     endDate: '',
     exclusionsAndQuestions: '',
     exclusionsDesc: '',

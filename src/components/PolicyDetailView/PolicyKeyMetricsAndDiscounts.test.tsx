@@ -71,9 +71,13 @@ describe('PolicyKeyMetricsAndDiscounts', () => {
   })
 
   it('shows conditional deductible label when kasko deductible is zero', () => {
+    // After the Apr 30 cross-contamination fix the hardcoded AXA-specific
+    // "Glass: 20% outside CASU" string was replaced with a generic
+    // "Conditional — see details below" pointer that doesn't smuggle one
+    // insurer's terminology onto unrelated policies.
     const policy = { ...base, deductible: 0 }
     render(<PolicyKeyMetricsAndDiscounts policy={policy} />)
-    expect(screen.getByText(/No standard deductible/i)).toBeInTheDocument()
+    expect(screen.getByText(/Conditional — see details below/i)).toBeInTheDocument()
   })
 
   it('shows proportional-deductible label when deductiblePercent is set', () => {

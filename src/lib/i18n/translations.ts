@@ -440,6 +440,7 @@ export interface TranslationDictionary {
       end: string
     }
     deductibleLabel: string
+    deductibleConditional: string
     endDate: string
     exclusionsAndQuestions: string
     exclusionsDesc: string

@@ -436,6 +436,7 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
       end: 'Bitiş:',
     },
     deductibleLabel: 'Muafiyet',
+    deductibleConditional: 'Şartlı — detaylar için aşağıya bkz.',
     endDate: 'Bitiş Tarihi',
     exclusionsAndQuestions: 'İstisnalar ve Sorular',
     exclusionsDesc: 'İstisnalar nelerin kapsandığını sınırlar. Bunları bilmek önemlidir.',

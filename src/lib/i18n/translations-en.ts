@@ -430,6 +430,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
       end: 'End:',
     },
     deductibleLabel: 'Deductible',
+    deductibleConditional: 'Conditional — see details below',
     endDate: 'End Date',
     exclusionsAndQuestions: 'Exclusions & Questions',
     exclusionsDesc: 'Exclusions limit what is covered. It is important to know these.',
