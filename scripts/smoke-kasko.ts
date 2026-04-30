@@ -3,14 +3,17 @@
  * Kasko Vehicle Extraction Smoke Test
  *
  * For each PDF fixture in tests/fixtures/kasko/:
- *   1. Base64-encode the PDF
- *   2. POST to {SMOKE_BASE_URL}/api/ai/ocr/document-ai → text
- *   3. POST to {SMOKE_BASE_URL}/api/ai/extract (SSE keepalive) → ExtractedPolicyData
- *   4. Assert data.vehicleMake / .vehicleModel are populated and match expected
+ *   1. Split into ≤10-page chunks via pdf-lib (Document AI's hard limit)
+ *   2. Base64-encode each chunk
+ *   3. POST to {SMOKE_BASE_URL}/api/ai/ocr/document-ai → text per chunk
+ *   4. Concatenate text across chunks
+ *   5. POST to {SMOKE_BASE_URL}/api/ai/extract (SSE keepalive) → ExtractedPolicyData
+ *   6. Assert data.vehicleMake / .vehicleModel are populated and match expected
  *
  * Direct extraction-quality smoke — does NOT exercise the persistence layer
  * (route tests cover that). Verifies that the production AI pipeline returns
- * vehicle make/model for real Turkish kasko policies.
+ * vehicle make/model for real Turkish kasko policies, including multi-page
+ * fleet PDFs that exceed Document AI's 15-page limit.
  *
  * Required env vars:
  *   SMOKE_BASE_URL   — origin of the production server. Falls back to
@@ -25,10 +28,16 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
+import { PDFDocument } from 'pdf-lib'
 
 const PASS_THRESHOLD = 80
 const REQUEST_TIMEOUT_MS = 180_000 // SSE keepalive holds the connection; AI extractions land 60-120s
 const FIXTURES_DIR = path.resolve('tests/fixtures/kasko')
+
+// Mirrors src/lib/ai/pdf-splitter.ts DOCUMENT_AI_PAGE_LIMIT — keep in sync.
+// Production reduced this from the documented 15 to 10 to avoid 20MB payload
+// 403s on dense PDFs (see pdf-splitter.ts line 11).
+const DOCUMENT_AI_PAGE_LIMIT = 10
 
 interface Fixture {
   file: string
@@ -206,8 +215,35 @@ async function postSse<T>(
   }
 }
 
-async function ocrPdf(baseUrl: string, pdfBuffer: Buffer): Promise<string> {
-  const documentBase64 = pdfBuffer.toString('base64')
+/**
+ * Split a PDF into ≤DOCUMENT_AI_PAGE_LIMIT-page chunks using pdf-lib. Mirrors
+ * the splitting logic in src/lib/ai/pdf-splitter.ts so the smoke can exercise
+ * multi-page fleet PDFs that exceed Document AI's hard limit. Returns the
+ * original buffer in a single-element array when no split is needed.
+ */
+async function splitPdfBuffer(pdfBuffer: Buffer): Promise<Uint8Array[]> {
+  const sourceBytes = new Uint8Array(pdfBuffer)
+  const sourceDoc = await PDFDocument.load(sourceBytes, { ignoreEncryption: true })
+  const totalPages = sourceDoc.getPageCount()
+  if (totalPages <= DOCUMENT_AI_PAGE_LIMIT) {
+    return [sourceBytes]
+  }
+  const chunks: Uint8Array[] = []
+  const numChunks = Math.ceil(totalPages / DOCUMENT_AI_PAGE_LIMIT)
+  for (let i = 0; i < numChunks; i++) {
+    const start = i * DOCUMENT_AI_PAGE_LIMIT
+    const end = Math.min(start + DOCUMENT_AI_PAGE_LIMIT, totalPages)
+    const chunkDoc = await PDFDocument.create()
+    const indices = Array.from({ length: end - start }, (_, idx) => start + idx)
+    const copied = await chunkDoc.copyPages(sourceDoc, indices)
+    for (const page of copied) chunkDoc.addPage(page)
+    chunks.push(await chunkDoc.save())
+  }
+  return chunks
+}
+
+async function ocrChunk(baseUrl: string, chunk: Uint8Array): Promise<string> {
+  const documentBase64 = Buffer.from(chunk).toString('base64')
   const result = await postJson<{ success: boolean; data?: { text?: string }; error?: string }>(
     `${baseUrl}/api/ai/ocr/document-ai`,
     { documentBase64 },
@@ -220,6 +256,23 @@ async function ocrPdf(baseUrl: string, pdfBuffer: Buffer): Promise<string> {
   const text = result.data.data?.text ?? ''
   if (!text.trim()) throw new Error('OCR returned empty text')
   return text
+}
+
+async function ocrPdf(baseUrl: string, pdfBuffer: Buffer): Promise<string> {
+  const chunks = await splitPdfBuffer(pdfBuffer)
+  if (chunks.length === 1) {
+    return ocrChunk(baseUrl, chunks[0])
+  }
+  console.log(`    (splitting into ${chunks.length} chunks of ≤${DOCUMENT_AI_PAGE_LIMIT} pages)`)
+  const texts: string[] = []
+  for (let i = 0; i < chunks.length; i++) {
+    const chunkText = await ocrChunk(baseUrl, chunks[i])
+    texts.push(chunkText)
+  }
+  // Join with a page-marker separator so layout-sensitive regex anchors in the
+  // extractor (e.g. "Marka :", "Plaka :") don't accidentally match across the
+  // boundary between two chunks.
+  return texts.join('\n\n[PAGE BREAK]\n\n')
 }
 
 async function extractUnified(
@@ -277,20 +330,10 @@ function checkExtraction(extractedData: Record<string, unknown>, fixture: Fixtur
 async function runFixture(baseUrl: string, fixture: Fixture): Promise<FixtureResult> {
   const pdfPath = path.join(FIXTURES_DIR, fixture.file)
   const pdfBuffer = fs.readFileSync(pdfPath)
-  let text: string
-  try {
-    text = await ocrPdf(baseUrl, pdfBuffer)
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    // Treat the Document AI 15-page limit as a SKIP rather than a FAIL — it's
-    // an OCR-side limitation, not a vehicle-extraction regression. Production
-    // splits oversized PDFs client-side via pdf-splitter.ts; the smoke
-    // intentionally does not duplicate that splitting logic.
-    if (msg.includes('page limit') || msg.includes('15 or fewer pages')) {
-      return { fixture, status: 'skip', reason: 'PDF exceeds 15-page Document AI limit' }
-    }
-    throw err
-  }
+  // splitPdfBuffer in ocrPdf handles the Document AI 15-page hard limit by
+  // mirroring src/lib/ai/pdf-splitter.ts. No 'skip' path needed any more —
+  // multi-page fleet PDFs are now first-class fixtures.
+  const text = await ocrPdf(baseUrl, pdfBuffer)
   const extractedData = await extractUnified(baseUrl, text)
   return checkExtraction(extractedData, fixture)
 }
