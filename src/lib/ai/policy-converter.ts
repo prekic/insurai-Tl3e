@@ -252,8 +252,14 @@ export async function convertToAnalyzedPolicy(
   // inject synthetic `category: 'supplementary'` rows so downstream coverage
   // enumeration and Value scoring pick them up.
   if (rawText && (policyType === 'kasko' || policyType === 'traffic')) {
-    const supplementaryFromLlm = coverages.filter((c) => c.category === 'supplementary').length
-    if (supplementaryFromLlm < 3) {
+    // Apr 30 2026 — gate dropped (was: supplementaryFromLlm < 3). Reviewer
+    // caught the LLM returning 3 generic supplementary coverages while
+    // missing the Anadolu-specific add-on bundle (Hatalı Akaryakıt, Cam Hasar
+    // Koruma, Hasarsızlık İndirimi Koruma, İkame Araç, Evcil Hayvan, Anahtar
+    // Çalınma, Mini Onarım, Eskisi Yerine Yenisi). Three generic hits passed
+    // the < 3 threshold and the regex fallback never ran. The startsWith
+    // dedup below is bidirectional, so over-firing this pass is safe.
+    {
       const bullets = extractEkSozlesmeBullets(rawText)
       const existingNames = new Set(coverages.map((c) => c.name.toLowerCase()))
       for (const bullet of bullets) {
