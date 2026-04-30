@@ -707,10 +707,15 @@ export async function convertToAnalyzedPolicy(
   basePolicy.exclusionsEn = ensureExclusionsEn(basePolicy.exclusions, basePolicy.exclusionsEn)
 
   // ── Semantic exclusion deduplication ──────────────────────────────────
-  // AI extraction often produces overlapping exclusions that describe the
-  // same restriction differently (e.g. "key left in ignition → theft" and
-  // "vehicle left running → theft"). Collapse semantically similar pairs.
+  // Two-stage pass:
+  //   (1) Trigram-Jaccard collapses arbitrary paraphrases (added P1 #9 —
+  //       reviewer caught 4× "no license" and 2× "keys-in-ignition"
+  //       paraphrases that the keyword-cluster pass below missed because
+  //       only one cluster keyword hit each paraphrase).
+  //   (2) Cluster-keyword dedup catches any same-concept duplicates the
+  //       Jaccard pass left behind.
   {
+    basePolicy.exclusions = dedupByTrigramJaccard(basePolicy.exclusions)
     const dedupResult = deduplicateExclusions(basePolicy.exclusions)
     if (dedupResult.length < basePolicy.exclusions.length) {
       // Rebuild English array from the kept indices
@@ -1353,6 +1358,91 @@ export function classifyExclusions(exclusions: string[]): {
   }
 
   return { trueExclusions, conditionalDeductibles, trueExclusionIndices, maxDeductiblePercent }
+}
+
+// Turkish stop-words that are too common to count toward similarity.
+const TURKISH_STOPWORDS = new Set([
+  've',
+  'veya',
+  'ile',
+  'için',
+  'gibi',
+  'kadar',
+  'ya',
+  'da',
+  'de',
+  'bir',
+  'bu',
+  'şu',
+  'olan',
+  'olarak',
+  'tarafından',
+])
+
+/**
+ * Build a stemmed-word set for fuzzy similarity comparison. Lowercases, strips
+ * punctuation, splits on whitespace, drops Turkish stop-words, then truncates
+ * each word to its first 5 characters as a crude stem (avoids needing a
+ * proper Turkish stemmer for "araç/araçtaki/araçlar" variants etc.).
+ */
+function stemmedWordSet(s: string): Set<string> {
+  const norm = s
+    .toLowerCase()
+    .replace(/[^a-zçğıöşü0-9\s]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const words = norm.split(' ').filter((w) => w.length > 0 && !TURKISH_STOPWORDS.has(w))
+  // 4-char prefix is the right length for Turkish: stems "araç" and "araçtaki"
+  // both to "araç", "çalın" and "çalınma" both to "çalı". 5-char overshoots.
+  return new Set(words.map((w) => (w.length > 4 ? w.slice(0, 4) : w)))
+}
+
+/** Jaccard similarity between two sets, ∈ [0, 1]. */
+function jaccard(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0
+  let inter = 0
+  for (const x of a) if (b.has(x)) inter++
+  const union = a.size + b.size - inter
+  return union === 0 ? 0 : inter / union
+}
+
+/**
+ * Collapse semantically similar exclusion paraphrases via stemmed-word
+ * Jaccard similarity. Reviewer's Sprint 2 #9: AI was producing 4 different
+ * paraphrases of the same "no driver's license" clause and 2 of
+ * "keys-in-ignition" because the cluster-based dedup below required 2+
+ * keyword hits per cluster — single-keyword paraphrases slipped through.
+ *
+ * Uses stemmed-word Jaccard (not trigram) because Turkish has long suffix
+ * variations (araç/araçlar/araçtaki) that make character-trigram overlap
+ * misleadingly low even for clear paraphrases. Crude 5-char prefix stem +
+ * stop-word filter handles the common variants without needing a full
+ * Turkish stemmer.
+ *
+ * Default threshold 0.70 ≈ "70% of meaningful word stems overlap" — collapses
+ * paraphrases of the same clause without false-collapsing distinct clauses.
+ */
+export function dedupByTrigramJaccard(exclusions: string[], threshold = 0.7): string[] {
+  if (exclusions.length <= 1) return exclusions
+  const sigs = exclusions.map(stemmedWordSet)
+  const removed = new Set<number>()
+  for (let i = 0; i < exclusions.length; i++) {
+    if (removed.has(i)) continue
+    for (let j = i + 1; j < exclusions.length; j++) {
+      if (removed.has(j)) continue
+      if (jaccard(sigs[i], sigs[j]) >= threshold) {
+        // Keep the longer phrasing — usually the more-specific one carries
+        // the legal anchor (e.g. clause reference) that the user can cite.
+        if (exclusions[i].length >= exclusions[j].length) {
+          removed.add(j)
+        } else {
+          removed.add(i)
+          break // i is gone, no point comparing further pairs starting at i
+        }
+      }
+    }
+  }
+  return exclusions.filter((_, i) => !removed.has(i))
 }
 
 function deduplicateExclusions(exclusions: string[]): string[] {
