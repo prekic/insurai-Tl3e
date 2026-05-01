@@ -99,51 +99,22 @@ jobs:
             const tail = trendLog.length > 3500 ? '...\n' + trendLog.slice(-3500) : trendLog
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
 
-            // Phase 4 follow-up: replace the literal `null` below with a
-            // designated tracking-issue number once one is created. Until
-            // then, we comment on the most recent merged PR (mirroring
-            // smoke-kasko.yml's fallback) so the regression isn't silent.
-            const trackingIssue = null
+            // Phase 4 designated tracking issue — see issue #419 for the
+            // full operational handbook (when to act, when not to act,
+            // schema-version-bump procedure).
+            const trackingIssue = 419
 
-            if (trackingIssue) {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: trackingIssue,
-                body:
-                  `## 🚨 Audit trend regression\n\n` +
-                  `Workflow run: ${runUrl}\n\n` +
-                  `<details><summary>trend output (tail)</summary>\n\n` +
-                  `\`\`\`\n${tail}\n\`\`\`\n\n</details>`,
-              })
-              return
-            }
-
-            // Fallback: comment on the most recent merged PR.
-            const prs = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'closed',
-              base: 'main',
-              sort: 'updated',
-              direction: 'desc',
-              per_page: 10,
-            })
-            const merged = prs.data.find((p) => p.merged_at)
-            if (!merged) {
-              core.warning('No merged PR or tracking issue available — skipping comment')
-              return
-            }
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: merged.number,
+              issue_number: trackingIssue,
               body:
-                `## 🚨 Audit trend regression detected\n\n` +
-                `Triggered by: \`${context.eventName}\`\n` +
+                `## 🚨 Audit trend regression\n\n` +
+                `Triggered by: \`${context.eventName}\` on \`${context.sha.slice(0, 7)}\`\n` +
                 `Workflow run: ${runUrl}\n\n` +
                 `<details><summary>trend output (tail)</summary>\n\n` +
-                `\`\`\`\n${tail}\n\`\`\`\n\n</details>\n\n` +
+                `\`\`\`\n${tail}\n\`\`\`\n\n` +
+                `</details>\n\n` +
                 `If this is a real regression, revert or land a follow-up fix. ` +
                 `If a golden fixture's expected metrics shifted intentionally, ` +
                 `bump SCHEMA_VERSION in scripts/audit-trend-track.ts.`,

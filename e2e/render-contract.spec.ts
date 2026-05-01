@@ -361,24 +361,30 @@ test.describe('🧷 Render-contract guards — Phase 2', () => {
   // -------------------------------------------------------------------
   // 4. CAVEAT — unlimited coverage with carveOuts surfaces a caveat note
   //
-  // SKIPPED in this iteration: the test environment hits the hardcoded
-  // benchmark fallback (`benchmarkStatus: 'untrusted'`), which flips
-  // `evaluation.isProvisional = true` → `isUnverified = true` →
-  // `PolicyScenariosSection` returns null → no `[data-testid="scenario-caveat"]`
-  // ever mounts in the DOM. Mocking `/rest/v1/premium_benchmarks*` doesn't
-  // help because the hardcoded fallback runs synchronously before the
-  // cache populates from the network mock.
+  // SKIPPED in this E2E spec — the same render-contract guard ships at the
+  // component level in `PolicyScenariosSection.test.tsx` ("Render-contract
+  // — carve-out caveat" describe block, 6 tests). That coverage catches
+  // the same regression class (data has caveat → DOM renders it) and
+  // additionally locks down: (a) the count contract for multiple
+  // scenarios, (b) the role="note" a11y attribute, (c) the isUnverified
+  // suppression invariant, (d) caveat-content sanity (must contain both
+  // the qualifying amount AND a location keyword).
   //
-  // The carve-out detection logic itself is fully covered by:
-  //   - src/lib/audit/__tests__/quality-detectors.test.ts (Phase 1)
+  // The full E2E variant remained intractable because the test
+  // environment unavoidably hits the hardcoded benchmark fallback
+  // (`benchmarkStatus: 'untrusted'`), which flips
+  // `evaluation.isProvisional = true` → `isUnverified = true` →
+  // `PolicyScenariosSection` returns null → no caveat ever mounts.
+  // Mocking `/rest/v1/premium_benchmarks*` doesn't help because the
+  // hardcoded fallback runs synchronously before the route mock
+  // resolves. The component-level test sidesteps this entirely.
+  //
+  // Carve-out detection logic itself is also covered by:
+  //   - src/lib/audit/__tests__/quality-detectors.test.ts (Phase 1
+  //     CARVE_OUT_DISPLAY_MISMATCH detector)
   //   - src/lib/policy-evaluation/__tests__/imm-scenario-detection.test.ts
   //   - src/lib/policy-evaluation/__tests__/evaluator.test.ts (Phase 1
   //     "Self-Audit Detectors" describe block)
-  //
-  // To unskip: provide a benchmark seed via `vi.spyOn` style at module
-  // load (currently impossible in Playwright network-only mocking) OR
-  // add a query-param / cookie test override that forces
-  // `benchmarkStatus = 'trusted'`. Tracked as Phase 2 follow-up.
   // -------------------------------------------------------------------
   test.skip('caveat render-contract: unlimited IMM with carve-outs renders at least one scenario-caveat note', async ({
     page,

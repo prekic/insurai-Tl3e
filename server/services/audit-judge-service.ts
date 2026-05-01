@@ -414,26 +414,17 @@ async function shouldNotifyCritical(
 export type { AuditJudgeFinding, AuditJudgeFindingKind, AuditJudgeFindingSeverity }
 
 // =============================================================================
-// PHASE 3 FOLLOW-UP — Per-policy fire-and-forget invocation path
+// Per-policy invocation — wired via /api/ai/audit-judge
 // =============================================================================
 //
-// The current Phase 3 commit ships:
-//   - runAuditJudge() (this file)
-//   - DB migrations 053 + 054
-//   - tests/fixtures/golden/ corpus
-//   - scripts/audit-judge-corpus.ts CLI (npm run audit:judge)
+// Production invocation paths:
+//   - CLI (golden corpus): scripts/audit-judge-corpus.ts (npm run audit:judge)
+//   - Per-extraction (browser → server): src/lib/audit/judge-client.ts
+//     → POST /api/ai/audit-judge → server/routes/ai/audit-judge.ts
+//     → calls runAuditJudge here. The client is fire-and-forget; the
+//       endpoint returns 202 Accepted immediately and runs the actual
+//       judgement in the background.
 //
-// What's NOT yet wired: per-policy invocation from production extraction.
-// The cleanest path is a new API endpoint `/api/audit/judge` (POST) that
-// the client calls fire-and-forget after `convertToAnalyzedPolicy()`
-// succeeds. The endpoint:
-//   1. Reads { policyId, structuredExtraction, rawText, ... } from body
-//   2. Validates origin / user session
-//   3. Calls runAuditJudge() and returns 202 immediately
-//      (or runs in background via a queue if response time matters)
-//
-// Why deferred: the CLI script gives full coverage of the golden corpus,
-// which is the primary verification path. The per-policy hook adds a
-// separate moving piece (API endpoint + client wrapper + auth check)
-// that benefits from being its own commit so the server / endpoint
-// changes can be reviewed and rolled back independently.
+// See server/routes/ai/audit-judge.ts for the endpoint definition and
+// src/lib/ai/policy-extractor.ts (post-conversion hook) for the
+// browser-side dispatch site.

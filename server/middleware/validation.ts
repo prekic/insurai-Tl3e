@@ -377,6 +377,50 @@ export const chatSchema = z.object({
  */
 export const validateChat = validate(chatSchema)
 
+/**
+ * Phase 3 follow-up — schema for the per-policy audit-judge endpoint.
+ *
+ * Body shape mirrors `AuditJudgeInput` in
+ * `server/services/audit-judge-service.ts`. The endpoint is fire-and-forget
+ * from the client's perspective (returns 202 immediately); the actual
+ * judgement runs in the request handler and persists the row before the
+ * connection closes — but the client never reads the response body.
+ *
+ * Limits:
+ *   - rawText: max 200KB (the judge truncates internally to ~30KB before
+ *     sending to Anthropic; the higher bound here lets us accept any
+ *     in-flight extraction without rejecting at the gateway).
+ *   - structuredExtraction: max ~150KB serialised — generous given the
+ *     extraction schema is bounded.
+ */
+export const auditJudgeSchema = z.object({
+  insuranceLine: z
+    .string()
+    .min(1, 'insuranceLine is required')
+    .max(64, 'insuranceLine too long')
+    .transform((s) => s.toLowerCase().trim()),
+  country: z
+    .string()
+    .max(8, 'country code too long')
+    .optional()
+    .default('TR')
+    .transform((s) => s.toUpperCase()),
+  startDate: z.string().min(1, 'startDate is required').max(64, 'startDate too long'),
+  insurer: z.string().min(1, 'insurer is required').max(256, 'insurer too long'),
+  rawText: z
+    .string()
+    .min(1, 'rawText is required')
+    .max(200_000, 'rawText too long (max 200KB)')
+    .transform(sanitizeDocumentText),
+  structuredExtraction: z.unknown().refine((v) => v && typeof v === 'object', {
+    message: 'structuredExtraction must be an object',
+  }),
+  policyId: z.string().uuid('policyId must be a UUID').optional().nullable(),
+  fixtureId: z.string().max(128, 'fixtureId too long').optional().nullable(),
+})
+
+export const validateAuditJudge = validate(auditJudgeSchema)
+
 // =============================================================================
 // Export types
 // =============================================================================
@@ -387,3 +431,4 @@ export type OCRInput = z.infer<typeof ocrSchema>
 export type DocumentAIInput = z.infer<typeof documentAISchema>
 export type ChatInput = z.infer<typeof chatSchema>
 export type ChatMessage = z.infer<typeof chatMessageSchema>
+export type AuditJudgeInput = z.infer<typeof auditJudgeSchema>
