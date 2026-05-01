@@ -35,6 +35,26 @@ describe('normaliseInsurer', () => {
   it('collapses internal whitespace', () => {
     expect(normaliseInsurer('Türkiye  Sigorta   A.Ş.')).toBe('türkiye')
   })
+
+  it('NFKC-folds decomposed accents to their precomposed form (gotcha #143)', () => {
+    // Precomposed 'ü' is U+00FC; decomposed is U+0075 + U+0308 (combining diaeresis).
+    // Without NFKC pre-pass these hash differently despite rendering identically.
+    const precomposed = 'Türkiye Sigorta'
+    const decomposed = 'Türkiye Sigorta'
+    expect(normaliseInsurer(precomposed)).toBe(normaliseInsurer(decomposed))
+    expect(normaliseInsurer(decomposed)).toBe('türkiye')
+  })
+
+  it('normalises NBSP and ideographic spaces via NFKC + whitespace collapse (gotcha #143)', () => {
+    // NBSP (U+00A0) and ideographic space (U+3000) — both collapse to ASCII space
+    // after NFKC normalisation + the leading \s+ → ' ' pass.
+    const nbsp = 'Anadolu Sigorta'
+    const ideographic = 'Anadolu　Sigorta'
+    const ascii = 'Anadolu Sigorta'
+    expect(normaliseInsurer(nbsp)).toBe(normaliseInsurer(ascii))
+    expect(normaliseInsurer(ideographic)).toBe(normaliseInsurer(ascii))
+    expect(normaliseInsurer(nbsp)).toBe('anadolu')
+  })
 })
 
 describe('parseYearBucket', () => {

@@ -72,10 +72,16 @@ export interface TypologyDimensions extends Required<Omit<TypologyInput, 'countr
  * hash to the same typology. Lowercase + Turkish-fold via
  * `toLowerCase().replace(/i̇/g, 'i')` (gotcha #62) so that "İSTANBUL"
  * collisions don't drift across the case-folding bug.
+ *
+ * NFKC pre-pass (gotcha #143): visually-equivalent Unicode forms must
+ * normalise identically — decomposed accents (U+0075 + U+0308 vs
+ * precomposed U+00FC), fullwidth spaces (U+3000), NBSP (U+00A0), and
+ * other compatibility variants would otherwise hash to different
+ * typologies and bypass the LLM cache.
  */
 export function normaliseInsurer(provider: string): string {
   if (!provider || typeof provider !== 'string') return ''
-  let s = provider.trim().toLowerCase().replace(/i̇/g, 'i')
+  let s = provider.normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase().replace(/i̇/g, 'i')
   // Carrier-name suffixes commonly seen in Turkish insurer documents.
   // Order matters — strip longer compound forms first.
   s = s.replace(/\s+a\.?\s*ş\.?\s*$/u, '')
