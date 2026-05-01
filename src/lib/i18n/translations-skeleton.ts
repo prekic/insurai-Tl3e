@@ -440,6 +440,8 @@ export const SKELETON_TRANSLATIONS: TranslationDictionary = {
     evaluationHistoryError: '',
     evaluationHistoryEmpty: '',
     evaluationHistoryDesc: '',
+    specialProvisionsLabel: '',
+    specialProvisionsCount: '',
   },
 
   exportMenu: {

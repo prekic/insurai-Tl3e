@@ -24,6 +24,7 @@ import { PolicyMetadataHeader } from './PolicyDetailView/PolicyMetadataHeader'
 import { PolicyExportMenu } from './PolicyDetailView/PolicyExportMenu'
 import { VehicleInfoCard } from './PolicyDetailView/VehicleInfoCard'
 import { PolicyScenariosSection } from './PolicyDetailView/PolicyScenariosSection'
+import { SpecialProvisionsPanel } from './PolicyDetailView/SpecialProvisionsPanel'
 import {
   MobileEvaluationCard,
   MobileInsightsCard,
@@ -411,6 +412,15 @@ export function PolicyDetailView() {
                 </CardContent>
               )}
             </Card>
+
+            {/* Sprint 3 #13 — Special Provisions panel: surfaces named-deductible
+                scenarios (Anlaşmalı olmayan servis, Pert araç muafiyeti, etc.)
+                that previously lived buried inside the Exclusions section's
+                "Addressed in policy" subsection. */}
+            <SpecialProvisionsPanel
+              provisions={policy.conditionalDeductibles ?? []}
+              isUnverified={isUnverified}
+            />
 
             {/* Exclusions - Comprehensive Analysis - Expandable */}
             <Card className="overflow-hidden">

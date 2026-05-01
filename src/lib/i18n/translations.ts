@@ -492,6 +492,8 @@ export interface TranslationDictionary {
     evaluationHistoryError: string
     evaluationHistoryEmpty: string
     evaluationHistoryDesc: string
+    specialProvisionsLabel: string
+    specialProvisionsCount: string
   }
 
   // Export Menu (PolicyDetailView)

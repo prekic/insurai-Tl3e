@@ -486,6 +486,8 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     evaluationHistoryError: 'Failed to load history: {error}',
     evaluationHistoryEmpty: 'No evaluation history found for this policy.',
     evaluationHistoryDesc: 'Historical trend of actuarial scores over multiple evaluations',
+    specialProvisionsLabel: 'Special Provisions',
+    specialProvisionsCount: '{count} named-deductible scenarios — click to expand',
   },
 
   exportMenu: {

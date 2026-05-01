@@ -491,6 +491,8 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     evaluationHistoryError: 'Geçmiş yüklenemedi: {error}',
     evaluationHistoryEmpty: 'Bu poliçe için değerlendirme geçmişi bulunamadı.',
     evaluationHistoryDesc: 'Birden fazla değerlendirme üzerinden aktüeryal puan trendi',
+    specialProvisionsLabel: 'Özel Şartlar',
+    specialProvisionsCount: '{count} isimlendirilmiş muafiyet senaryosu — açmak için tıklayın',
   },
 
   exportMenu: {
