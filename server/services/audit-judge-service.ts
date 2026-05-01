@@ -250,9 +250,16 @@ export async function runAuditJudge(input: AuditJudgeInput): Promise<AuditJudgeR
   const criticalCount = verifiedFindings.filter((f) => f.severity === 'critical').length
 
   // 8. Persist row.
+  // Bill against the operator-configured model alias (judgeModel), NOT the
+  // Anthropic-echoed `response.model`. The latter can carry a dated suffix
+  // (e.g. `claude-sonnet-4-6-20251022`) that wouldn't match a bare-alias
+  // pricing entry, silently falling back to the `default` rate. Using
+  // `judgeModel` keeps cost attribution stable across Anthropic's model
+  // routing decisions. (`calculateCost` also strips dated suffixes as a
+  // belt-and-suspenders fallback.)
   const inputTokens = response.usage?.input_tokens ?? 0
   const outputTokens = response.usage?.output_tokens ?? 0
-  const usedModel = response.model || judgeModel
+  const usedModel = judgeModel
   const costUsd = calculateCost(usedModel, inputTokens, outputTokens).totalCost
 
   const insertRow = {
@@ -295,12 +302,12 @@ export async function runAuditJudge(input: AuditJudgeInput): Promise<AuditJudgeR
 
   // 9. First-of-typology critical-finding notification.
   if (criticalCount > 0) {
-    const shouldNotify = await shouldNotifyCritical(
+    const decision = await evaluateNotificationDecision(
       typology.hash,
       auditConfig.judgeCriticalNotifyFirstOnly,
       judgementId
     )
-    if (shouldNotify) {
+    if (decision.notify) {
       await notifyAuditQuality(typology.dimensions, parsed.summary, {
         typologyHash: typology.hash,
         typologyDimensions: typology.dimensions,
@@ -309,10 +316,25 @@ export async function runAuditJudge(input: AuditJudgeInput): Promise<AuditJudgeR
         findings: verifiedFindings,
         judgementId,
       }).catch((err) =>
-        log.warn('notifyAuditQuality failed', {
+        // Escalated from log.warn → log.error: silent suppression here
+        // was the original gotcha #145 cause. If a notification can't
+        // be enqueued the operator must see it in production logs.
+        log.error('notifyAuditQuality failed', {
           error: err instanceof Error ? err.message : String(err),
+          typologyHash: typology.hash,
+          judgementId,
         })
       )
+    } else {
+      // Surface WHY no admin notification fired despite critical findings.
+      // Without this, "0 admin_notifications rows" looks like a silent bug
+      // even when the strict first-only policy is doing its job correctly.
+      log.info('Critical findings did not trigger notification', {
+        typologyHash: typology.hash,
+        judgementId,
+        criticalCount,
+        reason: decision.reason,
+      })
     }
   }
 
@@ -381,19 +403,33 @@ function verifyFinding(finding: AuditJudgeFinding, rawText: string): AuditJudgeF
 }
 
 /**
+ * Outcome of the first-of-typology notification gate. The `reason` field
+ * lets the caller log WHY a notification was suppressed so operators can
+ * distinguish "policy correctly suppressing a duplicate" from "query
+ * silently failed and we lost a notification".
+ */
+type NotificationDecision =
+  | { notify: true; reason: 'first_of_typology' | 'first_only_disabled' }
+  | { notify: false; reason: 'subsequent_of_typology' | 'no_db_client' | 'query_error' }
+
+/**
  * Decide whether to enqueue an admin notification for this critical finding.
  * Honours `judge_critical_notify_first_only` (true → notify only when this
  * is the FIRST audit_judgements row for the typology hash, identified by
  * skipping the just-inserted row).
+ *
+ * Returns a typed `NotificationDecision` so the caller can log the reason
+ * — gotcha #145: previously returned a bare boolean and the `false` case
+ * conflated "correctly suppressed duplicate" with "query failed silently".
  */
-async function shouldNotifyCritical(
+async function evaluateNotificationDecision(
   typologyHash: string,
   firstOnly: boolean,
   excludeJudgementId: string | undefined
-): Promise<boolean> {
-  if (!firstOnly) return true
+): Promise<NotificationDecision> {
+  if (!firstOnly) return { notify: true, reason: 'first_only_disabled' }
   const db = getSupabase()
-  if (!db) return false
+  if (!db) return { notify: false, reason: 'no_db_client' }
   let query = db
     .from('audit_judgements')
     .select('id', { count: 'exact', head: true })
@@ -404,10 +440,15 @@ async function shouldNotifyCritical(
   }
   const { count, error } = await query
   if (error) {
-    log.warn('shouldNotifyCritical query failed', pgErr(error))
-    return false
+    log.error('evaluateNotificationDecision query failed', {
+      ...pgErr(error),
+      typologyHash,
+    })
+    return { notify: false, reason: 'query_error' }
   }
   return (count ?? 0) === 0
+    ? { notify: true, reason: 'first_of_typology' }
+    : { notify: false, reason: 'subsequent_of_typology' }
 }
 
 // Re-exports for downstream consumers.

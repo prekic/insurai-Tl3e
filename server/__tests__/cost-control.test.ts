@@ -180,6 +180,29 @@ describe('Cost Control', () => {
       expect(result.inputCost.toString().split('.')[1]?.length || 0).toBeLessThanOrEqual(6)
       expect(result.outputCost.toString().split('.')[1]?.length || 0).toBeLessThanOrEqual(6)
     })
+
+    it('strips dated suffix from versioned model names (gotcha #144)', () => {
+      // Anthropic and OpenAI both echo a dated variant in `response.model`
+      // even when the request asked for an alias. The audit judge initially
+      // billed against the echoed name, missing the bare-alias pricing entry
+      // and silently falling back to the (cheaper) `default` rate.
+      const versioned = calculateCost('claude-sonnet-4-6-20251022', 1000, 500)
+      const bare = calculateCost('claude-sonnet-4-6', 1000, 500)
+      // Both must hit the same pricing entry — bare cost is the source of truth.
+      expect(versioned.totalCost).toBeCloseTo(bare.totalCost, 6)
+      // And it must NOT be the default rate (0.001 input / 0.002 output) —
+      // assert against the actual claude-sonnet-4-6 rate (0.003 / 0.015).
+      expect(bare.totalCost).toBeCloseTo(1 * 0.003 + 0.5 * 0.015, 6)
+    })
+
+    it('handles short suffixes (5-digit) without false-stripping (gotcha #144)', () => {
+      // The suffix-strip regex requires 6+ digits to avoid mangling model
+      // names that happen to end in short numeric strings (e.g. `gpt-4`).
+      // `gpt-4` should hit its own entry, not strip to `gpt`.
+      const result = calculateCost('gpt-4', 1000, 500)
+      // gpt-4: input 0.03, output 0.06
+      expect(result.totalCost).toBeCloseTo(1 * 0.03 + 0.5 * 0.06, 6)
+    })
   })
 
   // ===========================================================================

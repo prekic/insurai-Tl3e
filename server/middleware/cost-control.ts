@@ -193,6 +193,17 @@ initializeDefaultBudgets()
 // ============================================================================
 
 /**
+ * Strip a versioned model suffix (e.g. `-20251022`) so callers passing a
+ * runtime-echoed model name like `claude-sonnet-4-6-20251022` still hit
+ * the bare `claude-sonnet-4-6` pricing entry instead of silently falling
+ * through to `default`. Anthropic and OpenAI both echo dated variants
+ * back in `response.model` even when the request asked for an alias.
+ */
+function normaliseModelKey(model: string): string {
+  return model.replace(/-\d{6,}$/, '')
+}
+
+/**
  * Calculate cost for token usage
  */
 export function calculateCost(
@@ -201,8 +212,12 @@ export function calculateCost(
   outputTokens: number
 ): { inputCost: number; outputCost: number; totalCost: number } {
   const tokenPricing = getTokenPricing()
+  const normalisedModel = normaliseModelKey(model)
   const pricing =
-    tokenPricing[model] || tokenPricing['default'] || DEFAULT_COST_PER_1K_TOKENS['default']
+    tokenPricing[model] ||
+    tokenPricing[normalisedModel] ||
+    tokenPricing['default'] ||
+    DEFAULT_COST_PER_1K_TOKENS['default']
 
   const inputCost = (inputTokens / 1000) * pricing.input
   const outputCost = (outputTokens / 1000) * pricing.output
