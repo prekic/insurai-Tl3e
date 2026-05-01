@@ -33,6 +33,7 @@
     "qa:extraction": "tsx scripts/qa-extraction-quality.ts",
     "smoke:kasko": "tsx scripts/smoke-kasko.ts",
     "audit:judge": "tsx scripts/audit-judge-corpus.ts",
+    "audit:trends": "tsx scripts/audit-trend-track.ts",
     "test:e2e": "playwright test",
     "test:e2e:fast": "playwright test --project=chromium",
     "test:e2e:ui": "playwright test --ui",

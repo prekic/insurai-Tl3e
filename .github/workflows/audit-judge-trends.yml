@@ -1,0 +1,150 @@
+name: Audit Judge + Trends (Manual)
+
+# Phase 4 trend tracking + Phase 3 audit-judge.
+#
+# Manual trigger only at first ship — no `schedule:` cron yet. The team
+# enables the cron after the first few manual runs confirm:
+#   - the judge prompt produces useful findings (not noise)
+#   - the trend metrics are stable across runs of identical input
+#   - the cost per run is within the daily budget (`judge_max_runs_per_day`)
+#
+# Cost note: `audit:trends` is cheap (just OCR + extract). `audit:judge`
+# is ~$0.015/fixture (Anthropic Sonnet 4.6) but typology-cached, so the
+# steady-state cost is bounded to ~one call per unique typology per
+# prompt-version.
+#
+# To enable scheduled runs once the system is calibrated, uncomment the
+# `schedule:` block below.
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_judge:
+        description: 'Also run the audit judge (costs Anthropic credits)?'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+  # ── Scheduled runs (DISABLED by default — uncomment when calibrated) ──
+  # schedule:
+  #   - cron: '0 6 * * 1' # Mondays at 06:00 UTC
+
+concurrency:
+  group: audit-judge-trends
+  cancel-in-progress: true
+
+jobs:
+  trend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run trend tracking (cheap — no judge calls)
+        id: trend
+        env:
+          SMOKE_BASE_URL: ${{ secrets.PRODUCTION_SERVER_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -o pipefail
+          npm run audit:trends 2>&1 | tee trend-output.log
+
+      - name: Run audit judge (only when explicitly requested)
+        if: inputs.run_judge == 'true'
+        env:
+          SMOKE_BASE_URL: ${{ secrets.PRODUCTION_SERVER_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -o pipefail
+          npm run audit:judge 2>&1 | tee judge-output.log
+
+      - name: Upload trend report as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-reports
+          path: |
+            reports/trend-*.md
+            reports/judge-*.md
+            trend-output.log
+            judge-output.log
+          retention-days: 30
+
+      - name: Comment on tracking issue when fixtures regress critically
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            let trendLog = ''
+            try {
+              trendLog = fs.readFileSync('trend-output.log', 'utf8')
+            } catch (err) {
+              trendLog = `(no trend log: ${err.message})`
+            }
+            const tail = trendLog.length > 3500 ? '...\n' + trendLog.slice(-3500) : trendLog
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+
+            // Phase 4 follow-up: replace the literal `null` below with a
+            // designated tracking-issue number once one is created. Until
+            // then, we comment on the most recent merged PR (mirroring
+            // smoke-kasko.yml's fallback) so the regression isn't silent.
+            const trackingIssue = null
+
+            if (trackingIssue) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: trackingIssue,
+                body:
+                  `## 🚨 Audit trend regression\n\n` +
+                  `Workflow run: ${runUrl}\n\n` +
+                  `<details><summary>trend output (tail)</summary>\n\n` +
+                  `\`\`\`\n${tail}\n\`\`\`\n\n</details>`,
+              })
+              return
+            }
+
+            // Fallback: comment on the most recent merged PR.
+            const prs = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'closed',
+              base: 'main',
+              sort: 'updated',
+              direction: 'desc',
+              per_page: 10,
+            })
+            const merged = prs.data.find((p) => p.merged_at)
+            if (!merged) {
+              core.warning('No merged PR or tracking issue available — skipping comment')
+              return
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: merged.number,
+              body:
+                `## 🚨 Audit trend regression detected\n\n` +
+                `Triggered by: \`${context.eventName}\`\n` +
+                `Workflow run: ${runUrl}\n\n` +
+                `<details><summary>trend output (tail)</summary>\n\n` +
+                `\`\`\`\n${tail}\n\`\`\`\n\n</details>\n\n` +
+                `If this is a real regression, revert or land a follow-up fix. ` +
+                `If a golden fixture's expected metrics shifted intentionally, ` +
+                `bump SCHEMA_VERSION in scripts/audit-trend-track.ts.`,
+            })
