@@ -144,6 +144,14 @@ Merged as `f12a7cb`.
 
 7. **Stale local `main` recurred this session** (existing CLAUDE.md gotcha). After each PR merge, the next branch creation was preceded by `git fetch origin main && git reset --hard origin/main` — this is the correct hygiene to avoid working off a stale base.
 
+8. **Fresh sandbox came up without `node_modules`.** The first `npx vitest run …` invocation crashed with `ERR_MODULE_NOT_FOUND: Cannot find package 'vite'` because `node_modules/` was empty (1 entry: just `.package-lock.json`). Ran `npm install --no-audit --no-fund` (~31s, 1245 packages) before any tests could execute. The postinstall hook copies `pdf.worker.min.mjs` and runs `husky` — both completed cleanly. **For the next agent**: if the sandbox is fresh, `npm install` is a prerequisite for ANY test/typecheck/script work. Side-effect: `package-lock.json` shows as modified after install (legitimate timestamp churn) — leave it unstaged when committing unrelated changes.
+
+9. **Top-level `await` fails when running a `.ts` script outside the project root via `tsx`.** Tried `npx tsx /tmp/probe-extra.ts` (a quick one-off scratch file) and esbuild reported: `Top-level await is currently not supported with the "cjs" output format`. Renaming to `.mts` then ran but tripped a separate `Cannot find module '@supabase/supabase-js'` because the script wasn't inside the project's package boundary. **Fix**: always put one-off `tsx` scripts INSIDE the project (e.g. `scripts/_scratch.mts` or `scripts/probe-foo.mts`), not in `/tmp`. The project's `tsconfig.json` ESM target + `node_modules` resolution only applies to files within the package root.
+
+10. **Diagnostic script smoke-test pattern using fake env.** Verified `scripts/diagnose-audit-judge-observability.ts` runs cleanly without crashing on init by passing dummy values: `SUPABASE_URL=http://invalid SUPABASE_SERVICE_ROLE_KEY=fake npx tsx scripts/diagnose-audit-judge-observability.ts`. The Supabase client constructor accepts any URL string; the actual `fetch` only fails on the per-query call, which the script's per-query try/catch surfaces as `✗ Q1 failed: TypeError: fetch failed`. This pattern (fake-env smoke test) is useful for any new script that takes env vars at boot — verifies module-level wiring without needing real credentials.
+
+11. **Renamed `shouldNotifyCritical → evaluateNotificationDecision` in PR #427 left stale test comments.** `server/services/__tests__/audit-judge-service.test.ts` lines 330, 358, 383, 412 still contain comments like `// shouldNotifyCritical query` — the tests still pass because they mock the Supabase layer (not the function name), but the comments are dead documentation. Out of scope to fix in PR #427 since touching the test file would have meant a larger diff; **flagged here as a residual cleanup item** worth picking up in any future audit-judge test work. ~5-line patch.
+
 ---
 
 ## Bugs / Known Issues
@@ -173,6 +181,9 @@ Merged as `f12a7cb`.
 | #426 | `claude/audit-anadolu-fixture-eMjGW` | P4 (Anadolu Birleşik fixture) | `7407882` |
 | #427 | `claude/audit-observability-eMjGW` | P2a + P2b (cost + notification) | `6674bbc` |
 | #428 | `claude/audit-cron-uncomment-eMjGW` | P3 (enable schedule cron) | `f12a7cb` |
+| #429 | `claude/session-handoff-may-2-eMjGW` | docs (this handoff file) | `e4776e3` |
+| #430 | `claude/docs-gotchas-may-2-eMjGW` | docs (CLAUDE.md gotchas #151-#154) | `26a0ab0` |
+| #431 | `claude/handoff-completeness-delta-eMjGW` | docs (completeness-delta sync — this section) | _pending_ |
 
 ### Run the audit layer locally
 
@@ -240,6 +251,6 @@ LIMIT 5;
 
 ### Docs
 
-- `CLAUDE.md` — Next Session Instructions items #1, #2, #10 rewritten; "Last Updated" bumped (PR #428)
-- `SESSION_HANDOFF.md` — full rewrite (this file)
+- `CLAUDE.md` — Next Session Instructions items #1, #2, #10 rewritten; "Last Updated" bumped (PR #428). 4 new gotchas appended #151-#154 (PR #430): dated-suffix model echo (P2a real cause), typed `{value, reason}` return pattern (P2b refactor), `tests/fixtures/kasko/.gitignore` force-add convention, verify-handoff-causes-against-source rule.
+- `SESSION_HANDOFF.md` — full rewrite (PR #429), then completeness-delta-sync added quirks #8-#11 + PR #429/#430/#431 to PR-by-PR map (PR #431, this file).
 - `/root/.claude/plans/considering-that-i-prefere-serene-mist.md` — plan file authored Phase 4, approved before execution
