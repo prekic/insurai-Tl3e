@@ -48,11 +48,19 @@ export const DEFAULT_WARN_DROP_RATIO = 0.3
 export const DEFAULT_CRITICAL_DROP_RATIO = 0.6
 
 /**
- * Minimum baseline value before regression flags fire. Prevents
- * "1 → 0" from registering as a 100% drop / critical regression
- * when the baseline is too small to have meaningful variance.
+ * Minimum baseline value before regression flags fire. Prevents small-count
+ * extraction-noise (e.g. `3 → 0` exclusions on the same policy across two
+ * Anthropic runs) from registering as a 100% drop / critical regression.
+ *
+ * Empirically (Apr-30 → May-1 trend run on the 3-fixture golden corpus),
+ * a baseline of `3` was still inside the noise floor: Anthropic re-bucketed
+ * what it had previously classified as "exclusions" into other fields,
+ * dropping the count from 3 to 0 without any actual signal loss in the
+ * underlying policy text. Bumping to `5` adds enough headroom that single
+ * paraphrase shifts no longer trip CRIT, while still catching real
+ * regressions like a `17 → 6` coverage collapse.
  */
-export const MIN_BASELINE_FOR_REGRESSION = 3
+export const MIN_BASELINE_FOR_REGRESSION = 5
 
 // -----------------------------------------------------------------------------
 // Metric extraction

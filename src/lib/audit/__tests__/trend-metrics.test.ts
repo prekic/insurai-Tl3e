@@ -137,12 +137,29 @@ describe('compareMetrics', () => {
     expect(r.flagged.map((d) => d.key).sort()).toEqual(['ai_insights', 'exclusions'])
   })
 
-  it('does NOT flag drops when baseline is below minBaseline=3', () => {
-    const baseline: TrendMetrics = { ...ZERO, ai_insights: 2 }
+  it('does NOT flag drops when baseline is below minBaseline=5', () => {
+    const baseline: TrendMetrics = { ...ZERO, ai_insights: 4 }
     const current: TrendMetrics = { ...ZERO, ai_insights: 0 }
-    // 100% drop, but baseline=2 < minBaseline=3 → suppressed
+    // 100% drop, but baseline=4 < minBaseline=5 → suppressed
+    // (Includes the real-world golf-2001 noise case from May-1: a
+    // baseline of 3 with current=0 must NOT trip CRIT — see the
+    // MIN_BASELINE_FOR_REGRESSION JSDoc for the rationale.)
     const r = compareMetrics(baseline, current)
     expect(r.severity).toBe('pass')
+  })
+
+  it('does NOT flag the golf-2001 May-1 noise case (3 → 0 exclusions)', () => {
+    // Regression guard: this exact fixture+metric pair tripped CRIT
+    // on workflow Run #3 (Apr 30 → May 1), forcing the
+    // MIN_BASELINE_FOR_REGRESSION bump from 3 → 5. The drop was
+    // Anthropic re-bucketing exclusions into adjacent fields, NOT
+    // real signal loss. If a future change reintroduces the bug,
+    // this test will fail loudly.
+    const baseline: TrendMetrics = { ...ZERO, exclusions: 3 }
+    const current: TrendMetrics = { ...ZERO, exclusions: 0 }
+    const r = compareMetrics(baseline, current)
+    expect(r.severity).toBe('pass')
+    expect(r.flagged).toEqual([])
   })
 
   it('respects custom thresholds', () => {
