@@ -756,5 +756,60 @@ describe('Policy Evaluator', () => {
         expect(evaluation.displayedAiConfidence).toBeUndefined()
       })
     })
+
+    describe('Phase 1 Self-Audit Detectors', () => {
+      // The 4 deterministic quality detectors run inside evaluatePolicy()
+      // and attach findings to evaluation.qualityFindings. Critical findings
+      // ALSO escalate to extractionGateTriggers and flip extractionIncomplete.
+      // See src/lib/audit/quality-detectors.ts.
+      it('attaches qualityFindings array on every evaluation', () => {
+        const policy = createMockPolicy({
+          type: 'kasko',
+          vehicleInfo: { make: 'Toyota', model: 'Corolla', year: 2022 },
+          aiConfidence: 0.92,
+        } as Partial<Policy>)
+        const evaluation = evaluatePolicy(policy)
+        // 4 detectors always run; findings array has 4 entries (mostly pass).
+        expect(Array.isArray(evaluation.qualityFindings)).toBe(true)
+        expect(evaluation.qualityFindings!.length).toBe(4)
+      })
+
+      it('does not gate the UI for warn-level detector findings', () => {
+        // A policy with valid headline fields and a single dedup-able
+        // conditional deductible row (warn-level only) should NOT flip
+        // extractionIncomplete.
+        const policy = createMockPolicy({
+          type: 'kasko',
+          vehicleInfo: { make: 'Toyota', model: 'Corolla', year: 2022 },
+          aiConfidence: 0.92,
+          conditionalDeductibles: ['Pert araç muafiyeti: %35', 'Pert araç tenzili muafiyet: %35'],
+        } as Partial<Policy>)
+        const evaluation = evaluatePolicy(policy)
+
+        expect(evaluation.extractionIncomplete).toBeUndefined()
+        // displayedAiConfidence should remain at the raw value
+        expect(evaluation.displayedAiConfidence).toBe(0.92)
+        // But the warn finding should be visible in qualityFindings
+        const dedupFinding = evaluation.qualityFindings!.find(
+          (f) => f.check === 'FINANCIAL_RISKS_DUPLICATED'
+        )
+        expect(dedupFinding?.severity).toBe('warn')
+      })
+
+      it('runs text-dependent detectors when rawText option is supplied', () => {
+        const policy = createMockPolicy({
+          type: 'kasko',
+          vehicleInfo: { make: 'Toyota', model: 'Corolla', year: 2022 },
+          aiConfidence: 0.92,
+          conditionalDeductibles: [],
+        } as Partial<Policy>)
+        const rawText =
+          'Kullanım şekli aracın ticari olarak rent-a-car veya taksi şeklinde kullanılması durumunda %80 oranında tenzili muafiyet uygulanır.'
+        const evaluation = evaluatePolicy(policy, { rawText })
+
+        expect(evaluation.extractionIncomplete).toBe(true)
+        expect(evaluation.extractionGateTriggers).toContain('NAMED_SCENARIO_MISSING_HIGH_IMPACT')
+      })
+    })
   })
 })

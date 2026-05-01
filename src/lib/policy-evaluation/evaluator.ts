@@ -42,6 +42,7 @@ import {
 import { KASKO_COMMERCIAL_BENCHMARKS } from '@/data/market-data/benchmarks'
 import { inferIndustryFromInsuredName } from '../ai/turkish-utils'
 import { evaluateSimpleDisplayMode } from '../analysis/kasko-pilot-gate'
+import { runAllQualityDetectors, extractCriticalTriggers } from '../audit/quality-detectors'
 
 /**
  * Maximum displayed AI confidence when the extraction completeness gate fires.
@@ -119,7 +120,7 @@ function matchesIMMPattern(text: string | undefined | null): boolean {
  *   ≤ 29% OR no %     → medium (İlk cam hasarı %20, lock-replacement caps,
  *                                non-percentage scenarios)
  */
-function bucketConditionalDeductibleSeverity(scenario: string): {
+export function bucketConditionalDeductibleSeverity(scenario: string): {
   severity: ComplianceIssue['severity']
   percent: number | null
 } {
@@ -182,7 +183,7 @@ const IMM_CARVEOUT_LOCATION_HINTS = [
  * carve-out. Returns a short bilingual caveat string when found, else
  * null.
  */
-function detectImmCarveOut(
+export function detectImmCarveOut(
   coverage: import('@/types/policy').Coverage
 ): { en: string; tr: string } | null {
   const carveOuts = (coverage as { carveOuts?: string[] | null }).carveOuts
@@ -486,6 +487,15 @@ export interface EvaluatePolicyOptions {
   config?: Partial<EvaluationConfig>
   gradeThresholds?: Partial<GradeThresholds>
   statusThresholds?: Partial<StatusThresholds>
+  /**
+   * Raw extracted PDF text. When supplied, Phase 1 self-audit detectors
+   * (`runAllQualityDetectors`) run and their findings are attached to
+   * `evaluation.qualityFindings`. Critical findings additionally flip
+   * `extractionIncomplete`. When omitted, structural-only detectors still
+   * run (carve-out display contract, dedup) but text-dependent ones are
+   * skipped with a `'pass'` status. See `src/lib/audit/quality-detectors.ts`.
+   */
+  rawText?: string | null
 }
 
 export function evaluatePolicy(
@@ -497,16 +507,20 @@ export function evaluatePolicy(
   let gradeThresholds: GradeThresholds
   let statusThresholds: StatusThresholds
 
+  let rawText: string | null = null
+
   if (
     'config' in configOrOptions ||
     'gradeThresholds' in configOrOptions ||
-    'statusThresholds' in configOrOptions
+    'statusThresholds' in configOrOptions ||
+    'rawText' in configOrOptions
   ) {
     // New signature with options object
     const options = configOrOptions as EvaluatePolicyOptions
     config = options.config || {}
     gradeThresholds = { ...DEFAULT_GRADE_THRESHOLDS, ...options.gradeThresholds }
     statusThresholds = { ...DEFAULT_STATUS_THRESHOLDS, ...options.statusThresholds }
+    rawText = options.rawText ?? null
   } else {
     // Old signature - just config
     config = configOrOptions as Partial<EvaluationConfig>
@@ -626,6 +640,39 @@ export function evaluatePolicy(
   const extractionCompletenessTriggers = gateResult.triggers.filter(
     (t) => t.startsWith('MISSING_VEHICLE_') || t === 'COVERAGE_PLACEHOLDER_DETECTED'
   )
+
+  // Generate scenario cards now (was in the return literal) so the Phase 1
+  // self-audit detectors can verify the carve-out display contract against
+  // them before we finalise the gate.
+  const scenarioCardsForReturn = generateScenarioCards(policy, complianceResult)
+
+  // Phase 1 self-audit detectors. Critical findings escalate into the
+  // existing extractionIncomplete gate so the UI banner + score suppression
+  // behaviour kicks in (gotcha #101). Warn-severity findings flow through
+  // to `qualityFindings` for display in a non-blocking panel without
+  // gating any UI. See `src/lib/audit/quality-detectors.ts`.
+  const conditionalDeductibles = (policy as { conditionalDeductibles?: string[] })
+    .conditionalDeductibles
+  const supplementaryCount = (policy.coverages || []).filter(
+    (c) => (c as { category?: string }).category === 'supplementary'
+  ).length
+  const qualityFindings = runAllQualityDetectors({
+    conditionalDeductibles,
+    coverages: policy.coverages,
+    scenarioCards: scenarioCardsForReturn,
+    rawText,
+    supplementaryCount,
+  })
+  const detectorCriticalTriggers = extractCriticalTriggers(qualityFindings)
+  // Append detector triggers without duplicating any that the kasko-pilot-gate
+  // already emitted (defensive — current detector trigger codes don't collide
+  // with MISSING_VEHICLE_*/COVERAGE_PLACEHOLDER_DETECTED, but keep the dedup
+  // for forward-compat).
+  for (const trig of detectorCriticalTriggers) {
+    if (!extractionCompletenessTriggers.includes(trig)) {
+      extractionCompletenessTriggers.push(trig)
+    }
+  }
   const extractionIncomplete = extractionCompletenessTriggers.length > 0
 
   // Displayed confidence is capped when the gate fires so the UI cannot show
@@ -662,6 +709,7 @@ export function evaluatePolicy(
     extractionGateTriggers:
       extractionCompletenessTriggers.length > 0 ? extractionCompletenessTriggers : undefined,
     displayedAiConfidence,
+    qualityFindings: qualityFindings.length > 0 ? qualityFindings : undefined,
     status: getStatusFromScore(overallScore, statusThresholds),
 
     scoreBreakdown: {
@@ -688,7 +736,7 @@ export function evaluatePolicy(
 
     recommendations,
     summary,
-    scenarioCards: generateScenarioCards(policy, complianceResult),
+    scenarioCards: scenarioCardsForReturn,
 
     benchmarkConfidence,
 

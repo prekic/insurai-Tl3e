@@ -36,6 +36,20 @@ export type BenchmarkConfidenceLevel = 'high' | 'low' | 'suppressed'
  */
 export type BenchmarkFreshness = 'current' | 'aging' | 'stale'
 
+/**
+ * Self-audit detector finding emitted by `scripts/qa-extraction-quality.ts`
+ * checks. The same shape is attached to `PolicyEvaluation.qualityFindings`
+ * (warn-severity surfaces in a non-blocking UI panel; critical-severity
+ * also flips `extractionIncomplete`).
+ */
+export interface QualityFinding {
+  /** Stable check identifier (e.g. `FINANCIAL_RISKS_DUPLICATED`). */
+  check: string
+  severity: 'pass' | 'warn' | 'critical'
+  /** Human-readable diagnostic with concrete numbers (e.g. `'Collapsed 5→3 issue rows'`). */
+  detail: string
+}
+
 export interface BenchmarkContextFactor {
   factor: string
   factorTr: string
@@ -91,6 +105,10 @@ export interface PolicyEvaluation {
    *  UI cannot render "98% confidence" next to "Incomplete extraction". The
    *  raw value on `AnalyzedPolicy.aiConfidence` is preserved for audit. */
   displayedAiConfidence?: number
+  /** Phase 1 self-audit detector findings. Critical-severity entries flip
+   *  `extractionIncomplete`; warn-severity entries surface in a non-blocking
+   *  "Quality findings" panel. See `scripts/qa-extraction-quality.ts`. */
+  qualityFindings?: QualityFinding[]
   status: EvaluationStatus
 
   // Category scores

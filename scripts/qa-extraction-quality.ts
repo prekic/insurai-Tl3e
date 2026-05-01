@@ -45,7 +45,13 @@ import { reconstructPolicySafely } from './backfill-evaluation-scores'
 import { evaluatePolicy } from '../src/lib/policy-evaluation'
 import { initializeBenchmarks } from '../src/lib/policy-evaluation/benchmark-service'
 import type { Database } from '../src/lib/supabase/types'
-import type { PolicyEvaluation } from '../src/lib/policy-evaluation/types'
+import type { PolicyEvaluation, QualityFinding } from '../src/lib/policy-evaluation/types'
+import {
+  checkFinancialRisksDedup,
+  checkEkSozlesmeBulletParity,
+  checkNamedScenarioCoverage,
+  checkCarveOutDisplayContract,
+} from '../src/lib/audit/quality-detectors'
 
 dotenv.config()
 
@@ -73,7 +79,15 @@ const LABEL_LEAK_VALUES = new Set(['no', 'hayır', 'hayir', '-', 'n/a', 'na', 'n
 // -----------------------------------------------------------------------------
 
 type Severity = 'pass' | 'warn' | 'critical'
-type CheckName = 'VEHICLE_COMPLETENESS' | 'CONFIDENCE_GATE_SYNC' | 'GRADE_GATE_SYNC'
+type CheckName =
+  | 'VEHICLE_COMPLETENESS'
+  | 'CONFIDENCE_GATE_SYNC'
+  | 'GRADE_GATE_SYNC'
+  | 'FINANCIAL_RISKS_DUPLICATED'
+  | 'EK_SOZLESME_BULLETS_UNDERREPORTED'
+  | 'NAMED_SCENARIO_MISSING'
+  | 'NAMED_SCENARIO_MISSING_HIGH_IMPACT'
+  | 'CARVE_OUT_DISPLAY_MISMATCH'
 
 interface CheckResult {
   check: CheckName
@@ -93,7 +107,30 @@ const CHECK_NAMES: readonly CheckName[] = [
   'VEHICLE_COMPLETENESS',
   'CONFIDENCE_GATE_SYNC',
   'GRADE_GATE_SYNC',
+  'FINANCIAL_RISKS_DUPLICATED',
+  'EK_SOZLESME_BULLETS_UNDERREPORTED',
+  'NAMED_SCENARIO_MISSING',
+  'CARVE_OUT_DISPLAY_MISMATCH',
 ] as const
+
+/**
+ * Map a `QualityFinding` from the shared detector module into a CheckResult.
+ * The detectors emit one of 5 stable check IDs; the
+ * `NAMED_SCENARIO_MISSING_HIGH_IMPACT` variant is collapsed to a row under
+ * `NAMED_SCENARIO_MISSING` for the markdown summary table (severity is
+ * preserved, so the critical bucket still reflects the high-impact case).
+ */
+function findingToCheckResult(f: QualityFinding): CheckResult {
+  const check =
+    f.check === 'NAMED_SCENARIO_MISSING_HIGH_IMPACT'
+      ? 'NAMED_SCENARIO_MISSING'
+      : (f.check as CheckName)
+  return {
+    check,
+    severity: f.severity,
+    detail: f.detail,
+  }
+}
 
 // -----------------------------------------------------------------------------
 // Per-policy checks
@@ -233,6 +270,11 @@ function writeMarkdown(
     VEHICLE_COMPLETENESS: { pass: 0, warn: 0, critical: 0 },
     CONFIDENCE_GATE_SYNC: { pass: 0, warn: 0, critical: 0 },
     GRADE_GATE_SYNC: { pass: 0, warn: 0, critical: 0 },
+    FINANCIAL_RISKS_DUPLICATED: { pass: 0, warn: 0, critical: 0 },
+    EK_SOZLESME_BULLETS_UNDERREPORTED: { pass: 0, warn: 0, critical: 0 },
+    NAMED_SCENARIO_MISSING: { pass: 0, warn: 0, critical: 0 },
+    NAMED_SCENARIO_MISSING_HIGH_IMPACT: { pass: 0, warn: 0, critical: 0 },
+    CARVE_OUT_DISPLAY_MISMATCH: { pass: 0, warn: 0, critical: 0 },
   }
   for (const r of reports) {
     for (const c of r.checks) counts[c.check][c.severity]++
@@ -348,7 +390,30 @@ async function main(): Promise<void> {
       continue
     }
     try {
-      const evaluation = evaluatePolicy(policy)
+      // Pull raw text for the text-dependent detectors (gotcha #105 — present
+      // on policies ingested after Apr 25, 2026; older rows return undefined
+      // and the bullet-count + named-scenario detectors short-circuit to pass).
+      const rawText: string | undefined =
+        typeof (row as { raw_data?: { extractedText?: string } }).raw_data?.extractedText ===
+        'string'
+          ? (
+              (row as { raw_data?: { extractedText?: string } }).raw_data as {
+                extractedText: string
+              }
+            ).extractedText
+          : undefined
+      const evaluation = evaluatePolicy(policy, { rawText: rawText ?? null })
+      const conditionalDeductibles = (policy as { conditionalDeductibles?: string[] })
+        .conditionalDeductibles
+      const supplementaryCount = (policy.coverages || []).filter(
+        (c) => (c as { category?: string }).category === 'supplementary'
+      ).length
+      const detectorFindings = [
+        checkFinancialRisksDedup(conditionalDeductibles),
+        checkEkSozlesmeBulletParity(rawText ?? null, supplementaryCount),
+        checkNamedScenarioCoverage(rawText ?? null, conditionalDeductibles),
+        checkCarveOutDisplayContract(policy.coverages, evaluation.scenarioCards ?? null),
+      ]
       const report: PolicyReport = {
         id: policy.id,
         policyNumber: policy.policyNumber,
@@ -358,6 +423,7 @@ async function main(): Promise<void> {
           checkVehicleCompleteness(policy as PolicyLike),
           checkConfidenceGateSync(policy as PolicyLike, evaluation),
           checkGradeGateSync(evaluation),
+          ...detectorFindings.map(findingToCheckResult),
         ],
       }
       reports.push(report)
@@ -393,6 +459,11 @@ async function main(): Promise<void> {
     VEHICLE_COMPLETENESS: { pass: 0, warn: 0, critical: 0 },
     CONFIDENCE_GATE_SYNC: { pass: 0, warn: 0, critical: 0 },
     GRADE_GATE_SYNC: { pass: 0, warn: 0, critical: 0 },
+    FINANCIAL_RISKS_DUPLICATED: { pass: 0, warn: 0, critical: 0 },
+    EK_SOZLESME_BULLETS_UNDERREPORTED: { pass: 0, warn: 0, critical: 0 },
+    NAMED_SCENARIO_MISSING: { pass: 0, warn: 0, critical: 0 },
+    NAMED_SCENARIO_MISSING_HIGH_IMPACT: { pass: 0, warn: 0, critical: 0 },
+    CARVE_OUT_DISPLAY_MISMATCH: { pass: 0, warn: 0, critical: 0 },
   }
   for (const r of reports) {
     for (const c of r.checks) counts[c.check][c.severity]++
@@ -426,6 +497,15 @@ export {
   checkVehicleCompleteness,
   checkConfidenceGateSync,
   checkGradeGateSync,
+  findingToCheckResult,
   INCOMPLETE_CONFIDENCE_CAP,
   LABEL_LEAK_VALUES,
 }
+// Re-export Phase 1 self-audit detectors for downstream tooling that prefers
+// to import everything from the QA gate module.
+export {
+  checkFinancialRisksDedup,
+  checkEkSozlesmeBulletParity,
+  checkNamedScenarioCoverage,
+  checkCarveOutDisplayContract,
+} from '../src/lib/audit/quality-detectors'
