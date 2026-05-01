@@ -36,6 +36,41 @@ export type BenchmarkConfidenceLevel = 'high' | 'low' | 'suppressed'
  */
 export type BenchmarkFreshness = 'current' | 'aging' | 'stale'
 
+/**
+ * Self-audit detector finding emitted by `scripts/qa-extraction-quality.ts`
+ * checks. The same shape is attached to `PolicyEvaluation.qualityFindings`
+ * (warn-severity surfaces in a non-blocking UI panel; critical-severity
+ * also flips `extractionIncomplete`).
+ */
+export interface QualityFinding {
+  /** Stable check identifier (e.g. `FINANCIAL_RISKS_DUPLICATED`). */
+  check: string
+  severity: 'pass' | 'warn' | 'critical'
+  /** Human-readable diagnostic with concrete numbers (e.g. `'Collapsed 5→3 issue rows'`). */
+  detail: string
+}
+
+/**
+ * Phase 3 — single audit-judge finding. Mirrors
+ * `server/lib/audit-judge-schema.ts:AuditJudgeFinding` (kept structurally
+ * compatible). Persisted on `PolicyEvaluation.judgeCriticalFindings`
+ * after the audit-judge runs (server-side, fire-and-forget). UI wiring
+ * deferred to a Phase 3 follow-up.
+ */
+export interface AuditJudgeFinding {
+  kind:
+    | 'DUPLICATION'
+    | 'MISSING_LINE_ITEM'
+    | 'FRAMING_INACCURACY'
+    | 'RENDER_GAP'
+    | 'SUB_LIMIT_OMITTED'
+  severity: 'critical' | 'warn'
+  quote: string
+  message: string
+  /** Set by the post-LLM verifier in `audit-judge-service.ts`. */
+  quoteVerified?: boolean
+}
+
 export interface BenchmarkContextFactor {
   factor: string
   factorTr: string
@@ -91,6 +126,18 @@ export interface PolicyEvaluation {
    *  UI cannot render "98% confidence" next to "Incomplete extraction". The
    *  raw value on `AnalyzedPolicy.aiConfidence` is preserved for audit. */
   displayedAiConfidence?: number
+  /** Phase 1 self-audit detector findings. Critical-severity entries flip
+   *  `extractionIncomplete`; warn-severity entries surface in a non-blocking
+   *  "Quality findings" panel. See `scripts/qa-extraction-quality.ts`. */
+  qualityFindings?: QualityFinding[]
+  /** Phase 3 audit-judge critical findings (only critical-severity, post-quote-verification).
+   *  Populated by the server-side judge fire-and-forget, NOT by the synchronous
+   *  evaluator path — so consumers see this only after a subsequent page load
+   *  or refetch. UI wiring is deferred until we calibrate against real judge
+   *  output. See `server/services/audit-judge-service.ts`. */
+  judgeCriticalFindings?: AuditJudgeFinding[]
+  /** ISO timestamp of the most recent audit_judgements row for this policy. */
+  judgeRunAt?: string
   status: EvaluationStatus
 
   // Category scores

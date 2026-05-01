@@ -374,10 +374,13 @@ async function main(): Promise<void> {
 
 // Only run main() when executed directly (not when imported by tests).
 // import.meta.url is a file:// URL; process.argv[1] is the absolute path.
+// pathToFileURL handles cross-platform path normalisation (Windows
+// backslashes + triple-slash) which the literal template-string form misses.
+import { pathToFileURL } from 'node:url'
 const invokedDirectly =
   typeof process !== 'undefined' &&
   process.argv[1] &&
-  import.meta.url === `file://${process.argv[1]}`
+  import.meta.url === pathToFileURL(process.argv[1]).href
 
 if (invokedDirectly) {
   main().catch((err) => {

@@ -1221,7 +1221,7 @@ function normalizeTurkishLegalEntityName(name: string): string {
  * match into a single evidence-softened string, which surfaced as
  * "1 conditional" in the UI even when a policy had 5+ distinct triggers.
  */
-const NAMED_DEDUCTIBLE_SCENARIOS: Array<{
+export const NAMED_DEDUCTIBLE_SCENARIOS: Array<{
   keywords: RegExp[]
   labelTr: string
 }> = [

@@ -1,0 +1,53 @@
+{
+  "$schema": "./golden.schema.md",
+  "fixtures": [
+    {
+      "fixtureId": "anadolu-volkswagen-tiguan",
+      "sourcePath": "../kasko/anadolu-volkswagen-tiguan.pdf",
+      "insurer": "Anadolu Sigorta",
+      "insuranceLine": "kasko",
+      "country": "TR",
+      "yearBucket": 2024,
+      "expectedCoverages": ["Çarpma", "Hırsızlık", "Yangın", "Doğal Afet"],
+      "expectedConditionalDeductibles": ["Pert araç muafiyeti", "Anlaşmalı olmayan servis"],
+      "expectedExclusions": [],
+      "expectedBundleProducts": [],
+      "expectedNamedScenarios": [],
+      "forbiddenPhrases": ["CASU", "AXA Sigorta"],
+      "criticalFlags": [],
+      "notes": "Phase 3 baseline fixture. Eriş Ambalaj fleet policy. Reuses the kasko smoke fixture PDF — the audit judge runs the same input through a different prompt. Year-bucket 2024."
+    },
+    {
+      "fixtureId": "anadolu-volkswagen-golf-2001",
+      "sourcePath": "../kasko/anadolu-volkswagen-golf.pdf",
+      "insurer": "Anadolu Sigorta",
+      "insuranceLine": "kasko",
+      "country": "TR",
+      "yearBucket": 2024,
+      "expectedCoverages": ["Çarpma", "Hırsızlık", "Yangın"],
+      "expectedConditionalDeductibles": [],
+      "expectedExclusions": [],
+      "expectedBundleProducts": [],
+      "expectedNamedScenarios": [],
+      "forbiddenPhrases": ["CASU", "AXA Sigorta"],
+      "criticalFlags": [],
+      "notes": "Same insurer + year-bucket as tiguan above — exercises typology-cache hit path (second run should short-circuit on the typology hash). Plate 35 PR 962, MY 2001."
+    },
+    {
+      "fixtureId": "allianz-peugeot-308",
+      "sourcePath": "../kasko/allianz-peugeot.pdf",
+      "insurer": "Allianz",
+      "insuranceLine": "kasko",
+      "country": "TR",
+      "yearBucket": 2024,
+      "expectedCoverages": ["Çarpma", "Hırsızlık"],
+      "expectedConditionalDeductibles": [],
+      "expectedExclusions": [],
+      "expectedBundleProducts": [],
+      "expectedNamedScenarios": [],
+      "forbiddenPhrases": ["Anadolu Hizmet Grup", "AS+ Yetkili Servis", "CASU"],
+      "criticalFlags": [],
+      "notes": "Different insurer than the two anadolu fixtures — exercises cache-MISS path on a new typology hash."
+    }
+  ]
+}

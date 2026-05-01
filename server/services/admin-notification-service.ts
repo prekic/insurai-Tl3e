@@ -307,6 +307,44 @@ export async function notifyPerformanceAlert(
 }
 
 /**
+ * Helper: Phase 3 audit-judge quality notification.
+ *
+ * Fired when the audit judge produces critical-severity findings on the
+ * FIRST run for a typology hash (subject to `judge_critical_notify_first_only`
+ * config). Routes to category='system' rather than widening the
+ * admin_notifications.category CHECK constraint — the audit context is
+ * carried in the title/message + the typology dimensions in `details`.
+ *
+ * `details` keys (consumed by the admin UI for filtering / drilldown):
+ *   - typologyHash: SHA-256 hex
+ *   - typologyDimensions: {insuranceLine, country, yearBucket, insurer, insurerNormalised}
+ *   - findingCount, criticalCount: integer counts
+ *   - findings: full audit_judgements.findings JSON for inline display
+ *   - judgeJudgementId: UUID of the audit_judgements row
+ */
+export async function notifyAuditQuality(
+  typologyDimensions: {
+    insuranceLine: string
+    country: string
+    yearBucket: number
+    insurer: string
+  },
+  summary: string,
+  details: Record<string, unknown>
+): Promise<void> {
+  const subjectInsurer = typologyDimensions.insurer || 'unknown'
+  const subjectYear = typologyDimensions.yearBucket
+  const subjectLine = typologyDimensions.insuranceLine.toUpperCase()
+  await createNotification({
+    type: 'error',
+    category: 'system',
+    title: `[Audit Judge] Critical findings on first-of-typology — ${subjectLine} / ${subjectInsurer} / ${subjectYear}`,
+    message: summary,
+    details,
+  })
+}
+
+/**
  * Startup probe — verify the service can write to admin_notifications at boot,
  * not on the first alert fire. Surfaces env-var and migration-not-applied issues
  * immediately as a clear log line rather than silently failing later.

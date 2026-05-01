@@ -16,6 +16,8 @@ import {
 import { generateMarketComparisonDataAsync } from '@/lib/market-data/service'
 import type { ProcessingLogger } from '@/lib/processing-logger'
 
+import { submitAuditJudge } from '@/lib/audit/judge-client'
+
 import type { AnalyzedPolicy, PolicyType } from '@/types/policy'
 import {
   AI_CONFIG,
@@ -1335,6 +1337,29 @@ export async function extractPolicyFromDocument(
           )
         }
       }
+    }
+
+    // ── Phase 3 follow-up: per-policy audit-judge fire-and-forget ──
+    // Currently scoped to kasko (the live `Audit Judge - Kasko` prompt).
+    // The browser POSTs to /api/ai/audit-judge which returns 202 and
+    // runs `runAuditJudge()` server-side. Typology cache short-circuits
+    // subsequent uploads matching the same (insurer × year-bucket).
+    // The dispatch is itself test-gated inside submitAuditJudge — no
+    // need to await here, no need to handle errors here. See
+    // `src/lib/audit/judge-client.ts`.
+    if (policy.type === 'kasko' && policy.startDate && policy.provider) {
+      submitAuditJudge({
+        insuranceLine: policy.type,
+        country: 'TR',
+        startDate: policy.startDate,
+        insurer: policy.provider,
+        rawText: documentText,
+        structuredExtraction: policy,
+        policyId: policy.id || null,
+        fixtureId: null,
+      }).catch(() => {
+        /* submitAuditJudge already swallows + logs internally */
+      })
     }
 
     return {

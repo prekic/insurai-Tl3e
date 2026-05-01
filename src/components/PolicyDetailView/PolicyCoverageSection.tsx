@@ -185,7 +185,7 @@ function getLocalizedCoverageName(
  * Collapsible coverage category for mobile-friendly display
  */
 function CollapsibleCoverageCategory({
-  categoryKey: _categoryKey,
+  categoryKey,
   categoryLabel,
   CategoryIcon,
   coverages,
@@ -195,7 +195,7 @@ function CollapsibleCoverageCategory({
   defaultExpanded = false,
   formatAmount,
 }: {
-  categoryKey: string // Used for React key prop
+  categoryKey: string // React key prop + data-coverage-category for E2E render-contract guards
   categoryLabel: string
   coverageNames: Record<string, string>
   CategoryIcon: React.ElementType
@@ -217,7 +217,10 @@ function CollapsibleCoverageCategory({
   }
 
   return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden">
+    <div
+      className="border border-gray-200 rounded-xl overflow-hidden"
+      data-coverage-category={categoryKey}
+    >
       {/* Category header - clickable */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
@@ -242,7 +245,11 @@ function CollapsibleCoverageCategory({
           // Handle grouped coverages with sub-limits
           if (groupedCoverage.isGrouped && groupedCoverage.subLimits) {
             return (
-              <div key={i} className="p-2.5 rounded-lg bg-blue-50 border border-blue-100">
+              <div
+                key={i}
+                data-testid="coverage-row"
+                className="p-2.5 rounded-lg bg-blue-50 border border-blue-100"
+              >
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-6 h-6 bg-blue-100 rounded-md flex items-center justify-center flex-shrink-0">
                     <Check className="text-blue-600" size={12} />
@@ -287,7 +294,11 @@ function CollapsibleCoverageCategory({
           const hasInfo = !!infoText || !!coverage.page || !!coverage.clause || !!coverage.quote
 
           return (
-            <div key={i} className="rounded-lg bg-gray-50 overflow-hidden">
+            <div
+              key={i}
+              data-testid="coverage-row"
+              className="rounded-lg bg-gray-50 overflow-hidden"
+            >
               <button
                 onClick={() => hasInfo && toggleCoverageInfo(i)}
                 className={`flex items-center justify-between gap-2 p-2.5 w-full text-left transition-colors ${hasInfo ? 'hover:bg-gray-100 cursor-pointer' : ''}`}
@@ -651,7 +662,7 @@ function ExclusionsSection({
                 const hasContentToExpand = hasExplanation || hasEvidence
 
                 return (
-                  <li key={i}>
+                  <li key={i} data-testid="exclusion-row">
                     <button
                       onClick={() =>
                         hasContentToExpand && setExpandedExclusion(isExpanded ? null : i)
@@ -750,6 +761,7 @@ function ExclusionsSection({
               {analysis.clarificationNeeded.map((item, i) => (
                 <div
                   key={`clarify-${i}`}
+                  data-testid="ask-insurer-clarify"
                   className="p-3 bg-white rounded-lg border border-blue-100 shadow-sm"
                 >
                   <p className="text-sm font-semibold text-gray-900">{item.item}</p>
@@ -796,6 +808,7 @@ function ExclusionsSection({
                 .map((item, i) => (
                   <div
                     key={`missing-${i}`}
+                    data-testid="ask-insurer-missing"
                     className="p-3 bg-white rounded-lg border border-blue-100 shadow-sm"
                   >
                     <div className="flex justify-between items-start gap-2">

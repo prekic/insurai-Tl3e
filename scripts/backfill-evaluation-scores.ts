@@ -225,7 +225,9 @@ async function main() {
   console.log(`-----------------\n`)
 }
 
-// Only run if executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Only run if executed directly. pathToFileURL handles Windows backslashes
+// — the older `file://${process.argv[1]}` form silently no-ops on Windows.
+import { pathToFileURL } from 'node:url'
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch(console.error)
 }

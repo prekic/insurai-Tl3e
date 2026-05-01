@@ -91,6 +91,7 @@ export function PolicyScenariosSection({ scenarios, isUnverified }: PolicyScenar
           <div
             className="mt-2 flex gap-2 bg-amber-50 border border-amber-200 rounded p-2 text-xs text-amber-800"
             role="note"
+            data-testid="scenario-caveat"
           >
             <span className="font-semibold flex-shrink-0">
               {locale === 'tr' ? 'İstisna:' : 'Caveat:'}

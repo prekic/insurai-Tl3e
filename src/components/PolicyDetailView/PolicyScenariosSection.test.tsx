@@ -147,4 +147,97 @@ describe('PolicyScenariosSection', () => {
     render(<PolicyScenariosSection scenarios={[riskScenario]} isUnverified={false} />)
     expect(screen.getByText('Flood Uncovered')).toBeInTheDocument()
   })
+
+  // ── Phase 2 follow-up: render-contract for the IMM carve-out caveat ─
+  //
+  // The original Phase 2 plan called for an E2E test (`render-contract.spec.ts`
+  // test #4) verifying that an unlimited coverage with `carveOuts` populated
+  // produces a `[data-testid="scenario-caveat"]` DOM element. That test was
+  // skipped in commit 9e4e7a9 because the test environment unavoidably hits
+  // the hardcoded benchmark fallback (`benchmarkStatus: 'untrusted'`), which
+  // flips `evaluation.isProvisional = true` → `isUnverified = true` →
+  // `PolicyScenariosSection` returns null. The benchmark cache populates
+  // asynchronously after `evaluatePolicy()` already returned, so a Playwright
+  // route mock can't resolve the timing.
+  //
+  // At the component level the contract is still trivially testable: pass a
+  // ScenarioCard with `caveat` populated and assert the DOM. This catches
+  // the same regression class — "data has caveat → DOM has caveat row" —
+  // without the benchmark-cache E2E plumbing. The full E2E variant remains
+  // documented in the spec file as a known-skip with rationale.
+  describe('Render-contract — carve-out caveat', () => {
+    const carveOutScenario: ScenarioCard = {
+      id: 's-imm',
+      title: 'At-Fault Major Accident',
+      titleTR: 'Kusurlu Büyük Kazada',
+      description: 'IMM Sınırsız scenario.',
+      descriptionTR: 'IMM Sınırsız senaryosu.',
+      financialStatus: 'covered',
+      insurerPays: 'Unlimited',
+      userPays: '0 TL',
+      caveat:
+        'Capped at 2,500,000 TL per event at airports, ports, fuel depots, refineries, and similar high-exposure locations.',
+      caveatTR:
+        'Havalimanı, liman, akaryakıt depoları, rafineri ve benzeri yerlerde olay başı 2.500.000 TL üst sınırı uygulanır.',
+    }
+
+    it('renders [data-testid="scenario-caveat"] when caveat is populated', () => {
+      render(<PolicyScenariosSection scenarios={[carveOutScenario]} />)
+      const caveats = screen.getAllByTestId('scenario-caveat')
+      expect(caveats).toHaveLength(1)
+    })
+
+    it('caveat text includes the qualifying amount AND location keyword', () => {
+      // Sanity guard: a generic / empty caveat pill defeats the purpose.
+      // The IMM detector in `evaluator.ts:detectImmCarveOut` always populates
+      // either the full bilingual string (location + amount) or the hedged
+      // location-only fallback. This test catches the regression where the
+      // caveat exists but its CONTENT lost the safety signal.
+      render(<PolicyScenariosSection scenarios={[carveOutScenario]} />)
+      const caveat = screen.getByTestId('scenario-caveat')
+      const text = caveat.textContent ?? ''
+      const hasAmount = /2,?500,?000|2[,.]?5\s*milyon/i.test(text)
+      const hasLocation =
+        /airports?|ports?|fuel\s*depots?|refineries?|havaliman|liman|akaryak/i.test(text)
+      expect(hasAmount).toBe(true)
+      expect(hasLocation).toBe(true)
+    })
+
+    it('does NOT render a caveat row when scenario has no caveat fields', () => {
+      // coveredScenario has neither `caveat` nor `caveatTR`.
+      render(<PolicyScenariosSection scenarios={[coveredScenario]} />)
+      expect(screen.queryByTestId('scenario-caveat')).not.toBeInTheDocument()
+    })
+
+    it('renders one caveat row per scenario with caveat (count contract)', () => {
+      const second: ScenarioCard = {
+        ...carveOutScenario,
+        id: 's-imm-2',
+        title: 'Secondary IMM Scenario',
+        titleTR: 'İkinci IMM Senaryosu',
+      }
+      render(<PolicyScenariosSection scenarios={[carveOutScenario, second, coveredScenario]} />)
+      // 2 scenarios with caveat + 1 without → exactly 2 caveat rows in DOM.
+      expect(screen.getAllByTestId('scenario-caveat')).toHaveLength(2)
+    })
+
+    it('caveat block carries role="note" for screen readers', () => {
+      render(<PolicyScenariosSection scenarios={[carveOutScenario]} />)
+      const caveat = screen.getByTestId('scenario-caveat')
+      expect(caveat).toHaveAttribute('role', 'note')
+    })
+
+    it('SUPPRESSED when isUnverified=true (regression test for the half-gate)', () => {
+      // Mirror of the existing "renders nothing when isUnverified is true"
+      // test, but specifically asserting that the caveat doesn't leak through.
+      // This catches the case where a future change might bypass the
+      // top-level isUnverified return for some "important safety info" reason
+      // and silently surface caveats from incomplete extractions.
+      const { container } = render(
+        <PolicyScenariosSection scenarios={[carveOutScenario]} isUnverified />
+      )
+      expect(container.firstChild).toBeNull()
+      expect(screen.queryByTestId('scenario-caveat')).not.toBeInTheDocument()
+    })
+  })
 })
