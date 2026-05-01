@@ -488,6 +488,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     evaluationHistoryDesc: 'Historical trend of actuarial scores over multiple evaluations',
     specialProvisionsLabel: 'Special Provisions',
     specialProvisionsCount: '{count} named-deductible scenarios — click to expand',
+    servisNetworkCallout: 'Deductible applies for repairs outside the authorized service network',
   },
 
   exportMenu: {

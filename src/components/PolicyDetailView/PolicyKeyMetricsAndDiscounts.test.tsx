@@ -150,4 +150,31 @@ describe('PolicyKeyMetricsAndDiscounts', () => {
     expect(screen.queryByText('Net Premium')).not.toBeInTheDocument()
     expect(screen.queryByText('BSMV Tax')).not.toBeInTheDocument()
   })
+
+  // Sprint 3 #14 — AS+ servis network callout
+  it('renders the servis network callout when an "Anlaşmalı olmayan servis" scenario is present', () => {
+    const policy: AnalyzedPolicy = {
+      ...base,
+      conditionalDeductibles: ['Anlaşmalı olmayan servis: %35'],
+    }
+    render(<PolicyKeyMetricsAndDiscounts policy={policy} />)
+    const callout = screen.getByTestId('servis-network-callout')
+    expect(callout).toBeInTheDocument()
+    expect(callout).toHaveTextContent(/authorized service network/i)
+    expect(callout.getAttribute('role')).toBe('note')
+  })
+
+  it('omits the servis network callout when no AS+ scenario is present', () => {
+    const policy: AnalyzedPolicy = {
+      ...base,
+      conditionalDeductibles: ['Pert araç muafiyeti: %20', 'Sürücü yaşı: %10'],
+    }
+    render(<PolicyKeyMetricsAndDiscounts policy={policy} />)
+    expect(screen.queryByTestId('servis-network-callout')).not.toBeInTheDocument()
+  })
+
+  it('omits the servis network callout when conditionalDeductibles is missing/empty', () => {
+    render(<PolicyKeyMetricsAndDiscounts policy={base} />)
+    expect(screen.queryByTestId('servis-network-callout')).not.toBeInTheDocument()
+  })
 })

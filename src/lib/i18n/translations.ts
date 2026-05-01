@@ -494,6 +494,7 @@ export interface TranslationDictionary {
     evaluationHistoryDesc: string
     specialProvisionsLabel: string
     specialProvisionsCount: string
+    servisNetworkCallout: string
   }
 
   // Export Menu (PolicyDetailView)

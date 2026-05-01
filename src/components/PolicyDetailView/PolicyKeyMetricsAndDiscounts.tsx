@@ -14,6 +14,14 @@ export function PolicyKeyMetricsAndDiscounts({ policy }: PolicyKeyMetricsAndDisc
   const isConditionalDeductible =
     policy.deductibleUncertain || (policy.type === 'kasko' && policy.deductible === 0)
 
+  // Sprint 3 #14 — surface the AS+ (Anlaşmalı Servis) network warning when
+  // the policy carries an "Anlaşmalı olmayan servis" named-deductible scenario.
+  // Detection is derived from the existing canonical conditionalDeductibles
+  // strings (gotcha #93) — no new schema field required.
+  const hasNonNetworkServisCallout = (policy.conditionalDeductibles ?? []).some((p) =>
+    /Anla[şs]mal[ıi] olmayan servis/i.test(p)
+  )
+
   const discountList: Array<{ type: string; rate: string }> = []
   if (policy.discounts) {
     if (policy.discounts.ncdDiscount) {
@@ -85,6 +93,15 @@ export function PolicyKeyMetricsAndDiscounts({ policy }: PolicyKeyMetricsAndDisc
                 ? formatConverted(policy.deductible)
                 : t.global.none}
         </p>
+        {hasNonNetworkServisCallout && (
+          <small
+            role="note"
+            data-testid="servis-network-callout"
+            className="block mt-1 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 leading-tight"
+          >
+            {t.policy.servisNetworkCallout}
+          </small>
+        )}
       </div>
 
       {/* Discounts Section */}

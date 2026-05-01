@@ -442,6 +442,7 @@ export const SKELETON_TRANSLATIONS: TranslationDictionary = {
     evaluationHistoryDesc: '',
     specialProvisionsLabel: '',
     specialProvisionsCount: '',
+    servisNetworkCallout: '',
   },
 
   exportMenu: {

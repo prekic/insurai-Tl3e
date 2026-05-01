@@ -493,6 +493,7 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     evaluationHistoryDesc: 'Birden fazla değerlendirme üzerinden aktüeryal puan trendi',
     specialProvisionsLabel: 'Özel Şartlar',
     specialProvisionsCount: '{count} isimlendirilmiş muafiyet senaryosu — açmak için tıklayın',
+    servisNetworkCallout: 'Yetkili servis dışı onarımlarda muafiyet uygulanır',
   },
 
   exportMenu: {
