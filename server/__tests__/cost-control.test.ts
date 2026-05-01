@@ -769,7 +769,7 @@ describe('Cost Control', () => {
 
       const result = estimateTokensFromRequest(req)
 
-      expect(result.model).toBe('claude-3-5-haiku')
+      expect(result.model).toBe('claude-haiku-4-5')
     })
 
     it('detects openai model from path (default)', () => {

@@ -327,7 +327,7 @@ describe('runAuditJudge', () => {
       { data: [], error: null },
       { data: null, error: null, count: 0 },
       { data: [{ id: 'j-1' }], error: null },
-      { data: null, error: null, count: 0 } // shouldNotifyCritical query
+      { data: null, error: null, count: 0 } // evaluateNotificationDecision query
     )
     const { runAuditJudge } = await import('../audit-judge-service')
     const result = await runAuditJudge(STD_INPUT)
@@ -355,7 +355,7 @@ describe('runAuditJudge', () => {
       { data: [], error: null },
       { data: null, error: null, count: 0 },
       { data: [{ id: 'j-1' }], error: null },
-      { data: null, error: null, count: 0 } // shouldNotifyCritical → 0 prior rows = first
+      { data: null, error: null, count: 0 } // evaluateNotificationDecision → 0 prior rows = first
     )
     const { runAuditJudge } = await import('../audit-judge-service')
     await runAuditJudge(STD_INPUT)
@@ -380,7 +380,7 @@ describe('runAuditJudge', () => {
       { data: [], error: null },
       { data: null, error: null, count: 0 },
       { data: [{ id: 'j-2' }], error: null },
-      { data: null, error: null, count: 1 } // shouldNotifyCritical → 1 prior row → skip
+      { data: null, error: null, count: 1 } // evaluateNotificationDecision → 1 prior row → skip
     )
     const { runAuditJudge } = await import('../audit-judge-service')
     await runAuditJudge(STD_INPUT)
@@ -409,7 +409,7 @@ describe('runAuditJudge', () => {
       { data: [], error: null },
       { data: null, error: null, count: 0 },
       { data: [{ id: 'j-3' }], error: null }
-      // No 4th query — shouldNotifyCritical short-circuits when firstOnly=false
+      // No 4th query — evaluateNotificationDecision short-circuits when firstOnly=false
     )
     const { runAuditJudge } = await import('../audit-judge-service')
     await runAuditJudge(STD_INPUT)
