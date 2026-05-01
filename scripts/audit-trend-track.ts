@@ -476,9 +476,30 @@ async function main(): Promise<void> {
   writeMarkdown(reports, mdPath, gitSha)
   console.log(`\n[audit-trend-track] Report: ${mdPath}`)
 
+  // Exit-code semantics:
+  //   2 → setup error (env vars missing — handled by exitSetupError above)
+  //   1 → at least one fixture has a CRITICAL regression vs baseline (real
+  //        signal-loss event — gate this in CI to fail the workflow)
+  //   0 → all fixtures either passed or had transient extraction errors
+  //        that don't reflect signal loss. Production extraction is
+  //        occasionally flaky (Anthropic timeouts, OpenAI quota fluctuations);
+  //        we don't want those to redden the trends workflow because they're
+  //        upstream issues, not audit-layer issues. Errored fixtures still
+  //        appear in the report so operators can investigate, but they
+  //        don't fail CI on their own. The smoke-kasko workflow handles
+  //        extraction-health gating separately.
   const anyCritical = reports.some((r) => r.comparison && r.comparison.severity === 'critical')
   const anyErrored = reports.some((r) => r.status === 'error')
-  process.exit(anyCritical || anyErrored ? 1 : 0)
+  if (anyErrored) {
+    const erroredIds = reports
+      .filter((r) => r.status === 'error')
+      .map((r) => r.fixtureId)
+      .join(', ')
+    console.warn(
+      `\n[audit-trend-track] WARNING: ${reports.filter((r) => r.status === 'error').length} fixture(s) errored at extraction (${erroredIds}). Not failing CI — environmental flakiness only blocks gating when it produces a real regression signal.`
+    )
+  }
+  process.exit(anyCritical ? 1 : 0)
 }
 
 // `import.meta.url === \`file://${process.argv[1]}\`` works on POSIX but
