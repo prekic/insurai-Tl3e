@@ -84,13 +84,13 @@ Return ONLY valid JSON matching this schema. No prose preamble, no markdown fenc
 }$audit_judge_sys$,
   $audit_judge_user$RAW POLICY TEXT (truncated to ~30,000 chars if longer):
 
-{document_text}
+{{document_text}}
 
 ---
 
 STRUCTURED EXTRACTION (the AnalyzedPolicy JSON our pipeline produced):
 
-{structured_extraction}
+{{structured_extraction}}
 
 ---
 

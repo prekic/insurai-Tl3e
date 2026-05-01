@@ -147,13 +147,13 @@ ${JSON.stringify(AUDIT_JUDGE_JSON_SCHEMA.schema, null, 2)}
  */
 export const DEFAULT_AUDIT_JUDGE_USER_PROMPT_TEMPLATE = `RAW POLICY TEXT (truncated to ~30,000 chars if longer):
 
-{document_text}
+{{document_text}}
 
 ---
 
 STRUCTURED EXTRACTION (the AnalyzedPolicy JSON our pipeline produced):
 
-{structured_extraction}
+{{structured_extraction}}
 
 ---
 
