@@ -40,9 +40,9 @@ import {
   dedupByTrigramJaccard,
   extractEkSozlesmeBullets,
   NAMED_DEDUCTIBLE_SCENARIOS,
-} from '@/lib/ai/policy-converter'
-import type { Coverage } from '@/types/policy'
-import type { QualityFinding, ScenarioCard } from '@/lib/policy-evaluation/types'
+} from '../ai/policy-converter.js'
+import type { Coverage } from '../../types/policy.js'
+import type { QualityFinding, ScenarioCard } from '../policy-evaluation/types.js'
 
 /**
  * Inlined to break a potential circular import cycle (evaluator.ts already
