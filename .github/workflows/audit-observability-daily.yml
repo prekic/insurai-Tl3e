@@ -1,0 +1,94 @@
+name: Audit Judge Observability (Daily)
+
+# 7-day verification window for the May-2 audit-judge follow-up PRs
+# (#427 cost_usd persistence, #428 cron enablement) and the May-1
+# admin-notification fix (gotcha #145). Runs the read-only diagnostic
+# script and posts the 4-query summary to issue #419 every day.
+#
+# Once 7 successful nightly runs confirm steady-state observability,
+# this workflow can be disabled via:
+#   gh workflow disable audit-observability-daily.yml
+#
+# Cost: zero — the script issues 4 read-only Supabase queries.
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    - cron: '0 8 * * *' # Daily at 08:00 UTC
+
+concurrency:
+  group: audit-observability
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run audit-judge observability diagnostic
+        id: diag
+        env:
+          SUPABASE_URL: ${{ secrets.PROD_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_KEY }}
+        run: |
+          set -o pipefail
+          npm run diagnose:audit 2>&1 | tee diag-output.log
+
+      - name: Upload diagnostic output as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-observability-diag
+          path: diag-output.log
+          retention-days: 14
+
+      - name: Comment diagnostic summary on tracking issue
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            let diagLog = ''
+            try {
+              diagLog = fs.readFileSync('diag-output.log', 'utf8')
+            } catch (err) {
+              diagLog = `(no diag log: ${err.message})`
+            }
+            const tail = diagLog.length > 6000 ? '...\n' + diagLog.slice(-6000) : diagLog
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            const status = '${{ job.status }}'
+            const emoji = status === 'success' ? '✅' : '🚨'
+
+            // Phase 4 designated tracking issue — see issue #419 for the
+            // full operational handbook and observability checklist.
+            const trackingIssue = 419
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: trackingIssue,
+              body:
+                `## ${emoji} Audit-judge observability snapshot\n\n` +
+                `Triggered by: \`${context.eventName}\` on \`${context.sha.slice(0, 7)}\`\n` +
+                `Job status: \`${status}\`\n` +
+                `Workflow run: ${runUrl}\n\n` +
+                `<details><summary>diagnostic output (tail)</summary>\n\n` +
+                `\`\`\`\n${tail}\n\`\`\`\n\n` +
+                `</details>\n\n` +
+                `**What to look for**: \`audit_judgements.cost_usd > 0\` for post-May-2 rows ` +
+                `(confirms PR #427 fix landed) and an \`admin_notifications\` row with title prefix ` +
+                `\`[Audit Judge]\` for any new typology (confirms gotcha #145 fix landed).\n\n` +
+                `_After 7 clean nightly runs, this workflow can be disabled via_ ` +
+                `\`gh workflow disable audit-observability-daily.yml\`.`,
+            })
