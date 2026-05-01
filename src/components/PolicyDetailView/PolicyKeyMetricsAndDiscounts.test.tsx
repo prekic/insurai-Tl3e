@@ -121,4 +121,33 @@ describe('PolicyKeyMetricsAndDiscounts', () => {
     render(<PolicyKeyMetricsAndDiscounts policy={policy} />)
     expect(screen.queryByText(/Discounts \/ Extra Benefits/i)).not.toBeInTheDocument()
   })
+
+  it('renders Net + BSMV breakdown rows when both premiumNet and premiumTax are present', () => {
+    const policy: AnalyzedPolicy = {
+      ...base,
+      premium: 12500,
+      premiumNet: 10593,
+      premiumTax: 1907,
+    }
+    render(<PolicyKeyMetricsAndDiscounts policy={policy} />)
+    // Headline gross premium still renders
+    expect(screen.getByText('₺12,500')).toBeInTheDocument()
+    // The two breakdown rows render with their bilingual labels and amounts
+    expect(screen.getByText('Net Premium')).toBeInTheDocument()
+    expect(screen.getByText('BSMV Tax')).toBeInTheDocument()
+    expect(screen.getByText('₺10,593')).toBeInTheDocument()
+    expect(screen.getByText('₺1,907')).toBeInTheDocument()
+  })
+
+  it('omits the Net + BSMV breakdown when only one of the two is present', () => {
+    const onlyNet: AnalyzedPolicy = {
+      ...base,
+      premium: 12500,
+      premiumNet: 10593,
+      premiumTax: undefined,
+    }
+    render(<PolicyKeyMetricsAndDiscounts policy={onlyNet} />)
+    expect(screen.queryByText('Net Premium')).not.toBeInTheDocument()
+    expect(screen.queryByText('BSMV Tax')).not.toBeInTheDocument()
+  })
 })

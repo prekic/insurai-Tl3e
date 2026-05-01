@@ -349,6 +349,8 @@ export const SKELETON_TRANSLATIONS: TranslationDictionary = {
     percentile: '',
     expectedOutOfPocket: '',
     premiumLabel: '',
+    premiumNet: '',
+    premiumTax: '',
     expectedUncoveredLoss: '',
     contractQualityScore: '',
     partsStandard: '',

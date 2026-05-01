@@ -391,6 +391,8 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     percentile: '{percentile}th Percentile',
     expectedOutOfPocket: 'Expected Out-of-Pocket',
     premiumLabel: 'Premium:',
+    premiumNet: 'Net Premium',
+    premiumTax: 'BSMV Tax',
     expectedUncoveredLoss: 'Expected Uncovered Loss:',
     contractQualityScore: 'Contract Quality Score',
     partsStandard: 'Parts Standard:',

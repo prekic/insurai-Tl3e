@@ -50,12 +50,22 @@ export function PolicyKeyMetricsAndDiscounts({ policy }: PolicyKeyMetricsAndDisc
               ? formatConverted(policy.premium)
               : t.policy.notSpecified}
         </p>
-        {/* Premium breakdown: Net + BSMV */}
+        {/* Premium breakdown: stacked Net + BSMV when both are present */}
         {policy.premiumNet && policy.premiumTax && (
-          <p className="text-[10px] text-gray-400 mt-0.5 truncate">
-            {locale === 'tr' ? 'Net' : 'Net'}: {formatConverted(policy.premiumNet)} + BSMV:{' '}
-            {formatConverted(policy.premiumTax)}
-          </p>
+          <dl className="mt-1 space-y-0.5">
+            <div className="flex justify-between gap-2 text-[10px] text-gray-500">
+              <dt className="truncate">{t.policy.premiumNet}</dt>
+              <dd className="font-medium text-gray-700 whitespace-nowrap">
+                {formatConverted(policy.premiumNet)}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-2 text-[10px] text-gray-500">
+              <dt className="truncate">{t.policy.premiumTax}</dt>
+              <dd className="font-medium text-gray-700 whitespace-nowrap">
+                {formatConverted(policy.premiumTax)}
+              </dd>
+            </div>
+          </dl>
         )}
       </div>
       <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">

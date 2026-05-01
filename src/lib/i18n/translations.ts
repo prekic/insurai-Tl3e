@@ -401,6 +401,8 @@ export interface TranslationDictionary {
     percentile: string
     expectedOutOfPocket: string
     premiumLabel: string
+    premiumNet: string
+    premiumTax: string
     expectedUncoveredLoss: string
     contractQualityScore: string
     partsStandard: string

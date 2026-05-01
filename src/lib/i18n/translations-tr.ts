@@ -394,6 +394,8 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     percentile: '{percentile}. Yüzdelik',
     expectedOutOfPocket: 'Beklenen Cepten Ödeme',
     premiumLabel: 'Prim:',
+    premiumNet: 'Net Prim',
+    premiumTax: 'BSMV',
     expectedUncoveredLoss: 'Beklenen Kapsanmayan Hasar:',
     contractQualityScore: 'Sözleşme Kalite Puanı',
     partsStandard: 'Parça Standardı:',
