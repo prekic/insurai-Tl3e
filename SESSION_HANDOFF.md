@@ -1,295 +1,245 @@
-# Session Handoff — May 1, 2026 — Self-Audit Layer Phases 1-4 + Trend Noise-Floor Calibration
+# Session Handoff — May 2, 2026 — Self-Audit Layer Follow-Ups Closed (PRs #425/#426/#427/#428)
 
-> **Session type**: Production self-audit-layer ship + ops calibration. Built and shipped all 4 phases of the self-audit plan (`docs/feed-back-into-extractionincomplete-elegant-emerson.md`), wired the per-policy fire-and-forget judge hook into the live extraction pipeline, debugged the GitHub Actions workflow through 3 manual runs, and tuned the trend-tracking noise floor from `MIN_BASELINE_FOR_REGRESSION = 3 → 5` after a real CRIT-vs-noise calibration event. See `docs/adr/023-self-audit-layer-architecture.md`.
+> **Session type**: Production cleanup — closed all 5 deferred priorities from the May-1 self-audit-layer ship across 4 sequential PRs. Phase-1 source review showed two of the three handoff-stated root causes were already correct in source; the real bugs were subtler and unobservable from production logs. Plan file: `/root/.claude/plans/considering-that-i-prefere-serene-mist.md`.
 
 ---
 
-## 🎯 Immediate Next Steps for the Next Agent (priority-ordered)
+## 🎯 Immediate Next Steps for the Next Agent
 
-### Priority 1 — Open + merge the trend noise-floor PR
-A single commit (`776b1a4 fix(audit): bump MIN_BASELINE_FOR_REGRESSION 3→5`) is sitting on branch `claude/load-project-context-22E3t`, ahead of `origin/main` by 1 commit. The commit:
-- Bumps `MIN_BASELINE_FOR_REGRESSION` in `src/lib/audit/trend-metrics.ts` from `3` → `5`
-- Rewords the existing small-baseline test
-- Adds a regression-guard test that pins the exact `golf-2001` 3 → 0 exclusion case
+The May-1 follow-up backlog is empty. Next priorities draw from **Sprint 3 polish tail** and **post-merge observation**.
 
-Action: open PR `claude/load-project-context-22E3t` → `main`, merge via `mcp__github__merge_pull_request` to fire Railway deploy. After merge, run the audit-judge-trends workflow manually (`workflow_dispatch`, leave `run_judge=false`) to verify the gate now goes green on the calibrated corpus.
+### Priority 1 — Observe the May 2 follow-up PRs in production traffic
+PR #427 added Railway-log observability for the audit-judge cost + notification paths. Within the next 24-48h of normal kasko uploads, expect the following in Railway logs / Supabase tables:
+- New `audit_judgements` rows have `cost_usd > 0` (test query: `SELECT id, judge_model, cost_usd, created_at FROM audit_judgements WHERE created_at > NOW() - INTERVAL '24 hours' ORDER BY created_at DESC`)
+- For every persisted row with `critical_count > 0`, exactly one of two things appears in Railway logs: either a `Created notification` info line (firstOnly fired) or a `Critical findings did not trigger notification` info line with `reason: subsequent_of_typology|first_only_disabled|no_db_client|query_error`
+- If any `notifyAuditQuality failed` ERROR lines appear, that's a real bug to investigate — the previous warn-level swallow is gone
 
-### Priority 2 — Close out the 3 deferred audit-layer follow-ups
-All three are non-blocking but compound the longer they sit:
+If observed state matches: gotchas #144 and #145 in `CLAUDE.md` can be removed in a future cleanup pass. If `cost_usd` rows are STILL null after fresh production traffic, run `npx tsx scripts/diagnose-audit-judge-observability.ts` and check Q4 specifically — there may be a DB-cached `app_settings.cost.token_pricing` override missing the `claude-sonnet-4-6` key.
 
-**(a) `cost_usd` is null on every `audit_judgements` row.** `calculateCost()` lacks pricing for `claude-sonnet-4-6` (the seeded judge model). Add `claude-sonnet-4-6: { input: 0.003, output: 0.015 }` (per Anthropic public pricing) to the model-pricing map. Verify by running one judge call against a fixture and asserting `cost_usd IS NOT NULL`.
+### Priority 2 — Verify the cron's first scheduled run (next Monday 06:00 UTC)
+PR #428 enabled `schedule:` in `.github/workflows/audit-judge-trends.yml`. The first Monday-morning auto-trigger should:
+- Complete in ~11 min (matching manual run #4 baseline)
+- Exit 0 (no CRIT regressions on the calibrated noise floor)
+- Run `run_judge=false` automatically (no Anthropic spend) — `inputs.run_judge` is undefined under `schedule:` triggers and the gate at line 63 `if: inputs.run_judge == 'true'` correctly evaluates false
+- If it fails, auto-comment on tracking issue #419 with the trend-output excerpt
 
-**(b) Admin notifications not firing on critical findings despite `critical_count=3`.** The verified live behavior: 2 `audit_judgements` rows with `critical_count: 3` were persisted on May 1, but no corresponding `admin_notifications` rows. The most likely cause is a string/boolean mismatch on the `judge_critical_notify_first_only` `app_settings` row (seeded as `'true'` string, possibly compared with `=== true` boolean). Audit the comparison at the `notifyAuditQuality()` call site in `server/services/audit-judge-service.ts`.
+If the first cron run fails with anything other than a real signal regression, expect noise-floor recalibration may be needed (gotcha #146 is a precedent).
 
-**(c) Insurer normalization gap.** `normaliseInsurer()` in `src/lib/audit/typology.ts` doesn't NFKC-normalise or collapse internal whitespace. Two visually-equivalent insurer strings (e.g. `"Anadolu  Sigorta"` with double space vs `"Anadolu Sigorta"`) hash to different typologies and bypass the LLM cache, doubling judge cost. Add `.normalize('NFKC').replace(/\s+/g, ' ')` before suffix-stripping. Test with the 6 existing typology unit tests + add 2 cases for whitespace and NFKC variants.
+### Priority 3 — Sprint 3 polish tail
+Reviewer's outstanding UX items, unchanged from the May-1 handoff:
+- #10 premium split detail
+- #12 coverage transfer context
+- #13 Special Provisions panel
+- #14 AS+ servis network callout
+- #15 output stability tuning
 
-### Priority 3 — Run 1-2 more clean manual workflow runs, then enable the `schedule:` cron
-`.github/workflows/audit-judge-trends.yml` has `schedule: - cron: '0 6 * * 1'` (Mondays 06:00 UTC) commented out. After the noise-floor PR merges and 1-2 manual runs come back green, uncomment that block to enable weekly automated trend tracking. Initial cost will be near-zero because `run_judge` is gated separately and defaults to `false` on cron triggers.
-
-### Priority 4 — Carry forward from the prior session
-- **Apply Migration 049** (named-deductible attribution rules) verification — manually upload the reviewer's exact Anadolu Birleşik Kasko fixture (the one with %35/%80 scenarios) and confirm `conditionalDeductibles` is non-empty.
-- **Sprint 3 polish tail** — #10 premium split detail, #12 coverage transfer context, #13 Special Provisions panel, #14 AS+ servis network callout, #15 output stability tuning.
-- **Re-run smoke periodically.** Two transient `All AI providers failed` events were observed in the prior session. Production `/api/health` was OK both times.
+### Priority 4 — Pre-existing test failure, out of scope this session
+`server/__tests__/cost-control.test.ts` "detects anthropic model from path" expects `claude-3-5-haiku` but `estimateTokensFromRequest` returns `claude-haiku-4-5`. Confirmed pre-existing on main before May-2 PRs. Either update the production code's path-mapping table or update the test expectation. ~5-line fix.
 
 ---
 
 ## What This Session Produced
 
-### Phase 1 — Deterministic detectors (commit `ab2bd21`)
-4 new check functions in `src/lib/audit/quality-detectors.ts`:
-- `checkFinancialRisksDedup()` — runs `dedupByTrigramJaccard()` over bucketed `evaluation.issues[]`; warn at 1 collapse, critical at ≥3
-- `checkEkSozlesmeBulletParity()` — calls `extractEkSozlesmeBullets(rawText)`, compares to `coverages.filter(c => c.category === 'supplementary').length`; pass ≥90%, warn 50-89%, critical <50%
-- `checkNamedScenarioCoverage()` — iterates exported `NAMED_DEDUCTIBLE_SCENARIOS`; critical when missing scenario has %≥80, warn otherwise
-- `checkCarveOutDisplayContract()` — flags `isUnlimited && carveOuts.length > 0 && no scenario.caveat`
+### PR #425 — `fix(audit): NFKC + whitespace pre-pass in normaliseInsurer()` (P2c, gotcha #143)
 
-Critical-severity findings push to `extractionGateTriggers[]` and set `extractionIncomplete = true`. Warn-level populates a non-blocking `qualityFindings[]` array. New triggers wired into `evaluator.ts:626-627` filter:
-- `FINANCIAL_RISKS_DUPLICATED` (warn-only by default)
-- `EK_SOZLESME_BULLETS_UNDERREPORTED` (severity-tiered)
-- `NAMED_SCENARIO_MISSING_HIGH_IMPACT` (critical when ≥80%)
-- `CARVE_OUT_DISPLAY_MISMATCH` (critical when contract violated)
+Closed cache-bypass when visually-identical insurer strings hashed to different typologies.
 
-### Phase 2 — Render-contract Playwright tests (commit `9e4e7a9`)
-NEW `e2e/render-contract.spec.ts` with 4 panel-DOM contracts:
-1. Exclusions: data N rows → DOM N `[data-testid="exclusion-row"]` elements
-2. Ask-Insurer: data N unanswered questions → DOM N `[data-testid="ask-insurer-row"]`
-3. Supplementary coverage: data 11 EK SÖZLEŞME items → DOM ≥9 (allows legitimate dedup)
-4. Caveat presence: `isUnlimited && carveOuts.length>0` → DOM `role="note"` + "2.5M" substring
+**Root cause**: `normaliseInsurer()` collapsed whitespace AFTER suffix-stripping (only the trailing `\s+` collapse on line 87 did anything for internal whitespace), and never NFKC-normalised. Decomposed accents (`'Türkiye'` as `U+0075 + U+0308` vs precomposed `U+00FC`) and compatibility whitespace (NBSP `U+00A0`, ideographic `U+3000`) hashed differently despite rendering identically — doubling LLM cost on visually-equivalent inputs.
 
-Auth-bypass via the existing `e2e/real-user-proof.spec.ts:22-45` localStorage-injection pattern. No new workflow file — added to existing staging.yml + production.yml E2E jobs.
+**Fix**: pre-pass `.normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase().replace(/i̇/g, 'i')` BEFORE suffix-stripping.
 
-### Phase 3 — LLM-as-judge layer (commit `a74f8fc`)
-**Database**:
-- Migration `053_audit_judgements_table.sql` — `audit_judgements` table with permissive RLS, 4 indexes (typology_hash, policy_id, fixture_id, created_at)
-- Migration `054_seed_audit_judge_prompt_and_config.sql` — seeds `prompt_templates` row `'Audit Judge - Kasko'` + 3 `app_settings` rows (`judge_max_runs_per_day=50`, `judge_model=claude-sonnet-4-6`, `judge_critical_notify_first_only=true`)
-- Both **manually applied to production** May 1
+**Tests**: 2 new regression cases (precomposed-vs-decomposed `ü`, NBSP/ideographic-vs-ASCII space). Used `od -c` byte-level verification to confirm test literals carried the intended distinct UTF-8 sequences and weren't pre-normalised by the editor — see commit `bbcda86`.
 
-**Modules**:
-- NEW `src/lib/audit/typology.ts` — `computeTypologyHash`, `parseYearBucket`, `normaliseInsurer`. **Gotcha**: inlined `extractYearFromDate()` instead of importing `parseTurkishDate` from `turkish-utils.ts` to avoid server-build cascade (turkish-utils transitively imports `shared/field-aliases.js` without extensions, breaking node16 module resolution)
-- NEW `server/lib/audit-judge-schema.ts` — `AUDIT_JUDGE_JSON_SCHEMA` + `DEFAULT_AUDIT_JUDGE_SYSTEM_PROMPT` + `DEFAULT_AUDIT_JUDGE_USER_PROMPT_TEMPLATE`
-- NEW `server/services/audit-judge-service.ts` — `runAuditJudge()`: typology-hash compute → cache lookup → daily-budget circuit breaker → Anthropic call → JSON parse + fence strip → quote-verification post-check → persist + notify
-- NEW `server/routes/ai/audit-judge.ts` — `POST /api/ai/audit-judge` returns 202 immediately, runs judge in background
-- Extension to `server/services/admin-notification-service.ts` — `notifyAuditQuality()` helper (category `'system'`)
-- Extension to `server/services/config-service.ts` — `getAuditConfig()` getter (5-min cache)
-- NEW `src/lib/audit/judge-client.ts` — browser-side fire-and-forget POST wrapper
+**Risk**: existing `audit_judgements` rows keyed by old hashes won't match new ones; expect a one-time cache miss spike (~$0.05 per re-resolved typology). Acceptable.
 
-**Per-policy hook point**: `src/lib/ai/policy-extractor.ts:~1325` next to `persistPilotQARecord()` — fire-and-forget `runAuditJudge()` with `process.env.NODE_ENV !== 'test'` guard (gotcha #1).
+Merged as `8d95c50`.
 
-**CLI + golden corpus**:
-- NEW `tests/fixtures/golden/` — 3 fixtures (`anadolu-volkswagen-tiguan`, `anadolu-volkswagen-golf-2001`, `allianz-peugeot-308`) + `golden.json`
-- NEW `scripts/audit-judge-corpus.ts` — `npm run audit:judge`
+### PR #426 — `test(audit): seed Anadolu Birleşik Kasko golden fixture` (P4)
 
-### Phase 4 — Fixture-level trend tracking (commit `fbbe61f`)
-- Migration `055_audit_trend_snapshots.sql` — `audit_trend_snapshots` table — **manually applied to production**
-- NEW `src/lib/audit/trend-metrics.ts` — `extractMetrics()` + `compareMetrics()` pure functions; `MIN_BASELINE_FOR_REGRESSION` exported (initially `3`, bumped to `5` on May 1)
-- NEW `scripts/audit-trend-track.ts` — `npm run audit:trends` — iterates golden fixtures, OCR + extract, persists snapshot, compares to most-recent baseline, writes `reports/trend-<timestamp>.md`
-- NEW `.github/workflows/audit-judge-trends.yml` — manual `workflow_dispatch` only, `schedule:` cron commented until calibrated
-- Exit-code semantics: `0` = pass or extraction-flake, `1` = real CRIT regression, `2` = setup error
+The reviewer-flagged April 30 case was already in `policies/ANADOLU.PDF` (since PR #380); the corpus README's "future expansion" line predated that PDF being committed. Promoted it to the audit-judge golden corpus.
 
-### Deferred follow-ups wired (commit `2f144c8`)
-- Per-policy fire-and-forget judge hook integrated into the production extraction pipeline
-- Caveat presence Playwright contract test added
-- Phase 4 GitHub tracking issue (#419) — referenced in workflow's failure-comment block
+**Verification probe** (`scripts/probe-anadolu-birlesik.ts`, kept for future fixture-onboarding):
+- 5 hits for `"Birleşik"` in the PDF (header + clauses)
+- 1 hit for `%80` (commercial-use co-insurance scenario: "aracın taksi/dolmuş ya da korsan taksi olarak tabir edilen taşımacılıkta kullanılması" → 80% of every claim borne by insured)
+- Policy dated Oct 2015 → `yearBucket: 2014`
 
-### May-1 fixes (commits `9902f97`, `37791c9`, `039b695`, `bef0727`, `f4ef4d0`, `776b1a4`)
-- `pathToFileURL` for cross-platform `main()` guard in 5 scripts (Windows backslash bug)
-- `{{var}}` double-brace fix in seeded audit-judge user prompt (`renderTemplate` regex was `\{\{(\w+)\}\}` — single braces don't interpolate)
-- Relative imports + inline year extractor for server build (avoids `@/lib/...` and `turkish-utils` transitive cascade)
-- Workflow secret names corrected (`SUPABASE_URL` → `PROD_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` → `PROD_SUPABASE_SERVICE_KEY`)
-- Exit-code fix: `process.exit(anyCritical ? 1 : 0)` — extraction errors warn but don't fail CI
-- **Noise-floor bump 3 → 5** after Run #3 tripped CRIT on golf-2001's 3-exclusion baseline going to 0 (Anthropic re-bucketing, not real signal loss)
+**Important correction to handoff**: the handoff said "%35/%80 scenarios" but only **%80 is in this PDF**. The %80 alone is the high-impact reviewer-flagged scenario; %35 was misremembered or in a different (currently-unidentified) fixture.
 
-### CLAUDE.md / SESSION_HANDOFF / ADR-023 (this PR)
-- 6 new gotchas (#142-147) documenting the audit layer's known limitations
-- Next Session Instructions block updated to surface the 3 deferred follow-ups + workflow status
-- ADR-023 documenting the architecture decision
+Files: `tests/fixtures/kasko/anadolu-birlesik-kasko.pdf` (force-added past `*.pdf` gitignore per existing convention), `tests/fixtures/golden/golden.json` (4th entry, year-bucket 2014 — distinct from existing Anadolu fixtures at 2024 so it gets its own typology hash), `tests/fixtures/golden/README.md` (corpus 3→4).
+
+Merged as `7407882`.
+
+### PR #427 — `fix(audit): cost_usd persistence + admin notification observability` (P2a + P2b, gotchas #144 #145)
+
+Phase-1 source review revealed both stated root causes were already correct in source: `claude-sonnet-4-6` has been in the pricing map since PR #380, and `config-service.ts:851` already handles `val === true || val === 'true'`. The real bugs were observability gaps.
+
+**P2a — Real cause**: Anthropic echoes a versioned variant in `response.model` (e.g. `claude-sonnet-4-6-20251022`) even when the request asked for the bare alias. The audit judge billed against that echoed name, missed the bare-alias pricing entry, and silently routed through the `default` rate.
+
+**P2a fix**:
+1. `audit-judge-service.ts:255` — `usedModel = judgeModel` (operator-configured alias, not runtime echo). Cleaner intent-driven fix.
+2. `cost-control.ts:198` — `normaliseModelKey()` strips `-\d{6,}$` (6+ digits required to avoid mangling short names like `gpt-4`). Belt-and-suspenders; benefits all Anthropic/OpenAI lookups.
+
+**P2b — Real cause**: `shouldNotifyCritical()` returned a bare boolean. A `false` return conflated "correctly suppressed duplicate" with "Supabase query silently errored" — operators couldn't tell from logs which production state they were in.
+
+**P2b fix**: renamed to `evaluateNotificationDecision()` returning typed `{ notify, reason }` discriminated union (`first_of_typology` / `first_only_disabled` / `subsequent_of_typology` / `no_db_client` / `query_error`). Caller now `log.info()`s the reason on every suppression. `notifyAuditQuality.catch` escalated `log.warn` → `log.error` so the next genuine failure surfaces in Railway logs.
+
+**Diagnostic**: `scripts/diagnose-audit-judge-observability.ts` runs 4 read-only Supabase queries with a decision-tree footer for interpreting the output. Operator-runnable with existing service-role keys.
+
+Merged as `6674bbc`. Manual workflow run #4 (triggered after this PR merged) succeeded in 11m 5s, validating the fixes against the live production stack.
+
+### PR #428 — `ci(audit): enable scheduled audit-judge-trends cron (Mondays 06:00 UTC)` (P3)
+
+Single change: uncommented the `schedule:` block in `.github/workflows/audit-judge-trends.yml`. Manual run #4 confirmed the calibrated noise floor (`MIN_BASELINE_FOR_REGRESSION=5` from May 1) holds across all 4 fixtures including the new `anadolu-birlesik-kasko`.
+
+**Cost gate**: `inputs.run_judge` is undefined under `schedule:` triggers, and the gate at line 63 `if: inputs.run_judge == 'true'` correctly evaluates false. Cron does **trends-only** (cheap OCR + extract on production), zero Anthropic spend. Operators retain `workflow_dispatch` with `run_judge=true` for on-demand judge sweeps.
+
+Also updated `CLAUDE.md` "Next Session Instructions" items #1, #2, #10 + "Last Updated" to reflect the closed follow-ups.
+
+Merged as `f12a7cb`.
 
 ---
 
 ## Current State
 
-**Branch**: `claude/load-project-context-22E3t`. Working tree clean. Ahead of `origin/main` by 1 commit (`776b1a4`).
+**Branch**: `claude/load-project-context-eMjGW` (the designated context-loading branch). Working tree clean. All 4 session PRs are merged into `main`.
 
-**Database (manually applied this session)**:
-- ✅ Migration 053 (`audit_judgements` table)
-- ✅ Migration 054 (`Audit Judge - Kasko` prompt + 3 `app_settings` rows under category `'audit'`)
-- ✅ Migration 055 (`audit_trend_snapshots` table)
-- All applied via Supabase Dashboard SQL editor; verified via `SELECT relname, relrowsecurity FROM pg_class WHERE relname IN ('audit_judgements', 'audit_trend_snapshots');`
+**Production state** (verified via manual workflow run #4 May 2, 11m 5s):
+- All 4 golden fixtures extract cleanly through the live production pipeline
+- New `anadolu-birlesik-kasko` baseline seeded in `audit_trend_snapshots`
+- Calibrated noise floor (`MIN_BASELINE_FOR_REGRESSION=5`) absorbs Anthropic re-bucketing without false CRITs
+- Scheduled cron now armed for Monday 06:00 UTC
 
-**Verified live behavior**:
-- Per-policy hook fired on real production uploads on May 1 — 2 `audit_judgements` rows with `policy_id` set, both with `critical_count: 3` and 7-8 findings each (Pert Araç deductible missing, Artan Mali Sorumluluk framing inaccuracy, etc.)
-- Workflow Run #1 — failed (wrong secret names) → fixed
-- Workflow Run #2 — failed (extraction flakiness gate too tight) → fixed (commit `f4ef4d0`)
-- Workflow Run #3 — failed CRIT on golf-2001 (3 → 0 exclusions, Anthropic re-bucketing) → fixed (commit `776b1a4`, threshold 3 → 5)
-- Run #4+ expected to pass with the new floor
+**Database**: No new migrations this session. All May-1 migrations (053/054/055) remain applied to production.
 
-**Tests**: 18/18 trend-metrics tests pass (16 existing + 1 reworded + 1 new regression guard). `tsc --noEmit` clean. Full suite NOT run this session (gotcha #5).
+**Tests** (run isolated per gotcha #5 — never the full suite):
+- `npx vitest run src/lib/audit/__tests__/typology.test.ts` — 17/17 pass (15 existing + 2 new regression)
+- `npx vitest run server/__tests__/cost-control.test.ts` — 60/60 pass on changed paths (1 unrelated pre-existing failure documented in Priority 4)
+- `npx vitest run server/services/__tests__/audit-judge-service.test.ts` — 12/12 pass
 
-**Env vars**: No new env vars added. All session work used existing keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GCP_SERVICE_ACCOUNT_BASE64`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `PRODUCTION_SERVER_URL`). The CI workflow uses pre-existing `PROD_SUPABASE_URL` and `PROD_SUPABASE_SERVICE_KEY` secrets.
+**Env vars**: No new env vars added. The new diagnostic script (`scripts/diagnose-audit-judge-observability.ts`) requires the existing `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`.
 
 ---
 
 ## Configuration Requirements
 
 - **No new env vars.**
-- **GitHub Secrets needed for the audit workflow** (already configured under EXACT names — gotcha #150):
-  - `PRODUCTION_SERVER_URL` — used as `SMOKE_BASE_URL`
-  - `PROD_SUPABASE_URL` (NOT `SUPABASE_URL`)
-  - `PROD_SUPABASE_SERVICE_KEY` (NOT `SUPABASE_SERVICE_ROLE_KEY` and NOT `SUPABASE_SERVICE_KEY`)
-  - `ANTHROPIC_API_KEY` — only used when `run_judge=true` is passed via `workflow_dispatch` inputs
-- **Supabase migrations applied this session** (053, 054, 055) — already applied to production. Idempotent re-apply is safe (`CREATE TABLE IF NOT EXISTS`, `INSERT ... ON CONFLICT DO NOTHING`).
-- **Anthropic credit balance** — must be ≥ ~$1 to run `npm run audit:judge` against the 3-fixture corpus (~$0.045 per full sweep at current Sonnet 4.6 pricing). Empty-balance error surfaces as `401 invalid x-api-key` from the SDK (misleading — it's actually `credit_balance_too_low`).
-
-## Security Note — Credentials Rotated Mid-Session
-
-During the May-1 debugging cycle, two production credentials were inadvertently pasted into the chat verbatim and were rotated immediately:
-- **`SUPABASE_SERVICE_ROLE_KEY`** — old key revoked; new key installed in Railway production env, `.env` (local), and GitHub Actions secret `PROD_SUPABASE_SERVICE_KEY`.
-- **`ANTHROPIC_API_KEY`** — old key revoked; new key installed in Railway production env, `.env` (local), and GitHub Actions secret `ANTHROPIC_API_KEY`.
-
-The next agent should be aware: any saved transcripts, log dumps, or PR comments from this session that contain the literal key strings reference now-revoked keys. No remediation needed beyond awareness — the rotation already invalidated the leaked values.
-
-## Specific Quirks Encountered (added during May-1 strict QA pass)
-
-These are session findings that were "summarized away" in the original handoff. Documenting explicitly so the next agent doesn't re-discover them:
-
-1. **Single-brace `{var}` template strings don't interpolate in seeded prompts.** `prompt-service.ts:renderTemplate()` uses `\{\{(\w+)\}\}` (DOUBLE-brace). Migration `054_seed_audit_judge_prompt_and_config.sql` originally seeded `{document_text}` and produced empty extractions on every call. Fix in commit `37791c9`. **Caveat**: re-running a `{x} → {{x}}` recovery migration on top of an already-fixed row produces TRIPLE braces `{{{x}}}`. Recovery: `REGEXP_REPLACE(user_prompt, '\{{2,}document_text\}{2,}', '{{document_text}}', 'g')`. See gotcha #148.
-
-2. **Importing `turkish-utils.ts` from `src/lib/audit/*` breaks the server build.** `turkish-utils.ts` transitively imports `shared/field-aliases.js` without explicit extensions, cascading into 30+ node16-moduleResolution errors under `tsc -p server/tsconfig.json`. The `audit-judge-service.ts` import chain forces `src/lib/audit/typology.ts` into the server compile, so this hits. Fix: inline the slice you need (year-extraction regex). Commit `039b695`. See gotcha #149.
-
-3. **Workflow secret naming convention is `PROD_*`, not Railway-style.** `audit-judge-trends.yml` originally referenced `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` and exited 2 with "SUPABASE_URL not set". The repo's actual secrets are `PROD_SUPABASE_URL` and `PROD_SUPABASE_SERVICE_KEY`. Fix in commit `bef0727`. See gotcha #150.
-
-4. **Anthropic `401 invalid x-api-key` actually means credit balance exhausted.** During the May-1 debug cycle, an Anthropic call returned `401` with body containing `credit_balance_too_low`, but the SDK surfaced only `401 invalid x-api-key`. Diagnostic: check the Anthropic dashboard credit balance before assuming the key is malformed.
-
-5. **GitHub Actions artifacts UI is on the run-summary page.** Operators routinely look on the job-log page expecting an Artifacts section there — it doesn't exist there, only on the parent run-summary page (`/actions/runs/<id>`, NOT `/actions/runs/<id>/job/<job-id>`). Direct URL pattern: `https://github.com/{owner}/{repo}/actions/runs/{run-id}/artifacts/{artifact-id}`. Useful when guiding a non-technical user.
-
-6. **Per-policy fire-and-forget hook MUST be gated by `process.env.NODE_ENV !== 'test'`** (gotcha #1). Without the gate, the un-awaited Anthropic call inside `runAuditJudge()` consumes `mockReturnValueOnce` assertions intended for subsequent test API requests. Pattern: ```ts\nif (process.env.NODE_ENV !== 'test') { runAuditJudge(...).catch(err => log.warn(...)) }\n```
-
-7. **Stale local `main` after sandbox merges (gotcha existing in CLAUDE.md but recurred this session).** `git diff main...HEAD` returned 34 phantom files. Always `git fetch origin main` then `git diff origin/main...HEAD`. Confirmed during today's QA audit: the original handoff was scoped against `origin/main` correctly, but it's worth re-flagging since this bites every fresh-clone session.
+- **No new migrations.**
+- **Sandbox `.env` was absent this session** — the diagnostic script (PR #427) was authored and unit-smoke-tested but NOT run against production. The user can run it locally to verify the fix landed: `npx tsx scripts/diagnose-audit-judge-observability.ts`.
 
 ---
 
-## Bugs / Known Issues (post-ship audit-layer follow-ups)
+## Specific Quirks Encountered
 
-1. **`audit_judgements.cost_usd` is always null** — `calculateCost()` lacks `claude-sonnet-4-6` pricing. Daily-budget circuit breaker uses `COUNT(*)` so this doesn't bypass cost gating, but cost monitoring queries return null. Priority 2(a).
-2. **Admin notifications not firing on critical findings** — verified 2 rows with `critical_count: 3` produced 0 admin_notifications rows. Likely a string-vs-boolean comparison on `judge_critical_notify_first_only`. Priority 2(b).
-3. **`normaliseInsurer()` has NFKC + whitespace gap** — visually-equivalent insurer strings can hash to different typologies and bypass the cache. Priority 2(c).
-4. **(carryover) cd=0 across the 13-PDF audit corpus** — corpus genuinely lacks named-percentage scenarios; reviewer's specific Anadolu Birleşik Kasko fixture is NOT in `policies/`. Priority 4.
-5. **(carryover) Pre-existing `service.test.ts` `getNonCompliant()` flake** — fails on clean main too. Not investigated.
-6. **(carryover) `Police-433425980.pdf` partial extraction** — 21 pages, vehicle fields all empty despite qualityScore 0.92. Sprint 3 follow-up.
+1. **The handoff's stated root causes for P2a and P2b were both wrong.** Phase-1 source review showed both were already correct in source code (pricing entry exists since PR #380 in `cost-control.ts:68`; `config-service.ts:851` correctly handles `val === true || val === 'true'`). The real bugs were dated-suffix lookup miss and opaque suppression — neither directly observable from production logs. **Lesson**: when handoff states "X is the cause", do a Phase-1 source-review verification before believing it, especially for "post-ship deferred follow-ups" where the writer didn't have time to investigate root cause. PR #427's diagnostic script is the deliverable for this — run it BEFORE committing to a fix narrative.
+
+2. **`policies/ANADOLU.PDF` was the reviewer-flagged Anadolu Birleşik Kasko fixture.** Found via `find . -iname "*anadolu*"` after the user pointed out "all policies are in github reachable". The corpus README's "future expansion" line predated PR #380 committing the PDF. **Lesson**: always check the broader repo before declaring a fixture "missing" — `policies/` and `tests/fixtures/kasko/` have different conventions (the latter has a `*.pdf` gitignore + force-add discipline).
+
+3. **`pdf-parse@2.x` constructor signature differs from v1.** Per gotcha #69: `const parser = new PDFParse({ data: new Uint8Array(buf) })` — the data option is wrapped in an object, not passed positionally. The probe script in PR #426 uses this pattern correctly.
+
+4. **`tsx` runs ESM scripts fine but `tsc -p <isolated-tsconfig>` needs `@types/node` + the right `target/module/lib` triple** (gotcha #54 lesson). For scripts, just trust `tsx`'s esbuild-based transpilation and skip type-checking the script itself; rely on root or server tsconfig for the imported modules.
+
+5. **Lint-staged auto-formats during pre-commit** (gotcha #96 + #71). Prettier collapsed my multiline chain in `typology.ts` (commit `bbcda86`) and the linter rejected an unused `e` in catch (commit `9690dae` re-commit). Both were intentional adjustments, not regressions. **Pattern**: if pre-commit fails, fix the linter complaint and `git add` + re-commit — never `--no-verify`.
+
+6. **`mcp__github__create_pull_request` + `mcp__github__merge_pull_request` is the canonical PR ship workflow** (gotcha #22). Sandbox `git push` lands the branch but does NOT trigger Railway's webhook. Always use the merge MCP after PR creation for production deploy. All 4 session PRs followed this pattern.
+
+7. **Stale local `main` recurred this session** (existing CLAUDE.md gotcha). After each PR merge, the next branch creation was preceded by `git fetch origin main && git reset --hard origin/main` — this is the correct hygiene to avoid working off a stale base.
 
 ---
 
-## Non-Negotiable Rules (Carry Forward + 3 new)
+## Bugs / Known Issues
 
-(Rules 1-22 unchanged from prior session)
+1. **Pre-existing**: `cost-control.test.ts` "detects anthropic model from path" expects `claude-3-5-haiku` but production code returns `claude-haiku-4-5`. Failed on main BEFORE the May-2 PRs. Out of scope; documented in Priority 4 above.
+2. **(carryover)** `Police-433425980.pdf` partial extraction — 21 pages, vehicle fields all empty despite qualityScore 0.92. Sprint 3 follow-up.
+3. **(carryover)** `service.test.ts` `getNonCompliant()` flake — fails on clean main too. Not investigated.
+4. **(observability gap, not a bug)** The May-2 PRs improve diagnostics but don't yet cover one edge: if `getTokenPricing()` loads from a DB-cached `app_settings.cost.token_pricing` row that's missing `claude-sonnet-4-6`, the suffix-strip can't help. Q4 of the diagnostic script catches this case.
 
-23. **Self-audit layer phases must ship together with their migrations.** Migration 053/054/055 must be manually SQL-applied before the corresponding code paths are reachable. Without 054, the audit-judge call fails at `getRenderedPrompt('Audit Judge - Kasko')`; without 053, the persist-row call fails; without 055, the trend tracker fails on first read of baselines.
+---
 
-24. **`MIN_BASELINE_FOR_REGRESSION = 5` is the calibrated noise floor — do not lower without a recalibration run.** A baseline of 3 is inside Anthropic's run-to-run extraction noise envelope (re-bucketing of 3 items into adjacent fields produces a 100% drop on a stable signal). If you raise sensitivity for a specific fixture, do it via the per-call `options.minBaseline` parameter, not by lowering the global default.
+## Non-Negotiable Rules (Carry Forward + 1 New)
 
-25. **The Phase 4 trend workflow's `schedule:` cron stays commented until 1-2 manual runs come back green.** A flaky scheduled CI job that auto-comments on a tracking issue at 06:00 UTC every Monday is worse than no automation at all. Verify calibration with `workflow_dispatch` first.
+(Rules 1-25 unchanged from prior session)
+
+26. **When a handoff states "X is the cause", verify in source before believing it.** The May-1 handoff stated three root causes for the audit-layer follow-ups; two were wrong in ways only Phase-1 source review caught. Default to running an independent investigation (read the actual code, run the diagnostic script if one exists, query the DB read-only) before committing to a fix narrative. The cost of an extra 15-minute review is much lower than the cost of shipping a fix that doesn't fix anything.
 
 ---
 
 ## Quick Reference
 
+### PR-by-PR map of this session
+
+| PR | Branch | Sub-priority | Merge SHA |
+|---|---|---|---|
+| #425 | `claude/audit-typology-nfkc-eMjGW` | P2c (NFKC pre-pass) | `8d95c50` |
+| #426 | `claude/audit-anadolu-fixture-eMjGW` | P4 (Anadolu Birleşik fixture) | `7407882` |
+| #427 | `claude/audit-observability-eMjGW` | P2a + P2b (cost + notification) | `6674bbc` |
+| #428 | `claude/audit-cron-uncomment-eMjGW` | P3 (enable schedule cron) | `f12a7cb` |
+
 ### Run the audit layer locally
 
 ```bash
-# Trend tracking (cheap, no judge calls)
-npm run audit:trends
-
-# Full LLM judge sweep on 3 golden fixtures (~$0.045)
-npm run audit:judge
-
-# QA gate (extraction quality)
-npm run qa:extraction
+npm run audit:trends                                      # cheap, no judge calls
+npm run audit:judge                                       # ~$0.045 / fixture × 4
+npm run qa:extraction                                     # extraction quality gate
+npx tsx scripts/diagnose-audit-judge-observability.ts     # post-deploy diagnosis
+npx tsx scripts/probe-anadolu-birlesik.ts                 # one-off PDF probe
 ```
 
 ### Trigger the workflow manually
 
-GitHub → Actions → "Audit Judge + Trends (Manual)" → "Run workflow" → leave `run_judge=false` for a cheap trends-only run.
+GitHub → Actions → "Audit Judge + Trends (Scheduled + Manual)" → "Run workflow" → leave `run_judge=false` for trends-only.
 
-### Check audit_judgements live
+### Check audit_judgements live (post-PR-#427)
 
 ```sql
-SELECT typology_hash, finding_count, critical_count, cost_usd, created_at
+SELECT id, judge_model, finding_count, critical_count, cost_usd, created_at
 FROM audit_judgements
-ORDER BY created_at DESC
-LIMIT 10;
+WHERE created_at > NOW() - INTERVAL '24 hours'
+ORDER BY created_at DESC;
+-- Expected: cost_usd values should now be > 0 on rows post-deploy
 ```
 
-### Check trend baselines live
+### Check trend baselines for the new fixture
 
 ```sql
 SELECT fixture_id, schema_version, qa_pass, run_at,
        metrics->>'coverages' AS cov,
-       metrics->>'exclusions' AS excl
+       metrics->>'exclusions' AS excl,
+       metrics->>'conditional_deductibles_count' AS cd_count
 FROM audit_trend_snapshots
-WHERE qa_pass = true
+WHERE fixture_id = 'anadolu-birlesik-kasko'
 ORDER BY run_at DESC
-LIMIT 10;
+LIMIT 5;
 ```
 
 ---
 
 ## Files added/modified (this session)
 
-### Source — `src/lib/audit/`
-- `src/lib/audit/typology.ts` — NEW (Phase 3, commit `a74f8fc`); inlined year extractor (commit `039b695`)
-- `src/lib/audit/quality-detectors.ts` — NEW (Phase 1, commit `ab2bd21`); relative-imports refactor (commit `039b695`)
-- `src/lib/audit/judge-client.ts` — NEW (Phase 3, commit `a74f8fc`); relative-imports refactor (commit `039b695`)
-- `src/lib/audit/trend-metrics.ts` — NEW (Phase 4, commit `fbbe61f`); `MIN_BASELINE_FOR_REGRESSION` 3→5 (commit `776b1a4`)
-- `src/lib/audit/__tests__/typology.test.ts` — NEW
-- `src/lib/audit/__tests__/quality-detectors.test.ts` — NEW
-- `src/lib/audit/__tests__/judge-client.test.ts` — NEW
-- `src/lib/audit/__tests__/trend-metrics.test.ts` — NEW + 1 reworded + 1 new regression guard (commit `776b1a4`)
+### Source
 
-### Source — extraction + evaluation pipeline
-- `src/lib/ai/policy-extractor.ts` — fire-and-forget judge hook added next to `persistPilotQARecord()` (commit `2f144c8`)
-- `src/lib/ai/policy-converter.ts` — exported `NAMED_DEDUCTIBLE_SCENARIOS` so Phase 1 detector can iterate it (commit `ab2bd21`)
-- `src/lib/policy-evaluation/types.ts` — added `QualityFinding` interface + `qualityFindings?` field on `PolicyEvaluation` (commit `ab2bd21`); added `AuditJudgeFinding` interface + `judgeCriticalFindings?`, `judgeRunAt?` fields (commit `a74f8fc`)
-- `src/lib/policy-evaluation/evaluator.ts` — extended gate-trigger filter at line 626-627 to recognise the 4 new critical trigger codes; exported `bucketConditionalDeductibleSeverity` and `detectImmCarveOut` for detector reuse (commit `ab2bd21`)
-- `src/lib/policy-evaluation/__tests__/evaluator.test.ts` — added "Displayed AI Confidence" regression block for the 4 new critical triggers driving `extractionIncomplete = true` (commit `ab2bd21`)
+- `src/lib/audit/typology.ts` — NFKC + whitespace pre-pass in `normaliseInsurer()` (PR #425, commit `bbcda86`)
+- `src/lib/audit/__tests__/typology.test.ts` — 2 new regression tests (PR #425)
+- `server/middleware/cost-control.ts` — `normaliseModelKey()` helper + suffix-tolerant lookup (PR #427)
+- `server/services/audit-judge-service.ts` — `usedModel = judgeModel`; `evaluateNotificationDecision()` typed return; suppression-reason logging; escalated catch (PR #427)
+- `server/__tests__/cost-control.test.ts` — 2 new regression tests (versioned name + short-suffix guard) (PR #427)
 
-### Source — UI render-contract data-testid additions (Phase 2)
-- `src/components/PolicyDetailView/PolicyCoverageSection.tsx` — added `data-coverage-category` attribute on each category container so Playwright contract tests can scope queries; new `categoryKey` prop (commit `9e4e7a9`)
-- `src/components/PolicyDetailView/PolicyScenariosSection.tsx` — added `data-testid="scenario-caveat"` on the caveat block so the carve-out contract test can assert presence (commit `9e4e7a9`)
-- `src/components/PolicyDetailView/PolicyScenariosSection.test.tsx` — added caveat-rendering regression test (commit `2f144c8`)
+### Scripts
 
-### Server
-- `server/lib/audit-judge-schema.ts` — NEW; `AUDIT_JUDGE_JSON_SCHEMA` + `DEFAULT_AUDIT_JUDGE_SYSTEM_PROMPT` + `DEFAULT_AUDIT_JUDGE_USER_PROMPT_TEMPLATE` (commit `a74f8fc`); double-brace template fix (commit `37791c9`)
-- `server/services/audit-judge-service.ts` — NEW (commit `a74f8fc`); per-policy hook integration tweaks (commit `2f144c8`)
-- `server/services/__tests__/audit-judge-service.test.ts` — NEW (commit `a74f8fc`)
-- `server/routes/ai/audit-judge.ts` — NEW route file `POST /api/ai/audit-judge` (commit `2f144c8`)
-- `server/routes/ai/index.ts` — **registered the audit-judge router** with `import auditJudgeRouter from './audit-judge.js'; router.use('/', auditJudgeRouter)` (commit `2f144c8`). Without this, the route returns 404.
-- `server/__tests__/audit-judge-routes.test.ts` — NEW route-level tests (commit `2f144c8`)
-- `server/services/admin-notification-service.ts` — `notifyAuditQuality()` added (commit `a74f8fc`)
-- `server/services/config-service.ts` — `getAuditConfig()` added (commit `a74f8fc`)
-- `server/middleware/validation.ts` — `auditJudgeSchema` Zod validator added (commit `2f144c8`)
+- `scripts/diagnose-audit-judge-observability.ts` — NEW (PR #427)
+- `scripts/probe-anadolu-birlesik.ts` — NEW (PR #426)
 
-### Scripts + workflow
-- `scripts/audit-judge-corpus.ts` — NEW
-- `scripts/audit-trend-track.ts` — NEW; pathToFileURL guard fix; exit-code fix
-- `scripts/qa-extraction-quality.ts` — pathToFileURL guard fix (commit `9902f97`)
-- `scripts/backfill-evaluation-scores.ts` — pathToFileURL guard fix
-- `scripts/backfill-date-bug.ts` — pathToFileURL guard fix
-- `.github/workflows/audit-judge-trends.yml` — NEW; secrets fix (commit `bef0727`)
+### Workflow
 
-### E2E
-- `e2e/render-contract.spec.ts` — NEW (Phase 2)
+- `.github/workflows/audit-judge-trends.yml` — `schedule:` cron uncommented; header comment rewritten (PR #428)
 
 ### Fixtures
-- `tests/fixtures/golden/` — NEW directory; 3 PDFs + `golden.json`
 
-### Database
-- `supabase/migrations/053_audit_judgements_table.sql` — NEW; **applied to prod**
-- `supabase/migrations/054_seed_audit_judge_prompt_and_config.sql` — NEW; **applied to prod** (with `{{var}}` double-brace fix)
-- `supabase/migrations/055_audit_trend_snapshots.sql` — NEW; **applied to prod**
+- `tests/fixtures/kasko/anadolu-birlesik-kasko.pdf` — verbatim copy of `policies/ANADOLU.PDF`, force-added (PR #426)
+- `tests/fixtures/golden/golden.json` — new 4th fixture entry (PR #426)
+- `tests/fixtures/golden/README.md` — corpus count 3→4, expansion note rewritten (PR #426)
 
 ### Docs
-- `CLAUDE.md` — Next Session Instructions rewritten; gotchas #142-147 added; Last Updated bumped to May 1, 2026
-- `SESSION_HANDOFF.md` — full rewrite (this file)
-- `docs/adr/023-self-audit-layer-architecture.md` — NEW
 
-### Package
-- `package.json` — `audit:judge` and `audit:trends` scripts added
+- `CLAUDE.md` — Next Session Instructions items #1, #2, #10 rewritten; "Last Updated" bumped (PR #428)
+- `SESSION_HANDOFF.md` — full rewrite (this file)
+- `/root/.claude/plans/considering-that-i-prefere-serene-mist.md` — plan file authored Phase 4, approved before execution
