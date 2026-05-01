@@ -486,7 +486,9 @@ async function main(): Promise<void> {
 }
 
 // Only run if executed directly (allows safe import of helpers in tests).
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Cross-platform main() guard — pathToFileURL handles Windows backslashes.
+import { pathToFileURL } from 'node:url'
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((e) => {
     console.error(e)
     process.exit(1)

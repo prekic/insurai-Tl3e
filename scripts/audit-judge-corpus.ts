@@ -413,7 +413,10 @@ async function main(): Promise<void> {
   process.exit(anyCritical || anyErrored ? 1 : 0)
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Cross-platform main() guard — `import.meta.url === \`file://${argv}\``
+// silently no-ops on Windows due to backslash / triple-slash mismatch.
+import { pathToFileURL } from 'node:url'
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((err) => {
     console.error(err)
     process.exit(1)

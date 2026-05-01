@@ -481,7 +481,12 @@ async function main(): Promise<void> {
   process.exit(anyCritical || anyErrored ? 1 : 0)
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// `import.meta.url === \`file://${process.argv[1]}\`` works on POSIX but
+// silently fails on Windows because process.argv[1] uses backslashes
+// while import.meta.url uses forward slashes + three slashes after
+// `file:`. Use Node's pathToFileURL for cross-platform correctness.
+import { pathToFileURL } from 'node:url'
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((err) => {
     console.error(err)
     process.exit(1)
