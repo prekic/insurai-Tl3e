@@ -110,6 +110,19 @@ export interface RetentionConfig {
   extractionMetricsRetentionDays: number
 }
 
+/**
+ * Phase 3 — audit-judge runtime config. Read by `getAuditConfig()`.
+ * Seeded by migration 054_seed_audit_judge_prompt_and_config.sql.
+ */
+export interface AuditConfig {
+  /** Daily circuit-breaker for the audit judge service. */
+  judgeMaxRunsPerDay: number
+  /** Anthropic model used by the judge. */
+  judgeModel: string
+  /** When true, only first-of-typology critical findings enqueue a notification. */
+  judgeCriticalNotifyFirstOnly: boolean
+}
+
 export interface FXConfig {
   serverCacheTtlMs: number
   apiTimeoutMs: number
@@ -278,6 +291,12 @@ const DEFAULT_RETENTION_CONFIG: RetentionConfig = {
   extractionMetricsRetentionDays: 30,
 }
 
+const DEFAULT_AUDIT_CONFIG: AuditConfig = {
+  judgeMaxRunsPerDay: 50,
+  judgeModel: 'claude-sonnet-4-6',
+  judgeCriticalNotifyFirstOnly: true,
+}
+
 // =============================================================================
 // KEY MAPPINGS (database key -> TypeScript property)
 // =============================================================================
@@ -390,6 +409,12 @@ const MONITORING_KEY_MAP: Record<string, keyof MonitoringConfig> = {
 const RETENTION_KEY_MAP: Record<string, keyof RetentionConfig> = {
   processing_log_retention_days: 'processingLogRetentionDays',
   extraction_metrics_retention_days: 'extractionMetricsRetentionDays',
+}
+
+const AUDIT_KEY_MAP: Record<string, keyof AuditConfig> = {
+  judge_max_runs_per_day: 'judgeMaxRunsPerDay',
+  judge_model: 'judgeModel',
+  judge_critical_notify_first_only: 'judgeCriticalNotifyFirstOnly',
 }
 
 // =============================================================================
@@ -803,6 +828,40 @@ export async function getRetentionConfig(): Promise<RetentionConfig> {
 }
 
 /**
+ * Phase 3 — get audit-judge runtime config. Mirrors getMonitoringConfig
+ * pattern: load all `audit` rows from app_settings, merge over
+ * DEFAULT_AUDIT_CONFIG, cache 5 min. Boolean and number values are
+ * coerced from their JSONB-stored representations.
+ */
+export async function getAuditConfig(): Promise<AuditConfig> {
+  const cacheKey = 'config:audit'
+
+  const cached = getFromCache<AuditConfig>(cacheKey)
+  if (cached !== null) {
+    return cached
+  }
+
+  const dbSettings = await getCategorySettings('audit')
+  const config = { ...DEFAULT_AUDIT_CONFIG }
+
+  for (const [dbKey, tsKey] of Object.entries(AUDIT_KEY_MAP)) {
+    if (dbSettings[dbKey] !== undefined) {
+      const val = dbSettings[dbKey]
+      if (tsKey === 'judgeCriticalNotifyFirstOnly') {
+        ;(config as Record<string, unknown>)[tsKey] = val === true || val === 'true'
+      } else if (tsKey === 'judgeMaxRunsPerDay') {
+        ;(config as Record<string, unknown>)[tsKey] = Number(val)
+      } else {
+        ;(config as Record<string, unknown>)[tsKey] = String(val)
+      }
+    }
+  }
+
+  setInCache(cacheKey, config)
+  return config
+}
+
+/**
  * Get FX configuration with database values merged over defaults
  */
 export async function getFXConfig(): Promise<FXConfig> {
@@ -1031,6 +1090,7 @@ export const configService = {
   getOCRConfig,
   getMonitoringConfig,
   getRetentionConfig,
+  getAuditConfig,
   getFXConfig,
   getServerConfig,
   getWebhooksConfig,
