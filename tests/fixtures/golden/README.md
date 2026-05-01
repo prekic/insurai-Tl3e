@@ -30,8 +30,10 @@ Curated fixtures for `npm run audit:judge` (`scripts/audit-judge-corpus.ts`). Th
 3. Run `npm run audit:judge` to generate a baseline `audit_judgements` row.
 4. Inspect the resulting `reports/judge-<timestamp>.md` — if the judge raises critical findings the fixture should expect, add the corresponding `criticalFlags`.
 
-## Initial corpus (3 fixtures)
+## Initial corpus (4 fixtures)
 
 The first cut reuses the kasko smoke fixtures — same PDFs, different prompt. The corpus deliberately includes two Anadolu Sigorta fixtures from the same year-bucket so the typology-cache hit path is exercised on the second one (the cache should short-circuit; only the first run hits Anthropic).
 
-Future expansion: add an Anadolu Birleşik Kasko fixture (the reviewer-flagged April 30 case), an AXA AS+ kasko, a Ray Sigorta, and one of HDI/Sompo/Quick.
+The fourth fixture (`anadolu-birlesik-kasko`, added May 2026) is the reviewer-flagged April 30 case — an Anadolu BİRLEŞİK KASKO SİGORTA / GENİŞLETİLMİŞ KASKO product with a high-impact 80% co-insurance deductible scenario triggered by commercial use (taxi/dolmuş/pirate-taxi). Year-bucket 2014 (policy dated Oct 2015) — distinct from the other Anadolu fixtures so it lands on its own typology hash and exercises Migration 049's named-deductible attribution rules end-to-end.
+
+Future expansion: add an AXA AS+ kasko, a Ray Sigorta, and one of HDI/Sompo/Quick.

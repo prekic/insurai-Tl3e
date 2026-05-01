@@ -48,6 +48,22 @@
       "forbiddenPhrases": ["Anadolu Hizmet Grup", "AS+ Yetkili Servis", "CASU"],
       "criticalFlags": [],
       "notes": "Different insurer than the two anadolu fixtures — exercises cache-MISS path on a new typology hash."
+    },
+    {
+      "fixtureId": "anadolu-birlesik-kasko",
+      "sourcePath": "../kasko/anadolu-birlesik-kasko.pdf",
+      "insurer": "Anadolu Sigorta",
+      "insuranceLine": "kasko",
+      "country": "TR",
+      "yearBucket": 2014,
+      "expectedCoverages": ["Çarpma", "Hırsızlık", "Yangın"],
+      "expectedConditionalDeductibles": ["Rent-a-car / ticari kullanım"],
+      "expectedExclusions": [],
+      "expectedBundleProducts": [],
+      "expectedNamedScenarios": ["Rent-a-car / ticari kullanım: %80"],
+      "forbiddenPhrases": ["CASU", "AXA Sigorta"],
+      "criticalFlags": [],
+      "notes": "Reviewer-flagged April 30 case (Migration 049 named-deductible attribution). Anadolu BİRLEŞİK KASKO SİGORTA / GENİŞLETİLMİŞ KASKO product. Contains a high-impact 80% co-insurance deductible scenario triggered by commercial use (taxi/dolmuş/pirate-taxi). 12 pages, dated Oct 2015 (yearBucket 2014). Source: policies/ANADOLU.PDF (kept verbatim under tests/fixtures/kasko/ for repeatable runs)."
     }
   ]
 }
