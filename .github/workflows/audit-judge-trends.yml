@@ -1,20 +1,19 @@
-name: Audit Judge + Trends (Manual)
+name: Audit Judge + Trends (Scheduled + Manual)
 
 # Phase 4 trend tracking + Phase 3 audit-judge.
 #
-# Manual trigger only at first ship — no `schedule:` cron yet. The team
-# enables the cron after the first few manual runs confirm:
-#   - the judge prompt produces useful findings (not noise)
-#   - the trend metrics are stable across runs of identical input
-#   - the cost per run is within the daily budget (`judge_max_runs_per_day`)
+# Scheduled cron enabled May 2026 after manual run #4 confirmed:
+#   - the calibrated noise floor (MIN_BASELINE_FOR_REGRESSION=5) absorbs
+#     Anthropic's run-to-run extraction re-bucketing without false CRITs
+#   - all 4 golden fixtures (incl. the new anadolu-birlesik-kasko) extract
+#     cleanly and seed baselines
+#   - run duration is steady at ~11 min (well within Actions' free-tier
+#     concurrency budget)
 #
 # Cost note: `audit:trends` is cheap (just OCR + extract). `audit:judge`
 # is ~$0.015/fixture (Anthropic Sonnet 4.6) but typology-cached, so the
 # steady-state cost is bounded to ~one call per unique typology per
-# prompt-version.
-#
-# To enable scheduled runs once the system is calibrated, uncomment the
-# `schedule:` block below.
+# prompt-version. Cron triggers default `run_judge=false` → trends-only.
 
 on:
   workflow_dispatch:
@@ -28,9 +27,8 @@ on:
           - 'false'
           - 'true'
 
-  # ── Scheduled runs (DISABLED by default — uncomment when calibrated) ──
-  # schedule:
-  #   - cron: '0 6 * * 1' # Mondays at 06:00 UTC
+  schedule:
+    - cron: '0 6 * * 1' # Mondays at 06:00 UTC
 
 concurrency:
   group: audit-judge-trends
