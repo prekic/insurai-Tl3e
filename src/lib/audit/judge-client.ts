@@ -19,7 +19,7 @@
  * call (gotcha #1 — un-awaited fetches steal mock assertions).
  */
 
-import { env } from '@/lib/env'
+import { env } from '../env.js'
 
 export interface SubmitAuditJudgeInput {
   insuranceLine: string

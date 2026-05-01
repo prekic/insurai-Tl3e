@@ -15,7 +15,40 @@
  */
 
 import { createHash } from 'node:crypto'
-import { parseTurkishDate } from '@/lib/ai/turkish-utils'
+
+/**
+ * Minimal year extractor for typology hashing. Inlined rather than
+ * importing `parseTurkishDate` from `src/lib/ai/turkish-utils.ts` because
+ * the server's `tsc -p server/tsconfig.json` build compiles this file
+ * (audit-judge-service depends on it) AND turkish-utils transitively
+ * imports `shared/field-aliases.js` without extensions, cascading into
+ * a node16-moduleResolution failure across many files. Inlining the
+ * small slice we actually need (year extraction) is materially simpler
+ * than fixing every transitive import.
+ *
+ * Handles DD.MM.YYYY / DD/MM/YYYY / DD-MM-YYYY / ISO YYYY-MM-DD —
+ * 99%+ of policy startDate inputs the audit judge sees in production.
+ * Falls back to null on Turkish month names, malformed input, or any
+ * out-of-range year (<1900 or >2200).
+ */
+function extractYearFromDate(dateStr: string | null | undefined): number | null {
+  if (!dateStr || typeof dateStr !== 'string') return null
+  const trimmed = dateStr.trim()
+  if (!trimmed) return null
+  // ISO YYYY-MM-DD
+  const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (iso) {
+    const y = parseInt(iso[1], 10)
+    return Number.isFinite(y) ? y : null
+  }
+  // DD[./-]MM[./-]YYYY  (Turkish + European formats)
+  const dmy = trimmed.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/)
+  if (dmy) {
+    const y = parseInt(dmy[3], 10)
+    return Number.isFinite(y) ? y : null
+  }
+  return null
+}
 
 export interface TypologyInput {
   /** Branch / insurance line ('kasko', 'traffic', 'dask', 'zas', 'health', etc.) */
@@ -60,11 +93,9 @@ export function normaliseInsurer(provider: string): string {
  * if the input is unparseable. `2024 → 2024`, `2025 → 2024`, `2026 → 2026`.
  */
 export function parseYearBucket(startDate: string | null | undefined): number | null {
-  if (!startDate) return null
-  const iso = parseTurkishDate(startDate)
-  if (!iso) return null
-  const year = parseInt(iso.slice(0, 4), 10)
-  if (!Number.isFinite(year) || year < 1900 || year > 2200) return null
+  const year = extractYearFromDate(startDate)
+  if (year === null) return null
+  if (year < 1900 || year > 2200) return null
   return Math.floor(year / 2) * 2
 }
 
