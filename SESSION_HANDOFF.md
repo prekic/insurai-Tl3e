@@ -131,13 +131,39 @@ Auth-bypass via the existing `e2e/real-user-proof.spec.ts:22-45` localStorage-in
 ## Configuration Requirements
 
 - **No new env vars.**
-- **GitHub Secrets needed for the audit workflow** (already configured):
+- **GitHub Secrets needed for the audit workflow** (already configured under EXACT names — gotcha #150):
   - `PRODUCTION_SERVER_URL` — used as `SMOKE_BASE_URL`
-  - `PROD_SUPABASE_URL`
-  - `PROD_SUPABASE_SERVICE_KEY`
+  - `PROD_SUPABASE_URL` (NOT `SUPABASE_URL`)
+  - `PROD_SUPABASE_SERVICE_KEY` (NOT `SUPABASE_SERVICE_ROLE_KEY` and NOT `SUPABASE_SERVICE_KEY`)
   - `ANTHROPIC_API_KEY` — only used when `run_judge=true` is passed via `workflow_dispatch` inputs
 - **Supabase migrations applied this session** (053, 054, 055) — already applied to production. Idempotent re-apply is safe (`CREATE TABLE IF NOT EXISTS`, `INSERT ... ON CONFLICT DO NOTHING`).
-- **Anthropic credit balance** — must be ≥ ~$1 to run `npm run audit:judge` against the 3-fixture corpus (~$0.045 per full sweep at current Sonnet 4.6 pricing).
+- **Anthropic credit balance** — must be ≥ ~$1 to run `npm run audit:judge` against the 3-fixture corpus (~$0.045 per full sweep at current Sonnet 4.6 pricing). Empty-balance error surfaces as `401 invalid x-api-key` from the SDK (misleading — it's actually `credit_balance_too_low`).
+
+## Security Note — Credentials Rotated Mid-Session
+
+During the May-1 debugging cycle, two production credentials were inadvertently pasted into the chat verbatim and were rotated immediately:
+- **`SUPABASE_SERVICE_ROLE_KEY`** — old key revoked; new key installed in Railway production env, `.env` (local), and GitHub Actions secret `PROD_SUPABASE_SERVICE_KEY`.
+- **`ANTHROPIC_API_KEY`** — old key revoked; new key installed in Railway production env, `.env` (local), and GitHub Actions secret `ANTHROPIC_API_KEY`.
+
+The next agent should be aware: any saved transcripts, log dumps, or PR comments from this session that contain the literal key strings reference now-revoked keys. No remediation needed beyond awareness — the rotation already invalidated the leaked values.
+
+## Specific Quirks Encountered (added during May-1 strict QA pass)
+
+These are session findings that were "summarized away" in the original handoff. Documenting explicitly so the next agent doesn't re-discover them:
+
+1. **Single-brace `{var}` template strings don't interpolate in seeded prompts.** `prompt-service.ts:renderTemplate()` uses `\{\{(\w+)\}\}` (DOUBLE-brace). Migration `054_seed_audit_judge_prompt_and_config.sql` originally seeded `{document_text}` and produced empty extractions on every call. Fix in commit `37791c9`. **Caveat**: re-running a `{x} → {{x}}` recovery migration on top of an already-fixed row produces TRIPLE braces `{{{x}}}`. Recovery: `REGEXP_REPLACE(user_prompt, '\{{2,}document_text\}{2,}', '{{document_text}}', 'g')`. See gotcha #148.
+
+2. **Importing `turkish-utils.ts` from `src/lib/audit/*` breaks the server build.** `turkish-utils.ts` transitively imports `shared/field-aliases.js` without explicit extensions, cascading into 30+ node16-moduleResolution errors under `tsc -p server/tsconfig.json`. The `audit-judge-service.ts` import chain forces `src/lib/audit/typology.ts` into the server compile, so this hits. Fix: inline the slice you need (year-extraction regex). Commit `039b695`. See gotcha #149.
+
+3. **Workflow secret naming convention is `PROD_*`, not Railway-style.** `audit-judge-trends.yml` originally referenced `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` and exited 2 with "SUPABASE_URL not set". The repo's actual secrets are `PROD_SUPABASE_URL` and `PROD_SUPABASE_SERVICE_KEY`. Fix in commit `bef0727`. See gotcha #150.
+
+4. **Anthropic `401 invalid x-api-key` actually means credit balance exhausted.** During the May-1 debug cycle, an Anthropic call returned `401` with body containing `credit_balance_too_low`, but the SDK surfaced only `401 invalid x-api-key`. Diagnostic: check the Anthropic dashboard credit balance before assuming the key is malformed.
+
+5. **GitHub Actions artifacts UI is on the run-summary page.** Operators routinely look on the job-log page expecting an Artifacts section there — it doesn't exist there, only on the parent run-summary page (`/actions/runs/<id>`, NOT `/actions/runs/<id>/job/<job-id>`). Direct URL pattern: `https://github.com/{owner}/{repo}/actions/runs/{run-id}/artifacts/{artifact-id}`. Useful when guiding a non-technical user.
+
+6. **Per-policy fire-and-forget hook MUST be gated by `process.env.NODE_ENV !== 'test'`** (gotcha #1). Without the gate, the un-awaited Anthropic call inside `runAuditJudge()` consumes `mockReturnValueOnce` assertions intended for subsequent test API requests. Pattern: ```ts\nif (process.env.NODE_ENV !== 'test') { runAuditJudge(...).catch(err => log.warn(...)) }\n```
+
+7. **Stale local `main` after sandbox merges (gotcha existing in CLAUDE.md but recurred this session).** `git diff main...HEAD` returned 34 phantom files. Always `git fetch origin main` then `git diff origin/main...HEAD`. Confirmed during today's QA audit: the original handoff was scoped against `origin/main` correctly, but it's worth re-flagging since this bites every fresh-clone session.
 
 ---
 
@@ -208,24 +234,38 @@ LIMIT 10;
 
 ## Files added/modified (this session)
 
-### Source
+### Source — `src/lib/audit/`
 - `src/lib/audit/typology.ts` — NEW (Phase 3, commit `a74f8fc`); inlined year extractor (commit `039b695`)
-- `src/lib/audit/quality-detectors.ts` — NEW (Phase 1, commit `ab2bd21`)
-- `src/lib/audit/judge-client.ts` — NEW (Phase 3, commit `a74f8fc`)
+- `src/lib/audit/quality-detectors.ts` — NEW (Phase 1, commit `ab2bd21`); relative-imports refactor (commit `039b695`)
+- `src/lib/audit/judge-client.ts` — NEW (Phase 3, commit `a74f8fc`); relative-imports refactor (commit `039b695`)
 - `src/lib/audit/trend-metrics.ts` — NEW (Phase 4, commit `fbbe61f`); `MIN_BASELINE_FOR_REGRESSION` 3→5 (commit `776b1a4`)
 - `src/lib/audit/__tests__/typology.test.ts` — NEW
 - `src/lib/audit/__tests__/quality-detectors.test.ts` — NEW
 - `src/lib/audit/__tests__/judge-client.test.ts` — NEW
 - `src/lib/audit/__tests__/trend-metrics.test.ts` — NEW + 1 reworded + 1 new regression guard (commit `776b1a4`)
-- `src/lib/ai/policy-extractor.ts` — fire-and-forget judge hook added (commit `2f144c8`)
+
+### Source — extraction + evaluation pipeline
+- `src/lib/ai/policy-extractor.ts` — fire-and-forget judge hook added next to `persistPilotQARecord()` (commit `2f144c8`)
+- `src/lib/ai/policy-converter.ts` — exported `NAMED_DEDUCTIBLE_SCENARIOS` so Phase 1 detector can iterate it (commit `ab2bd21`)
+- `src/lib/policy-evaluation/types.ts` — added `QualityFinding` interface + `qualityFindings?` field on `PolicyEvaluation` (commit `ab2bd21`); added `AuditJudgeFinding` interface + `judgeCriticalFindings?`, `judgeRunAt?` fields (commit `a74f8fc`)
+- `src/lib/policy-evaluation/evaluator.ts` — extended gate-trigger filter at line 626-627 to recognise the 4 new critical trigger codes; exported `bucketConditionalDeductibleSeverity` and `detectImmCarveOut` for detector reuse (commit `ab2bd21`)
+- `src/lib/policy-evaluation/__tests__/evaluator.test.ts` — added "Displayed AI Confidence" regression block for the 4 new critical triggers driving `extractionIncomplete = true` (commit `ab2bd21`)
+
+### Source — UI render-contract data-testid additions (Phase 2)
+- `src/components/PolicyDetailView/PolicyCoverageSection.tsx` — added `data-coverage-category` attribute on each category container so Playwright contract tests can scope queries; new `categoryKey` prop (commit `9e4e7a9`)
+- `src/components/PolicyDetailView/PolicyScenariosSection.tsx` — added `data-testid="scenario-caveat"` on the caveat block so the carve-out contract test can assert presence (commit `9e4e7a9`)
+- `src/components/PolicyDetailView/PolicyScenariosSection.test.tsx` — added caveat-rendering regression test (commit `2f144c8`)
 
 ### Server
-- `server/lib/audit-judge-schema.ts` — NEW
-- `server/services/audit-judge-service.ts` — NEW
-- `server/routes/ai/audit-judge.ts` — NEW
-- `server/services/admin-notification-service.ts` — `notifyAuditQuality()` added
-- `server/services/config-service.ts` — `getAuditConfig()` added
-- `server/middleware/validation.ts` — `auditJudgeSchema` added
+- `server/lib/audit-judge-schema.ts` — NEW; `AUDIT_JUDGE_JSON_SCHEMA` + `DEFAULT_AUDIT_JUDGE_SYSTEM_PROMPT` + `DEFAULT_AUDIT_JUDGE_USER_PROMPT_TEMPLATE` (commit `a74f8fc`); double-brace template fix (commit `37791c9`)
+- `server/services/audit-judge-service.ts` — NEW (commit `a74f8fc`); per-policy hook integration tweaks (commit `2f144c8`)
+- `server/services/__tests__/audit-judge-service.test.ts` — NEW (commit `a74f8fc`)
+- `server/routes/ai/audit-judge.ts` — NEW route file `POST /api/ai/audit-judge` (commit `2f144c8`)
+- `server/routes/ai/index.ts` — **registered the audit-judge router** with `import auditJudgeRouter from './audit-judge.js'; router.use('/', auditJudgeRouter)` (commit `2f144c8`). Without this, the route returns 404.
+- `server/__tests__/audit-judge-routes.test.ts` — NEW route-level tests (commit `2f144c8`)
+- `server/services/admin-notification-service.ts` — `notifyAuditQuality()` added (commit `a74f8fc`)
+- `server/services/config-service.ts` — `getAuditConfig()` added (commit `a74f8fc`)
+- `server/middleware/validation.ts` — `auditJudgeSchema` Zod validator added (commit `2f144c8`)
 
 ### Scripts + workflow
 - `scripts/audit-judge-corpus.ts` — NEW
