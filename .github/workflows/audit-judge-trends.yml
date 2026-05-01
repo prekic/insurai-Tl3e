@@ -55,8 +55,8 @@ jobs:
         id: trend
         env:
           SMOKE_BASE_URL: ${{ secrets.PRODUCTION_SERVER_URL }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_URL: ${{ secrets.PROD_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_KEY }}
         run: |
           set -o pipefail
           npm run audit:trends 2>&1 | tee trend-output.log
@@ -65,8 +65,8 @@ jobs:
         if: inputs.run_judge == 'true'
         env:
           SMOKE_BASE_URL: ${{ secrets.PRODUCTION_SERVER_URL }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_URL: ${{ secrets.PROD_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           set -o pipefail
