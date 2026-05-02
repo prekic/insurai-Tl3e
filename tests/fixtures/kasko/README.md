@@ -46,7 +46,27 @@ Every fixture in this directory must be declared in `fixtures.json`:
 | `expectedMake` | yes | Substring of expected `vehicleInfo.make` (case-insensitive) |
 | `expectedModel` | no | Substring of expected `vehicleInfo.model` (case-insensitive). Omit to skip model assertion |
 | `insurer` | yes | Display name shown in the per-fixture log line |
+| `forbiddenPhrases` | no | Cross-insurer state-leak guard (Test A). Insurer-specific terminology that MUST NOT appear in this fixture's extraction output. The smoke runner JSON-serializes the extracted policy data and substring-checks each phrase. E.g. `"CASU"` (AXA's contracted glass network) on a non-AXA fixture, `"AS+ Yetkili Servis"` on a non-Anadolu fixture. Catches AI cross-insurer hallucination + hardcoded string regressions. |
 | `notes` | no | Free-text reminder of why this fixture exists |
+
+### Test A — Cross-Insurer State Leak coverage
+
+Round-4 reviewer (May 2026) called for an explicit cross-insurer leak test
+verifying no insurer-specific terminology carries between policies. This is
+covered at three layers:
+
+1. **Extraction layer**: `forbiddenPhrases[]` per fixture above. Runs on every
+   push to main via `.github/workflows/smoke-kasko.yml` (gotcha #136).
+2. **Rendering layer**: `src/lib/reviewer/__tests__/cross-insurer-leak.test.ts`
+   exercises the canonical reviewer-summary builder with synthetic AXA /
+   Anadolu / Allianz fixtures and asserts no marker leakage. Runs in the
+   normal Vitest suite.
+3. **(Future) UI layer**: Playwright spec at `e2e/cross-insurer-leak.spec.ts`
+   (deferred — requires LLM mocking or live API budget). Adding only when a
+   regression slips past layers 1 + 2.
+
+Pass criteria for layers 1 + 2: zero violations. A single hit on any layer
+fails the whole gate.
 
 The smoke runner uses **case-insensitive substring** matching for both make and
 model — so `expectedMake: "FORD"` matches `"Ford"`, `"FORD MOTOR"`, etc. Pick
