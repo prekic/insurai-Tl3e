@@ -32,9 +32,9 @@ on:
         default: '5'
         type: string
       fixture:
-        description: 'Fixture filename in tests/fixtures/kasko/'
+        description: 'Fixture filename in tests/fixtures/kasko/ (canonical: anadolu-volkswagen-tiguan.pdf)'
         required: false
-        default: 'anadolu-birlesik-kasko.pdf'
+        default: 'anadolu-volkswagen-tiguan.pdf'
         type: string
 
 concurrency:
