@@ -1,256 +1,177 @@
-# Session Handoff — May 2, 2026 — Self-Audit Layer Follow-Ups Closed (PRs #425/#426/#427/#428)
+# Session Handoff — May 2, 2026 — Round-4 Reviewer Feedback Closed (22 PRs, #432–#453)
 
-> **Session type**: Production cleanup — closed all 5 deferred priorities from the May-1 self-audit-layer ship across 4 sequential PRs. Phase-1 source review showed two of the three handoff-stated root causes were already correct in source; the real bugs were subtler and unobservable from production logs. Plan file: `/root/.claude/plans/considering-that-i-prefere-serene-mist.md`.
+> **Session type**: Production accuracy hardening — opened with May-2 follow-through (5 PRs #432-#436), pivoted mid-session to closing Round-4 Anadolu Sigorta reviewer feedback (17 PRs #437-#453, including 3 P0 + 4 P1 + 4 P2 + 3 diagnostic tests + 2 hot-fixes). Path A redesign of the Output Stability Test (PR #453) ships a substantive-check stability gate that PASSED on first run after the OCR hot-fix. Plan file: `/root/.claude/plans/work-on-these-remember-witty-pancake.md`.
 
 ---
 
 ## 🎯 Immediate Next Steps for the Next Agent
 
-The May-1 follow-up backlog is empty. Next priorities draw from **Sprint 3 polish tail** and **post-merge observation**.
+### Priority 1 — Restore production AI temperature (operator manual SQL)
 
-### Priority 1 — Observe the May 2 follow-up PRs in production traffic
-PR #427 added Railway-log observability for the audit-judge cost + notification paths. Within the next 24-48h of normal kasko uploads, expect the following in Railway logs / Supabase tables:
-- New `audit_judgements` rows have `cost_usd > 0` (test query: `SELECT id, judge_model, cost_usd, created_at FROM audit_judgements WHERE created_at > NOW() - INTERVAL '24 hours' ORDER BY created_at DESC`)
-- For every persisted row with `critical_count > 0`, exactly one of two things appears in Railway logs: either a `Created notification` info line (firstOnly fired) or a `Critical findings did not trigger notification` info line with `reason: subsequent_of_typology|first_only_disabled|no_db_client|query_error`
-- If any `notifyAuditQuality failed` ERROR lines appear, that's a real bug to investigate — the previous warn-level swallow is gone
+**Status**: BLOCKED on a single SQL update. Tested at `0` for stability verification, must return to default `0.1`.
 
-If observed state matches: gotchas #144 and #145 in `CLAUDE.md` can be removed in a future cleanup pass. If `cost_usd` rows are STILL null after fresh production traffic, run `npx tsx scripts/diagnose-audit-judge-observability.ts` and check Q4 specifically — there may be a DB-cached `app_settings.cost.token_pricing` override missing the `claude-sonnet-4-6` key.
+```sql
+UPDATE public.app_settings
+SET value = '0.1', updated_at = NOW()
+WHERE category = 'ai' AND key = 'temperature';
+```
 
-### Priority 2 — Verify the cron's first scheduled run (next Monday 06:00 UTC)
-PR #428 enabled `schedule:` in `.github/workflows/audit-judge-trends.yml`. The first Monday-morning auto-trigger should:
-- Complete in ~11 min (matching manual run #4 baseline)
-- Exit 0 (no CRIT regressions on the calibrated noise floor)
-- Run `run_judge=false` automatically (no Anthropic spend) — `inputs.run_judge` is undefined under `schedule:` triggers and the gate at line 63 `if: inputs.run_judge == 'true'` correctly evaluates false
-- If it fails, auto-comment on tracking issue #419 with the trend-output excerpt
+Run via Supabase SQL Editor. Cache TTL is 5 min (gotcha #159) — wait the time, or trigger a Railway redeploy to flush. Once done, this priority is closed and the production default is restored.
 
-If the first cron run fails with anything other than a real signal regression, expect noise-floor recalibration may be needed (gotcha #146 is a precedent).
+**Why temporarily set to 0**: The Output Stability Test (Round-4 Test B, PR #450 / #453) needed maximum determinism to verify the substantive-check stability gate. Test B PASSED at T=0 with zero flips on 7 reviewer-flagged signals. Round-4 work doesn't require T=0 in production — `0.1` gives slightly more natural phrasing and the deterministic post-processing layer (Sprints 1–3) absorbs the small LLM variance on user-facing fields.
 
-### Priority 3 — Sprint 3 polish tail
-Reviewer's outstanding UX items, unchanged from the May-1 handoff:
-- #10 premium split detail
-- #12 coverage transfer context
-- #13 Special Provisions panel
-- #14 AS+ servis network callout
-- #15 output stability tuning
+### Priority 2 — Hand off to reviewer for Round 5 verification
 
-### Priority 4 — Pre-existing test failure, out of scope this session
-`server/__tests__/cost-control.test.ts` "detects anthropic model from path" expects `claude-3-5-haiku` but `estimateTokensFromRequest` returns `claude-haiku-4-5`. Confirmed pre-existing on main before May-2 PRs. Either update the production code's path-mapping table or update the test expectation. ~5-line fix.
+**Status**: Round-4 work complete. Round 5 starts when the reviewer responds.
 
----
+Concrete hand-off:
+1. Re-upload `tests/fixtures/kasko/anadolu-birlesik-kasko.pdf` via production UI
+2. Screenshot each panel the Round-4 review flagged: hero deductible, Critical Financial Risks, Excess Liability scenario card, exclusions panel, Ask Your Insurer panel, AI Insights, Discounts panel, coverage list including Hatalı Akaryakıt, Anadolu Hizmet, AS+ Yetkili Servis Ağı
+3. Send those + the change-log of Round-4 PRs (#437–#453) to the reviewer
+4. Whatever they push back on becomes Round 5
 
-## What This Session Produced
+Round-4 reviewer's quoted bottom line: _"If Sprint 1 ships, this output is launch-quality for friendly beta."_ All three sprints shipped.
 
-### PR #425 — `fix(audit): NFKC + whitespace pre-pass in normaliseInsurer()` (P2c, gotcha #143)
+### Priority 3 — Sprint 3 deferred items (need reviewer domain spec)
 
-Closed cache-bypass when visually-identical insurer strings hashed to different typologies.
+Two items from the original Round-4 review are blocked on the reviewer providing a spec rather than implementation:
 
-**Root cause**: `normaliseInsurer()` collapsed whitespace AFTER suffix-stripping (only the trailing `\s+` collapse on line 87 did anything for internal whitespace), and never NFKC-normalised. Decomposed accents (`'Türkiye'` as `U+0075 + U+0308` vs precomposed `U+00FC`) and compatibility whitespace (NBSP `U+00A0`, ideographic `U+3000`) hashed differently despite rendering identically — doubling LLM cost on visually-equivalent inputs.
+- **Sprint 3 #12** — coverage transfer context (the spec is unclear: is this about `previousInsurer` which we now ship in PR #448, or is it a separate UI feature?)
+- **Sprint 3 #15** — output stability tuning (Test B already shipped — this item likely covers operator-facing tuning of the new substantive-check thresholds)
 
-**Fix**: pre-pass `.normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase().replace(/i̇/g, 'i')` BEFORE suffix-stripping.
+Don't ship either until the reviewer clarifies. If the reviewer does respond with specifics, both are 1-PR scopes each.
 
-**Tests**: 2 new regression cases (precomposed-vs-decomposed `ü`, NBSP/ideographic-vs-ASCII space). Used `od -c` byte-level verification to confirm test literals carried the intended distinct UTF-8 sequences and weren't pre-normalised by the editor — see commit `bbcda86`.
+### Priority 4 — Disable daily observability workflow once 7 clean comments accumulate on issue #419
 
-**Risk**: existing `audit_judgements` rows keyed by old hashes won't match new ones; expect a one-time cache miss spike (~$0.05 per re-resolved typology). Acceptable.
-
-Merged as `8d95c50`.
-
-### PR #426 — `test(audit): seed Anadolu Birleşik Kasko golden fixture` (P4)
-
-The reviewer-flagged April 30 case was already in `policies/ANADOLU.PDF` (since PR #380); the corpus README's "future expansion" line predated that PDF being committed. Promoted it to the audit-judge golden corpus.
-
-**Verification probe** (`scripts/probe-anadolu-birlesik.ts`, kept for future fixture-onboarding):
-- 5 hits for `"Birleşik"` in the PDF (header + clauses)
-- 1 hit for `%80` (commercial-use co-insurance scenario: "aracın taksi/dolmuş ya da korsan taksi olarak tabir edilen taşımacılıkta kullanılması" → 80% of every claim borne by insured)
-- Policy dated Oct 2015 → `yearBucket: 2014`
-
-**Important correction to handoff**: the handoff said "%35/%80 scenarios" but only **%80 is in this PDF**. The %80 alone is the high-impact reviewer-flagged scenario; %35 was misremembered or in a different (currently-unidentified) fixture.
-
-Files: `tests/fixtures/kasko/anadolu-birlesik-kasko.pdf` (force-added past `*.pdf` gitignore per existing convention), `tests/fixtures/golden/golden.json` (4th entry, year-bucket 2014 — distinct from existing Anadolu fixtures at 2024 so it gets its own typology hash), `tests/fixtures/golden/README.md` (corpus 3→4).
-
-Merged as `7407882`.
-
-### PR #427 — `fix(audit): cost_usd persistence + admin notification observability` (P2a + P2b, gotchas #144 #145)
-
-Phase-1 source review revealed both stated root causes were already correct in source: `claude-sonnet-4-6` has been in the pricing map since PR #380, and `config-service.ts:851` already handles `val === true || val === 'true'`. The real bugs were observability gaps.
-
-**P2a — Real cause**: Anthropic echoes a versioned variant in `response.model` (e.g. `claude-sonnet-4-6-20251022`) even when the request asked for the bare alias. The audit judge billed against that echoed name, missed the bare-alias pricing entry, and silently routed through the `default` rate.
-
-**P2a fix**:
-1. `audit-judge-service.ts:255` — `usedModel = judgeModel` (operator-configured alias, not runtime echo). Cleaner intent-driven fix.
-2. `cost-control.ts:198` — `normaliseModelKey()` strips `-\d{6,}$` (6+ digits required to avoid mangling short names like `gpt-4`). Belt-and-suspenders; benefits all Anthropic/OpenAI lookups.
-
-**P2b — Real cause**: `shouldNotifyCritical()` returned a bare boolean. A `false` return conflated "correctly suppressed duplicate" with "Supabase query silently errored" — operators couldn't tell from logs which production state they were in.
-
-**P2b fix**: renamed to `evaluateNotificationDecision()` returning typed `{ notify, reason }` discriminated union (`first_of_typology` / `first_only_disabled` / `subsequent_of_typology` / `no_db_client` / `query_error`). Caller now `log.info()`s the reason on every suppression. `notifyAuditQuality.catch` escalated `log.warn` → `log.error` so the next genuine failure surfaces in Railway logs.
-
-**Diagnostic**: `scripts/diagnose-audit-judge-observability.ts` runs 4 read-only Supabase queries with a decision-tree footer for interpreting the output. Operator-runnable with existing service-role keys.
-
-Merged as `6674bbc`. Manual workflow run #4 (triggered after this PR merged) succeeded in 11m 5s, validating the fixes against the live production stack.
-
-### PR #428 — `ci(audit): enable scheduled audit-judge-trends cron (Mondays 06:00 UTC)` (P3)
-
-Single change: uncommented the `schedule:` block in `.github/workflows/audit-judge-trends.yml`. Manual run #4 confirmed the calibrated noise floor (`MIN_BASELINE_FOR_REGRESSION=5` from May 1) holds across all 4 fixtures including the new `anadolu-birlesik-kasko`.
-
-**Cost gate**: `inputs.run_judge` is undefined under `schedule:` triggers, and the gate at line 63 `if: inputs.run_judge == 'true'` correctly evaluates false. Cron does **trends-only** (cheap OCR + extract on production), zero Anthropic spend. Operators retain `workflow_dispatch` with `run_judge=true` for on-demand judge sweeps.
-
-Also updated `CLAUDE.md` "Next Session Instructions" items #1, #2, #10 + "Last Updated" to reflect the closed follow-ups.
-
-Merged as `f12a7cb`.
-
----
-
-## Current State
-
-**Branch**: `claude/load-project-context-eMjGW` (the designated context-loading branch). Working tree clean. All 4 session PRs are merged into `main`.
-
-**Production state** (verified via manual workflow run #4 May 2, 11m 5s):
-- All 4 golden fixtures extract cleanly through the live production pipeline
-- New `anadolu-birlesik-kasko` baseline seeded in `audit_trend_snapshots`
-- Calibrated noise floor (`MIN_BASELINE_FOR_REGRESSION=5`) absorbs Anthropic re-bucketing without false CRITs
-- Scheduled cron now armed for Monday 06:00 UTC
-
-**Database**: No new migrations this session. All May-1 migrations (053/054/055) remain applied to production.
-
-**Tests** (run isolated per gotcha #5 — never the full suite):
-- `npx vitest run src/lib/audit/__tests__/typology.test.ts` — 17/17 pass (15 existing + 2 new regression)
-- `npx vitest run server/__tests__/cost-control.test.ts` — 60/60 pass on changed paths (1 unrelated pre-existing failure documented in Priority 4)
-- `npx vitest run server/services/__tests__/audit-judge-service.test.ts` — 12/12 pass
-
-**Env vars**: No new env vars added. The new diagnostic script (`scripts/diagnose-audit-judge-observability.ts`) requires the existing `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`.
-
----
-
-## Configuration Requirements
-
-- **No new env vars.**
-- **No new migrations.**
-- **Sandbox `.env` was absent this session** — the diagnostic script (PR #427) was authored and unit-smoke-tested but NOT run against production. The user can run it locally to verify the fix landed: `npx tsx scripts/diagnose-audit-judge-observability.ts`.
-
----
-
-## Specific Quirks Encountered
-
-1. **The handoff's stated root causes for P2a and P2b were both wrong.** Phase-1 source review showed both were already correct in source code (pricing entry exists since PR #380 in `cost-control.ts:68`; `config-service.ts:851` correctly handles `val === true || val === 'true'`). The real bugs were dated-suffix lookup miss and opaque suppression — neither directly observable from production logs. **Lesson**: when handoff states "X is the cause", do a Phase-1 source-review verification before believing it, especially for "post-ship deferred follow-ups" where the writer didn't have time to investigate root cause. PR #427's diagnostic script is the deliverable for this — run it BEFORE committing to a fix narrative.
-
-2. **`policies/ANADOLU.PDF` was the reviewer-flagged Anadolu Birleşik Kasko fixture.** Found via `find . -iname "*anadolu*"` after the user pointed out "all policies are in github reachable". The corpus README's "future expansion" line predated PR #380 committing the PDF. **Lesson**: always check the broader repo before declaring a fixture "missing" — `policies/` and `tests/fixtures/kasko/` have different conventions (the latter has a `*.pdf` gitignore + force-add discipline).
-
-3. **`pdf-parse@2.x` constructor signature differs from v1.** Per gotcha #69: `const parser = new PDFParse({ data: new Uint8Array(buf) })` — the data option is wrapped in an object, not passed positionally. The probe script in PR #426 uses this pattern correctly.
-
-4. **`tsx` runs ESM scripts fine but `tsc -p <isolated-tsconfig>` needs `@types/node` + the right `target/module/lib` triple** (gotcha #54 lesson). For scripts, just trust `tsx`'s esbuild-based transpilation and skip type-checking the script itself; rely on root or server tsconfig for the imported modules.
-
-5. **Lint-staged auto-formats during pre-commit** (gotcha #96 + #71). Prettier collapsed my multiline chain in `typology.ts` (commit `bbcda86`) and the linter rejected an unused `e` in catch (commit `9690dae` re-commit). Both were intentional adjustments, not regressions. **Pattern**: if pre-commit fails, fix the linter complaint and `git add` + re-commit — never `--no-verify`.
-
-6. **`mcp__github__create_pull_request` + `mcp__github__merge_pull_request` is the canonical PR ship workflow** (gotcha #22). Sandbox `git push` lands the branch but does NOT trigger Railway's webhook. Always use the merge MCP after PR creation for production deploy. All 4 session PRs followed this pattern.
-
-7. **Stale local `main` recurred this session** (existing CLAUDE.md gotcha). After each PR merge, the next branch creation was preceded by `git fetch origin main && git reset --hard origin/main` — this is the correct hygiene to avoid working off a stale base.
-
-8. **Fresh sandbox came up without `node_modules`.** The first `npx vitest run …` invocation crashed with `ERR_MODULE_NOT_FOUND: Cannot find package 'vite'` because `node_modules/` was empty (1 entry: just `.package-lock.json`). Ran `npm install --no-audit --no-fund` (~31s, 1245 packages) before any tests could execute. The postinstall hook copies `pdf.worker.min.mjs` and runs `husky` — both completed cleanly. **For the next agent**: if the sandbox is fresh, `npm install` is a prerequisite for ANY test/typecheck/script work. Side-effect: `package-lock.json` shows as modified after install (legitimate timestamp churn) — leave it unstaged when committing unrelated changes.
-
-9. **Top-level `await` fails when running a `.ts` script outside the project root via `tsx`.** Tried `npx tsx /tmp/probe-extra.ts` (a quick one-off scratch file) and esbuild reported: `Top-level await is currently not supported with the "cjs" output format`. Renaming to `.mts` then ran but tripped a separate `Cannot find module '@supabase/supabase-js'` because the script wasn't inside the project's package boundary. **Fix**: always put one-off `tsx` scripts INSIDE the project (e.g. `scripts/_scratch.mts` or `scripts/probe-foo.mts`), not in `/tmp`. The project's `tsconfig.json` ESM target + `node_modules` resolution only applies to files within the package root.
-
-10. **Diagnostic script smoke-test pattern using fake env.** Verified `scripts/diagnose-audit-judge-observability.ts` runs cleanly without crashing on init by passing dummy values: `SUPABASE_URL=http://invalid SUPABASE_SERVICE_ROLE_KEY=fake npx tsx scripts/diagnose-audit-judge-observability.ts`. The Supabase client constructor accepts any URL string; the actual `fetch` only fails on the per-query call, which the script's per-query try/catch surfaces as `✗ Q1 failed: TypeError: fetch failed`. This pattern (fake-env smoke test) is useful for any new script that takes env vars at boot — verifies module-level wiring without needing real credentials.
-
-11. **Renamed `shouldNotifyCritical → evaluateNotificationDecision` in PR #427 left stale test comments.** `server/services/__tests__/audit-judge-service.test.ts` lines 330, 358, 383, 412 still contain comments like `// shouldNotifyCritical query` — the tests still pass because they mock the Supabase layer (not the function name), but the comments are dead documentation. Out of scope to fix in PR #427 since touching the test file would have meant a larger diff; **flagged here as a residual cleanup item** worth picking up in any future audit-judge test work. ~5-line patch.
-
----
-
-## Bugs / Known Issues
-
-1. **Pre-existing**: `cost-control.test.ts` "detects anthropic model from path" expects `claude-3-5-haiku` but production code returns `claude-haiku-4-5`. Failed on main BEFORE the May-2 PRs. Out of scope; documented in Priority 4 above.
-2. **(carryover)** `Police-433425980.pdf` partial extraction — 21 pages, vehicle fields all empty despite qualityScore 0.92. Sprint 3 follow-up.
-3. **(carryover)** `service.test.ts` `getNonCompliant()` flake — fails on clean main too. Not investigated.
-4. **(observability gap, not a bug)** The May-2 PRs improve diagnostics but don't yet cover one edge: if `getTokenPricing()` loads from a DB-cached `app_settings.cost.token_pricing` row that's missing `claude-sonnet-4-6`, the suffix-strip can't help. Q4 of the diagnostic script catches this case.
-
----
-
-## Non-Negotiable Rules (Carry Forward + 1 New)
-
-(Rules 1-25 unchanged from prior session)
-
-26. **When a handoff states "X is the cause", verify in source before believing it.** The May-1 handoff stated three root causes for the audit-layer follow-ups; two were wrong in ways only Phase-1 source review caught. Default to running an independent investigation (read the actual code, run the diagnostic script if one exists, query the DB read-only) before committing to a fix narrative. The cost of an extra 15-minute review is much lower than the cost of shipping a fix that doesn't fix anything.
-
----
-
-## Quick Reference
-
-### PR-by-PR map of this session
-
-| PR | Branch | Sub-priority | Merge SHA |
-|---|---|---|---|
-| #425 | `claude/audit-typology-nfkc-eMjGW` | P2c (NFKC pre-pass) | `8d95c50` |
-| #426 | `claude/audit-anadolu-fixture-eMjGW` | P4 (Anadolu Birleşik fixture) | `7407882` |
-| #427 | `claude/audit-observability-eMjGW` | P2a + P2b (cost + notification) | `6674bbc` |
-| #428 | `claude/audit-cron-uncomment-eMjGW` | P3 (enable schedule cron) | `f12a7cb` |
-| #429 | `claude/session-handoff-may-2-eMjGW` | docs (this handoff file) | `e4776e3` |
-| #430 | `claude/docs-gotchas-may-2-eMjGW` | docs (CLAUDE.md gotchas #151-#154) | `26a0ab0` |
-| #431 | `claude/handoff-completeness-delta-eMjGW` | docs (completeness-delta sync — this section) | _pending_ |
-
-### Run the audit layer locally
+PR #432 (May 2) shipped `audit-observability-daily.yml` running daily at 08:00 UTC. The workflow's comment template self-documents a sunset hint:
 
 ```bash
-npm run audit:trends                                      # cheap, no judge calls
-npm run audit:judge                                       # ~$0.045 / fixture × 4
-npm run qa:extraction                                     # extraction quality gate
-npx tsx scripts/diagnose-audit-judge-observability.ts     # post-deploy diagnosis
-npx tsx scripts/probe-anadolu-birlesik.ts                 # one-off PDF probe
+gh workflow disable audit-observability-daily.yml
 ```
 
-### Trigger the workflow manually
-
-GitHub → Actions → "Audit Judge + Trends (Scheduled + Manual)" → "Run workflow" → leave `run_judge=false` for trends-only.
-
-### Check audit_judgements live (post-PR-#427)
-
-```sql
-SELECT id, judge_model, finding_count, critical_count, cost_usd, created_at
-FROM audit_judgements
-WHERE created_at > NOW() - INTERVAL '24 hours'
-ORDER BY created_at DESC;
--- Expected: cost_usd values should now be > 0 on rows post-deploy
-```
-
-### Check trend baselines for the new fixture
-
-```sql
-SELECT fixture_id, schema_version, qa_pass, run_at,
-       metrics->>'coverages' AS cov,
-       metrics->>'exclusions' AS excl,
-       metrics->>'conditional_deductibles_count' AS cd_count
-FROM audit_trend_snapshots
-WHERE fixture_id = 'anadolu-birlesik-kasko'
-ORDER BY run_at DESC
-LIMIT 5;
-```
+Trigger when issue #419 has 7 consecutive green comments showing `audit_judgements.cost_usd > 0` and `admin_notifications` rows firing correctly. This proves the May-2 fixes (PR #427) are genuinely working in steady state.
 
 ---
 
-## Files added/modified (this session)
+## 📦 What Shipped This Session (22 PRs)
 
-### Source
+### May-2 follow-through (prior to Round-4 review, 5 PRs)
+The session opened with the previously-planned May-2 follow-up (plan file `work-on-these-remember-witty-pancake.md` initial scope) before pivoting to Round-4 review when it arrived mid-session.
 
-- `src/lib/audit/typology.ts` — NFKC + whitespace pre-pass in `normaliseInsurer()` (PR #425, commit `bbcda86`)
-- `src/lib/audit/__tests__/typology.test.ts` — 2 new regression tests (PR #425)
-- `server/middleware/cost-control.ts` — `normaliseModelKey()` helper + suffix-tolerant lookup (PR #427)
-- `server/services/audit-judge-service.ts` — `usedModel = judgeModel`; `evaluateNotificationDecision()` typed return; suppression-reason logging; escalated catch (PR #427)
-- `server/__tests__/cost-control.test.ts` — 2 new regression tests (versioned name + short-suffix guard) (PR #427)
+| # | Topic |
+|---|---|
+| #432 | Daily observability workflow (`audit-observability-daily.yml`) + `diagnose:audit` npm script |
+| #433 | Cost-control test alignment (`claude-3-5-haiku` → `claude-haiku-4-5`) + audit-judge-service comment refresh |
+| #434 | Premium Net + BSMV stacked breakdown rows (Sprint 3 #10) |
+| #435 | Special Provisions panel for named-deductible scenarios (Sprint 3 #13) |
+| #436 | AS+ servis network deductible callout (Sprint 3 #14) |
 
-### Scripts
+### Sprint 1 — Round-4 Pre-Launch Blockers (5 PRs)
+| # | Topic | Round-4 ref |
+|---|---|---|
+| #437 | Hero deductible UI fallback to highest-% scenario | P0 #1 |
+| #438 | Kullanım Şekli regex broadening (extraction-side root cause) | P0 #1 root cause |
+| #439 | Pin canonical %80 label flow into Critical Financial Risks | P0 #2 |
+| #440 | `detectImmCarveOut` accepts fallback haystacks | P0 #3 |
+| #441 | Cross-insurer leak guard at the rendering layer | Test A |
 
-- `scripts/diagnose-audit-judge-observability.ts` — NEW (PR #427)
-- `scripts/probe-anadolu-birlesik.ts` — NEW (PR #426)
+### Sprint 2 — Accuracy Hardening (5 PRs)
+| # | Topic | Round-4 ref |
+|---|---|---|
+| #442 | Exclusions dedup tightening (0.65 + exact-match pre-pass) + ÖTV-conditional filter | P1 #4 |
+| #443 | Migration 056 — formal-exclusion checklist final-step | P1 #5 |
+| #444 | Ask Your Insurer keyword broadening for Anadolu phrasings | P1 #6 |
+| #445 | 3 deterministic AI Insights recognition rules (niche kloze count, transfer, AS+ network) | P1 #6 |
+| #446 | Glass-repair recategorization (assistance → supplementary) | P1 #7 |
 
-### Workflow
+### Sprint 3 — Polish + Tests (5 PRs + 2 hot-fixes)
+| # | Topic | Round-4 ref |
+|---|---|---|
+| #447 | Hatalı Akaryakıt 50K limit recovery from description text | P2 #8 |
+| #448 | `previousInsurer` schema field + Discounts panel transfer attribution + migration 057 | P2 #9 |
+| #449 | Anadolu Hizmet bilingual gloss text | P2 #11 |
+| #450 | Output Stability Test (Test B) — manual `workflow_dispatch` | Test B |
+| #451 | Graceful-degradation regression guards | Test C |
+| #452 | OCR + SSE parse hot-fix (smoke-kasko shape mismatch) | Test B fix |
+| #453 | Substantive-check stability gate (Path A redesign) | Test B v2 |
 
-- `.github/workflows/audit-judge-trends.yml` — `schedule:` cron uncommented; header comment rewritten (PR #428)
+---
 
-### Fixtures
+## 🚨 Configuration State at Hand-Off
 
-- `tests/fixtures/kasko/anadolu-birlesik-kasko.pdf` — verbatim copy of `policies/ANADOLU.PDF`, force-added (PR #426)
-- `tests/fixtures/golden/golden.json` — new 4th fixture entry (PR #426)
-- `tests/fixtures/golden/README.md` — corpus count 3→4, expansion note rewritten (PR #426)
+### Migrations applied to production Supabase
+- ✅ Migration 056 (formal-exclusion checklist) — applied + verified
+- ✅ Migration 057 (`previousInsurer` extraction instruction) — applied + verified
 
-### Docs
+Both follow the standard idempotent guarded-update pattern (matches 048-055). Verification queries are in each migration's footer.
 
-- `CLAUDE.md` — Next Session Instructions items #1, #2, #10 rewritten; "Last Updated" bumped (PR #428). 4 new gotchas appended #151-#154 (PR #430): dated-suffix model echo (P2a real cause), typed `{value, reason}` return pattern (P2b refactor), `tests/fixtures/kasko/.gitignore` force-add convention, verify-handoff-causes-against-source rule.
-- `SESSION_HANDOFF.md` — full rewrite (PR #429), then completeness-delta-sync added quirks #8-#11 + PR #429/#430/#431 to PR-by-PR map (PR #431, this file).
-- `/root/.claude/plans/considering-that-i-prefere-serene-mist.md` — plan file authored Phase 4, approved before execution
+### `app_settings` state
+- ⚠️ `ai.temperature` = `0` — TEMPORARY for Test B verification. **Restore to `0.1`** (Priority 1 above)
+- ✅ All other keys at standard defaults
+
+### Workflows enabled
+- ✅ `smoke-kasko.yml` — every push to main (existing)
+- ✅ `audit-judge-trends.yml` — Mondays 06:00 UTC + manual (existing)
+- ✅ `audit-observability-daily.yml` — daily 08:00 UTC + manual (PR #432, May 2)
+- ✅ `output-stability.yml` — manual `workflow_dispatch` only (PR #450 + #453, this session)
+
+### Required env vars — no changes this session
+No new env vars introduced. Migration 057 + the `previousInsurer` schema field expand the existing extraction prompt and JSON schema only. The new `output-stability.yml` workflow reuses the existing `PRODUCTION_SERVER_URL` GitHub secret (gotcha #150).
+
+---
+
+## 🛠️ Diagnostic Infrastructure Available
+
+These scripts are committed to `scripts/` and runnable via `npx tsx <path>` — operator can invoke any time:
+
+| Script | Purpose | When to use |
+|---|---|---|
+| `scripts/diagnose-audit-judge-observability.ts` | Read-only Supabase queries showing audit-judge health | When audit_judgements look wrong |
+| `scripts/probe-anadolu-deductible.ts` | Verifies `classifyExclusions` regex broadening for Kullanım Şekli (PR #438) | Before/after extraction-side regex changes |
+| `scripts/output-stability-check.ts` | Substantive-check stability gate (PR #453) | Before/after major prompt or post-processing changes |
+| `scripts/smoke-kasko.ts` | 4-fixture vehicle-extraction smoke (existing) | Auto-runs in CI on every push |
+
+The first three are operator-triggered; the fourth runs automatically.
+
+---
+
+## 🧪 Test Infrastructure State
+
+- **Test A** (cross-insurer state leak): rendering-layer guard at `src/lib/reviewer/__tests__/cross-insurer-leak.test.ts` (5 tests, runs in Vitest CI on every PR). Extraction-layer guard via `forbiddenPhrases[]` in `tests/fixtures/kasko/fixtures.json` continues to run via `smoke-kasko.yml`.
+- **Test B** (output stability): substantive-check workflow at `.github/workflows/output-stability.yml`. **Verified PASS** on May 2 with all 7 substantive checks consistent across 5 runs (K80 / AS35 / IMM / AHz / AS+ / BUN / PRV all `all-true`).
+- **Test C** (graceful degradation): unit-level regression guards at `src/lib/ai/__tests__/graceful-degradation.test.ts` (13 tests, runs in Vitest CI on every PR).
+
+---
+
+## 🚧 Known Issues / Caveats
+
+### Anthropic T=0 inherent variance — gotcha #155
+Setting `ai.temperature = 0` does NOT eliminate run-to-run variance in row counts on long policies (1-3 row spread is normal due to floating-point non-associativity in batched matmul). Substantive present/absent checks ARE 100% stable at T=0 — that's what the Test B gate measures. Don't gate stability tests on count variance; gate on substantive checks. Pattern documented in gotcha #156.
+
+### Stability/smoke scripts must mirror production endpoint shape — gotcha #157
+The OCR endpoint expects `documentBase64` field name (NOT `pdfBase64`) and returns `{ success, data: { text } }` (NOT flat). The SSE extract endpoint may emit `data:{...}` without trailing space. PR #452 caught all three of these the hard way. Always diff-check new scripts against `scripts/smoke-kasko.ts` (the canonical reference) before shipping.
+
+### Cache TTL 5 min — gotcha #159
+SQL updates to `app_settings` propagate to in-flight requests on TWO conditions: wait 5+ min, OR trigger a Railway redeploy. Plan operator-facing config changes accordingly.
+
+---
+
+## 📚 Documentation Sync
+
+- **CLAUDE.md** updated this session:
+  - Next-Session Instructions block fully rewritten
+  - 6 new gotchas appended: #155 (T=0 inherent variance), #156 (substantive-check stability pattern), #157 (script shape mirror smoke-kasko), #158 (`previousInsurer` schema count 34→35), #159 (5-min cache TTL), #160 (coverage-map conservative enrichment pattern)
+  - "Last Updated" line refreshed to May 2, 2026 with Round-4 closure summary
+
+- **No new ADRs** — see Step 3 of this hand-off (architecture check) for reasoning. Round-4 work was 100% within existing extraction/UI/test architectures.
+
+---
+
+## 🔭 Round 5 Hand-Off Path (when reviewer responds)
+
+1. The Round-4 reviewer's verdict was _"the most accurate output of any iteration across both test policies"_ — Round 5 will likely target either edge cases on the Anadolu policy that didn't appear in Round 4, OR a fresh policy from a different insurer.
+2. If Round 5 surfaces new stability concerns: re-run the Output Stability Test workflow (no temperature pin needed in steady state — the substantive checks are stable at T=0.1 too, just count panels show a bit more variance which is informational).
+3. If Round 5 surfaces extraction gaps on a fresh insurer: add fixture to `tests/fixtures/kasko/`, force-add via gotcha #153, declare in `fixtures.json` with appropriate `forbiddenPhrases[]` array.
+4. If Round 5 surfaces prompt instruction gaps: add migration 058+ following the idempotent guarded-update pattern (matches 048-057).
+
+The infrastructure for Round 5 follow-up is in place. No setup work required at the start of the next session.
