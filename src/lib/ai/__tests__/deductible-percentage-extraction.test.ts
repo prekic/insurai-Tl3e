@@ -52,6 +52,8 @@ function classifyAndExtractMaxPercent(exclusions: string[]): number {
     /onarım.*muafiyet/i,
     /pert.*muafiyet/i,
     /pert.*tenzil/i,
+    // Sprint 1 PR-S1.2 — kept in sync with production policy-converter.ts
+    /rent[\s-]*a[\s-]*car|taksi|dolmu[şs]|kurye|kargo|kiral[ıi]k\s*ara[çc]|ikame\s*ara[çc]|kullan[ıi]m\s*[şs]ekli|ticari\s*kullan[ıi]m/i,
   ]
 
   let maxDeductiblePercent = 0
@@ -160,6 +162,48 @@ describe('B2 — Deductible Percentage Extraction', () => {
     it('handles Turkish percentage format "%50" correctly', () => {
       const exclusions = ['%50 muafiyet uygulanır']
       expect(classifyAndExtractMaxPercent(exclusions)).toBe(50)
+    })
+  })
+
+  // Sprint 1 PR-S1.2 — Round-4 reviewer's Anadolu Kullanım Şekli regression
+  describe('B2.S1.2 — Anadolu Kullanım Şekli Klozu (%80 commercial-use)', () => {
+    it('extracts 80 from Turkish "%80\'i" suffix format (apostrophe + i)', () => {
+      // Verbatim from Anadolu Birleşik Kasko page 12-13
+      const text =
+        "her hasarın %80'i, sigortalının kendisi tarafından karşılanmak üzere tazminat bedelinden indirilir"
+      expect(extractDeductiblePercent(text)).toBe(80)
+    })
+
+    it('classifies "Kullanım Şekli Klozu" heading as conditional deductible', () => {
+      const exclusions = ['Kullanım Şekli Klozu — her hasarın %80\'i sigortalı tarafından ödenir']
+      expect(classifyAndExtractMaxPercent(exclusions)).toBe(80)
+    })
+
+    it('classifies "kiralık araç" use-case as conditional', () => {
+      const exclusions = [
+        'Aracın kiralık araç olarak kullanılması durumunda her hasarın %80\'i muafiyet uygulanır',
+      ]
+      expect(classifyAndExtractMaxPercent(exclusions)).toBe(80)
+    })
+
+    it('classifies "ikame araç" / "test sürüşü" use-case as conditional', () => {
+      const exclusions = [
+        'Aracın ikame araç ya da test sürüşü aracı olarak kullanımı %80 muafiyet',
+      ]
+      expect(classifyAndExtractMaxPercent(exclusions)).toBe(80)
+    })
+
+    it('classifies "kargo / kurye" courier use as conditional', () => {
+      const exclusions = ['Kargo veya kurye taşımacılığı için kullanımda %80 tenzili muafiyet']
+      expect(classifyAndExtractMaxPercent(exclusions)).toBe(80)
+    })
+
+    it('keeps the higher percentage when both 35% and 80% scenarios are present', () => {
+      const exclusions = [
+        'Anlaşmalı olmayan serviste onarımda %35 muafiyet',
+        'Kullanım Şekli Klozu — kiralık araç olarak kullanımda her hasarın %80\'i muafiyet',
+      ]
+      expect(classifyAndExtractMaxPercent(exclusions)).toBe(80)
     })
   })
 })

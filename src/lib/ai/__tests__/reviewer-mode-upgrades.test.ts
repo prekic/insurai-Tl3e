@@ -24,6 +24,8 @@ function classifyExclusions(exclusions: string[]): {
     /onarım.*muafiyet/i,
     /pert.*muafiyet/i,
     /pert.*tenzil/i,
+    // Sprint 1 PR-S1.2 — kept in sync with production policy-converter.ts
+    /rent[\s-]*a[\s-]*car|taksi|dolmu[şs]|kurye|kargo|kiral[ıi]k\s*ara[çc]|ikame\s*ara[çc]|kullan[ıi]m\s*[şs]ekli|ticari\s*kullan[ıi]m/i,
   ]
 
   const trueExclusions: string[] = []

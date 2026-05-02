@@ -1238,8 +1238,13 @@ export const NAMED_DEDUCTIBLE_SCENARIOS: Array<{
     labelTr: 'Beyan dışı LPG / CNG donanımı',
   },
   {
+    // Sprint 1 PR-S1.2 — Round-4 reviewer's Anadolu policy uses the section
+    // heading "Kullanım Şekli Klozu" with %80 deductible. Original keyword set
+    // didn't match the heading verbatim. Added: Turkish kiralık/ikame phrasings,
+    // dolmuş, kargo, taşımacılık (broader Turkish suffix-tolerant), and
+    // "kullanım şekli" itself.
     keywords: [
-      /rent[\s-]*a[\s-]*car|taksi|kurye|uygulama\s*ta[şs][ıi]mac[ıi]l[ıi]g[ıi]|ticari\s*kullan[ıi]m/i,
+      /rent[\s-]*a[\s-]*car|taksi|dolmu[şs]|kurye|kargo|kiral[ıi]k\s*ara[çc]|ikame\s*ara[çc]|uygulama\s*ta[şs][ıi]mac[ıi]l[ıi][ğg]?[ıi]?|ta[şs][ıi]mac[ıi]l[ıi][ğg]?[ıi]?|ticari\s*kullan[ıi]m|kullan[ıi]m\s*[şs]ekli/i,
     ],
     labelTr: 'Rent-a-car / ticari kullanım',
   },
@@ -1300,7 +1305,9 @@ export function classifyExclusions(exclusions: string[]): {
     /pert.*muaf[iİ]yet/i, // total loss deductible
     /pert.*tenzil/i, // total loss applied deductible
     /lpg|cng/i, // fuel-system declaration triggers
-    /rent[\s-]*a[\s-]*car|taksi|kurye/i, // use-case triggers
+    // Sprint 1 PR-S1.2 — broadened use-case triggers to catch Anadolu's
+    // "Kullanım Şekli Klozu" + Turkish kiralık/ikame phrasings.
+    /rent[\s-]*a[\s-]*car|taksi|dolmu[şs]|kurye|kargo|kiral[ıi]k\s*ara[çc]|ikame\s*ara[çc]|kullan[ıi]m\s*[şs]ekli|ticari\s*kullan[ıi]m/i,
   ]
 
   const trueExclusions: string[] = []
