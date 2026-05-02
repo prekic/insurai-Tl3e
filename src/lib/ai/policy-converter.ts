@@ -210,16 +210,27 @@ export async function convertToAnalyzedPolicy(
     const coverageName = c.name || c.description || 'Unnamed Coverage'
     const aiNameTr = c.nameTr && c.nameTr !== coverageName ? c.nameTr : null
     const mappedNameTr = lookupCoverageNameTr(coverageName)
+    const resolvedNameTr = aiNameTr ?? mappedNameTr ?? coverageName
+    // Sprint 3 PR-S3.1 — recover Hatalı Akaryakıt limit (50K) when the LLM
+    // extracted the description but missed setting limit.
+    const recoveredLimit = recoverWrongFuelLimit(
+      coverageName,
+      resolvedNameTr,
+      c.description,
+      c.clause,
+      c.quote,
+      c.limit ?? 0
+    )
     return {
       name: coverageName,
-      nameTr: aiNameTr ?? mappedNameTr ?? coverageName,
-      limit: c.limit ?? 0,
+      nameTr: resolvedNameTr,
+      limit: recoveredLimit ?? c.limit ?? 0,
       deductible: c.deductible ?? 0,
       included: c.included ?? true,
       description: c.description ?? undefined,
       isUnlimited: c.isUnlimited ?? false,
       isMarketValue: c.isMarketValue ?? false,
-      category: recategorizeIfGlassRepair(coverageName, aiNameTr ?? mappedNameTr ?? coverageName, c.category ?? 'other'),
+      category: recategorizeIfGlassRepair(coverageName, resolvedNameTr, c.category ?? 'other'),
       importance: determineCoverageImportance(c),
       // Evidence pointers — propagate from ExtractedCoverage so the reviewer
       // UI can surface "Page N / § clause / quote" provenance.
@@ -1500,6 +1511,39 @@ export function dedupByTrigramJaccard(exclusions: string[], threshold = 0.65): s
     }
   }
   return exclusions.filter((_, i) => !removed.has(i))
+}
+
+/**
+ * Sprint 3 PR-S3.1 — recover an explicit limit for "Hatalı Akaryakıt"
+ * (wrong-fuel) coverages when the LLM extracted the description but
+ * missed setting limit. Reviewer's Round-4 #8: coverage rendered as
+ * "Wrong Fuel — Included" with no number, despite the policy text
+ * specifying a 50,000 TL annual cap (Anadolu page 10).
+ *
+ * Conservative scan: only fires when (a) the coverage name matches the
+ * wrong-fuel pattern, (b) limit is 0/missing, and (c) the description /
+ * clause / quote contains a 50.000 / 50,000 / 50000 / "50 bin" phrasing.
+ * Returns the recovered limit (50000) or null if no recovery possible.
+ */
+export function recoverWrongFuelLimit(
+  name: string,
+  nameTr: string,
+  description: string | undefined | null,
+  clause: string | undefined | null,
+  quote: string | undefined | null,
+  currentLimit: number
+): number | null {
+  if (currentLimit > 0) return null
+  const nameHaystack = `${name} ${nameTr}`.toLowerCase()
+  const isWrongFuel = /hatal[ıi]\s*akaryak[ıi]t|wrong\s*fuel|misfuel/i.test(nameHaystack)
+  if (!isWrongFuel) return null
+
+  const textHaystack = `${description ?? ''} ${clause ?? ''} ${quote ?? ''}`
+  // Match 50.000, 50,000, 50000, "50 bin", "50.000 TL", "TL 50.000"
+  const fiftyKMatch = /\b50[.,\s]*000\b|\b50\s*bin\b/.test(textHaystack)
+  if (!fiftyKMatch) return null
+
+  return 50000
 }
 
 /**
