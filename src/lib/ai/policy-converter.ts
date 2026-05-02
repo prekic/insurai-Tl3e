@@ -715,6 +715,11 @@ export async function convertToAnalyzedPolicy(
   //   (2) Cluster-keyword dedup catches any same-concept duplicates the
   //       Jaccard pass left behind.
   {
+    // Sprint 2 PR-S2.1 — drop ÖTV / disabled-vehicle klozes that don't apply
+    // to the current policy's vehicle (no OTVExempt flag in schema, so the
+    // safe default is to drop). Runs BEFORE dedup so the dropped strings
+    // don't interfere with paraphrase detection.
+    basePolicy.exclusions = filterConditionalExclusions(basePolicy.exclusions)
     basePolicy.exclusions = dedupByTrigramJaccard(basePolicy.exclusions)
     const dedupResult = deduplicateExclusions(basePolicy.exclusions)
     if (dedupResult.length < basePolicy.exclusions.length) {
@@ -1414,6 +1419,16 @@ function jaccard(a: Set<string>, b: Set<string>): number {
 }
 
 /**
+ * Normalize a string for exact-match comparison: NFKC + whitespace-collapse
+ * + lowercase. Two visually-identical strings that differ only in invisible
+ * whitespace or unicode normalization will hash the same. Sprint 2 PR-S2.1
+ * exact-match pre-pass relies on this.
+ */
+function normalizeForExactMatch(s: string): string {
+  return s.normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+/**
  * Collapse semantically similar exclusion paraphrases via stemmed-word
  * Jaccard similarity. Reviewer's Sprint 2 #9: AI was producing 4 different
  * paraphrases of the same "no driver's license" clause and 2 of
@@ -1426,18 +1441,53 @@ function jaccard(a: Set<string>, b: Set<string>): number {
  * stop-word filter handles the common variants without needing a full
  * Turkish stemmer.
  *
- * Default threshold 0.70 ≈ "70% of meaningful word stems overlap" — collapses
- * paraphrases of the same clause without false-collapsing distinct clauses.
+ * Default threshold 0.65 ≈ "65% of meaningful word stems overlap" —
+ * collapses paraphrases of the same clause without false-collapsing distinct
+ * clauses. Round-4 reviewer found the previous 0.70 missed paraphrases with
+ * 60-69% overlap (e.g. "Ceramic / film coatings" appearing twice in slightly
+ * different phrasings). Tightened to 0.65 in PR-S2.1.
+ *
+ * Sprint 2 PR-S2.1: added an exact-match pre-pass before the Jaccard pass.
+ * Two strings that normalize identically (NFKC + whitespace-collapse +
+ * lowercase) are collapsed without going through Jaccard. Closes the
+ * "exact duplicates slipping through Jaccard at threshold ≥ 0.7" path
+ * the reviewer flagged for the Round-4 Anadolu policy.
  */
-export function dedupByTrigramJaccard(exclusions: string[], threshold = 0.7): string[] {
+export function dedupByTrigramJaccard(exclusions: string[], threshold = 0.65): string[] {
   if (exclusions.length <= 1) return exclusions
-  const sigs = exclusions.map(stemmedWordSet)
-  const removed = new Set<number>()
+
+  // Sprint 2 PR-S2.1 — exact-match pre-pass.
+  const seenNormalized = new Map<string, number>() // normalized → first index
+  const removedExact = new Set<number>()
+  for (let i = 0; i < exclusions.length; i++) {
+    const norm = normalizeForExactMatch(exclusions[i])
+    if (norm.length === 0) continue
+    const firstIdx = seenNormalized.get(norm)
+    if (firstIdx !== undefined) {
+      // Keep the longer of the two original strings (carries legal anchors)
+      if (exclusions[i].length > exclusions[firstIdx].length) {
+        removedExact.add(firstIdx)
+        seenNormalized.set(norm, i)
+      } else {
+        removedExact.add(i)
+      }
+    } else {
+      seenNormalized.set(norm, i)
+    }
+  }
+
+  // Jaccard pass — operates on the post-exact-match remainder.
+  const sigs = exclusions.map((e, i) => (removedExact.has(i) ? null : stemmedWordSet(e)))
+  const removed = new Set<number>(removedExact)
   for (let i = 0; i < exclusions.length; i++) {
     if (removed.has(i)) continue
+    const sigI = sigs[i]
+    if (!sigI) continue
     for (let j = i + 1; j < exclusions.length; j++) {
       if (removed.has(j)) continue
-      if (jaccard(sigs[i], sigs[j]) >= threshold) {
+      const sigJ = sigs[j]
+      if (!sigJ) continue
+      if (jaccard(sigI, sigJ) >= threshold) {
         // Keep the longer phrasing — usually the more-specific one carries
         // the legal anchor (e.g. clause reference) that the user can cite.
         if (exclusions[i].length >= exclusions[j].length) {
@@ -1450,6 +1500,30 @@ export function dedupByTrigramJaccard(exclusions: string[], threshold = 0.7): st
     }
   }
   return exclusions.filter((_, i) => !removed.has(i))
+}
+
+/**
+ * Sprint 2 PR-S2.1 — drops disabled-vehicle / ÖTV-exempt klozes from the
+ * exclusion list. The "Engellilere Ait Klozu" only applies to ÖTV-exempt
+ * disabled-driver vehicles, but the LLM extracts it as a generic exclusion
+ * even on non-disabled vehicles. Without an `OTVExempt` flag in the schema
+ * (vehicleInfo doesn't carry one), the safe default is to drop the kloz —
+ * better to under-surface a niche exclusion than to mislead the user that
+ * their non-disabled vehicle is subject to it.
+ *
+ * Future improvement: add `vehicleInfo.taxClass: 'OTVExempt' | 'Standard' |
+ * 'Unknown'` to the extraction schema and only filter when
+ * `taxClass !== 'OTVExempt'`. Tracked but out of scope for this PR.
+ */
+export function filterConditionalExclusions(exclusions: string[]): string[] {
+  return exclusions.filter((e) => {
+    const lc = e.toLowerCase()
+    // Match: "engellilere ait", "engelli araç", "özel donanımlı", "özel tertibatlı",
+    // "disabled vehicle", "specially equipped"
+    if (/engelli(?!\w)|engellilere|özel\s*donan[ıi]m|özel\s*tertibat/i.test(e)) return false
+    if (/disabled\s+vehicle|specially\s*equipped|specially\s*adapted/i.test(lc)) return false
+    return true
+  })
 }
 
 function deduplicateExclusions(exclusions: string[]): string[] {
