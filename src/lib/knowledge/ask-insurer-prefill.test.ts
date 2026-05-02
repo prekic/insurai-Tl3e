@@ -106,4 +106,104 @@ describe('analyzeExclusionsComprehensive — addressedByPolicy (P1 #11B)', () =>
     expect(matched).toContain('Commercial Use')
     expect(matched).toContain('Additional Drivers')
   })
+
+  // Sprint 2 PR-S2.3 — Round-4 reviewer's Anadolu phrasings
+  describe('PR-S2.3 — Round-4 Anadolu phrasings', () => {
+    it('matches Valet template via "otopark" / "servis/tamirhane" / "oto yıkama"', () => {
+      // Verbatim from Anadolu page 9 item (c) — vale parking covered
+      // conditionally if both parties acknowledge in writing.
+      const result = analyzeExclusionsComprehensive(
+        [
+          'Otopark, servis/tamirhane, oto yıkama vb. yerlerde her iki tarafın yazılı kabulü ile vale çalınma teminat altındadır.',
+        ],
+        [],
+        false
+      )
+      const valet = result.addressedByPolicy.find((a) => a.nameEn === 'Valet Theft/Damage')
+      expect(valet).toBeDefined()
+      expect(valet!.answer).toContain('otopark')
+    })
+
+    it('matches Additional Drivers template via "bordrolu / kiralama isimli"', () => {
+      // Anadolu page 13 — rental-named companies restrict drivers to
+      // family + bordrolu (payroll) personnel.
+      const result = analyzeExclusionsComprehensive(
+        [
+          'Kiralama isimli şirketler için aile bireyi ve bordrolu personel dışındaki sürücülerde teminat geçersizdir.',
+        ],
+        [],
+        false
+      )
+      const drivers = result.addressedByPolicy.find((a) => a.nameEn === 'Additional Drivers')
+      expect(drivers).toBeDefined()
+      expect(drivers!.answer).toContain('bordrolu')
+    })
+
+    it('matches Commercial Use template via canonical "Rent-a-car / ticari kullanım: %80" label', () => {
+      // After PR-S1.2, classifyExclusions emits this exact canonical label.
+      // The matcher should recognize it as addressing the Commercial Use
+      // question.
+      const result = analyzeExclusionsComprehensive(
+        [],
+        [],
+        false,
+        ['Rent-a-car / ticari kullanım: %80']
+      )
+      const commercial = result.addressedByPolicy.find((a) => a.nameEn === 'Commercial Use')
+      expect(commercial).toBeDefined()
+      expect(commercial!.answer).toBe('Rent-a-car / ticari kullanım: %80')
+    })
+
+    it('matches Commercial Use template via "kiralık araç / ikame araç / test sürüşü"', () => {
+      // Verbatim Anadolu Kullanım Şekli kloz phrasings.
+      const result = analyzeExclusionsComprehensive(
+        [
+          'Aracın kiralık araç, ikame araç ya da test sürüşü aracı olarak kullanılması durumunda %80 muafiyet uygulanır.',
+        ],
+        [],
+        false
+      )
+      const commercial = result.addressedByPolicy.find((a) => a.nameEn === 'Commercial Use')
+      expect(commercial).toBeDefined()
+      expect(commercial!.answer).toContain('kiralık araç')
+    })
+
+    it('matches Commercial Use via "dolmuş / kargo" — additional Anadolu kloz scenarios', () => {
+      const result = analyzeExclusionsComprehensive(
+        ['Aracın taksi/dolmuş veya kargo amaçlı kullanımı %80 muafiyete tabidir.'],
+        [],
+        false
+      )
+      const commercial = result.addressedByPolicy.find((a) => a.nameEn === 'Commercial Use')
+      expect(commercial).toBeDefined()
+    })
+
+    it('matches Commercial Use via "mobil uygulama yolcu/yük taşımacılığı"', () => {
+      const result = analyzeExclusionsComprehensive(
+        [
+          'Mobil uygulamalar/internet ile yolcu taşımacılığı veya yük taşımacılığı yapılması halinde teminat dışıdır.',
+        ],
+        [],
+        false
+      )
+      const commercial = result.addressedByPolicy.find((a) => a.nameEn === 'Commercial Use')
+      expect(commercial).toBeDefined()
+    })
+
+    it('all 3 Anadolu templates match together when policy has all 3 phrasings', () => {
+      const result = analyzeExclusionsComprehensive(
+        [
+          'Otopark teslimleri için yazılı kabul gerekir.',
+          'Bordrolu personel ve aile bireyi sürücülerde geçerlidir.',
+        ],
+        [],
+        false,
+        ['Rent-a-car / ticari kullanım: %80']
+      )
+      const matched = result.addressedByPolicy.map((a) => a.nameEn)
+      expect(matched).toContain('Valet Theft/Damage')
+      expect(matched).toContain('Additional Drivers')
+      expect(matched).toContain('Commercial Use')
+    })
+  })
 })

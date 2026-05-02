@@ -1385,7 +1385,20 @@ export const COMMON_EXCLUSIONS_TO_CHECK = [
     importance: 'high',
     affectsPrivate: true,
     affectsCommercial: false,
-    keywords: ['vale', 'anahtarın ele geçir', 'anahtar üzerinde', 'valet'],
+    keywords: [
+      'vale',
+      'anahtarın ele geçir',
+      'anahtar üzerinde',
+      'valet',
+      // Sprint 2 PR-S2.3 — Round-4 Anadolu phrasings: page 9 lists vale park,
+      // otopark, servis/tamirhane, oto yıkama as conditional-coverage
+      // contexts. Broaden to catch all four.
+      'otopark',
+      'servis/tamirhane',
+      'oto yıkama',
+      'oto yikama',
+      'parking',
+    ],
   },
   {
     name: 'Alkollü Sürücü Limiti',
@@ -1412,6 +1425,13 @@ export const COMMON_EXCLUSIONS_TO_CHECK = [
       'sürücü yaşı',
       'named driver',
       'additional driver',
+      // Sprint 2 PR-S2.3 — Round-4 Anadolu page 13: rental-named companies
+      // restrict drivers to "aile + bordrolu personel". Broaden to catch
+      // these specific phrasings.
+      'bordrolu',
+      'kiralama isimli',
+      'aile bireyi',
+      'kiralama unvan',
     ],
   },
   {
@@ -1443,6 +1463,19 @@ export const COMMON_EXCLUSIONS_TO_CHECK = [
       'rideshare',
       'uber',
       'commercial use',
+      // Sprint 2 PR-S2.3 — Round-4 Anadolu Kullanım Şekli kloz lists
+      // additional commercial-use scenarios that previously slipped past
+      // the matcher: kiralık araç, ikame araç, test sürüşü, dolmuş, kargo,
+      // mobil uygulamalar/yük taşımacılığı.
+      'kiralık araç',
+      'ikame araç',
+      'test sürüşü',
+      'dolmuş',
+      'kargo',
+      'mobil uygulama',
+      'yolcu taşımacı',
+      'yük taşımacı',
+      'rent-a-car / ticari kullanım', // canonical NAMED_DEDUCTIBLE_SCENARIOS label
     ],
   },
   {
