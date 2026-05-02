@@ -67,16 +67,29 @@ async function chunkAndOcr(baseUrl: string, pdfBytes: Uint8Array): Promise<strin
 
   let combined = ''
   for (const chunk of chunks) {
-    const base64 = Buffer.from(chunk).toString('base64')
+    const documentBase64 = Buffer.from(chunk).toString('base64')
     const res = await fetch(`${baseUrl}/api/ai/ocr/document-ai`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pdfBase64: base64 }),
+      // Production endpoint expects `documentBase64`, not `pdfBase64`. The
+      // response is wrapped in `{ success, data: { text } }`, not flat.
+      // Mirrors scripts/smoke-kasko.ts:269-283 (the working reference).
+      body: JSON.stringify({ documentBase64 }),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     })
-    if (!res.ok) throw new Error(`OCR failed: ${res.status}`)
-    const json = (await res.json()) as { text?: string }
-    combined += (json.text ?? '') + '\n'
+    if (!res.ok) {
+      const raw = await res.text().catch(() => '')
+      throw new Error(`OCR failed: ${res.status} — ${raw.slice(0, 200)}`)
+    }
+    const json = (await res.json()) as {
+      success?: boolean
+      data?: { text?: string }
+      error?: string
+    }
+    if (!json.success || !json.data?.text) {
+      throw new Error(`OCR returned non-success: ${json.error ?? 'empty text'}`)
+    }
+    combined += json.data.text + '\n'
   }
   return combined
 }
@@ -91,19 +104,32 @@ async function extractOnce(baseUrl: string, documentText: string): Promise<Panel
   if (!res.ok) throw new Error(`Extract failed: ${res.status}`)
 
   const text = await res.text()
-  // Final SSE event holds the JSON. Pattern matches smoke-kasko.ts.
-  const lines = text.split('\n').filter((l) => l.startsWith('data: '))
-  const lastDataLine = lines[lines.length - 1] ?? ''
-  const payload = lastDataLine.replace(/^data:\s*/, '').trim()
-  const parsed = JSON.parse(payload) as {
+  // Final SSE event holds the JSON. Match smoke-kasko.ts:214-220 exactly:
+  //   - split on \r?\n (Windows + Unix line endings)
+  //   - match `data:` with optional trailing space (some SSE impls omit it)
+  //   - slice off the 5-char prefix and trim
+  const lines = text.split(/\r?\n/)
+  let lastPayload = ''
+  for (const line of lines) {
+    if (line.startsWith('data:')) lastPayload = line.slice(5).trim()
+  }
+  if (!lastPayload || lastPayload === '[DONE]') {
+    throw new Error(`Extract returned no data SSE event. First 200 chars: ${text.slice(0, 200)}`)
+  }
+  const parsed = JSON.parse(lastPayload) as {
+    success?: boolean
     data?: {
       coverages?: unknown[]
       exclusions?: unknown[]
       conditionalDeductibles?: unknown[]
       isBundle?: boolean | null
     }
+    error?: string
   }
-  const data = parsed.data ?? {}
+  if (!parsed.success || !parsed.data) {
+    throw new Error(`Extract returned non-success: ${parsed.error ?? 'no data'}`)
+  }
+  const data = parsed.data
   const coverages = Array.isArray(data.coverages) ? data.coverages : []
 
   return {
