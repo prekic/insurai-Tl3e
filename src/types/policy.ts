@@ -222,6 +222,13 @@ export interface Policy {
   isBundle?: boolean | null
   /** Bundled product names as written on the policy (when isBundle=true). */
   bundleProducts?: string[] | null
+  /**
+   * Sprint 3 PR-S3.2 — when the policy text indicates a renewal/transfer
+   * from a different insurer (e.g. "yenilenmiştir from Sompo Japan"), the
+   * previous insurer's name. Drives the "preserved from <X>" suffix on the
+   * NCD discount label.
+   */
+  previousInsurer?: string
   /** Currency code for this policy (TRY, USD, EUR, GBP) - defaults to TRY */
   currency?: string
   /** Amendment information - populated if document has Zeyilname markers */

@@ -73,8 +73,18 @@ export function PolicyKeyMetricsAndDiscounts({ policy }: PolicyKeyMetricsAndDisc
   const discountList: Array<{ type: string; rate: string }> = []
   if (policy.discounts) {
     if (policy.discounts.ncdDiscount) {
+      // Sprint 3 PR-S3.2 — when previousInsurer is set, append "preserved
+      // from <insurer>" to the NCD label. Surfaces the transfer context the
+      // Round-4 reviewer flagged on the Anadolu policy (renewed from Sompo
+      // Japan with %50 NCD preserved).
+      const ncdBaseLabel = locale === 'tr' ? 'Hasarsızlık İndirimi' : 'No Claims Discount'
+      const transferSuffix = policy.previousInsurer
+        ? locale === 'tr'
+          ? ` — ${policy.previousInsurer} devri`
+          : ` — preserved from ${policy.previousInsurer}`
+        : ''
       discountList.push({
-        type: locale === 'tr' ? 'Hasarsızlık İndirimi' : 'No Claims Discount',
+        type: ncdBaseLabel + transferSuffix,
         rate: '%' + policy.discounts.ncdDiscount,
       })
     }

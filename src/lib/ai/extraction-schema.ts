@@ -16,6 +16,15 @@ export interface ExtractedPolicyData {
   isBundle?: boolean | null
   bundleProducts?: string[] | null
 
+  /**
+   * Sprint 3 PR-S3.2 — when the policy text indicates a renewal/transfer
+   * from a different insurer (Turkish "yenilenmiştir" / "geçiş" / "devir",
+   * English "renewed from" / "carry-over"), the previous insurer's name
+   * (e.g. "Sompo Japan", "Aksigorta"). Drives the "preserved from <X>"
+   * suffix on the NCD discount label and feeds generateInsurerTransferInsight().
+   */
+  previousInsurer?: string | null
+
   // Policyholder information
   insuredName: string | null
   insuredAddress: string | null

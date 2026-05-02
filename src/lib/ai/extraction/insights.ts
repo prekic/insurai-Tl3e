@@ -113,13 +113,35 @@ export function generateNicheKlozeCountInsight(data: ExtractedPolicyData): strin
 /**
  * Detects insurer-transfer + NCD-preservation context. Anadolu's policy
  * page 8 indicated renewal from Sompo Japan with %50 NCD (Tier 3)
- * preserved. The transfer context isn't a formal schema field yet
- * (PR-S3.2 will add `previousInsurer`), but the LLM extracts the
- * indicator phrasing into specialConditions / exclusions / aiInsights.
- * Pattern-match those text bins to surface the insight without a
- * schema dependency.
+ * preserved. Two-tier detection:
+ *   1. STRUCTURED — `data.previousInsurer` is set by the LLM (Sprint 3
+ *      PR-S3.2 added the schema field). Strongest signal; emits an
+ *      attributed insight naming the previous insurer.
+ *   2. TEXT-PATTERN FALLBACK — when the structured field isn't populated,
+ *      pattern-match `specialConditions` / `exclusions` for transfer
+ *      indicators ("yenilenmiştir" / "geçiş" / "devir" / "carry-over").
+ *      Surface a hedged insight that doesn't name the insurer.
  */
 export function generateInsurerTransferInsight(data: ExtractedPolicyData): string | null {
+  // Tier 1 — structured field (strongest signal)
+  if (typeof data.previousInsurer === 'string' && data.previousInsurer.trim().length > 0) {
+    const haystack = [
+      ...(data.specialConditions ?? []),
+      ...(data.exclusions ?? []),
+    ]
+      .join(' ')
+      .toLowerCase()
+    const hasNcdSignal = /hasars[ıi]zl[ıi]k\s*(indir|kademe)|no[\s-]?claims\s*discount/i.test(
+      haystack
+    )
+    const insurer = data.previousInsurer.trim()
+    if (hasNcdSignal) {
+      return `${insurer} poliçesinden devir/yenileme tespit edildi — hasarsızlık indirim kademesinin korunduğu ve devir sırasında bilgi farklılığı olmadığı doğrulanmalı`
+    }
+    return `${insurer} poliçesinden devir/yenileme görünüyor — devir koşulları ve önceki teminat kapsamıyla farklılıklar incelenmeli`
+  }
+
+  // Tier 2 — text-pattern fallback
   const haystack = [
     ...(data.specialConditions ?? []),
     ...(data.exclusions ?? []),
@@ -129,12 +151,9 @@ export function generateInsurerTransferInsight(data: ExtractedPolicyData): strin
 
   if (haystack.length === 0) return null
 
-  // Transfer indicators: "yenilenmiştir", "geçiş", "devir", "transfer", "carryover"
   const hasTransfer = /yenilen(?:m|d)i[şs]|önceki\s*sigort|geçi[şs]\s*pol|devi(?:r|rd)|carry[\s-]?over|transfer/i.test(
     haystack
   )
-
-  // NCD signal: hasarsızlık indirimi / no-claims discount + a percentage
   const hasNcdSignal = /hasars[ıi]zl[ıi]k\s*(indir|kademe)|no[\s-]?claims\s*discount/i.test(haystack)
 
   if (hasTransfer && hasNcdSignal) {

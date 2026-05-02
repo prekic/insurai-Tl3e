@@ -53,6 +53,11 @@ export const EXTRACTION_JSON_SCHEMA = {
         description:
           'When isBundle=true, the bundled product names exactly as written on the policy (e.g. ["Genişletilmiş Kasko", "Koltuk Ferdi Kaza", "Artan Mali Sorumluluk", "Hukuksal Koruma"]). Null when isBundle is false or null.',
       },
+      previousInsurer: {
+        type: ['string', 'null'],
+        description:
+          'Sprint 3 PR-S3.2 — when the policy text indicates a renewal or transfer from a different insurer (Turkish: "yenilenmiştir", "geçiş poliçesi", "devir", "önceki sigortacı"; English: "renewed from", "carry-over from", "transfer from"), extract the previous insurer\'s name (e.g. "Sompo Japan", "Aksigorta", "AXA"). Null when no transfer indicator is present. Often appears alongside an NCD/hasarsızlık-indirimi continuation note.',
+      },
       insuredName: {
         type: ['string', 'null'],
         description: 'Name of the insured person or entity',
@@ -497,6 +502,7 @@ export const EXTRACTION_JSON_SCHEMA = {
       'policyType',
       'isBundle',
       'bundleProducts',
+      'previousInsurer',
       'insuredName',
       'insuredAddress',
       'insuredEntityType',

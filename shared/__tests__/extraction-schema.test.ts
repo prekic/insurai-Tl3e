@@ -21,12 +21,13 @@ describe('shared/extraction-schema', () => {
     expect(schema.additionalProperties).toBe(false)
   })
 
-  it('has 34 top-level required fields', () => {
+  it('has 35 top-level required fields', () => {
     // This count tracks EXTRACTION_JSON_SCHEMA.schema.required.length and must
     // be updated alongside every top-level property addition/removal per
     // gotcha #47 (OpenAI strict-mode required[] completeness).
     // 32→34: added isBundle + bundleProducts for P1 #4 bundle detection.
-    expect(schema.required).toHaveLength(34)
+    // 34→35: added previousInsurer for Round-4 PR-S3.2 (Sompo Japan transfer).
+    expect(schema.required).toHaveLength(35)
   })
 
   it('has discounts object with required sub-fields', () => {

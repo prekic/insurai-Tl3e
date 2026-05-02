@@ -499,6 +499,11 @@ export async function convertToAnalyzedPolicy(
       Array.isArray(data.bundleProducts) && data.bundleProducts.length > 0
         ? data.bundleProducts
         : undefined,
+    // Sprint 3 PR-S3.2 — propagate previousInsurer when LLM extracts it
+    previousInsurer:
+      typeof data.previousInsurer === 'string' && data.previousInsurer.trim().length > 0
+        ? data.previousInsurer.trim()
+        : undefined,
     discounts: data.discounts ?? undefined,
     // Extract vehicle metadata from raw text for kasko/traffic policies.
     // The standard ExtractedPolicyData schema does not request vehicle fields,

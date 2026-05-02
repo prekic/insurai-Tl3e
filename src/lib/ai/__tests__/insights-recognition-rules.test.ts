@@ -153,6 +153,57 @@ describe('generateInsurerTransferInsight (PR-S2.4)', () => {
       expect(generateInsurerTransferInsight(data)).not.toBeNull()
     }
   })
+
+  // Sprint 3 PR-S3.2 — Tier 1 structured field signal
+  it('Tier 1: emits attributed insight naming previousInsurer when set + NCD', () => {
+    const data: ExtractedPolicyData = {
+      ...baseData,
+      previousInsurer: 'Sompo Japan',
+      specialConditions: ['Hasarsızlık indirimi %50 korunmuştur'],
+    }
+    const result = generateInsurerTransferInsight(data)
+    expect(result).not.toBeNull()
+    expect(result).toContain('Sompo Japan')
+    expect(result).toContain('hasarsızlık indirim kademesinin korunduğu')
+  })
+
+  it('Tier 1: emits hedged attributed insight when previousInsurer set but no NCD signal', () => {
+    const data: ExtractedPolicyData = {
+      ...baseData,
+      previousInsurer: 'Aksigorta',
+      specialConditions: ['Devir tamamlanmıştır'],
+    }
+    const result = generateInsurerTransferInsight(data)
+    expect(result).not.toBeNull()
+    expect(result).toContain('Aksigorta')
+    expect(result).toContain('devir/yenileme görünüyor')
+  })
+
+  it('Tier 1: previousInsurer takes precedence over text-pattern fallback', () => {
+    const data: ExtractedPolicyData = {
+      ...baseData,
+      previousInsurer: 'AXA Sigorta',
+      // Text pattern would also match (would have triggered Tier 2 alone)
+      specialConditions: ['Önceki sigortacıdan yenilenmiştir', 'Hasarsızlık indirimi %40'],
+    }
+    const result = generateInsurerTransferInsight(data)
+    expect(result).not.toBeNull()
+    // Tier 1 wins — names AXA explicitly instead of generic "Önceki sigortacıdan"
+    expect(result).toContain('AXA Sigorta')
+  })
+
+  it('Tier 1: empty/whitespace previousInsurer falls through to Tier 2', () => {
+    const data: ExtractedPolicyData = {
+      ...baseData,
+      previousInsurer: '   ', // whitespace-only
+      specialConditions: ['Yenilemedir, hasarsızlık indirimi korundu'],
+    }
+    const result = generateInsurerTransferInsight(data)
+    expect(result).not.toBeNull()
+    // Tier 2 generic phrasing — no insurer name
+    expect(result).not.toContain('AXA')
+    expect(result).toContain('Önceki sigortacıdan')
+  })
 })
 
 describe('generateNetworkBenefitInsight (PR-S2.4)', () => {

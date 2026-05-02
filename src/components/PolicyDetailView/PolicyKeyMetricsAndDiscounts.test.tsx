@@ -178,6 +178,29 @@ describe('PolicyKeyMetricsAndDiscounts', () => {
     expect(screen.queryByTestId('servis-network-callout')).not.toBeInTheDocument()
   })
 
+  // Sprint 3 PR-S3.2 — previousInsurer transfer context on NCD label
+  it('appends "preserved from <insurer>" suffix to NCD label when previousInsurer is set', () => {
+    const policy: AnalyzedPolicy = {
+      ...base,
+      discounts: { ncdDiscount: 50, groupDiscount: null, otherDiscountPct: null, evidence: null },
+      previousInsurer: 'Sompo Japan',
+    }
+    render(<PolicyKeyMetricsAndDiscounts policy={policy} />)
+    expect(screen.getByText(/No Claims Discount.*preserved from Sompo Japan/i)).toBeInTheDocument()
+    expect(screen.getByText('%50')).toBeInTheDocument()
+  })
+
+  it('renders bare "No Claims Discount" when previousInsurer is undefined', () => {
+    const policy: AnalyzedPolicy = {
+      ...base,
+      discounts: { ncdDiscount: 50, groupDiscount: null, otherDiscountPct: null, evidence: null },
+    }
+    render(<PolicyKeyMetricsAndDiscounts policy={policy} />)
+    expect(screen.getByText('No Claims Discount')).toBeInTheDocument()
+    // No "preserved from" suffix
+    expect(screen.queryByText(/preserved from/i)).not.toBeInTheDocument()
+  })
+
   // Sprint 1 PR-S1.1 — hero deductible fallback when deductiblePercent is missing
   it('renders highest-% conditional scenario when deductiblePercent is missing', () => {
     const policy: AnalyzedPolicy = {
