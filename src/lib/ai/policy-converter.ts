@@ -219,7 +219,7 @@ export async function convertToAnalyzedPolicy(
       description: c.description ?? undefined,
       isUnlimited: c.isUnlimited ?? false,
       isMarketValue: c.isMarketValue ?? false,
-      category: c.category ?? 'other',
+      category: recategorizeIfGlassRepair(coverageName, aiNameTr ?? mappedNameTr ?? coverageName, c.category ?? 'other'),
       importance: determineCoverageImportance(c),
       // Evidence pointers — propagate from ExtractedCoverage so the reviewer
       // UI can surface "Page N / § clause / quote" provenance.
@@ -1500,6 +1500,32 @@ export function dedupByTrigramJaccard(exclusions: string[], threshold = 0.65): s
     }
   }
   return exclusions.filter((_, i) => !removed.has(i))
+}
+
+/**
+ * Sprint 2 PR-S2.5 — recategorize glass-repair coverages from `assistance`
+ * to `supplementary`. The Round-4 reviewer flagged Anadolu's "Yerinde
+ * Sınırsız Cam Onarımı/Değişimi" rendering under Assistance Services
+ * when it's clearly a glass-coverage benefit (a feature of the AS+
+ * Yetkili Servis Ağı glass program), not a roadside-assistance service.
+ *
+ * Pattern matches Turkish + English glass-repair phrasings. Only fires
+ * when the LLM assigned `assistance` (the most common miscategorization);
+ * if the LLM correctly assigned `supplementary` or `main`, we don't touch.
+ */
+export function recategorizeIfGlassRepair(
+  name: string,
+  nameTr: string,
+  currentCategory: 'main' | 'liability' | 'supplementary' | 'assistance' | 'legal' | 'other'
+): typeof currentCategory {
+  if (currentCategory !== 'assistance') return currentCategory
+  const haystack = `${name} ${nameTr}`.toLowerCase()
+  const isGlassRepair =
+    /cam\s*onar[ıi]m|cam\s*de[ğg]i[şs]|glass\s*repair|glass\s*replace|windshield\s*(repair|replace)/i.test(
+      haystack
+    )
+  if (isGlassRepair) return 'supplementary'
+  return currentCategory
 }
 
 /**
