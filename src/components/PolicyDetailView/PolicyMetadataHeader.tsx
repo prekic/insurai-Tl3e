@@ -8,28 +8,18 @@ import type { AnalyzedPolicy } from '@/types/policy'
 interface PolicyMetadataHeaderProps {
   policy: AnalyzedPolicy
   isTrialResult: boolean
-  isUnverified: boolean
   children?: React.ReactNode // For export menu
 }
 
 export function PolicyMetadataHeader({
   policy,
   isTrialResult,
-  isUnverified,
   children,
 }: PolicyMetadataHeaderProps) {
   const navigate = useNavigate()
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
 
   const handleShare = async () => {
-    if (isUnverified) {
-      toast.warning(
-        locale === 'tr'
-          ? 'DOĞRULANMAMIŞ — Paylaşım inceleme tamamlanana kadar devre dışı'
-          : 'UNVERIFIED — Sharing disabled until review is complete'
-      )
-      return
-    }
     try {
       const shareUrl = `${window.location.origin}/policy/${policy.id}`
       if (navigator.share) {
@@ -93,9 +83,8 @@ export function PolicyMetadataHeader({
           <div className="flex gap-0.5 sm:gap-1 flex-shrink-0">
             <button
               onClick={handleShare}
-              className={`p-2 hover:bg-gray-100 rounded-lg transition-colors ${isUnverified ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               aria-label={t.common.share}
-              aria-disabled={isUnverified}
             >
               <Share2 size={18} className="text-gray-600" />
             </button>

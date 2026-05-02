@@ -162,21 +162,8 @@ export function PolicyDetailView() {
   }, [actuarialResult, policy])
 
   // Export handlers
-  const draftExportBlocked = useCallback(() => {
-    if (isUnverified) {
-      setExportMenuOpen(false)
-      toast.warning(
-        locale === 'tr'
-          ? 'DOĞRULANMAMIŞ — Dışa aktarma inceleme tamamlanana kadar devre dışı'
-          : 'UNVERIFIED — Export disabled until review is complete'
-      )
-      return true
-    }
-    return false
-  }, [isUnverified, locale])
-
   const handleExportPdf = useCallback(async () => {
-    if (!policy || draftExportBlocked()) return
+    if (!policy) return
     setExportMenuOpen(false)
     try {
       const success = await exportPolicy(policy)
@@ -189,17 +176,17 @@ export function PolicyDetailView() {
       console.error('Failed to export PDF:', err)
       toast.error(t.exportMenu.pdfSuccess ? 'PDF export failed' : 'PDF export failed')
     }
-  }, [policy, exportPolicy, t.exportMenu.pdfSuccess, t.exportMenu.popupBlocked, draftExportBlocked])
+  }, [policy, exportPolicy, t.exportMenu.pdfSuccess, t.exportMenu.popupBlocked])
 
   const handleExportCsv = useCallback(() => {
-    if (!policy || draftExportBlocked()) return
+    if (!policy) return
     setExportMenuOpen(false)
     exportSinglePolicyToCSV(policy, locale as 'tr' | 'en')
     toast.success(t.exportMenu.csvSuccess)
-  }, [policy, locale, t.exportMenu.csvSuccess, draftExportBlocked])
+  }, [policy, locale, t.exportMenu.csvSuccess])
 
   const handleExportExcel = useCallback(async () => {
-    if (!policy || draftExportBlocked()) return
+    if (!policy) return
     setExportMenuOpen(false)
     try {
       await exportSinglePolicyToExcel(policy, locale as 'tr' | 'en')
@@ -208,10 +195,10 @@ export function PolicyDetailView() {
       toast.error(locale === 'tr' ? 'Excel dışa aktarımı başarısız oldu' : 'Excel export failed')
       console.error(err)
     }
-  }, [policy, locale, t.exportMenu.excelSuccess, draftExportBlocked])
+  }, [policy, locale, t.exportMenu.excelSuccess])
 
   const handleExportText = useCallback(() => {
-    if (!policy || !reviewerSummary || draftExportBlocked()) return
+    if (!policy || !reviewerSummary) return
     setExportMenuOpen(false)
 
     const summary = exportToText(policy, locale)
@@ -226,7 +213,7 @@ export function PolicyDetailView() {
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
     toast.success(t.exportMenu.textSuccess)
-  }, [policy, reviewerSummary, locale, t, draftExportBlocked])
+  }, [policy, reviewerSummary, locale, t])
 
   // Show loading state while fetching policy
   if (isLoadingPolicy) {
@@ -313,14 +300,8 @@ export function PolicyDetailView() {
         </div>
       )}
 
-      <PolicyMetadataHeader
-        policy={policy}
-        isTrialResult={isTrialResult}
-        isUnverified={isUnverified}
-      >
+      <PolicyMetadataHeader policy={policy} isTrialResult={isTrialResult}>
         <PolicyExportMenu
-          isUnverified={isUnverified}
-          draftExportBlocked={draftExportBlocked}
           isPdfGenerating={isPdfGenerating}
           handleExportPdf={handleExportPdf}
           handleExportCsv={handleExportCsv}

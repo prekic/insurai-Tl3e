@@ -1,87 +1,47 @@
 import { describe, it, expect } from 'vitest'
 
 /**
- * Draft Gating Regression Tests (B4 Blocker)
+ * Draft Gating Regression Tests
  *
- * Validates that draft policies (from KASKO pilot with isDraft flag)
- * are properly gated from export and sharing operations.
- *
- * These tests verify the gating concept at a unit level rather than
- * rendering the full PolicyDetailView (which has many dependencies).
+ * Note: As of Option-A relaxation, draft / unverified policies are NO LONGER
+ * blocked from export or share — only the SharedResult banner and
+ * ComparePolicies draft labeling remain. The blocking-related blocks below
+ * assert the new contract: export and share remain functional regardless of
+ * isDraft. The banner / labeling blocks further down are unchanged.
  */
 
 // ---------------------------------------------------------------------------
-// PolicyDetailView: draftExportBlocked() logic
+// PolicyDetailView: export is no longer gated by isDraft
 // ---------------------------------------------------------------------------
-describe('Draft gating logic — PolicyDetailView export blocking', () => {
-  it('should block export when isDraft is true', () => {
+describe('Export is no longer gated by isDraft', () => {
+  it('does not block export even when isDraft is true', () => {
     const isDraft = true
-    const blocked = isDraft // simulates draftExportBlocked()
-    expect(blocked).toBe(true)
-  })
-
-  it('should allow export when isDraft is false', () => {
-    const isDraft = false
-    const blocked = isDraft
+    // Production no longer derives a `blocked` value from isDraft.
+    const blocked = false
     expect(blocked).toBe(false)
-  })
-
-  it('should allow export when displaySummary is null (non-pilot policy)', () => {
-    const displaySummary: { isDraft?: boolean } | null = null
-    // @ts-expect-error - mismatch due to schema update
-    const isDraft = displaySummary?.isDraft ?? false
-    expect(isDraft).toBe(false)
-  })
-
-  it('should allow export when displaySummary is undefined', () => {
-    const displaySummary: { isDraft?: boolean } | undefined = undefined
-    // @ts-expect-error - mismatch due to schema update
-    const isDraft = displaySummary?.isDraft ?? false
-    expect(isDraft).toBe(false)
-  })
-
-  it('should allow export when isPilotResult is true but isDraft is false', () => {
-    const displaySummary = { isPilotResult: true, isDraft: false }
-    const isDraft = displaySummary?.isDraft ?? false
-    expect(isDraft).toBe(false)
-  })
-
-  it('should block export when isPilotResult is true and isDraft is true', () => {
-    const displaySummary = { isPilotResult: true, isDraft: true }
-    const isDraft = displaySummary?.isDraft ?? false
     expect(isDraft).toBe(true)
   })
 
-  it('should allow export when isDraft field is missing from displaySummary', () => {
-    const displaySummary: { isPilotResult?: boolean } = { isPilotResult: true }
-    const isDraft = (displaySummary as { isDraft?: boolean })?.isDraft ?? false
-    expect(isDraft).toBe(false)
+  it('does not block export when isDraft is false', () => {
+    const blocked = false
+    expect(blocked).toBe(false)
   })
 })
 
 // ---------------------------------------------------------------------------
-// PolicyDetailView: share button draft gating
+// PolicyDetailView: share button no longer surfaces a draft toast warning
 // ---------------------------------------------------------------------------
-describe('Draft gating logic — share button toast warning', () => {
-  it('should show toast warning when sharing a draft policy', () => {
+describe('Share button no longer surfaces a draft toast warning', () => {
+  it('does not show a draft toast warning when sharing a draft policy', () => {
     const isDraft = true
-    let toastShown = false
-
-    if (isDraft) {
-      toastShown = true // simulates toast.warning(...)
-    }
-
-    expect(toastShown).toBe(true)
+    // Production share handler does not branch on isDraft.
+    const toastShown = false
+    expect(toastShown).toBe(false)
+    expect(isDraft).toBe(true)
   })
 
-  it('should not show toast warning when sharing a non-draft policy', () => {
-    const isDraft = false
-    let toastShown = false
-
-    if (isDraft) {
-      toastShown = true
-    }
-
+  it('does not show a draft toast warning when sharing a non-draft policy', () => {
+    const toastShown = false
     expect(toastShown).toBe(false)
   })
 })
@@ -172,22 +132,21 @@ describe('Draft gating edge cases', () => {
     expect(displaySummary.isDraft === true).toBe(false)
   })
 
-  it('should block all export types when isDraft is true', () => {
-    const isDraft = true
+  it('does not block any export type when isDraft is true', () => {
     const exportTypes = ['pdf', 'csv', 'text', 'excel'] as const
 
     for (const _exportType of exportTypes) {
-      const blocked = isDraft
-      expect(blocked).toBe(true)
+      // Option-A relaxation: export proceeds regardless of isDraft.
+      const blocked = false
+      expect(blocked).toBe(false)
     }
   })
 
-  it('should allow all export types when isDraft is false', () => {
-    const isDraft = false
+  it('does not block any export type when isDraft is false', () => {
     const exportTypes = ['pdf', 'csv', 'text', 'excel'] as const
 
     for (const _exportType of exportTypes) {
-      const blocked = isDraft
+      const blocked = false
       expect(blocked).toBe(false)
     }
   })

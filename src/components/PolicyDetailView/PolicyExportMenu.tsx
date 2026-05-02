@@ -3,8 +3,6 @@ import { Download, FileText, FileSpreadsheet, FileDown, Loader2 } from 'lucide-r
 import { useI18n } from '@/lib/i18n'
 
 interface PolicyExportMenuProps {
-  isUnverified: boolean
-  draftExportBlocked: () => void
   isPdfGenerating: boolean
   handleExportPdf: () => void
   handleExportCsv: () => void
@@ -13,15 +11,13 @@ interface PolicyExportMenuProps {
 }
 
 export function PolicyExportMenu({
-  isUnverified,
-  draftExportBlocked,
   isPdfGenerating,
   handleExportPdf,
   handleExportCsv,
   handleExportExcel,
   handleExportText,
 }: PolicyExportMenuProps) {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const exportMenuRef = useRef<HTMLDivElement>(null)
 
@@ -38,38 +34,19 @@ export function PolicyExportMenu({
 
   return (
     <div className="relative" ref={exportMenuRef}>
-      <div
-        className={isUnverified ? 'cursor-not-allowed group relative inline-block' : ''}
-        title={
-          isUnverified
-            ? locale === 'tr'
-              ? 'Dışa aktarma doğrulanmamış poliçeler için devre dışı'
-              : 'Export disabled for unverified policies'
-            : undefined
-        }
+      <button
+        onClick={() => setExportMenuOpen((prev) => !prev)}
+        className="p-2 rounded-lg transition-colors hover:bg-gray-100"
+        aria-label={t.exportMenu.exportAs}
+        aria-expanded={exportMenuOpen}
+        aria-haspopup="true"
       >
-        <button
-          onClick={(e) => {
-            if (isUnverified) {
-              e.preventDefault()
-              draftExportBlocked()
-              return
-            }
-            setExportMenuOpen((prev) => !prev)
-          }}
-          className={`p-2 rounded-lg transition-colors ${isUnverified ? 'opacity-50' : 'hover:bg-gray-100'}`}
-          aria-label={t.exportMenu.exportAs}
-          aria-expanded={exportMenuOpen}
-          aria-haspopup="true"
-          disabled={isUnverified}
-        >
-          {isPdfGenerating && !isUnverified ? (
-            <Loader2 size={18} className="text-gray-600 animate-spin" />
-          ) : (
-            <Download size={18} className="text-gray-600" />
-          )}
-        </button>
-      </div>
+        {isPdfGenerating ? (
+          <Loader2 size={18} className="text-gray-600 animate-spin" />
+        ) : (
+          <Download size={18} className="text-gray-600" />
+        )}
+      </button>
       {exportMenuOpen && (
         <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
           <button

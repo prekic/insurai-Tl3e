@@ -131,7 +131,7 @@ describe('Sprint 1: Trustworthiness Hardening UI Tests', () => {
     } as any)
   })
 
-  it('Renders UNVERIFIED banner and blocks export/share when isDraft is true', () => {
+  it('Renders UNVERIFIED banner but keeps export/share functional when isDraft is true', () => {
     vi.spyOn(useDisplaySafeSummaryHook, 'useDisplaySafeSummary').mockReturnValue({
       isDraft: true,
       isPilotResult: false,
@@ -139,24 +139,22 @@ describe('Sprint 1: Trustworthiness Hardening UI Tests', () => {
 
     renderComponent()
 
-    // Banner renders (English since locale = 'en')
+    // Banner still renders (English since locale = 'en')
     expect(
       screen.getByText(/AI output has not yet received human expert verification/i)
     ).toBeInTheDocument()
 
-    // Export blocked: the button inside the titled wrapper should be disabled
-    const exportWrapper = screen.getByTitle('Export disabled for unverified policies')
-    const exportBtn = exportWrapper.querySelector('button')
-    expect(exportBtn).toBeTruthy()
-    expect(exportBtn!.disabled).toBe(true)
+    // Export button is enabled (no longer disabled when unverified)
+    const exportBtn = screen.getByLabelText(/export/i)
+    expect((exportBtn as HTMLButtonElement).disabled).toBe(false)
 
-    // Share blocked
+    // Share button does not surface a UNVERIFIED warning toast
     const shareButton = screen.getByLabelText(/Share/i)
     fireEvent.click(shareButton)
-    expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining('UNVERIFIED'))
+    expect(toast.warning).not.toHaveBeenCalledWith(expect.stringContaining('UNVERIFIED'))
   })
 
-  it('Renders UNVERIFIED banner and blocks export/share when isVerificationPending is true', () => {
+  it('Renders UNVERIFIED banner but keeps export/share functional when isVerificationPending is true', () => {
     vi.spyOn(useDisplaySafeSummaryHook, 'useDisplaySafeSummary').mockReturnValue({
       isDraft: false,
       isPilotResult: true,
@@ -168,13 +166,12 @@ describe('Sprint 1: Trustworthiness Hardening UI Tests', () => {
       screen.getByText(/AI output has not yet received human expert verification/i)
     ).toBeInTheDocument()
 
-    // Share blocked
     const shareButton = screen.getByLabelText(/Share/i)
     fireEvent.click(shareButton)
-    expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining('UNVERIFIED'))
+    expect(toast.warning).not.toHaveBeenCalledWith(expect.stringContaining('UNVERIFIED'))
   })
 
-  it('Renders UNVERIFIED banner and blocks export/share when lowConfidence is true', () => {
+  it('Renders UNVERIFIED banner but keeps export/share functional when lowConfidence is true', () => {
     vi.spyOn(useDisplaySafeSummaryHook, 'useDisplaySafeSummary').mockReturnValue({
       isDraft: false,
       isPilotResult: false,
@@ -185,13 +182,12 @@ describe('Sprint 1: Trustworthiness Hardening UI Tests', () => {
       screen.getByText(/AI output has not yet received human expert verification/i)
     ).toBeInTheDocument()
 
-    // Share blocked
     const shareButton = screen.getByLabelText(/Share/i)
     fireEvent.click(shareButton)
-    expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining('UNVERIFIED'))
+    expect(toast.warning).not.toHaveBeenCalledWith(expect.stringContaining('UNVERIFIED'))
   })
 
-  it('Renders UNVERIFIED banner and blocks export/share when evaluation.isProvisional is true because aiConfidence < 0.85', () => {
+  it('Renders UNVERIFIED banner but keeps export/share functional when evaluation.isProvisional is true because aiConfidence < 0.85', () => {
     vi.spyOn(useDisplaySafeSummaryHook, 'useDisplaySafeSummary').mockReturnValue({
       isDraft: false,
       isPilotResult: false,
@@ -220,14 +216,12 @@ describe('Sprint 1: Trustworthiness Hardening UI Tests', () => {
     expect(
       screen.getByText(/AI output has not yet received human expert verification/i)
     ).toBeInTheDocument()
-    expect(
-      screen.getByTitle('Export disabled for unverified policies').querySelector('button')!.disabled
-    ).toBe(true)
+    expect((screen.getByLabelText(/export/i) as HTMLButtonElement).disabled).toBe(false)
     fireEvent.click(screen.getByLabelText(/Share/i))
-    expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining('UNVERIFIED'))
+    expect(toast.warning).not.toHaveBeenCalledWith(expect.stringContaining('UNVERIFIED'))
   })
 
-  it("Renders UNVERIFIED banner and blocks export/share when evaluation.isProvisional is true because benchmarkStatus === 'untrusted'", () => {
+  it("Renders UNVERIFIED banner but keeps export/share functional when evaluation.isProvisional is true because benchmarkStatus === 'untrusted'", () => {
     vi.spyOn(useDisplaySafeSummaryHook, 'useDisplaySafeSummary').mockReturnValue({
       isDraft: false,
       isPilotResult: false,
@@ -256,14 +250,12 @@ describe('Sprint 1: Trustworthiness Hardening UI Tests', () => {
     expect(
       screen.getByText(/AI output has not yet received human expert verification/i)
     ).toBeInTheDocument()
-    expect(
-      screen.getByTitle('Export disabled for unverified policies').querySelector('button')!.disabled
-    ).toBe(true)
+    expect((screen.getByLabelText(/export/i) as HTMLButtonElement).disabled).toBe(false)
     fireEvent.click(screen.getByLabelText(/Share/i))
-    expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining('UNVERIFIED'))
+    expect(toast.warning).not.toHaveBeenCalledWith(expect.stringContaining('UNVERIFIED'))
   })
 
-  it('Renders UNVERIFIED banner and blocks export/share when evaluation.isProvisional is true because benchmark is missing', () => {
+  it('Renders UNVERIFIED banner but keeps export/share functional when evaluation.isProvisional is true because benchmark is missing', () => {
     vi.spyOn(useDisplaySafeSummaryHook, 'useDisplaySafeSummary').mockReturnValue({
       isDraft: false,
       isPilotResult: false,
@@ -292,11 +284,9 @@ describe('Sprint 1: Trustworthiness Hardening UI Tests', () => {
     expect(
       screen.getByText(/AI output has not yet received human expert verification/i)
     ).toBeInTheDocument()
-    expect(
-      screen.getByTitle('Export disabled for unverified policies').querySelector('button')!.disabled
-    ).toBe(true)
+    expect((screen.getByLabelText(/export/i) as HTMLButtonElement).disabled).toBe(false)
     fireEvent.click(screen.getByLabelText(/Share/i))
-    expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining('UNVERIFIED'))
+    expect(toast.warning).not.toHaveBeenCalledWith(expect.stringContaining('UNVERIFIED'))
   })
   it('Renders new ScenarioCard structures without errors', () => {
     vi.spyOn(usePolicyEvaluationHook, 'usePolicyEvaluation').mockReturnValue({
