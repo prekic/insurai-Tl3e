@@ -76,6 +76,101 @@ export function hasKaskoBaseCoverage(coverages: ExtractedCoverage[]): boolean {
 }
 
 /**
+ * Sprint 2 PR-S2.4 — Round-4 reviewer asked for richer AI Insights
+ * recognizing the policy's actual content (27 detected coverage features
+ * with 14 niche klozes, Sompo Japan transfer with %50 NCD preserved,
+ * AS+ Yetkili Servis Ağı flagship benefit).
+ *
+ * Three new deterministic rule generators below.
+ */
+
+/**
+ * Recognizes when a policy carries an unusually large number of
+ * supplementary/niche klozes (beyond the standard kasko peril set).
+ * Anadolu's "Birleşik Kasko" had 27 coverage features including ~14
+ * niche additions like Hatalı Akaryakıt, Cam Koruma, Hasarsızlık
+ * Koruma, Eskisi Yerine Yenisi, Evcil Hayvan, Mini Onarım. Surfacing
+ * the count at the top of insights is high-signal.
+ */
+export function generateNicheKlozeCountInsight(data: ExtractedPolicyData): string | null {
+  const coverages = data.coverages ?? []
+  if (coverages.length === 0) return null
+
+  const supplementaryCount = coverages.filter(
+    (c) => c.category === 'supplementary' || c.category === 'assistance'
+  ).length
+
+  // Threshold: at least 5 supplementary OR 20+ total coverages with at
+  // least 3 supplementary (richness signal). Below this, the insight
+  // would be noise on a basic policy.
+  if (supplementaryCount < 5 && (coverages.length < 20 || supplementaryCount < 3)) {
+    return null
+  }
+
+  return `${coverages.length} teminat kalemi tespit edildi (${supplementaryCount} ek/asistans klozu) — kapsam zenginliği yüksek; her bir klozun limit ve koşulları doğrulanmalı`
+}
+
+/**
+ * Detects insurer-transfer + NCD-preservation context. Anadolu's policy
+ * page 8 indicated renewal from Sompo Japan with %50 NCD (Tier 3)
+ * preserved. The transfer context isn't a formal schema field yet
+ * (PR-S3.2 will add `previousInsurer`), but the LLM extracts the
+ * indicator phrasing into specialConditions / exclusions / aiInsights.
+ * Pattern-match those text bins to surface the insight without a
+ * schema dependency.
+ */
+export function generateInsurerTransferInsight(data: ExtractedPolicyData): string | null {
+  const haystack = [
+    ...(data.specialConditions ?? []),
+    ...(data.exclusions ?? []),
+  ]
+    .join(' ')
+    .toLowerCase()
+
+  if (haystack.length === 0) return null
+
+  // Transfer indicators: "yenilenmiştir", "geçiş", "devir", "transfer", "carryover"
+  const hasTransfer = /yenilen(?:m|d)i[şs]|önceki\s*sigort|geçi[şs]\s*pol|devi(?:r|rd)|carry[\s-]?over|transfer/i.test(
+    haystack
+  )
+
+  // NCD signal: hasarsızlık indirimi / no-claims discount + a percentage
+  const hasNcdSignal = /hasars[ıi]zl[ıi]k\s*(indir|kademe)|no[\s-]?claims\s*discount/i.test(haystack)
+
+  if (hasTransfer && hasNcdSignal) {
+    return 'Önceki sigortacıdan devir/yenileme tespit edildi — hasarsızlık indirim kademesinin korunduğu ve devir sırasında bilgi farklılığı olmadığı doğrulanmalı'
+  }
+  if (hasTransfer) {
+    return 'Önceki sigortacıdan poliçe devri/yenileme görünüyor — devir koşulları ve önceki teminat kapsamıyla farklılıklar incelenmeli'
+  }
+  return null
+}
+
+/**
+ * Surfaces the AS+ Yetkili Servis Ağı (Anlaşmalı Servis network) flagship
+ * benefit when present. Anadolu's policy page 1 highlights this as a
+ * primary benefit: ≤5,000 TL partial repairs at network shops do NOT
+ * affect hasarsızlık kademesi at renewal. For corporate fleets with
+ * existing %50 NCD to protect, this is high-relevance.
+ */
+export function generateNetworkBenefitInsight(data: ExtractedPolicyData): string | null {
+  const coverages = data.coverages ?? []
+  const coverageText = coverages
+    .map((c) => `${c.name ?? ''} ${c.nameTr ?? ''} ${c.description ?? ''}`)
+    .join(' ')
+    .toLowerCase()
+
+  // AS+ network signal: "AS+", "Anlaşmalı Servis Ağı", "Yetkili Servis Ağı"
+  const hasAsPlus = /\bas\+|anla[şs]mal[ıi]\s*servis\s*a[ğg][ıi]?|yetkili\s*servis\s*a[ğg][ıi]?/i.test(
+    coverageText
+  )
+
+  if (!hasAsPlus) return null
+
+  return 'Anlaşmalı Servis Ağı (AS+) avantajı tespit edildi — küçük tutarlı onarımların hasarsızlık kademesini etkilememesi için ağ koşulları ve eşik tutarı poliçeden teyit edilmeli'
+}
+
+/**
  * Generate policy strengths based on extracted data
  */
 export function generateStrengths(data: ExtractedPolicyData): string[] {
@@ -271,6 +366,20 @@ export async function generateRecommendationsAsync(data: ExtractedPolicyData): P
  */
 export async function generateAIInsightsAsync(data: ExtractedPolicyData): Promise<string[]> {
   const insights: string[] = []
+
+  // Sprint 2 PR-S2.4 — Round-4 reviewer asked for richer recognition
+  // insights at the top of the list. These three deterministic rules run
+  // BEFORE gaps/strengths/recommendations so they appear first and are
+  // visible in the UI's top-3 preview window (gotcha — maxAiInsightsPreview
+  // is 3). All three return null when their pattern doesn't apply, so
+  // they're zero-cost on policies that don't carry the relevant signal.
+  const recognitionInsights = [
+    generateNicheKlozeCountInsight(data),
+    generateInsurerTransferInsight(data),
+    generateNetworkBenefitInsight(data),
+  ].filter((i): i is string => i !== null)
+  insights.push(...recognitionInsights.map((r) => `✨ ${r}`))
+
   // Reviewer-mode priority order: gaps/warnings first, then strengths, then recommendations
   // Gaps and recommendations are generated in English, then translated to Turkish
   // for language-consistent reviewer output. Strengths are already Turkish.
