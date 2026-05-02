@@ -178,13 +178,35 @@ const IMM_CARVEOUT_LOCATION_HINTS = [
 ]
 
 /**
- * Inspect an IMM coverage's evidence fields (clause, quote, and any
- * carveOuts the LLM populated) for the 2.5M TL airport/port/fuel-depot
- * carve-out. Returns a short bilingual caveat string when found, else
- * null.
+ * Helpers for the IMM carve-out detector — checks if a haystack text
+ * contains the 2.5M TL location-+-amount pattern.
+ */
+function haystackHasCarveOut(haystack: string): {
+  locationHit: boolean
+  amountHit: boolean
+} {
+  const lc = haystack.toLowerCase()
+  const locationHit = IMM_CARVEOUT_LOCATION_HINTS.some((h) => lc.includes(h))
+  const amountHit = /2[.,\s]*500[.,\s]*000/.test(lc) || /2[,.]?5\s*milyon/.test(lc)
+  return { locationHit, amountHit }
+}
+
+/**
+ * Inspect an IMM coverage's evidence fields (clause, quote, description,
+ * carveOuts) for the 2.5M TL airport/port/fuel-depot carve-out. Returns
+ * a short bilingual caveat string when found, else null.
+ *
+ * Sprint 1 PR-S1.4 — Round-4 reviewer's Anadolu policy carries the
+ * "Artan Mali Sorumluluk Sınırsız Teminatı Klozu" with the 2.5M TL cap
+ * spelled out in detail at industrial sites. The LLM doesn't always
+ * place that text on the coverage's own evidence fields — sometimes it
+ * lands on `policy.exclusions[]` or `policy.specialConditions[]` instead.
+ * The optional `fallbackTexts` parameter lets the caller pass those
+ * adjacent text fields so the detector can still match.
  */
 export function detectImmCarveOut(
-  coverage: import('@/types/policy').Coverage
+  coverage: import('@/types/policy').Coverage,
+  fallbackTexts?: string[]
 ): { en: string; tr: string } | null {
   const carveOuts = (coverage as { carveOuts?: string[] | null }).carveOuts
   if (Array.isArray(carveOuts) && carveOuts.length > 0) {
@@ -195,13 +217,31 @@ export function detectImmCarveOut(
     }
   }
 
-  const haystack =
-    `${coverage.clause ?? ''} ${coverage.quote ?? ''} ${coverage.description ?? ''}`.toLowerCase()
-  if (!haystack.trim()) return null
+  // Primary haystack: the coverage's own evidence fields.
+  const primary =
+    `${coverage.clause ?? ''} ${coverage.quote ?? ''} ${coverage.description ?? ''}`.trim()
 
-  const locationHit = IMM_CARVEOUT_LOCATION_HINTS.some((h) => haystack.includes(h))
-  // The amount language is usually "2.500.000" or "2,5 milyon"; catch both.
-  const amountHit = /2[.,\s]*500[.,\s]*000/.test(haystack) || /2[,.]?5\s*milyon/.test(haystack)
+  let locationHit = false
+  let amountHit = false
+  if (primary) {
+    const hit = haystackHasCarveOut(primary)
+    locationHit = hit.locationHit
+    amountHit = hit.amountHit
+  }
+
+  // Sprint 1 PR-S1.4 — fallback to policy-level adjacent text fields.
+  // We accumulate hits across both primary AND fallback haystacks so that a
+  // policy with the location keyword on the coverage but the 2.5M amount on
+  // a special-conditions blob still resolves to the full caveat.
+  if (Array.isArray(fallbackTexts) && fallbackTexts.length > 0) {
+    for (const text of fallbackTexts) {
+      if (typeof text !== 'string' || !text.trim()) continue
+      const hit = haystackHasCarveOut(text)
+      if (hit.locationHit) locationHit = true
+      if (hit.amountHit) amountHit = true
+      if (locationHit && amountHit) break // short-circuit once we have both
+    }
+  }
 
   if (locationHit && amountHit) {
     return {
@@ -2146,7 +2186,16 @@ function generateScenarioCards(
       // locations. If the coverage's quote / clause / explicit carveOuts
       // hint at that pattern, surface it as a caveat badge rather than
       // claiming the user truly pays 0 TL in every scenario.
-      const carveOutCaveat = detectImmCarveOut(immCoverage)
+      //
+      // Sprint 1 PR-S1.4 — pass policy.exclusions[] and
+      // policy.specialConditions[] as fallback haystacks. The LLM doesn't
+      // always place the carve-out text on the coverage's own evidence
+      // fields; passing adjacent policy-level text lets the detector still
+      // match for the Round-4 Anadolu Birleşik Kasko case.
+      const carveOutCaveat = detectImmCarveOut(immCoverage, [
+        ...(policy.exclusions ?? []),
+        ...(policy.specialConditions ?? []),
+      ])
       cards.push({
         id: 'imm-scenario',
         title: 'At-Fault Major Accident',
