@@ -1,0 +1,112 @@
+name: Output Stability Test (Manual)
+
+# Sprint 3 PR-S3.5 — Round-4 reviewer's Test B.
+#
+# Runs production extraction on the same Anadolu fixture 5 times and
+# reports per-panel variance. Pass criteria: <10% variance per panel.
+#
+# Manual workflow_dispatch ONLY — each run costs ~5 × $0.015 = $0.075
+# in Anthropic credits + ~5 minutes wall-clock. Not scheduled to keep
+# spend predictable.
+#
+# Pre-flight (operator manual step) before running:
+#   1. Verify ai.temperature is set to 0 in app_settings (admin UI or
+#      one SQL UPDATE). The default 0.1 will produce variance.
+#   2. Migration 056 (formal exclusions) and 057 (previousInsurer) are
+#      applied — otherwise stability metrics include the noise from
+#      missing fields.
+#
+# After-run interpretation:
+#   - PASS (variance <10%): production extraction is stable on this
+#     fixture at temperature=0. Safe to extend the corpus.
+#   - FAIL (variance ≥10%): non-deterministic post-processing or
+#     prompt ambiguity remains. Investigation hints printed by the
+#     script point at policy-converter.ts and the live DB prompt.
+
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: 'Number of extraction runs (default 5)'
+        required: false
+        default: '5'
+        type: string
+      fixture:
+        description: 'Fixture filename in tests/fixtures/kasko/'
+        required: false
+        default: 'anadolu-birlesik-kasko.pdf'
+        type: string
+
+concurrency:
+  group: output-stability
+  cancel-in-progress: true
+
+jobs:
+  stability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run output stability check
+        id: stability
+        env:
+          SMOKE_BASE_URL: ${{ secrets.PRODUCTION_SERVER_URL }}
+          STABILITY_RUNS: ${{ inputs.runs }}
+          STABILITY_FIXTURE: ${{ inputs.fixture }}
+        run: |
+          set -o pipefail
+          npx tsx scripts/output-stability-check.ts 2>&1 | tee stability-output.log
+
+      - name: Upload stability log as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: output-stability-log
+          path: stability-output.log
+          retention-days: 30
+
+      - name: Comment result on tracking issue
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            let log = ''
+            try {
+              log = fs.readFileSync('stability-output.log', 'utf8')
+            } catch (err) {
+              log = `(no log: ${err.message})`
+            }
+            const tail = log.length > 4000 ? '...\n' + log.slice(-4000) : log
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            const status = '${{ job.status }}'
+            const emoji = status === 'success' ? '✅' : '🚨'
+
+            // Phase 4 designated tracking issue — same as audit-judge-trends.
+            const trackingIssue = 419
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: trackingIssue,
+              body:
+                `## ${emoji} Output Stability Test (Round-4 Test B)\n\n` +
+                `Triggered by: \`${context.eventName}\` on \`${context.sha.slice(0, 7)}\`\n` +
+                `Status: \`${status}\`\n` +
+                `Workflow run: ${runUrl}\n\n` +
+                `<details><summary>stability output (tail)</summary>\n\n` +
+                `\`\`\`\n${tail}\n\`\`\`\n\n` +
+                `</details>\n\n` +
+                `**Pre-flight verification**: confirm \`ai.temperature\` is pinned to ` +
+                `\`0\` in \`app_settings\` before re-running. The default \`0.1\` produces ` +
+                `variance even with deterministic post-processing.`,
+            })
