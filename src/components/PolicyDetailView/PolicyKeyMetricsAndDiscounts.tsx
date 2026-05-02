@@ -7,6 +7,30 @@ interface PolicyKeyMetricsAndDiscountsProps {
   policy: AnalyzedPolicy
 }
 
+/**
+ * Sprint 1 PR-S1.1 — extraction-fallback for the hero deductible label.
+ * When `policy.deductiblePercent` didn't get populated by classifyExclusions()
+ * but `policy.conditionalDeductibles[]` has canonical "<label>: %<N>" entries
+ * (gotcha #93), parse the highest-% scenario so the hero shows a number-
+ * anchored label rather than the generic "Conditional" placeholder.
+ */
+function getHighestDeductibleScenario(
+  provisions: string[] | undefined
+): { label: string; percent: number } | null {
+  if (!provisions || provisions.length === 0) return null
+  let max: { label: string; percent: number } | null = null
+  for (const p of provisions) {
+    const match = p.match(/^(.+?):\s*%(\d+)/)
+    if (match) {
+      const percent = parseInt(match[2], 10)
+      if (!Number.isNaN(percent) && (!max || percent > max.percent)) {
+        max = { label: match[1].trim(), percent }
+      }
+    }
+  }
+  return max
+}
+
 export function PolicyKeyMetricsAndDiscounts({ policy }: PolicyKeyMetricsAndDiscountsProps) {
   const { t, locale } = useI18n()
   const { formatConverted } = useDisplayCurrency()
@@ -21,6 +45,30 @@ export function PolicyKeyMetricsAndDiscounts({ policy }: PolicyKeyMetricsAndDisc
   const hasNonNetworkServisCallout = (policy.conditionalDeductibles ?? []).some((p) =>
     /Anla[şs]mal[ıi] olmayan servis/i.test(p)
   )
+
+  // Sprint 1 PR-S1.1 — fallback for hero deductible when extraction didn't
+  // populate `deductiblePercent`. Resolved once per render.
+  const fallbackDeductibleScenario = !policy.deductiblePercent
+    ? getHighestDeductibleScenario(policy.conditionalDeductibles)
+    : null
+
+  const renderDeductibleLabel = (): string => {
+    if (policy.deductiblePercent && policy.deductiblePercent > 0) {
+      return locale === 'tr'
+        ? `%${policy.deductiblePercent} tenzili muafiyet`
+        : `${policy.deductiblePercent}% proportional deductible`
+    }
+    if (fallbackDeductibleScenario) {
+      return `%${fallbackDeductibleScenario.percent} — ${fallbackDeductibleScenario.label}`
+    }
+    if (isConditionalDeductible) {
+      return t.policy.deductibleConditional
+    }
+    if (policy.deductible > 0) {
+      return formatConverted(policy.deductible)
+    }
+    return t.global.none
+  }
 
   const discountList: Array<{ type: string; rate: string }> = []
   if (policy.discounts) {
@@ -80,18 +128,13 @@ export function PolicyKeyMetricsAndDiscounts({ policy }: PolicyKeyMetricsAndDisc
         <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">{t.policy.deductibleLabel}</p>
         <p
           className={`text-sm font-semibold truncate ${
-            isConditionalDeductible ? 'text-amber-600' : 'text-gray-900'
+            isConditionalDeductible || fallbackDeductibleScenario
+              ? 'text-amber-600'
+              : 'text-gray-900'
           }`}
+          title={renderDeductibleLabel()}
         >
-          {policy.deductiblePercent && policy.deductiblePercent > 0
-            ? locale === 'tr'
-              ? `%${policy.deductiblePercent} tenzili muafiyet`
-              : `${policy.deductiblePercent}% proportional deductible`
-            : isConditionalDeductible
-              ? t.policy.deductibleConditional
-              : policy.deductible > 0
-                ? formatConverted(policy.deductible)
-                : t.global.none}
+          {renderDeductibleLabel()}
         </p>
         {hasNonNetworkServisCallout && (
           <small

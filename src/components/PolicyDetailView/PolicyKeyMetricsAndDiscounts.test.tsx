@@ -177,4 +177,48 @@ describe('PolicyKeyMetricsAndDiscounts', () => {
     render(<PolicyKeyMetricsAndDiscounts policy={base} />)
     expect(screen.queryByTestId('servis-network-callout')).not.toBeInTheDocument()
   })
+
+  // Sprint 1 PR-S1.1 — hero deductible fallback when deductiblePercent is missing
+  it('renders highest-% conditional scenario when deductiblePercent is missing', () => {
+    const policy: AnalyzedPolicy = {
+      ...base,
+      deductible: 0,
+      conditionalDeductibles: [
+        'Anlaşmalı olmayan servis: %35',
+        'Rent-a-car / ticari kullanım: %80',
+        'Pert araç muafiyeti: %20',
+      ],
+    }
+    render(<PolicyKeyMetricsAndDiscounts policy={policy} />)
+    // Highest-% wins: 80
+    expect(screen.getByText(/%80 — Rent-a-car \/ ticari kullanım/i)).toBeInTheDocument()
+    // The generic placeholder must NOT render when fallback succeeds
+    expect(screen.queryByText(/Conditional — see details below/i)).not.toBeInTheDocument()
+  })
+
+  it('falls through to generic Conditional label when conditionalDeductibles has no %N entries', () => {
+    const policy: AnalyzedPolicy = {
+      ...base,
+      deductible: 0,
+      // No %N — these don't match the fallback regex
+      conditionalDeductibles: ['Some descriptive text without a percent'],
+    }
+    render(<PolicyKeyMetricsAndDiscounts policy={policy} />)
+    expect(screen.getByText(/Conditional — see details below/i)).toBeInTheDocument()
+  })
+
+  it('prioritizes existing deductiblePercent over the fallback scenario', () => {
+    // When both deductiblePercent AND conditionalDeductibles are present,
+    // the explicit deductiblePercent wins (the fallback is a safety net only).
+    const policy: AnalyzedPolicy = {
+      ...base,
+      deductible: 0,
+      deductiblePercent: 5,
+      conditionalDeductibles: ['Rent-a-car / ticari kullanım: %80'],
+    }
+    render(<PolicyKeyMetricsAndDiscounts policy={policy} />)
+    expect(screen.getByText(/5% proportional deductible/i)).toBeInTheDocument()
+    // Fallback string must NOT render when deductiblePercent is set
+    expect(screen.queryByText(/%80 — Rent-a-car/i)).not.toBeInTheDocument()
+  })
 })
