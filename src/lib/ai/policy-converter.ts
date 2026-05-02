@@ -221,13 +221,16 @@ export async function convertToAnalyzedPolicy(
       c.quote,
       c.limit ?? 0
     )
+    // Sprint 3 PR-S3.4 — gloss for Anadolu Hizmet assistance package when
+    // the LLM didn't populate a substantive description.
+    const hizmetGloss = generateAnadoluHizmetGloss(coverageName, resolvedNameTr, c.description)
     return {
       name: coverageName,
       nameTr: resolvedNameTr,
       limit: recoveredLimit ?? c.limit ?? 0,
       deductible: c.deductible ?? 0,
       included: c.included ?? true,
-      description: c.description ?? undefined,
+      description: hizmetGloss ?? c.description ?? undefined,
       isUnlimited: c.isUnlimited ?? false,
       isMarketValue: c.isMarketValue ?? false,
       category: recategorizeIfGlassRepair(coverageName, resolvedNameTr, c.category ?? 'other'),
@@ -1516,6 +1519,40 @@ export function dedupByTrigramJaccard(exclusions: string[], threshold = 0.65): s
     }
   }
   return exclusions.filter((_, i) => !removed.has(i))
+}
+
+/**
+ * Sprint 3 PR-S3.4 — gloss text for "Anadolu Hizmet" assistance package.
+ *
+ * Round-4 reviewer: "Anadolu Service: Included" tells the user nothing.
+ * The actual Anadolu Hizmet package includes towing, replacement vehicle
+ * (30 days × 2/year), medical transport, companion accommodation,
+ * vehicle/corpse repatriation, and vale park service.
+ *
+ * Returns a bilingual gloss when:
+ *   (a) the coverage name matches the Anadolu Hizmet pattern, AND
+ *   (b) the existing description is empty / placeholder / shorter than 30 chars
+ *
+ * Returns null otherwise. Caller writes the returned string to the
+ * description field, leaving any LLM-extracted longer description alone.
+ */
+export function generateAnadoluHizmetGloss(
+  name: string,
+  nameTr: string,
+  existingDescription: string | undefined | null
+): string | null {
+  const haystack = `${name} ${nameTr}`.toLowerCase()
+  const isAnadoluHizmet = /anadolu\s*hizmet|anadolu\s*service/i.test(haystack)
+  if (!isAnadoluHizmet) return null
+
+  // If LLM already populated a substantive description, don't overwrite.
+  const existing = (existingDescription ?? '').trim()
+  if (existing.length >= 30) return null
+
+  // Bilingual gloss — Turkish first (primary user audience), then English
+  // separator + English variant. Single string; consumers can split on
+  // " / " if they need locale-specific rendering.
+  return 'Çekme/kurtarma, ikame araç (yılda 2 × 30 gün), tıbbi nakil, refakatçi konaklama, araç/cenaze nakli, vale park (İstanbul). / Includes towing, replacement vehicle (30 days × 2/year), medical transport, companion accommodation, vehicle/corpse repatriation, vale park (Istanbul).'
 }
 
 /**
