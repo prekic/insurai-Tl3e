@@ -122,22 +122,39 @@ No new env vars introduced. Migration 057 + the `previousInsurer` schema field e
 
 ## 🛠️ Diagnostic Infrastructure Available
 
-These scripts are committed to `scripts/` and runnable via `npx tsx <path>` — operator can invoke any time:
+These scripts are committed to `scripts/` and runnable via `npx tsx <path>` — operator can invoke any time. PR #432 also added an `npm run diagnose:audit` shortcut for the audit-judge probe.
 
-| Script | Purpose | When to use |
-|---|---|---|
-| `scripts/diagnose-audit-judge-observability.ts` | Read-only Supabase queries showing audit-judge health | When audit_judgements look wrong |
-| `scripts/probe-anadolu-deductible.ts` | Verifies `classifyExclusions` regex broadening for Kullanım Şekli (PR #438) | Before/after extraction-side regex changes |
-| `scripts/output-stability-check.ts` | Substantive-check stability gate (PR #453) | Before/after major prompt or post-processing changes |
-| `scripts/smoke-kasko.ts` | 4-fixture vehicle-extraction smoke (existing) | Auto-runs in CI on every push |
+| Script | npm shortcut | Purpose | When to use |
+|---|---|---|---|
+| `scripts/diagnose-audit-judge-observability.ts` | `npm run diagnose:audit` | Read-only Supabase queries showing audit-judge health (4 queries) | When audit_judgements look wrong |
+| `scripts/probe-anadolu-deductible.ts` | (none — run via `npx tsx`) | Verifies `classifyExclusions` regex broadening for Kullanım Şekli (PR #438) | Before/after extraction-side regex changes |
+| `scripts/output-stability-check.ts` | (run via workflow_dispatch) | Substantive-check stability gate (PR #453) | Before/after major prompt or post-processing changes |
+| `scripts/smoke-kasko.ts` | `npm run smoke:kasko` | 4-fixture vehicle-extraction smoke (existing) | Auto-runs in CI on every push |
 
 The first three are operator-triggered; the fourth runs automatically.
 
 ---
 
+## 🌐 i18n Keys Added This Session
+
+Per gotcha #98 (4-file rule), every i18n key addition this session touched all four of:
+`src/lib/i18n/translations-en.ts`, `translations-tr.ts`, `translations-skeleton.ts` (empty value), and the `TranslationDictionary` interface in `translations.ts`.
+
+| Key | EN value | TR value | Added in PR |
+|---|---|---|---|
+| `policy.premiumNet` | "Net Premium" | "Net Prim" | #434 |
+| `policy.premiumTax` | "BSMV Tax" | "BSMV" | #434 |
+| `policy.specialProvisionsLabel` | "Special Provisions" | "Özel Şartlar" | #435 |
+| `policy.specialProvisionsCount` | "{count} named-deductible scenarios — click to expand" | "{count} isimlendirilmiş muafiyet senaryosu — açmak için tıklayın" | #435 |
+| `policy.servisNetworkCallout` | "Deductible applies for repairs outside the authorized service network" | "Yetkili servis dışı onarımlarda muafiyet uygulanır" | #436 |
+
+5 new keys × 4 files = 20 file-touches. All 4 i18n files therefore appear in `git diff --name-status` with substantive content additions (not just empty-string skeleton entries — the real EN/TR strings are populated).
+
+---
+
 ## 🧪 Test Infrastructure State
 
-- **Test A** (cross-insurer state leak): rendering-layer guard at `src/lib/reviewer/__tests__/cross-insurer-leak.test.ts` (5 tests, runs in Vitest CI on every PR). Extraction-layer guard via `forbiddenPhrases[]` in `tests/fixtures/kasko/fixtures.json` continues to run via `smoke-kasko.yml`.
+- **Test A** (cross-insurer state leak): rendering-layer guard at `src/lib/reviewer/__tests__/cross-insurer-leak.test.ts` (5 tests, runs in Vitest CI on every PR). Extraction-layer guard via `forbiddenPhrases[]` in `tests/fixtures/kasko/fixtures.json` continues to run via `smoke-kasko.yml`. PR #441 also updated `tests/fixtures/kasko/README.md` to formally document the `forbiddenPhrases[]` field (previously undocumented in the field-reference table) and the three-layer Test A coverage strategy.
 - **Test B** (output stability): substantive-check workflow at `.github/workflows/output-stability.yml`. **Verified PASS** on May 2 with all 7 substantive checks consistent across 5 runs (K80 / AS35 / IMM / AHz / AS+ / BUN / PRV all `all-true`).
 - **Test C** (graceful degradation): unit-level regression guards at `src/lib/ai/__tests__/graceful-degradation.test.ts` (13 tests, runs in Vitest CI on every PR).
 

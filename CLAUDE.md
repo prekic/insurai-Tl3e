@@ -760,6 +760,13 @@ npm run format:check  # Check formatting
 npm run loadtest:quick  # 5s quick load test
 npm run loadtest:stress # 30s stress test
 
+# Diagnostics & Audit
+npm run diagnose:audit  # Audit-judge observability probe (PR #432, May 2 2026)
+npm run audit:trends    # Weekly trend baseline diff
+npm run audit:judge     # Audit judge corpus run
+npm run smoke:kasko     # Vehicle-extraction smoke against production
+npm run qa:extraction   # Extraction quality CSV/markdown report
+
 # Lighthouse
 npm run lighthouse    # Full Lighthouse CI run
 ```
