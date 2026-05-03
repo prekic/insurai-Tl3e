@@ -307,7 +307,17 @@ async function extractUnified(
     success: boolean
     data?: Record<string, unknown>
     error?: string
-  }>(`${baseUrl}/api/ai/extract`, { documentText, policyType: 'kasko' }, REQUEST_TIMEOUT_MS)
+  }>(
+    `${baseUrl}/api/ai/extract`,
+    // Cost-control PR (May 3 2026): smoke runs use Anthropic Haiku 4.5 instead
+    // of the production-default Sonnet 4.6. Haiku is ~3× cheaper and produces
+    // identical vehicle extraction quality on the 4 fixtures (smoke only checks
+    // make / model / year / plate / forbiddenPhrases, all of which Haiku handles
+    // fine). The deeper substantive-check stability gate keeps using the default
+    // Sonnet model — that's where extraction-quality regressions are caught.
+    { documentText, policyType: 'kasko', model: 'claude-haiku-4-5' },
+    REQUEST_TIMEOUT_MS
+  )
   if (!result.ok || !result.data?.success || !result.data.data) {
     const errMsg = result.data?.error ?? result.raw.slice(0, 200)
     throw new Error(`Extract failed: HTTP ${result.status} — ${errMsg}`)

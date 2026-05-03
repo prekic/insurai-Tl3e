@@ -11,8 +11,17 @@ on:
 
   # Fallback for when the Railway webhook isn't wired up yet — runs after
   # every push to main with a fixed sleep so production has time to redeploy.
+  # Path-filtered (May 3, 2026 cost-controls): only fire on AI-pipeline-affecting
+  # changes. Docs-only / unrelated-test PRs no longer burn ~$0.40 each.
   push:
     branches: [main]
+    paths:
+      - 'scripts/smoke-kasko.ts'
+      - 'server/routes/ai/**'
+      - 'src/lib/ai/**'
+      - 'shared/extraction-schema.ts'
+      - 'supabase/migrations/**'
+      - 'tests/fixtures/kasko/**'
 
 # Don't pile up runs — newest wins.
 concurrency:

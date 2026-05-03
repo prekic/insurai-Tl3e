@@ -70,7 +70,7 @@ import { pathToFileURL } from 'node:url'
 import { PDFDocument } from 'pdf-lib'
 
 const FIXTURES_DIR = path.resolve('tests/fixtures/kasko')
-const DEFAULT_RUNS = 5
+const DEFAULT_RUNS = 3
 const REQUEST_TIMEOUT_MS = 180_000
 const DOCUMENT_AI_PAGE_LIMIT = 10 // Mirrors src/lib/ai/pdf-splitter.ts:11
 

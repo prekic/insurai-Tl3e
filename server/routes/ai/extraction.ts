@@ -32,6 +32,7 @@ import {
 } from '../../middleware/validation.js'
 import * as adminNotificationService from '../../services/admin-notification-service.js'
 import { getAIConfig } from '../../services/config-service.js'
+import { hashOcrInput, lookupOcrCache, storeOcrCache } from '../../services/ocr-cache.js'
 import { sendExtractionCompleteNotification } from '../../services/notification-service.js'
 import { getExtractionPrompt } from '../../services/prompt-service.js'
 import { buildAnthropicSchemaPrompt, type ConfidenceWeights } from '../../lib/ai-prompts.js'
@@ -43,6 +44,42 @@ import {
 import { recordExtractionEvent, recordOverviewMetrics } from './shared.js'
 
 const log = logger.child('AI')
+
+// Allowlist of models a request body may set via the `model` field on extraction
+// endpoints. Without this guard, any caller (including untrusted clients on the
+// public internet) could pick claude-3-opus ($75/M output tokens) or any other
+// frontier-tier model and run up the bill. Cost-control PR (May 3, 2026).
+//
+// To add a new model, list its bare alias here; the dated suffix variant is
+// also tolerated (e.g. claude-haiku-4-5-20251001) for forward-compat with the
+// Anthropic SDK echoing dated model names — see gotcha #151.
+const EXTRACTION_MODEL_ALLOWLIST = new Set([
+  'claude-haiku-4-5',
+  'claude-haiku-4-5-20251001',
+  'claude-sonnet-4-6',
+  'claude-sonnet-4-6-20251022',
+  'gpt-5.4',
+  'gpt-4o',
+  'gpt-4o-mini',
+])
+
+/**
+ * Reject the request with HTTP 400 if `model` is set to a value outside the
+ * allowlist. Returns true if the caller should continue (model unset OR in
+ * allowlist), false if a 400 has been sent.
+ */
+function assertExtractionModelAllowed(model: unknown, res: Response): boolean {
+  if (model === undefined || model === null || model === '') return true
+  if (typeof model !== 'string' || !EXTRACTION_MODEL_ALLOWLIST.has(model)) {
+    res.status(400).json({
+      error: 'model not in allowlist',
+      code: 'MODEL_NOT_ALLOWED',
+      allowed: Array.from(EXTRACTION_MODEL_ALLOWLIST),
+    })
+    return false
+  }
+  return true
+}
 
 // ES Module directory resolution
 const __filename = fileURLToPath(import.meta.url)
@@ -252,6 +289,7 @@ router.post(
         model,
         policyType,
       } = req.body as OpenAIExtractionInput & { policyType?: string }
+      if (!assertExtractionModelAllowed(model, res)) return
       log.info('Document received', {
         requestId,
         chars: documentText?.length || 0,
@@ -621,6 +659,7 @@ router.post(
         model,
         policyType,
       } = req.body as AnthropicExtractionInput & { policyType?: string }
+      if (!assertExtractionModelAllowed(model, res)) return
 
       // Get AI config from database first (needed for dynamic confidence weights in prompt)
       const aiConfig = await getAIConfig()
@@ -1043,6 +1082,7 @@ router.post(
       model,
       policyType,
     } = req.body as AnthropicExtractionInput & { policyType?: string; model?: string }
+    if (!assertExtractionModelAllowed(model, res)) return
 
     log.info('Unified extraction request received', {
       requestId,
@@ -1970,6 +2010,33 @@ router.post(
 
       const { documentBase64, mimeType, languageHints } = req.body as DocumentAIInput
 
+      // Cache lookup BEFORE the live Document AI call (cost-control PR, May 3 2026).
+      // Document AI is deterministic on identical input, so SHA256(documentBase64) is
+      // a sound cache key. On hit, return the cached payload with the same response
+      // shape (formFields/tables omitted by design — see migration 061 comment).
+      // Cache failures never block the live OCR path (lookup returns null on error).
+      const cacheKey = hashOcrInput(documentBase64)
+      const cached = await lookupOcrCache(cacheKey)
+      if (cached) {
+        const cachedProcessingMs = Date.now() - startTime
+        log.info('OCR cache hit', {
+          sha256: cacheKey.slice(0, 16),
+          textBytes: cached.text.length,
+          processingTimeMs: cachedProcessingMs,
+        })
+        return res.json({
+          success: true,
+          data: {
+            text: cached.text,
+            confidence: cached.confidence ?? 0.85,
+            pageCount: cached.pageCount ?? 1,
+            processingTimeMs: cachedProcessingMs,
+            cached: true,
+          },
+          cost: 0,
+        })
+      }
+
       // Build Document AI endpoint
       const endpoint = `https://${GCP_CONFIG.location}-documentai.googleapis.com/v1/projects/${GCP_CONFIG.projectId}/locations/${GCP_CONFIG.location}/processors/${GCP_CONFIG.processorId}:process`
 
@@ -2207,6 +2274,17 @@ router.post(
         tables: tables.length,
         processingTimeMs,
       })
+
+      // Cache write — fire-and-forget. Failure to store does not invalidate
+      // the live OCR result we already have to return to the caller.
+      void storeOcrCache(
+        cacheKey,
+        result.document.text || '',
+        pageCount,
+        avgConfidence,
+        mimeType,
+        languageHints
+      )
 
       res.json({
         success: true,

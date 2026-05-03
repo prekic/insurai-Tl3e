@@ -27,9 +27,9 @@ on:
   workflow_dispatch:
     inputs:
       runs:
-        description: 'Number of extraction runs (default 5)'
+        description: 'Number of extraction runs (default 3 — binary substantive checks need 3 runs to detect a flip; cost-control May 3 2026)'
         required: false
-        default: '5'
+        default: '3'
         type: string
       fixture:
         description: 'Fixture filename in tests/fixtures/kasko/ (canonical: anadolu-volkswagen-tiguan.pdf)'
