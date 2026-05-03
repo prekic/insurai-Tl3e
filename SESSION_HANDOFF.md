@@ -1,6 +1,6 @@
 # Session Handoff — May 2, 2026 — Round-4 Reviewer Feedback Closed (22 PRs, #432–#453)
 
-> **Session type**: Production accuracy hardening — opened with May-2 follow-through (5 PRs #432-#436), pivoted mid-session to closing Round-4 Anadolu Sigorta reviewer feedback (17 PRs #437-#453, including 3 P0 + 4 P1 + 4 P2 + 3 diagnostic tests + 2 hot-fixes). Path A redesign of the Output Stability Test (PR #453) ships a substantive-check stability gate that PASSED on first run after the OCR hot-fix. Plan file: `/root/.claude/plans/work-on-these-remember-witty-pancake.md`.
+> **Session type**: Production accuracy hardening — opened with May-2 follow-through (5 PRs #432-#436), pivoted mid-session to closing Round-4 Anadolu Sigorta reviewer feedback (17 PRs #437-#453, including 3 P0 + 4 P1 + 4 P2 + 3 diagnostic tests + 2 hot-fixes). Path A redesign of the Output Stability Test (PR #453) ships a substantive-check stability gate; the gate's May-2 PASS verdict was later corrected by PR #457 — see "Test Infrastructure State" below. Plan file: `/root/.claude/plans/work-on-these-remember-witty-pancake.md`.
 
 ---
 
@@ -18,7 +18,7 @@ WHERE category = 'ai' AND key = 'temperature';
 
 Run via Supabase SQL Editor. Cache TTL is 5 min (gotcha #159) — wait the time, or trigger a Railway redeploy to flush. Once done, this priority is closed and the production default is restored.
 
-**Why temporarily set to 0**: The Output Stability Test (Round-4 Test B, PR #450 / #453) needed maximum determinism to verify the substantive-check stability gate. Test B PASSED at T=0 with zero flips on 7 reviewer-flagged signals. Round-4 work doesn't require T=0 in production — `0.1` gives slightly more natural phrasing and the deterministic post-processing layer (Sprints 1–3) absorbs the small LLM variance on user-facing fields.
+**Why temporarily set to 0**: The Output Stability Test (Round-4 Test B, PR #450 / #453) needed maximum determinism to verify the substantive-check stability gate. Test B exited PASS at T=0; PR #457 (May-2 follow-up) later discovered three bugs that made the verdict pass-by-default — only BUN was actually true on the original fixture. The gate is now correctly calibrated and Tiguan-as-default. Round-4 work doesn't require T=0 in production — `0.1` gives slightly more natural phrasing and the deterministic post-processing layer (Sprints 1–3) absorbs the small LLM variance on user-facing fields.
 
 ### Priority 2 — Hand off to reviewer for Round 5 verification
 
@@ -155,7 +155,7 @@ Per gotcha #98 (4-file rule), every i18n key addition this session touched all f
 ## 🧪 Test Infrastructure State
 
 - **Test A** (cross-insurer state leak): rendering-layer guard at `src/lib/reviewer/__tests__/cross-insurer-leak.test.ts` (5 tests, runs in Vitest CI on every PR). Extraction-layer guard via `forbiddenPhrases[]` in `tests/fixtures/kasko/fixtures.json` continues to run via `smoke-kasko.yml`. PR #441 also updated `tests/fixtures/kasko/README.md` to formally document the `forbiddenPhrases[]` field (previously undocumented in the field-reference table) and the three-layer Test A coverage strategy.
-- **Test B** (output stability): substantive-check workflow at `.github/workflows/output-stability.yml`. **Verified PASS** on May 2 with all 7 substantive checks consistent across 5 runs (K80 / AS35 / IMM / AHz / AS+ / BUN / PRV all `all-true`).
+- **Test B** (output stability): substantive-check workflow at `.github/workflows/output-stability.yml`. The May-2 "PASS — all 7 substantive checks consistent" verdict (PR #453 + hot-fix #452) was later found to be a **false-positive** by PR #457. Three bugs converged: (a) the workflow's default fixture `anadolu-birlesik-kasko.pdf` is byte-identical (same SHA256, 92KB) to the simpler `anadolu-volkswagen-golf.pdf` — a 2001 Golf with only K80 + BUN signals genuinely present, not the 2016 Eriş Ambalaj Tiguan fleet policy the reviewer scored against; (b) `String([object Object])` shape bug silently broke every `conditionalDeductibles[]` regex; (c) K80/AS35 patterns were calibrated for canonical post-processed labels rather than the raw extraction's English triggers and Turkish source-text-faithful evidence. PR #457 switched the fixture default to `anadolu-volkswagen-tiguan.pdf`, replaced `String(c)` with `JSON.stringify(c)`, broadened the K80/AS35 regexes, and added a quality-floor assertion that fails when ≥3 substantive checks are silently always-absent. Re-run after PR #457 against the Tiguan: **6/7 truly present** (K80 / AS35 / IMM / AHz / BUN / PRV ✓). AS+ remains a known **extraction-prompt gap** — the live `prompt_templates.user_prompt` does not yet emit AS+ Yetkili Servis Ağı as a distinct coverage row; tracked as a separate migration 058.
 - **Test C** (graceful degradation): unit-level regression guards at `src/lib/ai/__tests__/graceful-degradation.test.ts` (13 tests, runs in Vitest CI on every PR).
 
 ---
