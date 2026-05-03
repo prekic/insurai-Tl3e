@@ -12,6 +12,7 @@ import {
   validateAndEnhanceExtraction,
   type ValidationResult,
 } from '@/lib/extraction'
+import { executeExtractionPipeline } from './pipeline'
 
 import { generateMarketComparisonDataAsync } from '@/lib/market-data/service'
 import type { ProcessingLogger } from '@/lib/processing-logger'
@@ -1190,10 +1191,13 @@ export async function extractPolicyFromDocument(
       }
     }
 
+    // Stage 2 & 3: Validations & Adapters
+    const pipelineData = await executeExtractionPipeline(enhancedExtractedData)
+
     // Convert extracted data to AnalyzedPolicy format
     // Store both raw extractedText and processedText for display and analysis
     let policy = await convertToAnalyzedPolicy(
-      enhancedExtractedData,
+      pipelineData,
       file,
       documentText,
       processedText,
