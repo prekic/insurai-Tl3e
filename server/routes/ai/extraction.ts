@@ -43,6 +43,7 @@ import {
   JUDGE_SYSTEM_PROMPT,
 } from '../../lib/self-healing.js'
 import { recordExtractionEvent, recordOverviewMetrics } from './shared.js'
+import { runStage2Validation } from '../../../src/lib/policy-pipeline/stage2-validate/orchestrator.js'
 
 const log = logger.child('AI')
 
@@ -290,6 +291,7 @@ router.post(
         model,
         policyType,
       } = req.body as OpenAIExtractionInput & { policyType?: string }
+
       if (!assertExtractionModelAllowed(model, res)) return
       log.info('Document received', {
         requestId,
@@ -435,7 +437,7 @@ router.post(
         })
       }
 
-      const parsedData = healingResult.data
+      const parsedData = runStage2Validation(healingResult.data)
       const usedModel = healingResult.finalModel || model || 'gpt-5.4'
       const inputTokens = healingResult.totalInputTokens
       const outputTokens = healingResult.totalOutputTokens
@@ -660,6 +662,7 @@ router.post(
         model,
         policyType,
       } = req.body as AnthropicExtractionInput & { policyType?: string }
+
       if (!assertExtractionModelAllowed(model, res)) return
 
       // Get AI config from database first (needed for dynamic confidence weights in prompt)
@@ -787,7 +790,7 @@ router.post(
         })
       }
 
-      const parsedData = healingResult.data
+      const parsedData = runStage2Validation(healingResult.data)
       const usedModel = healingResult.finalModel || model || aiConfig.anthropicExtractionModel
       const inputTokens = healingResult.totalInputTokens
       const outputTokens = healingResult.totalOutputTokens
@@ -1203,7 +1206,7 @@ router.post(
 
           let parsedData: unknown
           try {
-            parsedData = JSON.parse(jsonContent)
+            parsedData = runStage2Validation(JSON.parse(jsonContent))
           } catch (parseError) {
             log.error('Anthropic returned invalid JSON', {
               requestId,

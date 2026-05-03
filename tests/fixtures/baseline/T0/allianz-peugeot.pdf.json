@@ -1,0 +1,1328 @@
+{
+  "fixture": "allianz-peugeot.pdf",
+  "documentTextLength": 26558,
+  "runs": [
+    {
+      "success": true,
+      "data": {
+        "policyNumber": "0001-0210-24147152",
+        "bağlıPolNo": null,
+        "provider": "Allianz Sigorta",
+        "policyType": "kasko",
+        "isBundle": true,
+        "bundleProducts": [
+          "GENİŞLETİLMİŞ KASKO",
+          "FERDİ KAZA",
+          "İHTİYARİ MALİ MESULİYET",
+          "HUKUKSAL KORUMA"
+        ],
+        "previousInsurer": "GÜNEŞ SİGORTA",
+        "insuredName": "NACİYE PREKA",
+        "insuredAddress": "TÜRKİYE, İstanbul 34020, Zeytinburnu, Telsiz MAH. Kaktüs Sokak NO:8 D:3",
+        "insuredEntityType": "individual",
+        "vehicleUsage": "private",
+        "startDate": "2018-09-15",
+        "endDate": "2019-09-15",
+        "vehicleMake": "PEUGEOT",
+        "vehicleModel": "308 COMFORT 1.6 VTI (120) 5 KAPI OV",
+        "vehicleYear": 2010,
+        "vehiclePlate": "34 GM 6461",
+        "vin": "VF34C5FWFAY000475",
+        "tcKimlik": "120******14",
+        "vkn": null,
+        "premium": 1659.72,
+        "sigortaBedeli": null,
+        "currency": "TRY",
+        "paymentFrequency": "annual",
+        "coverages": [
+          {
+            "name": "Kasko Teminatı",
+            "nameTr": "Kasko Teminatı",
+            "limit": null,
+            "deductible": null,
+            "description": "Araç hasar tarihi itibariyle piyasa rayiç değerine kadar teminat altındadır.",
+            "isUnlimited": false,
+            "isMarketValue": true,
+            "category": "main",
+            "included": true,
+            "limitType": null,
+            "page": 1,
+            "clause": "4.1 TEMİNAT ÖZETİ",
+            "quote": "Sigorta konusu araç, fabrika çıkışında monte edilen standart donanımlarıyla birlikte... hasar tarihi itibari ile piyasa rayiç değerine kadar teminat altına alınmıştır.",
+            "carveOuts": null,
+            "normalizedName": "comprehensive kasko",
+            "canonicalName": "MAIN_KASKO_COVERAGE",
+            "parsedLimit": null
+          },
+          {
+            "name": "İhtiyari Mali Sorumluluk",
+            "nameTr": "İhtiyari Mali Sorumluluk",
+            "limit": 400000,
+            "deductible": null,
+            "description": "Maddi+bedeni kaza başına 400.000 TL; manevi tazminat ölüm ve sürekli sakatlık için 100.000 TL ile IMM limitleri içinde.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "liability",
+            "included": true,
+            "limitType": "per_event",
+            "page": 1,
+            "clause": "İHTİYARİ MALİ MESULİYET",
+            "quote": "MADDI+BEDENİ KAZA BAŞINA 400.000 TL",
+            "carveOuts": null,
+            "normalizedName": "voluntary third party liability",
+            "canonicalName": "VOLUNTARY_THIRD_PARTY_LIABILITY",
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 400000
+            }
+          },
+          {
+            "name": "Deprem",
+            "nameTr": "Deprem",
+            "limit": null,
+            "deductible": 5,
+            "description": "Piyasa rayiç bedeli üzerinden %5 muafiyetlidir.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 1,
+            "clause": "Ek Teminatlar",
+            "quote": "-DEPREM/YANARDAĞ PÜSKÜRMESİ (%5 MUAFİYETLİ)",
+            "carveOuts": null,
+            "normalizedName": "earthquake and volcanic eruption",
+            "canonicalName": "EARTHQUAKE",
+            "parsedLimit": null
+          },
+          {
+            "name": "Grev, Lokavt, Terör",
+            "nameTr": "Grev, Lokavt, Terör",
+            "limit": null,
+            "deductible": null,
+            "description": "Türkiye Cumhuriyeti sınırları içinde kapsam dahilindedir.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 1,
+            "clause": "Ek Teminatlar",
+            "quote": "-GREV LOKAVT HALK HAREKETLERİ",
+            "carveOuts": null,
+            "normalizedName": "strike, lockout, riot and civil commotion",
+            "canonicalName": "STRIKE_LOCKOUT_TERROR",
+            "parsedLimit": null
+          },
+          {
+            "name": "Sel ve Su Baskını",
+            "nameTr": "Sel ve Su Baskını",
+            "limit": null,
+            "deductible": null,
+            "description": "Sel su baskınından kaynaklanan kasko zararları teminat altındadır.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 1,
+            "clause": "Ek Teminatlar",
+            "quote": "-SEL",
+            "carveOuts": null,
+            "normalizedName": "flood",
+            "canonicalName": "FLOOD_WATER_DAMAGE",
+            "parsedLimit": null
+          },
+          {
+            "name": "Mini Onarım",
+            "nameTr": "Mini Onarım",
+            "limit": null,
+            "deductible": null,
+            "description": "Auto King Servis Merkezlerinde küçük ölçekli hasarların bedelsiz giderilmesi hizmetidir.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 6,
+            "clause": "Mini Onarım Hizmeti Klozu",
+            "quote": "Allianz Mini Onarım Hizmeti, aracınızın kaporta, boya ve iç döşeme aksamlarında oluşabilecek... küçük ölçekli hasarların Auto King Servis Merkezlerinde bedelsiz olarak giderilmesi hizmetidir.",
+            "carveOuts": null,
+            "normalizedName": "mini repair service",
+            "canonicalName": "MINI_REPAIR",
+            "parsedLimit": null
+          },
+          {
+            "name": "Koltuk Ferdi Kaza - Vefat",
+            "nameTr": "Koltuk Ferdi Kaza - Vefat",
+            "limit": 5000,
+            "deductible": null,
+            "description": "Tescil belgesindeki yer adedi ile sınırlı ferdi kaza teminatı.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "other",
+            "included": true,
+            "limitType": "per_event",
+            "page": 1,
+            "clause": "FERDİ KAZA",
+            "quote": "YOLCU ÖLÜM/SÜREKLİ SAKATLIK 5.000 TL",
+            "carveOuts": null,
+            "normalizedName": "personal accident - passenger",
+            "canonicalName": "SEAT_PERSONAL_ACCIDENT_DEATH",
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 5000
+            }
+          },
+          {
+            "name": "Koltuk Ferdi Kaza - Sürekli Sakatlık",
+            "canonicalName": "SEAT_PERSONAL_ACCIDENT_DISABILITY",
+            "normalizedName": "koltuk ferdi kaza - sürekli sakatlık",
+            "nameTr": "Koltuk Ferdi Kaza - Sürekli Sakatlık",
+            "limit": 5000,
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 5000
+            },
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "isImplicit": false,
+            "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir."
+          },
+          {
+            "name": "Hukuksal Koruma",
+            "nameTr": "Hukuksal Koruma",
+            "limit": 5000,
+            "deductible": null,
+            "description": "Dava ve avukat masrafları için 5.000 TL.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "legal",
+            "included": true,
+            "limitType": "per_event",
+            "page": 1,
+            "clause": "HUKUKSAL KORUMA",
+            "quote": "DAVA VE AVUKAT MASRAFLARI 5.000 TL",
+            "carveOuts": null,
+            "normalizedName": "legal protection",
+            "canonicalName": "LEGAL_PROTECTION",
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 5000
+            }
+          }
+        ],
+        "specialConditions": [
+          "Sigortalı araç sigorta süresince rent-a-car ve ticari amaçla kullanılmayacaktır.",
+          "Modifiyeli araçlar teminat kapsamı dışındadır.",
+          "Zırhlı araçlar her koşulda teminat kapsamı dışındadır.",
+          "EPDK standartlarına ve yasal mevzuata uygun olmayan yakıt kullanımı nedeniyle oluşan doğrudan hasarlar ve buna bağlı yangın hasarları teminat dışıdır.",
+          "Kurye taşımacılığı yapılması durumunda meydana gelen hasar teminat kapsamı dışındadır.",
+          "Araç canlı yayınlarda, yarışlarda/off-road yarışlarında, gösterilerde, sergilerde, deneme sürüşlerinde, siyasi parti/belediye/askeri araç olarak veya üretim amacı dışında tadilatlı kullanımda kapsam dışıdır.",
+          "Araç standardı dışı aksesuar ve donanımlar poliçede belirtilmek kaydıyla teminat altına alınır; hasar anındaki rayiç değer her halükarda poliçede belirtilen bedelin %10 fazlası ile sınırlıdır.",
+          "Kısmi hasarlarda Allianz tazminat ödemesinden sonra poliçeyi fesih hakkını saklı tutar."
+        ],
+        "exclusions": [
+          "Rent-a-car amaçlı kullanım esnasında meydana gelen tüm hasarlar ile hasar anında aracın ticari amaçla kullanıldığının tespiti durumlarında oluşan hasar teminat kapsamı dışındadır.",
+          "Modifiyeli araçlar teminat kapsamı dışındadır; aracın modifiyeli olması veya sonradan modifiye yapılması durumunda sigorta şirketinin sorumluluğu yoktur.",
+          "Zırh ile kaplanan tüm araçlar her koşulda teminat kapsamı dışındadır.",
+          "EPDK standartlarına ve yasal mevzuata göre uygun olmayan yakıt kullanımı sebebiyle araçta meydana gelen doğrudan hasarlar ve bundan kaynaklanan yangın hasarları teminat dışıdır.",
+          "Sigortalı aracın kurye taşımacılığı yapması durumunda meydana gelen hasar teminat kapsamı dışındadır.",
+          "Sigortalı aracın canlı yayınlarda, yarışlarda/off-road yarışlarında, gösterilerde ve/veya sergilerde, deneme sürüşlerinde, siyasi parti/belediye/askeri araç olarak ve/veya üretim amacı dışında tadilatlı kullanılması durumunda poliçe teminatları kapsam dışındadır.",
+          "Aracın anahtarlarının araç üzerinde veya içinde bırakılması, anahtarsız çalıştırılabilen araçlarda çalışır vaziyette bırakılması veya kart/aparatın araç içinde ya da kapıları açma mesafesinde bulunması sonucu meydana gelen hırsızlık zararları teminat dışıdır.",
+          "Sigortalı aracı veya anahtarlarını resmi sıfat takınarak ya da güven oluşturan davranışlarla elde etmek suretiyle meydana gelen hırsızlık veya hırsızlığa teşebbüs zararları teminat dışıdır.",
+          "Cebir veya fiziksel şiddet kullanılmaksızın araca ait anahtarları ele geçirerek yapılan hırsızlık veya hırsızlığa teşebbüs sonucu oluşan zararlar teminat dışıdır.",
+          "Otopark fişi/belgesi olmadan aracın valeye/otoparka teslim edilmesi sonrası oluşan hırsızlık veya hırsızlığa teşebbüs teminat dışıdır.",
+          "Aracın vale veya otopark görevlisi tarafından çalınması neticesi oluşan hırsızlık veya hırsızlığa teşebbüs zararları teminat dışıdır.",
+          "Gönül rızası ile kullanılmasına izin verilen veya emanet edilen aracın bu kişilerce çalınması ya da çalınmaya teşebbüs edilmesi sonucu meydana gelen zararlar teminat dışıdır.",
+          "Sigorta ettiren/sigortalı/araç sahibi/sürücünün algılama yeteneğinin zayıflamasından ve/veya içinde bulunduğu hal ve şartlardan yararlanılarak anahtarların ele geçirilmesi sonucu meydana gelen hırsızlık zararları teminat dışıdır.",
+          "Aracın, aracı kiralayan kişiler tarafından çalınması teminat dışıdır.",
+          "Kişisel eşya teminatında ticari mallar, nakit, çek, senet, kıymetli evrak, mücevherat, kredi kartı, cep telefonu, taşınabilir bilgisayar, diğer elektronik eşyalar ve seyahat biletleri kapsam dışındadır.",
+          "Kilitli olmayan araçtan park halindeyken kişisel eşyaların çalınması ve araca zarar verilmeden meydana gelen çalınmalar (eve zorla girilerek anahtarın elde edilmesi hariç) teminat kapsamı dışındadır.",
+          "Yurtdışı teminatı alınmış olsa dahi Türkiye Cumhuriyeti sınırları dışında oluşacak hasarlarda asistans, çekme-çekilme ve ikame araç hizmeti kapsam dahilinde değildir.",
+          "Ticari Yaptırımlar Klozu: Birleşmiş Milletler kararları veya reasürörün tabi olduğu yasalar/düzenlemeler uyarınca ticari veya ekonomik yaptırımlara, yasak ya da kısıtlamaya konu olabilecek herhangi bir teminat verilmiş sayılmaz; böyle bir tazminatın ödenmesi veya menfaatin sağlanması yükümlülüğü yoktur."
+        ],
+        "exclusionsEn": [
+          "All losses occurring during rent-a-car use or when the vehicle is determined to be used for commercial purposes at the time of loss are خارج coverage.",
+          "Modified vehicles are excluded; if the vehicle is modified or later altered, the insurer has no liability.",
+          "All armored vehicles are excluded under all circumstances.",
+          "Direct damage to the vehicle caused by fuel not compliant with EPDK standards and applicable legislation, and resulting fire losses, are excluded.",
+          "Losses occurring while the insured vehicle is used for courier transportation are excluded.",
+          "Coverage is excluded if the insured vehicle is used in live broadcasts, races/off-road races, shows and/or exhibitions, test drives, as a political party/municipality/military vehicle, and/or altered for a purpose other than its original production purpose.",
+          "Theft losses arising from leaving the keys on or inside the vehicle, leaving keyless-start vehicles running, or leaving the card/device inside the vehicle or within door-opening distance are excluded.",
+          "Theft or attempted theft losses arising from obtaining the insured vehicle or its keys by impersonating an official or by deceptive trust-building behavior are excluded.",
+          "Losses arising from theft or attempted theft by obtaining the vehicle keys without force or physical violence are excluded.",
+          "Theft or attempted theft after delivering the vehicle to valet/parking without a parking slip/document is excluded.",
+          "Losses arising from theft or attempted theft by the valet or parking attendant are excluded.",
+          "Losses arising when a vehicle voluntarily entrusted or permitted for use is stolen or attempted to be stolen by those persons are excluded.",
+          "Theft losses arising from obtaining the keys by taking advantage of the weakened perception and/or circumstances of the policyholder/insured/owner/driver are excluded.",
+          "The theft of the vehicle by persons renting the vehicle is excluded.",
+          "Under personal belongings coverage, commercial goods, cash, checks, promissory notes, valuable papers, jewelry, credit cards, mobile phones, portable computers, other electronic items, and travel tickets are excluded.",
+          "The theft of personal belongings from an unlocked parked vehicle and theft without damage to the vehicle (except where the key was obtained by forced entry into the home) are excluded.",
+          "Even if foreign territory coverage is purchased, assistance, towing, and replacement vehicle services are not covered for losses occurring outside the borders of the Republic of Türkiye.",
+          "Sanctions Clause: No insurer/reinsurer shall be deemed to provide coverage, nor be liable to pay any claim or provide any benefit, if doing so would expose it to commercial or economic sanctions, prohibitions, or restrictions under United Nations resolutions or laws/regulations applicable to the reinsurer."
+        ],
+        "conditionalDeductibles": [
+          {
+            "trigger": "earthquake / volcanic eruption damage",
+            "rate": "%5",
+            "evidence": "Deprem ve yanardağ püskürmesi hasarlarında aracın piyasa rayici bedeli üzerinden, %5 muafiyet uygulanır."
+          },
+          {
+            "trigger": "repair at non-contracted brand authorized service",
+            "rate": "%25",
+            "evidence": "Allianz ile anlaşması olmayan Marka Yetkili Servislere gidilmesi durumunda, hasar bedeli üzerinden %25 tenzili muafiyet uygulanır."
+          },
+          {
+            "trigger": "theft after valet/parking delivery with parking slip/document",
+            "rate": "%20",
+            "evidence": "Otopark fişi/belgesi ile, aracın valeye/otoparka teslim edilmesi sonrası oluşan hırsızlık veya hırsızlığa teşebbüs zarar larında, hasar bedeli üzerinden % 20 muafiyet uygulanır."
+          }
+        ],
+        "discounts": {
+          "ncdDiscount": 30,
+          "groupDiscount": null,
+          "otherDiscountPct": 6.5,
+          "evidence": "HASARSIZLIK İNDİRİMİ %30 / SAĞLIK ÇAPRAZ SATIŞ İNDİRİMİ : %6,5"
+        },
+        "amendmentInfo": {
+          "isAmendment": false,
+          "amendmentNumber": null,
+          "amendmentDate": null,
+          "basePolicyNumber": null,
+          "amendmentReason": null,
+          "premiumDifference": null
+        },
+        "evidence": {
+          "insights": [
+            {
+              "text": "Bu poliçe birleşik bir oto sigorta paketidir; kasko ile birlikte ferdi kaza, ihtiyari mali mesuliyet ve hukuksal koruma ürünleri de fiyatlanmıştır.",
+              "textEn": "This policy is a bundled motor insurance package; in addition to kasko, personal accident, voluntary liability, and legal protection products are also priced.",
+              "quote": "Ödeme Vadesi Tutar FERDİ KAZA 15.00 TL ... İHTİYARİ 105.00 TL ... KASKO 1,460.67 TL",
+              "quoteTr": null
+            },
+            {
+              "text": "Araç ana teminatı piyasa rayiç değer esaslıdır.",
+              "textEn": "The main vehicle coverage is based on market value.",
+              "quote": "Sigorta konusu araç... hasar tarihi itibari ile piyasa rayiç değerine kadar teminat altına alınmıştır.",
+              "quoteTr": null
+            },
+            {
+              "text": "Önceki sigorta şirketi Güneş Sigorta olarak belirtilmiştir.",
+              "textEn": "The previous insurer is stated as Güneş Sigorta.",
+              "quote": "Önceki Sigorta Şirketi : GÜNEŞ SİGORTA",
+              "quoteTr": null
+            }
+          ],
+          "exclusions": [
+            {
+              "text": "Rent-a-car veya ticari amaçlı kullanımda oluşan hasarlar kapsam dışıdır.",
+              "textEn": "Losses arising from rent-a-car or commercial use are excluded.",
+              "quote": "Rent-a- car amaçlı kullanım esnasında meydana gelen tüm hasarlar ile hasar anında aracın ticari amaçla kullanıldığının tespiti durumlarında oluşan hasar, poliçe teminat kapsamı dışındadır.",
+              "quoteTr": null
+            },
+            {
+              "text": "Modifiyeli araçlar kapsam dışıdır.",
+              "textEn": "Modified vehicles are excluded.",
+              "quote": "Modifiyeli araçlar, işbu sigorta poliçesi teminat kapsamı dışında olup...",
+              "quoteTr": null
+            },
+            {
+              "text": "Ticari yaptırımlara konu olabilecek teminatlar için ödeme yükümlülüğü yoktur.",
+              "textEn": "There is no payment obligation for coverage that would be subject to trade/economic sanctions.",
+              "quote": "Ticari Yaptırımlar Klozu: Hiçbir sigorta / reasürans şirketi... ticari veya ekonomik yaptırımlara, yasak ya da kısıtlamaya konu olabilecek herhangi bir teminatı vermiş sayılmayacak, böyle bir tazminatın ödenmesi veya menfaatin sağlanmasında yükümlü olmayacaktır.",
+              "quoteTr": null
+            }
+          ]
+        },
+        "clauseGraph": {
+          "edges": [
+            {
+              "sourceId": "GENİŞLETİLMİŞ KASKO",
+              "targetId": "ANAHTAR KAYBI",
+              "relationshipType": "coverage_inclusion",
+              "description": "Anahtar kaybı ek teminat olarak kasko paketine dahildir.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "GENİŞLETİLMİŞ KASKO",
+              "targetId": "KİŞİSEL EŞYA",
+              "relationshipType": "coverage_inclusion",
+              "description": "Kişisel eşya hırsızlık teminatı ek teminat olarak dahildir.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "DEPREM/YANARDAĞ PÜSKÜRMESİ",
+              "targetId": null,
+              "relationshipType": "deductible_trigger",
+              "description": "Deprem/yanardağ hasarlarında %5 muafiyet uygulanır.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Anlaşmasız Marka Yetkili Servis",
+              "targetId": "GENİŞLETİLMİŞ KASKO",
+              "relationshipType": "deductible_trigger",
+              "description": "Anlaşmasız marka yetkili serviste onarım halinde %25 tenzili muafiyet uygulanır.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "KİRALIK ARAÇ HİZMETİ TEMİNATI (STANDART)",
+              "targetId": "ASİSTANS TEMİNATI",
+              "relationshipType": "service_benefit_linkage",
+              "description": "Servise çekim işleminin Allianz Yardım Hizmeti tarafından sağlanması şartına bağlıdır.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Ticari Yaptırımlar Klozu",
+              "targetId": "GENİŞLETİLMİŞ KASKO",
+              "relationshipType": "endorsement_override",
+              "description": "Yaptırım kapsamına giren durumlarda teminat ve tazminat yükümlülüğünü sınırlar.",
+              "isCandidate": false
+            }
+          ]
+        },
+        "confidence": {
+          "overall": 0.93,
+          "policyNumber": 0.99,
+          "provider": 0.99,
+          "dates": 0.99,
+          "premium": 0.98,
+          "coverages": 0.92
+        },
+        "qualityScore": {
+          "readabilityStructure": 0.95,
+          "completenessKeyFields": 0.97,
+          "numericLimitsReconciled": 0.91,
+          "noGuessingUncertaintiesListed": 0.93,
+          "total": 0.94
+        }
+      },
+      "usage": {
+        "prompt_tokens": 17489,
+        "completion_tokens": 5882,
+        "total_tokens": 23371,
+        "prompt_tokens_details": {
+          "cached_tokens": 7936,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "model": "gpt-5.4-2026-03-05",
+      "provider": "openai",
+      "fallback": true,
+      "fallbackReason": "ANTHROPIC_UNKNOWN_ERROR",
+      "cost": null,
+      "requestId": "ext-1777817745870",
+      "route": "/api/ai/extract",
+      "elapsedMs": 149592,
+      "phaseTiming": {
+        "configLoad_ms": 0,
+        "promptLoad_ms": 0,
+        "anthropic_ms": 90002,
+        "openai_ms": 59588
+      },
+      "fallbackChain": [
+        {
+          "provider": "anthropic",
+          "success": false,
+          "error_code": "ANTHROPIC_UNKNOWN_ERROR"
+        },
+        {
+          "provider": "openai",
+          "success": true,
+          "duration_ms": 59588
+        }
+      ]
+    },
+    {
+      "success": true,
+      "data": {
+        "policyNumber": "0001-0210-24147152",
+        "bağlıPolNo": null,
+        "provider": "Allianz Sigorta",
+        "policyType": "kasko",
+        "isBundle": true,
+        "bundleProducts": [
+          "GENİŞLETİLMİŞ KASKO",
+          "İHTİYARİ MALİ MESULİYET",
+          "FERDİ KAZA",
+          "HUKUKSAL KORUMA"
+        ],
+        "previousInsurer": "GÜNEŞ SİGORTA",
+        "insuredName": "NACİYE PREKA",
+        "insuredAddress": "TÜRKİYE, İstanbul 34020, Zeytinburnu, Telsiz MAH. Kaktüs Sokak NO:8 D:3",
+        "insuredEntityType": "individual",
+        "vehicleUsage": "private",
+        "startDate": "2018-09-15",
+        "endDate": "2019-09-15",
+        "vehicleMake": "PEUGEOT",
+        "vehicleModel": "308 COMFORT 1.6 VTI (120) 5 KAPI OV",
+        "vehicleYear": 2010,
+        "vehiclePlate": "34 GM 6461",
+        "vin": "VF34C5FWFAY000475",
+        "tcKimlik": "120******14",
+        "vkn": null,
+        "premium": 1659.72,
+        "sigortaBedeli": null,
+        "currency": "TRY",
+        "paymentFrequency": "annual",
+        "coverages": [
+          {
+            "name": "Kasko Teminatı",
+            "nameTr": "Kasko Teminatı",
+            "limit": null,
+            "deductible": null,
+            "description": "Araç hasar tarihi itibariyle piyasa rayiç değerine kadar teminat altındadır.",
+            "isUnlimited": false,
+            "isMarketValue": true,
+            "category": "main",
+            "included": true,
+            "limitType": null,
+            "page": 1,
+            "clause": "4.1 TEMİNAT ÖZETİ",
+            "quote": "Kasko Genel Şartları'nın A.1 bölümünde belirtilen -çarpışma, çarpma/çarpılma, yanma, kötü niyet veya muziplikle yapılan hareketler ile fiil ehliyetine sahip olmayan kişilerin yol açacağı zararlar, çalınma/çalınmaya teşebbüs- tüm riskler teminat dahilindedir.",
+            "carveOuts": null,
+            "normalizedName": "comprehensive kasko",
+            "canonicalName": "MAIN_KASKO_COVERAGE",
+            "parsedLimit": null
+          },
+          {
+            "name": "İhtiyari Mali Sorumluluk",
+            "nameTr": "İhtiyari Mali Sorumluluk",
+            "limit": 400000,
+            "deductible": null,
+            "description": "Maddi+bedeni kaza başına 400.000 TL; manevi tazminat ölüm ve sürekli sakatlık için 100.000 TL, IMM limitleri içinde.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "liability",
+            "included": true,
+            "limitType": "per_event",
+            "page": 1,
+            "clause": "İHTİYARİ MALİ MESULİYET",
+            "quote": "MADDI+BEDENİ KAZA BAŞINA 400.000 TL",
+            "carveOuts": null,
+            "normalizedName": "voluntary third party liability",
+            "canonicalName": "VOLUNTARY_THIRD_PARTY_LIABILITY",
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 400000
+            }
+          },
+          {
+            "name": "Deprem",
+            "nameTr": "Deprem",
+            "limit": null,
+            "deductible": 5,
+            "description": "Piyasa rayiç bedeli üzerinden %5 muafiyetli.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 1,
+            "clause": "Ek Teminatlar",
+            "quote": "-DEPREM/YANARDAĞ PÜSKÜRMESİ (%5 MUAFİYETLİ)",
+            "carveOuts": null,
+            "normalizedName": "earthquake and volcanic eruption",
+            "canonicalName": "EARTHQUAKE",
+            "parsedLimit": null
+          },
+          {
+            "name": "Grev, Lokavt, Terör",
+            "nameTr": "Grev, Lokavt, Terör",
+            "limit": null,
+            "deductible": null,
+            "description": "Türkiye Cumhuriyeti sınırları içinde geçerli.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 1,
+            "clause": "Ek Teminatlar",
+            "quote": "-GREV LOKAVT HALK HAREKETLERİ",
+            "carveOuts": null,
+            "normalizedName": "strike, lockout and civil commotion",
+            "canonicalName": "STRIKE_LOCKOUT_TERROR",
+            "parsedLimit": null
+          },
+          {
+            "name": "Sel ve Su Baskını",
+            "nameTr": "Sel ve Su Baskını",
+            "limit": null,
+            "deductible": null,
+            "description": "Sel su baskınından kaynaklanan kasko zararları teminat altındadır.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 1,
+            "clause": "Ek Teminatlar",
+            "quote": "-SEL",
+            "carveOuts": null,
+            "normalizedName": "flood",
+            "canonicalName": "FLOOD_WATER_DAMAGE",
+            "parsedLimit": null
+          },
+          {
+            "name": "Mini Onarım",
+            "nameTr": "Mini Onarım",
+            "limit": null,
+            "deductible": null,
+            "description": "Auto King Servis Merkezlerinde küçük ölçekli hasarların bedelsiz giderilmesi hizmeti.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 1,
+            "clause": "EK HİZMETLER",
+            "quote": "MİNİ ONARIM HİZMETİ",
+            "carveOuts": null,
+            "normalizedName": "mini repair service",
+            "canonicalName": "MINI_REPAIR",
+            "parsedLimit": null
+          },
+          {
+            "name": "Koltuk Ferdi Kaza - Vefat",
+            "nameTr": "Koltuk Ferdi Kaza - Vefat",
+            "limit": 5000,
+            "deductible": null,
+            "description": "Ferdi kaza teminatı.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "other",
+            "included": true,
+            "limitType": "per_event",
+            "page": 1,
+            "clause": "FERDİ KAZA",
+            "quote": "YOLCU ÖLÜM/SÜREKLİ SAKATLIK 5.000 TL",
+            "carveOuts": null,
+            "normalizedName": "personal accident - passenger death/permanent disability",
+            "canonicalName": "SEAT_PERSONAL_ACCIDENT_DEATH",
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 5000
+            }
+          },
+          {
+            "name": "Koltuk Ferdi Kaza - Sürekli Sakatlık",
+            "canonicalName": "SEAT_PERSONAL_ACCIDENT_DISABILITY",
+            "normalizedName": "koltuk ferdi kaza - sürekli sakatlık",
+            "nameTr": "Koltuk Ferdi Kaza - Sürekli Sakatlık",
+            "limit": 5000,
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 5000
+            },
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "isImplicit": false,
+            "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir."
+          },
+          {
+            "name": "Hukuksal Koruma",
+            "nameTr": "Hukuksal Koruma",
+            "limit": 5000,
+            "deductible": null,
+            "description": "Dava ve avukat masrafları.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "legal",
+            "included": true,
+            "limitType": "per_event",
+            "page": 1,
+            "clause": "HUKUKSAL KORUMA",
+            "quote": "DAVA VE AVUKAT MASRAFLARI 5.000 TL",
+            "carveOuts": null,
+            "normalizedName": "legal protection",
+            "canonicalName": "LEGAL_PROTECTION",
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 5000
+            }
+          }
+        ],
+        "specialConditions": [
+          "Sigortalı araç sigorta süresince rent-a-car ve ticari amaçla kullanılmayacaktır.",
+          "Modifiyeli araçlar teminat kapsamı dışındadır.",
+          "Zırhlı araçlar her koşulda teminat kapsamı dışındadır.",
+          "EPDK standartlarına ve yasal mevzuata uygun olmayan yakıt kullanımı nedeniyle oluşan doğrudan hasarlar ve buna bağlı yangın hasarları teminat dışıdır.",
+          "Kurye taşımacılığı sırasında meydana gelen hasarlar kapsam dışıdır.",
+          "Araç canlı yayınlarda, yarışlarda/off-road yarışlarında, gösterilerde, sergilerde, deneme sürüşlerinde, siyasi parti/belediye/askeri araç olarak veya üretim amacı dışında tadilatlı kullanımda kapsam dışıdır.",
+          "Araç standart dışı aksesuar ve donanımları beyana bağlı olarak poliçede belirtilmek kaydıyla teminat altına alınır.",
+          "Eksik/aşkın sigorta uygulanmayacaktır.",
+          "Peşin poliçe olarak üretilmiş olup kredi kartından 9 eşit taksit ile tahsil edilecektir."
+        ],
+        "exclusions": [
+          "Rent-a-car amaçlı kullanım esnasında meydana gelen tüm hasarlar ile hasar anında aracın ticari amaçla kullanıldığının tespiti durumlarında oluşan hasar teminat kapsamı dışındadır.",
+          "Modifiyeli araçlar teminat kapsamı dışındadır; aracın modifiyeli olması veya sonradan modifiye yapılması halinde sigorta şirketinin oluşacak hasarlardan sorumluluğu yoktur.",
+          "Zırh ile kaplanan tüm araçlar her koşulda teminat kapsamı dışındadır.",
+          "EPDK standartlarına ve yasal mevzuata uygun olmayan yakıt kullanımı sebebiyle araçta meydana gelen doğrudan hasarlar ve bundan kaynaklanan yangın hasarları teminat dışıdır.",
+          "Kurye taşımacılığı yapılması durumunda meydana gelen hasar teminat kapsamı dışındadır.",
+          "Aracın canlı yayınlarda, yarışlarda/off-road yarışlarında, gösterilerde/sergilerde, deneme sürüşlerinde, siyasi parti/belediye/askeri araç olarak veya üretim amacı dışında tadilatlı kullanılması durumunda teminat kapsam dışıdır.",
+          "Araç anahtarlarının araç üzerinde veya içinde bırakılması, anahtarsız çalıştırılabilen araçlarda kart/aparatın araç içinde bırakılması veya kapıları açma mesafesinde bulunması sonucu meydana gelen hırsızlık zararları teminat dışıdır.",
+          "Resmi sıfat takınarak veya güven oluşturan davranışlarla aracın ve/veya anahtarlarının elde edilmesi suretiyle meydana gelen hırsızlık veya hırsızlığa teşebbüs zararları teminat dışıdır.",
+          "Cebir veya fiziksel şiddet kullanılmaksızın araç anahtarlarının ele geçirilmesi sonucu oluşan hırsızlık veya hırsızlığa teşebbüs zararları teminat dışıdır.",
+          "Otopark fişi/belgesi olmadan aracın valeye/otoparka teslim edilmesi sonrası oluşan hırsızlık veya hırsızlığa teşebbüs zararları teminat dışıdır.",
+          "Aracın vale veya otopark görevlisi tarafından çalınması sonucu oluşan zararlar teminat dışıdır.",
+          "Gönül rızası ile kullanılmasına izin verilen veya emanet edilen aracın bu kişilerce çalınması ya da çalınmaya teşebbüs edilmesi sonucu meydana gelen zararlar teminat dışıdır.",
+          "Sigorta ettiren/sigortalı/araç sahibi/sürücünün algılama yeteneğinin zayıflamasından veya içinde bulunduğu hal ve şartlardan yararlanılarak anahtarların ele geçirilmesi sonucu meydana gelen hırsızlık zararları teminat dışıdır.",
+          "Aracın, aracı kiralayan kişiler tarafından çalınması teminat dışıdır.",
+          "Kişisel eşya teminatında ticari mallar, nakit, çek, senet, kıymetli evrak, mücevherat, kredi kartı, cep telefonu, taşınabilir bilgisayar ve diğer elektronik eşyalar ile seyahat biletleri kapsam dışıdır.",
+          "Kilitli olmayan araçtan park halindeyken kişisel eşyaların çalınması ve araca zarar verilmeden meydana gelen çalınmalar (eve zorla girilerek anahtar elde edilmesi hariç) teminat kapsamı dışındadır.",
+          "Kiralık araç hizmetinde aracın kaza dışında herhangi bir nedenle hareketsiz kaldığı durumlar ve kiralık amaçlı kullanılan araçlar kapsam dışıdır.",
+          "Yurtdışı teminatı alınmış olsa dahi Türkiye Cumhuriyeti sınırları dışında oluşacak hasarlarda asistans, çekme-çekilme ve ikame araç hizmeti kapsam dahilinde değildir.",
+          "Ticari Yaptırımlar Klozu: Birleşmiş Milletler kararları veya reasürörün tabi olduğu yasalar/düzenlemeler uyarınca ticari veya ekonomik yaptırımlara, yasak ya da kısıtlamaya konu olabilecek teminat verilmiş sayılmaz; bu tür tazminat veya menfaat sağlanmaz."
+        ],
+        "exclusionsEn": [
+          "All losses occurring during rent-a-car use or where the vehicle is determined to have been used for commercial purposes at the time of loss are خارج coverage.",
+          "Modified vehicles are excluded; if the vehicle is modified or later altered, the insurer has no liability for resulting losses.",
+          "All armored vehicles are excluded under all circumstances.",
+          "Direct damage caused by use of fuel not compliant with EPDK standards and legal regulations, and resulting fire losses, are excluded.",
+          "Losses occurring while the vehicle is used for courier transportation are excluded.",
+          "Coverage is excluded if the vehicle is used in live broadcasts, races/off-road races, shows/exhibitions, test drives, as a political party/municipality/military vehicle, or altered for purposes outside its original production purpose.",
+          "Theft losses arising from leaving the keys on or inside the vehicle, or in keyless vehicles leaving the card/device inside or within door-opening distance, are excluded.",
+          "Theft or attempted theft losses arising from obtaining the vehicle and/or keys by impersonating an official or creating trust through behavior are excluded.",
+          "Theft or attempted theft losses arising from obtaining the vehicle keys without force or physical violence are excluded.",
+          "Theft or attempted theft losses after handing the vehicle to valet/parking without a parking slip/document are excluded.",
+          "Losses arising from theft of the vehicle by valet or parking personnel are excluded.",
+          "Losses arising when a vehicle voluntarily entrusted or allowed to be used is stolen or attempted to be stolen by those persons are excluded.",
+          "Theft losses arising from obtaining the keys by taking advantage of the weakened perception or condition of the policyholder/insured/owner/driver are excluded.",
+          "The theft of the vehicle by persons renting the vehicle is excluded.",
+          "Under personal belongings coverage, commercial goods, cash, checks, promissory notes, valuable papers, jewelry, credit cards, mobile phones, portable computers and other electronic items, and travel tickets are excluded.",
+          "Theft of personal belongings from an unlocked parked vehicle and theft without damage to the vehicle (except where keys were obtained by forced entry into a home) are excluded.",
+          "Under replacement vehicle service, situations where the vehicle becomes immobilized for reasons other than an accident and vehicles used for rental purposes are excluded.",
+          "Even if foreign coverage is purchased, assistance, towing and replacement vehicle services are not covered for losses occurring outside the borders of the Republic of Turkey.",
+          "Sanctions Clause: No insurer/reinsurer shall be deemed to provide coverage, pay any claim, or provide any benefit that would expose it to commercial or economic sanctions, prohibitions, or restrictions under United Nations resolutions or laws/regulations applicable to the reinsurer."
+        ],
+        "conditionalDeductibles": [
+          {
+            "trigger": "earthquake / volcanic eruption damage",
+            "rate": "%5",
+            "evidence": "Deprem ve yanardağ püskürmesi hasarlarında aracın piyasa rayici bedeli üzerinden, %5 muafiyet uygulanır."
+          },
+          {
+            "trigger": "non-contracted brand authorized service",
+            "rate": "%25",
+            "evidence": "Allianz ile anlaşması olmayan Marka Yetkili Servislere gidilmesi durumunda, hasar bedeli üzerinden %25 tenzili muafiyet uygulanır."
+          },
+          {
+            "trigger": "theft after valet/parking delivery with parking slip/document",
+            "rate": "%20",
+            "evidence": "Otopark fişi/belgesi ile, aracın valeye/otoparka teslim edilmesi sonrası oluşan hırsızlık veya hırsızlığa teşebbüs zarar larında, hasar bedeli üzerinden % 20 muafiyet uygulanır."
+          }
+        ],
+        "discounts": {
+          "ncdDiscount": 30,
+          "groupDiscount": null,
+          "otherDiscountPct": 6.5,
+          "evidence": "HASARSIZLIK İNDİRİMİ %30 / SAĞLIK ÇAPRAZ SATIŞ İNDİRİMİ : %6,5"
+        },
+        "amendmentInfo": {
+          "isAmendment": false,
+          "amendmentNumber": null,
+          "amendmentDate": null,
+          "basePolicyNumber": null,
+          "amendmentReason": null,
+          "premiumDifference": null
+        },
+        "evidence": {
+          "insights": [
+            {
+              "text": "Policy is a bundled auto insurance package including kasko, voluntary liability, personal accident, and legal protection.",
+              "textEn": "Policy is a bundled auto insurance package including kasko, voluntary liability, personal accident, and legal protection.",
+              "quote": "GENİŞLETİLMİŞ KASKO ... İHTİYARİ MALİ MESULİYET ... FERDİ KAZA ... HUKUKSAL KORUMA",
+              "quoteTr": null
+            },
+            {
+              "text": "Main kasko coverage is based on market value at the date of loss.",
+              "textEn": "Main kasko coverage is based on market value at the date of loss.",
+              "quote": "Sigorta konusu araç... hasar tarihi itibari ile piyasa rayiç değerine kadar teminat altına alınmıştır.",
+              "quoteTr": null
+            },
+            {
+              "text": "Vehicle is a 2010 Peugeot 308 with plate 34 GM 6461.",
+              "textEn": "Vehicle is a 2010 Peugeot 308 with plate 34 GM 6461.",
+              "quote": "Marka : PEUGEOT (114) / Plaka No : 34 GM 6461 / Tip 308 COMFORT 1.6 VTI (120) 5 KAPI OV (792) / Model Yılı : 2010",
+              "quoteTr": null
+            }
+          ],
+          "exclusions": [
+            {
+              "text": "Commercial/rent-a-car use is excluded.",
+              "textEn": "Commercial/rent-a-car use is excluded.",
+              "quote": "Rent-a- car amaçlı kullanım esnasında meydana gelen tüm hasarlar ile hasar anında aracın ticari amaçla kullanıldığının tespiti durumlarında oluşan hasar, poliçe teminat kapsamı dışındadır.",
+              "quoteTr": null
+            },
+            {
+              "text": "Modified vehicles are excluded.",
+              "textEn": "Modified vehicles are excluded.",
+              "quote": "Modifiyeli araçlar, işbu sigorta poliçesi teminat kapsamı dışında olup",
+              "quoteTr": null
+            },
+            {
+              "text": "Sanctions exclusion applies.",
+              "textEn": "Sanctions exclusion applies.",
+              "quote": "Ticari Yaptırımlar Klozu: Hiçbir sigorta / reasürans şirketi... ticari veya ekonomik yaptırımlara, yasak ya da kısıtlamaya konu olabilecek herhangi bir teminatı vermiş sayılmayacak",
+              "quoteTr": null
+            }
+          ]
+        },
+        "clauseGraph": {
+          "edges": [
+            {
+              "sourceId": "GENİŞLETİLMİŞ KASKO",
+              "targetId": "ANAHTAR KAYBI",
+              "relationshipType": "coverage_inclusion",
+              "description": "Ana kasko ürününe ek sözleşme ile dahil edilmiş ek teminat.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "GENİŞLETİLMİŞ KASKO",
+              "targetId": "KİŞİSEL EŞYA",
+              "relationshipType": "coverage_inclusion",
+              "description": "Ana kasko ürününe ek sözleşme ile dahil edilmiş ek teminat.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "DEPREM/YANARDAĞ PÜSKÜRMESİ",
+              "targetId": null,
+              "relationshipType": "deductible_trigger",
+              "description": "Deprem/yanardağ hasarlarında %5 muafiyet uygulanır.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Anlaşmasız Marka Yetkili Servis",
+              "targetId": "GENİŞLETİLMİŞ KASKO",
+              "relationshipType": "deductible_trigger",
+              "description": "Anlaşmasız marka yetkili serviste onarım halinde %25 tenzili muafiyet uygulanır.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "KİRALIK ARAÇ HİZMETİ TEMİNATI (STANDART)",
+              "targetId": "ASİSTANS TEMİNATI",
+              "relationshipType": "service_benefit_linkage",
+              "description": "Servise çekim işleminin Allianz Yardım Hizmeti tarafından sağlanması şartına bağlıdır.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Ticari Yaptırımlar Klozu",
+              "targetId": "GENİŞLETİLMİŞ KASKO",
+              "relationshipType": "endorsement_override",
+              "description": "Yaptırım kapsamına giren durumlarda teminat ve tazminat yükümlülüğünü sınırlar.",
+              "isCandidate": false
+            }
+          ]
+        },
+        "confidence": {
+          "overall": 0.93,
+          "policyNumber": 0.99,
+          "provider": 0.99,
+          "dates": 0.99,
+          "premium": 0.98,
+          "coverages": 0.91
+        },
+        "qualityScore": {
+          "readabilityStructure": 0.95,
+          "completenessKeyFields": 0.97,
+          "numericLimitsReconciled": 0.9,
+          "noGuessingUncertaintiesListed": 0.92,
+          "total": 0.94
+        }
+      },
+      "usage": {
+        "prompt_tokens": 17489,
+        "completion_tokens": 5481,
+        "total_tokens": 22970,
+        "prompt_tokens_details": {
+          "cached_tokens": 17152,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "model": "gpt-5.4-2026-03-05",
+      "provider": "openai",
+      "fallback": true,
+      "fallbackReason": "ANTHROPIC_UNKNOWN_ERROR",
+      "cost": null,
+      "requestId": "ext-1777817895496",
+      "route": "/api/ai/extract",
+      "elapsedMs": 146290,
+      "phaseTiming": {
+        "configLoad_ms": 155,
+        "promptLoad_ms": 93,
+        "anthropic_ms": 90001,
+        "openai_ms": 56040
+      },
+      "fallbackChain": [
+        {
+          "provider": "anthropic",
+          "success": false,
+          "error_code": "ANTHROPIC_UNKNOWN_ERROR"
+        },
+        {
+          "provider": "openai",
+          "success": true,
+          "duration_ms": 56040
+        }
+      ]
+    },
+    {
+      "success": true,
+      "data": {
+        "policyNumber": "0001-0210-24147152",
+        "bağlıPolNo": null,
+        "provider": "Allianz Sigorta",
+        "policyType": "kasko",
+        "isBundle": true,
+        "bundleProducts": [
+          "GENİŞLETİLMİŞ KASKO",
+          "İHTİYARİ MALİ MESULİYET",
+          "FERDİ KAZA",
+          "HUKUKSAL KORUMA"
+        ],
+        "previousInsurer": "GÜNEŞ SİGORTA",
+        "insuredName": "NACİYE PREKA",
+        "insuredAddress": "TÜRKİYE, İstanbul 34020, Zeytinburnu, Telsiz MAH. Kaktüs Sokak NO:8 D:3",
+        "insuredEntityType": "individual",
+        "vehicleUsage": "private",
+        "startDate": "2018-09-15",
+        "endDate": "2019-09-15",
+        "vehicleMake": "PEUGEOT",
+        "vehicleModel": "308 COMFORT 1.6 VTI (120) 5 KAPI OV",
+        "vehicleYear": 2010,
+        "vehiclePlate": "34 GM 6461",
+        "vin": "VF34C5FWFAY000475",
+        "tcKimlik": "120******14",
+        "vkn": null,
+        "premium": 1659.72,
+        "sigortaBedeli": null,
+        "currency": "TRY",
+        "paymentFrequency": "annual",
+        "coverages": [
+          {
+            "name": "Kasko Teminatı",
+            "nameTr": "Kasko Teminatı",
+            "limit": null,
+            "deductible": null,
+            "description": "Vehicle covered up to market value as of loss date.",
+            "isUnlimited": false,
+            "isMarketValue": true,
+            "category": "main",
+            "included": true,
+            "limitType": null,
+            "page": 1,
+            "clause": "4.1 TEMİNAT ÖZETİ",
+            "quote": "Kasko Genel Şartları'nın A.1 bölümünde belirtilen -çarpışma, çarpma/çarpılma, yanma, kötü niyet veya muziplikle yapılan hareketler ile fiil ehliyetine sahip olmayan kişilerin yol açacağı zararlar, çalınma/çalınmaya teşebbüs- tüm riskler teminat dahilindedir.",
+            "carveOuts": null,
+            "normalizedName": "comprehensive kasko",
+            "canonicalName": "MAIN_KASKO_COVERAGE",
+            "parsedLimit": null
+          },
+          {
+            "name": "İhtiyari Mali Sorumluluk",
+            "nameTr": "İhtiyari Mali Sorumluluk",
+            "limit": 400000,
+            "deductible": null,
+            "description": "Material + bodily injury per accident 400,000 TL; includes defense against unjust claims; valid in Türkiye.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "liability",
+            "included": true,
+            "limitType": "per_event",
+            "page": 1,
+            "clause": "İHTİYARİ MALİ MESULİYET",
+            "quote": "MADDI+BEDENİ KAZA BAŞINA 400.000 TL",
+            "carveOuts": null,
+            "normalizedName": "voluntary third party liability",
+            "canonicalName": "VOLUNTARY_THIRD_PARTY_LIABILITY",
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 400000
+            }
+          },
+          {
+            "name": "Deprem",
+            "nameTr": "Deprem",
+            "limit": null,
+            "deductible": 5,
+            "description": "Covered with 5% deductible over vehicle market value.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 1,
+            "clause": "Ek Teminatlar",
+            "quote": "-DEPREM/YANARDAĞ PÜSKÜRMESİ (%5 MUAFİYETLİ)",
+            "carveOuts": null,
+            "normalizedName": "earthquake and volcanic eruption",
+            "canonicalName": "EARTHQUAKE",
+            "parsedLimit": null
+          },
+          {
+            "name": "Grev, Lokavt, Terör",
+            "nameTr": "Grev, Lokavt, Terör",
+            "limit": null,
+            "deductible": null,
+            "description": "Covered within Republic of Türkiye borders.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 1,
+            "clause": "Ek Teminatlar",
+            "quote": "-GREV LOKAVT HALK HAREKETLERİ",
+            "carveOuts": null,
+            "normalizedName": "strike, lockout, riot and civil commotion",
+            "canonicalName": "STRIKE_LOCKOUT_TERROR",
+            "parsedLimit": null
+          },
+          {
+            "name": "Sel ve Su Baskını",
+            "nameTr": "Sel ve Su Baskını",
+            "limit": null,
+            "deductible": null,
+            "description": "Flood/water inundation damages are covered.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 1,
+            "clause": "Ek Teminatlar",
+            "quote": "-SEL",
+            "carveOuts": null,
+            "normalizedName": "flood",
+            "canonicalName": "FLOOD_WATER_DAMAGE",
+            "parsedLimit": null
+          },
+          {
+            "name": "Mini Onarım",
+            "nameTr": "Mini Onarım",
+            "limit": null,
+            "deductible": null,
+            "description": "Small-scale body, paint and interior trim repairs at Auto King service centers within policy annex limits.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 6,
+            "clause": "Mini Onarım Hizmeti Klozu",
+            "quote": "Mini Onarım Hizmeti Klozu: Allianz Mini Onarım Hizmeti... küçük ölçekli hasarların Auto King Servis Merkezlerinde bedelsiz olarak giderilmesi hizmetidir.",
+            "carveOuts": null,
+            "normalizedName": "mini repair service",
+            "canonicalName": "MINI_REPAIR",
+            "parsedLimit": null
+          },
+          {
+            "name": "Koltuk Ferdi Kaza - Vefat",
+            "nameTr": "Koltuk Ferdi Kaza - Vefat",
+            "limit": 5000,
+            "deductible": null,
+            "description": "Passenger death/permanent disability cover.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "other",
+            "included": true,
+            "limitType": "per_event",
+            "page": 1,
+            "clause": "FERDİ KAZA",
+            "quote": "YOLCU ÖLÜM/SÜREKLİ SAKATLIK 5.000 TL",
+            "carveOuts": null,
+            "normalizedName": "personal accident - passenger",
+            "canonicalName": "SEAT_PERSONAL_ACCIDENT_DEATH",
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 5000
+            }
+          },
+          {
+            "name": "Koltuk Ferdi Kaza - Sürekli Sakatlık",
+            "canonicalName": "SEAT_PERSONAL_ACCIDENT_DISABILITY",
+            "normalizedName": "koltuk ferdi kaza - sürekli sakatlık",
+            "nameTr": "Koltuk Ferdi Kaza - Sürekli Sakatlık",
+            "limit": 5000,
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 5000
+            },
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "isImplicit": false,
+            "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir."
+          },
+          {
+            "name": "Hukuksal Koruma",
+            "nameTr": "Hukuksal Koruma",
+            "limit": 5000,
+            "deductible": null,
+            "description": "Legal expenses and attorney fees 5,000 TL.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "legal",
+            "included": true,
+            "limitType": "per_event",
+            "page": 1,
+            "clause": "HUKUKSAL KORUMA",
+            "quote": "DAVA VE AVUKAT MASRAFLARI 5.000 TL",
+            "carveOuts": null,
+            "normalizedName": "legal protection",
+            "canonicalName": "LEGAL_PROTECTION",
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 5000
+            }
+          }
+        ],
+        "specialConditions": [
+          "Sigortalı araç hiçbir şekilde rent-a-car ve ticari amaçla kullanılmayacaktır.",
+          "Modifiyeli araçlar teminat kapsamı dışındadır.",
+          "Zırhlı araçlar her koşulda teminat kapsamı dışındadır.",
+          "EPDK standartlarına ve yasal mevzuata uygun olmayan yakıt kullanımı nedeniyle oluşan doğrudan hasarlar ve buna bağlı yangın hasarları teminat dışıdır.",
+          "Kurye taşımacılığı yapılması durumunda meydana gelen hasar teminat kapsamı dışındadır.",
+          "Araç canlı yayınlarda, yarış/off-road yarışlarında, gösterilerde, sergilerde, deneme sürüşlerinde, siyasi parti/belediye/askeri araç olarak veya üretim amacı dışında tadilatlı kullanımda kapsam dışıdır.",
+          "Araç piyasa rayiç değerine kadar teminat altındadır.",
+          "Eksik/aşkın sigorta uygulanmayacaktır.",
+          "Peşin poliçe olarak üretilmiş bu poliçe kredi kartından 9 eşit taksit ile tahsil edilecektir."
+        ],
+        "exclusions": [
+          "Rent-a-car amaçlı kullanım esnasında meydana gelen tüm hasarlar ile hasar anında aracın ticari amaçla kullanıldığının tespiti durumlarında oluşan hasar, poliçe teminat kapsamı dışındadır.",
+          "Modifiyeli araçlar teminat kapsamı dışındadır; aracın modifiyeli olması ya da sonradan modifiye yapılması durumunda sigorta şirketinin sorumluluğu yoktur.",
+          "Aracın ve içindekilerin güvenliğini sağlamak amacıyla zırh ile kaplanan tüm araçlar her koşulda teminat kapsamı dışındadır.",
+          "EPDK standartlarına ve yasal mevzuata göre uygun olmayan yakıt kullanımı sebebiyle araçta meydana gelen doğrudan hasarlar ve bundan kaynaklanan yangın hasarları teminat dışıdır.",
+          "Sigortalı aracın kurye taşımacılığı yapması durumunda meydana gelen hasar teminat kapsamı dışındadır.",
+          "Sigortalı aracın canlı yayınlarda, yarışlarda/off-road yarışlarında, gösterilerde ve/veya sergilerde, deneme sürüşlerinde, siyasi parti/belediye/askeri araç olarak ve/veya fabrika çıkışından sonra tadilat ile farklılaştırılan üretim amacı dışında kullanılması durumunda teminatlar kapsam dışındadır.",
+          "Aracın anahtarlarının araç üzerinde veya araç içerisinde bırakılması nedeniyle meydana gelen hırsızlık veya hırsızlığa teşebbüs zararları teminat dışıdır.",
+          "Sigorta ettireni, sigortalıyı veya sürücüyü resmi sıfat takınarak veya güven oluşturan davranışlarla yanıltarak aracın ve/veya anahtarlarının elde edilmesi suretiyle meydana gelen hırsızlık zararları teminat dışıdır.",
+          "Cebir, fiziksel şiddet kullanılmaksızın araca ait anahtarları ele geçirerek yapılan hırsızlık veya hırsızlığa teşebbüs sonucu oluşan zararlar teminat dışıdır.",
+          "Otopark fişi/belgesi olmadan aracın valeye/otoparka teslim edilmesi sonrası oluşan hırsızlık veya hırsızlığa teşebbüs teminat dışıdır.",
+          "Aracın vale veya otopark görevlisi tarafından çalınması neticesi ile oluşan hırsızlık veya hırsızlığa teşebbüs sonucu oluşan hasarlar teminat dışıdır.",
+          "Gönül rızası ile kullanılmasına izin verilen veya emanet teslim edilen aracın bu kişilerce çalınması veya çalınmaya teşebbüs edilmesi sonucu meydana gelen zararlar teminat dışıdır.",
+          "Sigorta ettiren/sigortalı/araç sahibi/sürücünün algılama yeteneğinin zayıflamasından ve/veya içinde bulunduğu hal ve şartlardan yararlanarak anahtarların ele geçirilmesi sonucu meydana gelen hırsızlık veya hırsızlığa teşebbüs teminat dışıdır.",
+          "Aracın, aracı kiralayan kişiler tarafından çalınması teminat dışıdır.",
+          "Kişisel eşya teminatında ticari mallar, nakit, çek, senet, mücevherat, kredi kartı, cep telefonu, taşınabilir bilgisayar ve diğer elektronik eşyalar, seyahat biletleri teminat kapsamı dışındadır.",
+          "Kilitli olmayan araçtan park halindeyken kişisel eşyaların çalınması teminat kapsamı dışındadır; araca zarar verilmeden meydana gelen çalınmalar da (eve zorla girilerek anahtar elde edilmesi hariç) kapsam dışıdır.",
+          "Hiçbir sigorta / reasürans şirketi, Birleşmiş Milletler kararları veya reasürörün tabi olduğu yasalar veya düzenlemeler uyarınca ticari veya ekonomik yaptırımlara, yasak ya da kısıtlamaya konu olabilecek herhangi bir teminatı vermiş sayılmayacak, böyle bir tazminatın ödenmesi veya menfaatin sağlanmasında yükümlü olmayacaktır.",
+          "Yurtdışı teminatı alınmış olsa dahi, Türkiye Cumhuriyeti sınırları dışında oluşacak hasarlarda asistans, çekme çekilme ve ikame araç hizmeti kapsam dahilinde değildir."
+        ],
+        "exclusionsEn": [
+          "All losses occurring during rent-a-car use or when the vehicle is determined to be used for commercial purposes at the time of loss are خارج coverage.",
+          "Modified vehicles are excluded; if the vehicle is modified or later altered, the insurer has no liability for resulting losses.",
+          "All vehicles armored for the protection of the vehicle and its contents are excluded under all circumstances.",
+          "Direct damage to the vehicle caused by fuel not compliant with EPDK standards and legal regulations, and resulting fire losses, are excluded.",
+          "Losses occurring while the insured vehicle is used for courier transportation are excluded.",
+          "Coverage is excluded if the insured vehicle is used in live broadcasts, races/off-road races, shows and/or exhibitions, test drives, as a political party/municipality/military vehicle, and/or for a purpose altered after factory release outside its intended production purpose.",
+          "Theft or attempted theft losses arising because the vehicle keys were left on or inside the vehicle are excluded.",
+          "Theft losses arising from obtaining the vehicle and/or its keys by deceiving the policyholder, insured, or driver through false official capacity or trust-inducing behavior are excluded.",
+          "Losses arising from theft or attempted theft by obtaining the vehicle keys without force or physical violence are excluded.",
+          "Theft or attempted theft after delivering the vehicle to valet/parking without a parking slip/document is excluded.",
+          "Losses arising from theft or attempted theft when the vehicle is stolen by valet or parking personnel are excluded.",
+          "Losses arising when a vehicle voluntarily entrusted or permitted for use is stolen or attempted to be stolen by those persons are excluded.",
+          "Theft or attempted theft arising from obtaining the keys by exploiting the weakened perception or circumstances of the policyholder/insured/owner/driver is excluded.",
+          "Theft of the vehicle by persons renting the vehicle is excluded.",
+          "Under personal belongings coverage, commercial goods, cash, checks, promissory notes, jewelry, credit cards, mobile phones, portable computers and other electronic items, and travel tickets are excluded.",
+          "Theft of personal belongings from an unlocked parked vehicle is excluded; theft without damage to the vehicle is also excluded (except where the key was obtained by forcibly entering the home).",
+          "No insurer/reinsurer shall be deemed to provide coverage, pay any claim, or provide any benefit that would expose it to commercial or economic sanctions, prohibitions, or restrictions under United Nations resolutions or laws/regulations applicable to the reinsurer.",
+          "Even if foreign territory coverage is purchased, assistance, towing, and replacement vehicle services are not covered for losses occurring outside the borders of the Republic of Türkiye."
+        ],
+        "conditionalDeductibles": [
+          {
+            "trigger": "earthquake or volcanic eruption loss",
+            "rate": "%5",
+            "evidence": "Deprem ve yanardağ püskürmesi hasarlarında aracın piyasa rayici bedeli üzerinden, %5 muafiyet uygulanır."
+          },
+          {
+            "trigger": "repair at non-contracted brand authorized service",
+            "rate": "%25",
+            "evidence": "Allianz ile anlaşması olmayan Marka Yetkili Servislere gidilmesi durumunda, hasar bedeli üzerinden %25 tenzili muafiyet uygulanır."
+          },
+          {
+            "trigger": "theft after valet/parking delivery with parking slip/document",
+            "rate": "%20",
+            "evidence": "Otopark fişi/belgesi ile, aracın valeye/otoparka teslim edilmesi sonrası oluşan hırsızlık veya hırsızlığa teşebbüs zarar larında, hasar bedeli üzerinden % 20 muafiyet uygulanır."
+          }
+        ],
+        "discounts": {
+          "ncdDiscount": 30,
+          "groupDiscount": null,
+          "otherDiscountPct": 6.5,
+          "evidence": "HASARSIZLIK İNDİRİMİ %30 ... SAĞLIK ÇAPRAZ SATIŞ İNDİRİMİ : %6,5"
+        },
+        "amendmentInfo": {
+          "isAmendment": false,
+          "amendmentNumber": null,
+          "amendmentDate": null,
+          "basePolicyNumber": null,
+          "amendmentReason": null,
+          "premiumDifference": null
+        },
+        "evidence": {
+          "insights": [
+            {
+              "text": "Policy is a bundled motor insurance package including kasko, voluntary liability, personal accident, and legal protection.",
+              "textEn": "Policy is a bundled motor insurance package including kasko, voluntary liability, personal accident, and legal protection.",
+              "quote": "GENİŞLETİLMİŞ KASKO ... İHTİYARİ MALİ MESULİYET ... FERDİ KAZA ... HUKUKSAL KORUMA",
+              "quoteTr": null
+            },
+            {
+              "text": "Vehicle is insured up to market value at the date of loss.",
+              "textEn": "Vehicle is insured up to market value at the date of loss.",
+              "quote": "Sigorta konusu araç... hasar tarihi itibari ile piyasa rayiç değerine kadar teminat altına alınmıştır.",
+              "quoteTr": null
+            },
+            {
+              "text": "Previous insurer is Güneş Sigorta.",
+              "textEn": "Previous insurer is Güneş Sigorta.",
+              "quote": "Önceki Sigorta Şirketi : GÜNEŞ SİGORTA",
+              "quoteTr": null
+            }
+          ],
+          "exclusions": [
+            {
+              "text": "Commercial/rent-a-car use exclusion applies.",
+              "textEn": "Commercial/rent-a-car use exclusion applies.",
+              "quote": "Rent-a- car amaçlı kullanım esnasında meydana gelen tüm hasarlar ile hasar anında aracın ticari amaçla kullanıldığının tespiti durumlarında oluşan hasar, poliçe teminat kapsamı dışındadır.",
+              "quoteTr": null
+            },
+            {
+              "text": "Modified vehicles are excluded.",
+              "textEn": "Modified vehicles are excluded.",
+              "quote": "Modifiyeli araçlar, işbu sigorta poliçesi teminat kapsamı dışında olup...",
+              "quoteTr": null
+            },
+            {
+              "text": "Sanctions clause excludes coverage that would breach sanctions.",
+              "textEn": "Sanctions clause excludes coverage that would breach sanctions.",
+              "quote": "Ticari Yaptırımlar Klozu: Hiçbir sigorta / reasürans şirketi... ticari veya ekonomik yaptırımlara... konu olabilecek herhangi bir teminatı vermiş sayılmayacak...",
+              "quoteTr": null
+            }
+          ]
+        },
+        "clauseGraph": {
+          "edges": [
+            {
+              "sourceId": "GENİŞLETİLMİŞ KASKO",
+              "targetId": "ANAHTAR KAYBI",
+              "relationshipType": "coverage_inclusion",
+              "description": "Key loss added as supplementary coverage.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "GENİŞLETİLMİŞ KASKO",
+              "targetId": "KİŞİSEL EŞYA",
+              "relationshipType": "coverage_inclusion",
+              "description": "Personal belongings theft added by endorsement.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "DEPREM/YANARDAĞ PÜSKÜRMESİ",
+              "targetId": null,
+              "relationshipType": "deductible_trigger",
+              "description": "5% deductible applies over market value.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Anlaşmasız Marka Yetkili Servis",
+              "targetId": "GENİŞLETİLMİŞ KASKO",
+              "relationshipType": "deductible_trigger",
+              "description": "25% deductible if repaired at non-contracted brand authorized service.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Otopark fişi/belgesi ile vale/otopark teslimi sonrası hırsızlık",
+              "targetId": "Aracın çalınması veya çalınmaya teşebbüs rizikosu",
+              "relationshipType": "deductible_trigger",
+              "description": "20% deductible applies unless qualifying third-party liability policy and recorded tax-liable parking operator conditions are met.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Ticari Yaptırımlar Klozu",
+              "targetId": "GENİŞLETİLMİŞ KASKO",
+              "relationshipType": "endorsement_override",
+              "description": "Sanctions clause overrides otherwise granted coverage where payment/benefit would breach sanctions.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "KİRALIK ARAÇ HİZMETİ TEMİNATI (STANDART)",
+              "targetId": "ASİSTANS TEMİNATI",
+              "relationshipType": "service_benefit_linkage",
+              "description": "Replacement vehicle service operates as assistance benefit with service conditions.",
+              "isCandidate": false
+            }
+          ]
+        },
+        "confidence": {
+          "overall": 0.94,
+          "policyNumber": 0.99,
+          "provider": 0.99,
+          "dates": 0.99,
+          "premium": 0.98,
+          "coverages": 0.92
+        },
+        "qualityScore": {
+          "readabilityStructure": 0.95,
+          "completenessKeyFields": 0.98,
+          "numericLimitsReconciled": 0.91,
+          "noGuessingUncertaintiesListed": 0.94,
+          "total": 0.95
+        }
+      },
+      "usage": {
+        "prompt_tokens": 17489,
+        "completion_tokens": 5520,
+        "total_tokens": 23009,
+        "prompt_tokens_details": {
+          "cached_tokens": 17152,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "model": "gpt-5.4-2026-03-05",
+      "provider": "openai",
+      "fallback": true,
+      "fallbackReason": "ANTHROPIC_UNKNOWN_ERROR",
+      "cost": null,
+      "requestId": "ext-1777818041809",
+      "route": "/api/ai/extract",
+      "elapsedMs": 145441,
+      "phaseTiming": {
+        "configLoad_ms": 1,
+        "promptLoad_ms": 0,
+        "anthropic_ms": 90001,
+        "openai_ms": 55435
+      },
+      "fallbackChain": [
+        {
+          "provider": "anthropic",
+          "success": false,
+          "error_code": "ANTHROPIC_UNKNOWN_ERROR"
+        },
+        {
+          "provider": "openai",
+          "success": true,
+          "duration_ms": 55435
+        }
+      ]
+    }
+  ]
+}

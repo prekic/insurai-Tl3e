@@ -1,0 +1,16 @@
+{
+  "fixture": "anadolu-birlesik-kasko.pdf",
+  "temperature": 0,
+  "documentTextLength": 30297,
+  "runs": [
+    {
+      "error": "Extract failed: 429"
+    },
+    {
+      "error": "Extract failed: 429"
+    },
+    {
+      "error": "Extract failed: 429"
+    }
+  ]
+}

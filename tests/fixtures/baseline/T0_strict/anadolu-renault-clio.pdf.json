@@ -1,0 +1,16 @@
+{
+  "fixture": "anadolu-renault-clio.pdf",
+  "temperature": 0,
+  "documentTextLength": 41392,
+  "runs": [
+    {
+      "error": "Extract failed: 429"
+    },
+    {
+      "error": "Extract failed: 429"
+    },
+    {
+      "error": "Extract failed: 429"
+    }
+  ]
+}
