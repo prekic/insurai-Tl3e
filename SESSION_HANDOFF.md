@@ -1,6 +1,6 @@
-# Session Handoff — May 2, 2026 — Round-4 Reviewer Feedback Closed (22 PRs, #432–#453)
+# Session Handoff — May 3, 2026 — Cost Controls + OCR Cache Operational (8 PRs, #456-#463)
 
-> **Session type**: Production accuracy hardening — opened with May-2 follow-through (5 PRs #432-#436), pivoted mid-session to closing Round-4 Anadolu Sigorta reviewer feedback (17 PRs #437-#453, including 3 P0 + 4 P1 + 4 P2 + 3 diagnostic tests + 2 hot-fixes). Path A redesign of the Output Stability Test (PR #453) ships a substantive-check stability gate; the gate's May-2 PASS verdict was later corrected by PR #457 — see "Test Infrastructure State" below. Plan file: `/root/.claude/plans/work-on-these-remember-witty-pancake.md`.
+> **Session type**: Continuation of May 2 Round-4 work — opened with Option-A unverified-gate relaxation (#456), pivoted to fixing the Output Stability gate after empirical proof that the May-2 PASS verdict was a false-positive (#457), shipped 4 cost controls including a server-side OCR cache (#461), then tracked down and fixed a `pdf-lib` non-determinism bug that was defeating the cache (#462). Cost burn projected to drop ~70-80% steady-state. Cache verified working in production: `total_rows=7, hit_rows=7` after two smoke runs.
 
 ---
 
@@ -8,7 +8,7 @@
 
 ### Priority 1 — Restore production AI temperature (operator manual SQL)
 
-**Status**: BLOCKED on a single SQL update. Tested at `0` for stability verification, must return to default `0.1`.
+**Status**: STILL BLOCKED on the same single SQL update from the May-2 handoff. Today's session never restored it.
 
 ```sql
 UPDATE public.app_settings
@@ -16,179 +16,125 @@ SET value = '0.1', updated_at = NOW()
 WHERE category = 'ai' AND key = 'temperature';
 ```
 
-Run via Supabase SQL Editor. Cache TTL is 5 min (gotcha #159) — wait the time, or trigger a Railway redeploy to flush. Once done, this priority is closed and the production default is restored.
+Run via Supabase SQL Editor. Cache TTL is 5 min (gotcha #159) — wait, or trigger a Railway redeploy to flush. Once done, this priority is closed.
 
-**Why temporarily set to 0**: The Output Stability Test (Round-4 Test B, PR #450 / #453) needed maximum determinism to verify the substantive-check stability gate. Test B exited PASS at T=0; PR #457 (May-2 follow-up) later discovered three bugs that made the verdict pass-by-default — only BUN was actually true on the original fixture. The gate is now correctly calibrated and Tiguan-as-default. Round-4 work doesn't require T=0 in production — `0.1` gives slightly more natural phrasing and the deterministic post-processing layer (Sprints 1–3) absorbs the small LLM variance on user-facing fields.
+### Priority 2 — Round 5 reviewer hand-off when they respond
 
-### Priority 2 — Hand off to reviewer for Round 5 verification
+**Status**: Round 4 closed end-to-end (May 2). Round 5 starts when the reviewer pushes back. The infrastructure is in place:
 
-**Status**: Round-4 work complete. Round 5 starts when the reviewer responds.
+1. Re-upload `tests/fixtures/kasko/anadolu-volkswagen-tiguan.pdf` (new canonical fixture per PR #457 — same Eriş Ambalaj fleet policy the reviewer originally scored against).
+2. Screenshot the panels: hero deductible, Critical Financial Risks, Excess Liability scenario card, exclusions, Ask Your Insurer, AI Insights, Discounts (with `previousInsurer` text), coverages list including Hatalı Akaryakıt, Anadolu Hizmet, AS+ Yetkili Servis Ağı.
+3. Send change-log of all session-2 PRs (#456-#463) to the reviewer.
+4. Whatever they push back on becomes Round 5.
 
-Concrete hand-off:
-1. Re-upload `tests/fixtures/kasko/anadolu-birlesik-kasko.pdf` via production UI
-2. Screenshot each panel the Round-4 review flagged: hero deductible, Critical Financial Risks, Excess Liability scenario card, exclusions panel, Ask Your Insurer panel, AI Insights, Discounts panel, coverage list including Hatalı Akaryakıt, Anadolu Hizmet, AS+ Yetkili Servis Ağı
-3. Send those + the change-log of Round-4 PRs (#437–#453) to the reviewer
-4. Whatever they push back on becomes Round 5
+### Priority 3 — Path-filter audit / smoke-kasko savings observation
 
-Round-4 reviewer's quoted bottom line: _"If Sprint 1 ships, this output is launch-quality for friendly beta."_ All three sprints shipped.
+**Status**: PR #461 added a `paths:` filter to `smoke-kasko.yml`. Watch the next ~10 PRs to confirm docs-only / unrelated-test PRs no longer fire smoke. Realistic skip rate: 30-50% of PRs.
 
-### Priority 3 — Sprint 3 deferred items (need reviewer domain spec)
+### Priority 4 — Daily observability sunset (deferred from May 2)
 
-Two items from the original Round-4 review are blocked on the reviewer providing a spec rather than implementation:
-
-- **Sprint 3 #12** — coverage transfer context (the spec is unclear: is this about `previousInsurer` which we now ship in PR #448, or is it a separate UI feature?)
-- **Sprint 3 #15** — output stability tuning (Test B already shipped — this item likely covers operator-facing tuning of the new substantive-check thresholds)
-
-Don't ship either until the reviewer clarifies. If the reviewer does respond with specifics, both are 1-PR scopes each.
-
-### Priority 4 — Disable daily observability workflow once 7 clean comments accumulate on issue #419
-
-PR #432 (May 2) shipped `audit-observability-daily.yml` running daily at 08:00 UTC. The workflow's comment template self-documents a sunset hint:
+**Status**: same as May 2 — `audit-observability-daily.yml` can be disabled once issue #419 has 7 consecutive green daily comments confirming `audit_judgements.cost_usd > 0`. Not urgent.
 
 ```bash
 gh workflow disable audit-observability-daily.yml
 ```
 
-Trigger when issue #419 has 7 consecutive green comments showing `audit_judgements.cost_usd > 0` and `admin_notifications` rows firing correctly. This proves the May-2 fixes (PR #427) are genuinely working in steady state.
-
 ---
 
-## 📦 What Shipped This Session (22 PRs)
+## 📦 What Shipped This Session (8 PRs)
 
-### May-2 follow-through (prior to Round-4 review, 5 PRs)
-The session opened with the previously-planned May-2 follow-up (plan file `work-on-these-remember-witty-pancake.md` initial scope) before pivoting to Round-4 review when it arrived mid-session.
-
-| # | Topic |
-|---|---|
-| #432 | Daily observability workflow (`audit-observability-daily.yml`) + `diagnose:audit` npm script |
-| #433 | Cost-control test alignment (`claude-3-5-haiku` → `claude-haiku-4-5`) + audit-judge-service comment refresh |
-| #434 | Premium Net + BSMV stacked breakdown rows (Sprint 3 #10) |
-| #435 | Special Provisions panel for named-deductible scenarios (Sprint 3 #13) |
-| #436 | AS+ servis network deductible callout (Sprint 3 #14) |
-
-### Sprint 1 — Round-4 Pre-Launch Blockers (5 PRs)
-| # | Topic | Round-4 ref |
+| # | Type | Topic |
 |---|---|---|
-| #437 | Hero deductible UI fallback to highest-% scenario | P0 #1 |
-| #438 | Kullanım Şekli regex broadening (extraction-side root cause) | P0 #1 root cause |
-| #439 | Pin canonical %80 label flow into Critical Financial Risks | P0 #2 |
-| #440 | `detectImmCarveOut` accepts fallback haystacks | P0 #3 |
-| #441 | Cross-insurer leak guard at the rendering layer | Test A |
+| #456 | feat | Always allow share + download (Option A unverified-gate relaxation) |
+| #457 | fix | Output Stability gate — fixture / shape / regex breadth (3 bugs) |
+| #458 | docs | Correct May-2 Test B verdict — was false-positive |
+| #459 | feat | Migration 058 — surface AS+ Yetkili Servis Ağı (BLOATED VERSION) |
+| #460 | fix | Migration 059 rollback + 060 compact form |
+| #461 | feat | Cost controls × 4 (path filter, stability cap, OCR cache, Haiku smoke) |
+| #462 | fix | OCR cache key — source-file SHA + chunk index (pdf-lib non-determinism) |
+| #463 | chore | smoke-kasko timeout 10 → 15 min |
 
-### Sprint 2 — Accuracy Hardening (5 PRs)
-| # | Topic | Round-4 ref |
-|---|---|---|
-| #442 | Exclusions dedup tightening (0.65 + exact-match pre-pass) + ÖTV-conditional filter | P1 #4 |
-| #443 | Migration 056 — formal-exclusion checklist final-step | P1 #5 |
-| #444 | Ask Your Insurer keyword broadening for Anadolu phrasings | P1 #6 |
-| #445 | 3 deterministic AI Insights recognition rules (niche kloze count, transfer, AS+ network) | P1 #6 |
-| #446 | Glass-repair recategorization (assistance → supplementary) | P1 #7 |
-
-### Sprint 3 — Polish + Tests (5 PRs + 2 hot-fixes)
-| # | Topic | Round-4 ref |
-|---|---|---|
-| #447 | Hatalı Akaryakıt 50K limit recovery from description text | P2 #8 |
-| #448 | `previousInsurer` schema field + Discounts panel transfer attribution + migration 057 | P2 #9 |
-| #449 | Anadolu Hizmet bilingual gloss text | P2 #11 |
-| #450 | Output Stability Test (Test B) — manual `workflow_dispatch` | Test B |
-| #451 | Graceful-degradation regression guards | Test C |
-| #452 | OCR + SSE parse hot-fix (smoke-kasko shape mismatch) | Test B fix |
-| #453 | Substantive-check stability gate (Path A redesign) | Test B v2 |
+The session arc was instructive: #459 → #460 was a same-session rollback when the bloated AS+ section caused token-budget overruns; #461 → #462 was a same-day cache-invalidation diagnosis where the cache populated but never hit because of `pdf-lib` non-determinism across processes.
 
 ---
 
 ## 🚨 Configuration State at Hand-Off
 
 ### Migrations applied to production Supabase
-- ✅ Migration 056 (formal-exclusion checklist) — applied + verified
-- ✅ Migration 057 (`previousInsurer` extraction instruction) — applied + verified
-
-Both follow the standard idempotent guarded-update pattern (matches 048-055). Verification queries are in each migration's footer.
+- ✅ Migration 058 (AS+ extraction, bloated form) — applied + later rolled back via 059
+- ✅ Migration 059 (rollback of 058) — applied + verified
+- ✅ Migration 060 (AS+ compact form) — applied + verified
+- ✅ Migration 061 (`ocr_cache` table) — applied + verified (cache populated to 7 rows)
+- ✅ `DELETE FROM public.ocr_cache;` — applied between PR #461 and #462 to clear stale rows
 
 ### `app_settings` state
-- ⚠️ `ai.temperature` = `0` — TEMPORARY for Test B verification. **Restore to `0.1`** (Priority 1 above)
-- ✅ All other keys at standard defaults
+- ⚠️ `ai.temperature` = `0` — STILL TEMPORARY from May 2 Test B. **Restore to `0.1`** (Priority 1 above).
+- ✅ All other keys at standard defaults.
 
 ### Workflows enabled
-- ✅ `smoke-kasko.yml` — every push to main (existing)
-- ✅ `audit-judge-trends.yml` — Mondays 06:00 UTC + manual (existing)
-- ✅ `audit-observability-daily.yml` — daily 08:00 UTC + manual (PR #432, May 2)
-- ✅ `output-stability.yml` — manual `workflow_dispatch` only (PR #450 + #453, this session)
+- ✅ `smoke-kasko.yml` — every push to main MATCHING the new path filter (PR #461) + 15-min timeout (PR #463)
+- ✅ `audit-judge-trends.yml` — Mondays 06:00 UTC
+- ✅ `audit-observability-daily.yml` — daily 08:00 UTC (sunset candidate per Priority 4)
+- ✅ `output-stability.yml` — manual `workflow_dispatch`, default 3 runs (was 5), default fixture `anadolu-volkswagen-tiguan.pdf` (was the Golf-aliased `anadolu-birlesik-kasko.pdf`)
 
 ### Required env vars — no changes this session
-No new env vars introduced. Migration 057 + the `previousInsurer` schema field expand the existing extraction prompt and JSON schema only. The new `output-stability.yml` workflow reuses the existing `PRODUCTION_SERVER_URL` GitHub secret (gotcha #150).
+No new env vars introduced. The new `cacheKey` field on `/api/ai/ocr/document-ai` is a request-body addition, not a config addition.
 
 ---
 
-## 🛠️ Diagnostic Infrastructure Available
+## 🛠️ OCR Cache Operational Snapshot
 
-These scripts are committed to `scripts/` and runnable via `npx tsx <path>` — operator can invoke any time. PR #432 also added an `npm run diagnose:audit` shortcut for the audit-judge probe.
+After PR #462's cache-key fix landed and was verified end-to-end:
 
-| Script | npm shortcut | Purpose | When to use |
-|---|---|---|---|
-| `scripts/diagnose-audit-judge-observability.ts` | `npm run diagnose:audit` | Read-only Supabase queries showing audit-judge health (4 queries) | When audit_judgements look wrong |
-| `scripts/probe-anadolu-deductible.ts` | (none — run via `npx tsx`) | Verifies `classifyExclusions` regex broadening for Kullanım Şekli (PR #438) | Before/after extraction-side regex changes |
-| `scripts/output-stability-check.ts` | (run via workflow_dispatch) | Substantive-check stability gate (PR #453) | Before/after major prompt or post-processing changes |
-| `scripts/smoke-kasko.ts` | `npm run smoke:kasko` | 4-fixture vehicle-extraction smoke (existing) | Auto-runs in CI on every push |
+```
+total_rows         = 7    ← one per unique chunk × 4 fixtures
+hit_rows           = 7    ← every chunk hit on the 2nd smoke run
+earliest           = 09:39:13   (Run 1 — cold, populated)
+most_recent_hit    = 10:38:48   (Run 2 — warm, hit)
+```
 
-The first three are operator-triggered; the fourth runs automatically.
-
----
-
-## 🌐 i18n Keys Added This Session
-
-Per gotcha #98 (4-file rule), every i18n key addition this session touched all four of:
-`src/lib/i18n/translations-en.ts`, `translations-tr.ts`, `translations-skeleton.ts` (empty value), and the `TranslationDictionary` interface in `translations.ts`.
-
-| Key | EN value | TR value | Added in PR |
-|---|---|---|---|
-| `policy.premiumNet` | "Net Premium" | "Net Prim" | #434 |
-| `policy.premiumTax` | "BSMV Tax" | "BSMV" | #434 |
-| `policy.specialProvisionsLabel` | "Special Provisions" | "Özel Şartlar" | #435 |
-| `policy.specialProvisionsCount` | "{count} named-deductible scenarios — click to expand" | "{count} isimlendirilmiş muafiyet senaryosu — açmak için tıklayın" | #435 |
-| `policy.servisNetworkCallout` | "Deductible applies for repairs outside the authorized service network" | "Yetkili servis dışı onarımlarda muafiyet uygulanır" | #436 |
-
-5 new keys × 4 files = 20 file-touches. All 4 i18n files therefore appear in `git diff --name-status` with substantive content additions (not just empty-string skeleton entries — the real EN/TR strings are populated).
-
----
-
-## 🧪 Test Infrastructure State
-
-- **Test A** (cross-insurer state leak): rendering-layer guard at `src/lib/reviewer/__tests__/cross-insurer-leak.test.ts` (5 tests, runs in Vitest CI on every PR). Extraction-layer guard via `forbiddenPhrases[]` in `tests/fixtures/kasko/fixtures.json` continues to run via `smoke-kasko.yml`. PR #441 also updated `tests/fixtures/kasko/README.md` to formally document the `forbiddenPhrases[]` field (previously undocumented in the field-reference table) and the three-layer Test A coverage strategy.
-- **Test B** (output stability): substantive-check workflow at `.github/workflows/output-stability.yml`. The May-2 "PASS — all 7 substantive checks consistent" verdict (PR #453 + hot-fix #452) was later found to be a **false-positive** by PR #457. Three bugs converged: (a) the workflow's default fixture `anadolu-birlesik-kasko.pdf` is byte-identical (same SHA256, 92KB) to the simpler `anadolu-volkswagen-golf.pdf` — a 2001 Golf with only K80 + BUN signals genuinely present, not the 2016 Eriş Ambalaj Tiguan fleet policy the reviewer scored against; (b) `String([object Object])` shape bug silently broke every `conditionalDeductibles[]` regex; (c) K80/AS35 patterns were calibrated for canonical post-processed labels rather than the raw extraction's English triggers and Turkish source-text-faithful evidence. PR #457 switched the fixture default to `anadolu-volkswagen-tiguan.pdf`, replaced `String(c)` with `JSON.stringify(c)`, broadened the K80/AS35 regexes, and added a quality-floor assertion that fails when ≥3 substantive checks are silently always-absent. Re-run after PR #457 against the Tiguan: **6/7 truly present** (K80 / AS35 / IMM / AHz / BUN / PRV ✓). AS+ remains a known **extraction-prompt gap** — the live `prompt_templates.user_prompt` does not yet emit AS+ Yetkili Servis Ağı as a distinct coverage row; tracked as a separate migration 058.
-- **Test C** (graceful degradation): unit-level regression guards at `src/lib/ai/__tests__/graceful-degradation.test.ts` (13 tests, runs in Vitest CI on every PR).
+**Cost-projection**: smoke-kasko per push ~$0.40 → ~$0.04 (Haiku + cached OCR on warm cache). Path filter eliminates 30-50% of fires. `output-stability` per fire ~$0.61 → ~$0.32. Steady-state target: $0.50-1.00/day vs the May 3 measured $3-4.
 
 ---
 
 ## 🚧 Known Issues / Caveats
 
-### Anthropic T=0 inherent variance — gotcha #155
-Setting `ai.temperature = 0` does NOT eliminate run-to-run variance in row counts on long policies (1-3 row spread is normal due to floating-point non-associativity in batched matmul). Substantive present/absent checks ARE 100% stable at T=0 — that's what the Test B gate measures. Don't gate stability tests on count variance; gate on substantive checks. Pattern documented in gotcha #156.
+### `pdf-lib` is non-deterministic across Node processes — gotcha #162
+`PDFDocument.save()` produces different bytes per process for the same source PDF (per-process date / object-ID randomness). This bit us via PR #461's OCR cache: 13 stale rows piled up, 0 hits, before PR #462 fixed the cache key to use `sha256(sourceFileBytes):chunkIdx/totalChunks` instead.
 
-### Stability/smoke scripts must mirror production endpoint shape — gotcha #157
-The OCR endpoint expects `documentBase64` field name (NOT `pdfBase64`) and returns `{ success, data: { text } }` (NOT flat). The SSE extract endpoint may emit `data:{...}` without trailing space. PR #452 caught all three of these the hard way. Always diff-check new scripts against `scripts/smoke-kasko.ts` (the canonical reference) before shipping.
+### Migration 058 prompt-bloat regression — gotcha #161
+Adding a ~3KB AS+ section to `prompt_templates.user_prompt` shrunk Tiguan extraction's coverage list from 26-29 → 12 rows AND triggered "All AI providers failed" cascades. Combined system prompt + 60K-char Tiguan input was tipping the LLM's output-token budget. Fixed via 059 rollback + 060 compact (~500 byte) form. **Lesson**: prompt additions should be terse; worked examples and redundant trigger lists are bytes that compete with the document for output budget.
 
-### Cache TTL 5 min — gotcha #159
-SQL updates to `app_settings` propagate to in-flight requests on TWO conditions: wait 5+ min, OR trigger a Railway redeploy. Plan operator-facing config changes accordingly.
+### `ai.temperature` still pinned to 0
+Inherited from May 2. Production behavior is fine at T=0 but the post-processing layer is calibrated to absorb T=0.1 variance. Restore is Priority 1 above.
 
----
-
-## 📚 Documentation Sync
-
-- **CLAUDE.md** updated this session:
-  - Next-Session Instructions block fully rewritten
-  - 6 new gotchas appended: #155 (T=0 inherent variance), #156 (substantive-check stability pattern), #157 (script shape mirror smoke-kasko), #158 (`previousInsurer` schema count 34→35), #159 (5-min cache TTL), #160 (coverage-map conservative enrichment pattern)
-  - "Last Updated" line refreshed to May 2, 2026 with Round-4 closure summary
-
-- **No new ADRs** — see Step 3 of this hand-off (architecture check) for reasoning. Round-4 work was 100% within existing extraction/UI/test architectures.
+### Anthropic billing dipped twice today
+Ran out mid-session (around 11:00 UTC and again ~14:00 UTC). User refilled both times. Worth monitoring if billing instability continues — may need higher credit floor or auto-top-up.
 
 ---
 
-## 🔭 Round 5 Hand-Off Path (when reviewer responds)
+## 📚 Documentation Sync (this PR)
 
-1. The Round-4 reviewer's verdict was _"the most accurate output of any iteration across both test policies"_ — Round 5 will likely target either edge cases on the Anadolu policy that didn't appear in Round 4, OR a fresh policy from a different insurer.
-2. If Round 5 surfaces new stability concerns: re-run the Output Stability Test workflow (no temperature pin needed in steady state — the substantive checks are stable at T=0.1 too, just count panels show a bit more variance which is informational).
-3. If Round 5 surfaces extraction gaps on a fresh insurer: add fixture to `tests/fixtures/kasko/`, force-add via gotcha #153, declare in `fixtures.json` with appropriate `forbiddenPhrases[]` array.
-4. If Round 5 surfaces prompt instruction gaps: add migration 058+ following the idempotent guarded-update pattern (matches 048-057).
+- **CLAUDE.md** updated:
+  - Next-Session Instructions block rewritten to reflect today's state
+  - 5 new gotchas appended: #161 (migration prompt-bloat regression), #162 (pdf-lib non-determinism cross-process), #163 (OCR cache contract — cacheKey field), #164 (extraction model allowlist), #165 (Option-A unverified-gate relaxation)
+  - "Last Updated" line refreshed to May 3, 2026
+- **ADR-025** drafted: server-side OCR cache infrastructure (rationale + design decisions) — first persistent server-side cache for deterministic AI/OCR responses; pattern is extensible to extraction / sense-check / audit-judge if cost-warranted.
+- **No code changes in this PR** — pure docs + ADR.
 
-The infrastructure for Round 5 follow-up is in place. No setup work required at the start of the next session.
+---
+
+## 🔭 Where the next agent picks up
+
+If the reviewer responds in the next 24-48 hours:
+- Use the Round 5 path under Priority 2.
+- The Tiguan fixture at `tests/fixtures/kasko/anadolu-volkswagen-tiguan.pdf` is the canonical reference; smoke and stability both default to it now.
+
+If no reviewer activity:
+- Restore `ai.temperature` (Priority 1).
+- Watch the cost-control savings land over the next ~10 PRs to confirm the 70-80% reduction projection.
+- Consider sunsetting `audit-observability-daily.yml` (Priority 4).
+
+If new feature work begins:
+- The OCR cache infrastructure (PR #461 + #462, ADR-025) is ready to be reused for other expensive deterministic operations. Check ADR-025 for the contract.
+- The model allowlist on `/api/ai/extract` (PR #461) prevents arbitrary callers from picking expensive frontier models — use the helper `assertExtractionModelAllowed()` when adding new endpoints that take a `model` field.
