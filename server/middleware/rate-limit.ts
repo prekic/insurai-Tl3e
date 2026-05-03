@@ -240,6 +240,11 @@ function skip(req: Request): boolean {
     return true
   }
 
+  // Skip if explicit environment override is provided
+  if (process.env.SKIP_AI_RATE_LIMIT === 'true') {
+    return true
+  }
+
   // Skip for internal health checks from localhost
   if (req.path === '/api/health' && req.ip === '127.0.0.1') {
     return true
