@@ -147,6 +147,13 @@ export const documentAISchema = z.object({
     .enum(['application/pdf', 'image/png', 'image/jpeg', 'image/tiff', 'image/gif'])
     .default('application/pdf'),
   languageHints: z.array(z.string().max(10)).max(5).optional().default(['tr', 'en']),
+  // Optional client-provided cache key. Server hashes this string instead of
+  // documentBase64 when present. Required for cache hits across runs because
+  // pdf-lib's save() is non-deterministic across Node processes — the same
+  // source PDF produces a different chunk base64 every run, defeating
+  // sha256(documentBase64). Use a stable, content-addressed string like
+  // `${sha256(sourceFileBytes)}:${chunkIdx}/${totalChunks}`.
+  cacheKey: z.string().min(1).max(256).optional(),
 })
 
 // =============================================================================

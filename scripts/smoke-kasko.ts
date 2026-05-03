@@ -26,6 +26,7 @@
  *
  * See tests/fixtures/kasko/README.md for fixture conventions.
  */
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { PDFDocument } from 'pdf-lib'
@@ -266,11 +267,11 @@ async function splitPdfBuffer(pdfBuffer: Buffer): Promise<Uint8Array[]> {
   return chunks
 }
 
-async function ocrChunk(baseUrl: string, chunk: Uint8Array): Promise<string> {
+async function ocrChunk(baseUrl: string, chunk: Uint8Array, cacheKey?: string): Promise<string> {
   const documentBase64 = Buffer.from(chunk).toString('base64')
   const result = await postJson<{ success: boolean; data?: { text?: string }; error?: string }>(
     `${baseUrl}/api/ai/ocr/document-ai`,
-    { documentBase64 },
+    cacheKey ? { documentBase64, cacheKey } : { documentBase64 },
     REQUEST_TIMEOUT_MS
   )
   if (!result.ok || !result.data?.success) {
@@ -284,13 +285,21 @@ async function ocrChunk(baseUrl: string, chunk: Uint8Array): Promise<string> {
 
 async function ocrPdf(baseUrl: string, pdfBuffer: Buffer): Promise<string> {
   const chunks = await splitPdfBuffer(pdfBuffer)
+  // Cache key derived from the SOURCE PDF bytes — stable across runs/processes
+  // unlike the post-pdf-lib chunk bytes (gotcha: pdf-lib's save() embeds per-
+  // process date/PID-based randomness, so `sha256(documentBase64)` differs on
+  // every run for the same source PDF and the OCR cache always misses without
+  // an explicit cacheKey).
+  const sourceSha = createHash('sha256').update(pdfBuffer).digest('hex')
+  const total = chunks.length
+  const keyFor = (i: number): string => `${sourceSha}:${i}/${total}`
   if (chunks.length === 1) {
-    return ocrChunk(baseUrl, chunks[0])
+    return ocrChunk(baseUrl, chunks[0], keyFor(0))
   }
   console.log(`    (splitting into ${chunks.length} chunks of ≤${DOCUMENT_AI_PAGE_LIMIT} pages)`)
   const texts: string[] = []
   for (let i = 0; i < chunks.length; i++) {
-    const chunkText = await ocrChunk(baseUrl, chunks[i])
+    const chunkText = await ocrChunk(baseUrl, chunks[i], keyFor(i))
     texts.push(chunkText)
   }
   // Join with a page-marker separator so layout-sensitive regex anchors in the

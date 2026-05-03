@@ -64,6 +64,7 @@
  *   1 — fail: any substantive check flipped between runs
  *   2 — setup error
  */
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -116,13 +117,21 @@ async function chunkAndOcr(baseUrl: string, pdfBytes: Uint8Array): Promise<strin
     chunks.push(await sub.save())
   }
 
+  // Stable cache key derived from the SOURCE PDF bytes — see smoke-kasko.ts and
+  // server/routes/ai/extraction.ts for the why (pdf-lib save() is non-deterministic
+  // across Node processes so sha256(documentBase64) misses every run).
+  const sourceSha = createHash('sha256').update(pdfBytes).digest('hex')
+  const total = chunks.length
+
   let combined = ''
-  for (const chunk of chunks) {
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i]
     const documentBase64 = Buffer.from(chunk).toString('base64')
+    const cacheKey = `${sourceSha}:${i}/${total}`
     const res = await fetch(`${baseUrl}/api/ai/ocr/document-ai`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ documentBase64 }),
+      body: JSON.stringify({ documentBase64, cacheKey }),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     })
     if (!res.ok) {

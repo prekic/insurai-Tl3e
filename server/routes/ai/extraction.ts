@@ -8,6 +8,7 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import { GoogleGenAI, createPartFromBase64 } from '@google/genai'
+import crypto from 'node:crypto'
 import { Request, Response, Router } from 'express'
 import * as fs from 'fs'
 import { GoogleAuth } from 'google-auth-library'
@@ -2008,19 +2009,25 @@ router.post(
       }
       log.debug('Access token received')
 
-      const { documentBase64, mimeType, languageHints } = req.body as DocumentAIInput
+      const { documentBase64, mimeType, languageHints, cacheKey } = req.body as DocumentAIInput
 
       // Cache lookup BEFORE the live Document AI call (cost-control PR, May 3 2026).
-      // Document AI is deterministic on identical input, so SHA256(documentBase64) is
-      // a sound cache key. On hit, return the cached payload with the same response
-      // shape (formFields/tables omitted by design — see migration 061 comment).
+      // Document AI is deterministic on identical input. The challenge: pdf-lib's
+      // save() is non-deterministic across Node processes, so sha256(documentBase64)
+      // changes every run for the same source PDF (cross-process date/PID-based
+      // randomness inside pdf-lib). When the client supplies a stable `cacheKey`
+      // (e.g. `${sha256(sourceFileBytes)}:${chunkIdx}/${totalChunks}`), we hash that
+      // instead — which IS stable across runs and produces real cache hits.
       // Cache failures never block the live OCR path (lookup returns null on error).
-      const cacheKey = hashOcrInput(documentBase64)
-      const cached = await lookupOcrCache(cacheKey)
+      const cacheSha = cacheKey
+        ? crypto.createHash('sha256').update(cacheKey).digest('hex')
+        : hashOcrInput(documentBase64)
+      const cached = await lookupOcrCache(cacheSha)
       if (cached) {
         const cachedProcessingMs = Date.now() - startTime
         log.info('OCR cache hit', {
-          sha256: cacheKey.slice(0, 16),
+          sha256: cacheSha.slice(0, 16),
+          via: cacheKey ? 'cacheKey' : 'documentBase64',
           textBytes: cached.text.length,
           processingTimeMs: cachedProcessingMs,
         })
@@ -2278,7 +2285,7 @@ router.post(
       // Cache write — fire-and-forget. Failure to store does not invalidate
       // the live OCR result we already have to return to the caller.
       void storeOcrCache(
-        cacheKey,
+        cacheSha,
         result.document.text || '',
         pageCount,
         avgConfidence,
