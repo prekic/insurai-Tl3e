@@ -43,56 +43,6 @@ import {
   JUDGE_SYSTEM_PROMPT,
 } from '../../lib/self-healing.js'
 import { recordExtractionEvent, recordOverviewMetrics } from './shared.js'
-import { canonicalizeCoverage } from '../../../src/lib/policy-pipeline/stage2-validate/canonicalize-coverage.js'
-import { getConceptLabels } from '../../../src/lib/policy-pipeline/types/canonical-concepts.js'
-import { deriveEntityType } from '../../../src/lib/policy-pipeline/stage2-validate/derive-entity-type.js'
-import { parseCoverageLimit } from '../../../src/lib/policy-pipeline/stage2-validate/parse-coverage-limit.js'
-
-/**
- * Apply deterministic Stage 2 validation rules to LLM-generated extraction outputs.
- * 1. Derives entity type from ID lengths
- * 2. Canonicalizes coverage labels to eliminate paraphrasing
- * 3. Reconciles numeric/unlimited/market-value limits
- */
-function applyStage2Validation(data: any) {
-  if (!data) return data
-
-  // 1. Derive entity type
-  if (!data.insuredEntityType && (data.tcKimlik || data.vkn)) {
-    data.insuredEntityType = deriveEntityType(data.tcKimlik || data.vkn) || data.insuredEntityType
-  }
-
-  // 2. Canonicalize coverages
-  if (Array.isArray(data.coverages)) {
-    data.coverages.forEach((cov: any) => {
-      const rawLabel = cov.nameTr || cov.name
-      if (rawLabel) {
-        const canonicalConcept = canonicalizeCoverage(rawLabel)
-        if (canonicalConcept !== 'UNKNOWN') {
-          const labels = getConceptLabels(canonicalConcept)
-          cov.name = labels.en
-          cov.nameTr = labels.tr
-        }
-      }
-
-      // 3. Reconcile limits
-      const limitInfo = parseCoverageLimit(cov.limit, cov.isUnlimited, cov.isMarketValue)
-      if (limitInfo.type === 'unlimited') {
-        cov.isUnlimited = true
-        cov.limit = null
-      } else if (limitInfo.type === 'market_value') {
-        cov.isMarketValue = true
-        cov.limit = null
-      } else if (limitInfo.type === 'numeric') {
-        cov.limit = limitInfo.amount
-        cov.isUnlimited = false
-        cov.isMarketValue = false
-      }
-    })
-  }
-
-  return data
-}
 
 const log = logger.child('AI')
 
@@ -485,7 +435,7 @@ router.post(
         })
       }
 
-      const parsedData = applyStage2Validation(healingResult.data)
+      const parsedData = healingResult.data
       const usedModel = healingResult.finalModel || model || 'gpt-5.4'
       const inputTokens = healingResult.totalInputTokens
       const outputTokens = healingResult.totalOutputTokens
@@ -837,7 +787,7 @@ router.post(
         })
       }
 
-      const parsedData = applyStage2Validation(healingResult.data)
+      const parsedData = healingResult.data
       const usedModel = healingResult.finalModel || model || aiConfig.anthropicExtractionModel
       const inputTokens = healingResult.totalInputTokens
       const outputTokens = healingResult.totalOutputTokens
