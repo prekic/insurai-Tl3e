@@ -437,7 +437,20 @@ router.post(
         })
       }
 
-      const parsedData = runStage2Validation(healingResult.data)
+      // DEV UTILITY: Stage 2 bypass for raw-LLM baseline capture.
+      // Requires ALL THREE conditions: ?skipStage2=1 query param, ALLOW_STAGE2_BYPASS=true env var,
+      // and NODE_ENV !== 'production'. No single condition is sufficient on its own.
+      const skipStage2 =
+        req.query.skipStage2 === '1' &&
+        process.env.ALLOW_STAGE2_BYPASS === 'true' &&
+        process.env.NODE_ENV !== 'production'
+      if (skipStage2) {
+        console.warn(
+          '[STAGE2-BYPASS] Skipping runStage2Validation for raw LLM capture. NODE_ENV=' +
+            process.env.NODE_ENV
+        )
+      }
+      const parsedData = skipStage2 ? healingResult.data : runStage2Validation(healingResult.data)
       const usedModel = healingResult.finalModel || model || 'gpt-5.4'
       const inputTokens = healingResult.totalInputTokens
       const outputTokens = healingResult.totalOutputTokens
@@ -790,7 +803,20 @@ router.post(
         })
       }
 
-      const parsedData = runStage2Validation(healingResult.data)
+      // DEV UTILITY: Stage 2 bypass for raw-LLM baseline capture.
+      // Requires ALL THREE conditions: ?skipStage2=1 query param, ALLOW_STAGE2_BYPASS=true env var,
+      // and NODE_ENV !== 'production'. No single condition is sufficient on its own.
+      const skipStage2 =
+        req.query.skipStage2 === '1' &&
+        process.env.ALLOW_STAGE2_BYPASS === 'true' &&
+        process.env.NODE_ENV !== 'production'
+      if (skipStage2) {
+        console.warn(
+          '[STAGE2-BYPASS] Skipping runStage2Validation for raw LLM capture. NODE_ENV=' +
+            process.env.NODE_ENV
+        )
+      }
+      const parsedData = skipStage2 ? healingResult.data : runStage2Validation(healingResult.data)
       const usedModel = healingResult.finalModel || model || aiConfig.anthropicExtractionModel
       const inputTokens = healingResult.totalInputTokens
       const outputTokens = healingResult.totalOutputTokens
@@ -1206,7 +1232,21 @@ router.post(
 
           let parsedData: unknown
           try {
-            parsedData = runStage2Validation(JSON.parse(jsonContent))
+            // DEV UTILITY: Stage 2 bypass for raw-LLM baseline capture.
+            // Requires ALL THREE conditions: ?skipStage2=1 query param, ALLOW_STAGE2_BYPASS=true
+            // env var, and NODE_ENV !== 'production'. No single condition is sufficient.
+            const skipStage2 =
+              req.query.skipStage2 === '1' &&
+              process.env.ALLOW_STAGE2_BYPASS === 'true' &&
+              process.env.NODE_ENV !== 'production'
+            if (skipStage2) {
+              console.warn(
+                '[STAGE2-BYPASS] Skipping runStage2Validation for raw LLM capture. NODE_ENV=' +
+                  process.env.NODE_ENV
+              )
+            }
+            const rawParsed = JSON.parse(jsonContent)
+            parsedData = skipStage2 ? rawParsed : runStage2Validation(rawParsed)
           } catch (parseError) {
             log.error('Anthropic returned invalid JSON', {
               requestId,
