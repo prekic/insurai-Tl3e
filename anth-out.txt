@@ -1,7 +1,0 @@
-[dotenv@17.2.4] injecting env (17) from .env -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
-Anthropic success! {
-  type: 'text',
-  text: `I need to see the actual policy document content to extract the information according to the JSON schema. You mentioned "test document" but I don't see any document content provided. \n` +
-    '\n' +
-    "Please share the policy document text, image, or file content that you'd like me to analyze and extract information from according to the specified schema."
-}
