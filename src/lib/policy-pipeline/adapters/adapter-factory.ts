@@ -1,6 +1,6 @@
-import { InsurerAdapter } from './base-adapter'
-import { AnadoluAdapter } from './anadolu-adapter'
-import { AllianzAdapter } from './allianz-adapter'
+import { InsurerAdapter } from './base-adapter.js'
+import { AnadoluAdapter } from './anadolu-adapter.js'
+import { AllianzAdapter } from './allianz-adapter.js'
 
 class DefaultAdapter extends InsurerAdapter {
   constructor(providerName: string) {
@@ -15,7 +15,7 @@ class DefaultAdapter extends InsurerAdapter {
   public getRequiredCoverages(
     _docType?: string,
     _context?: any
-  ): import('./base-adapter').RequiredCoverageDefinition[] {
+  ): import('./base-adapter.js').RequiredCoverageDefinition[] {
     return []
   }
   public standardizeDeductible(coverage: any): any {

@@ -1,9 +1,9 @@
-import { canonicalizeCoverage } from './canonicalize-coverage'
-import { deriveEntityType } from './derive-entity-type'
-import { normalizeCoverageLabel } from './normalize-text'
-import { parseCoverageLimit } from './parse-coverage-limit'
-import { getAdapterForInsurer } from '../adapters/adapter-factory'
-import { getConceptLabels } from '../types/canonical-concepts'
+import { canonicalizeCoverage } from './canonicalize-coverage.js'
+import { deriveEntityType } from './derive-entity-type.js'
+import { normalizeCoverageLabel } from './normalize-text.js'
+import { parseCoverageLimit } from './parse-coverage-limit.js'
+import { getAdapterForInsurer } from '../adapters/adapter-factory.js'
+import { getConceptLabels } from '../types/canonical-concepts.js'
 
 /**
  * Runs the Stage 2 validation process on raw extraction data.

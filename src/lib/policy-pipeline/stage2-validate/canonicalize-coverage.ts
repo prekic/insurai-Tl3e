@@ -1,5 +1,5 @@
-import { CanonicalCoverageConcept } from '../types/canonical-concepts'
-import { normalizeCoverageLabel } from './normalize-text'
+import { CanonicalCoverageConcept } from '../types/canonical-concepts.js'
+import { normalizeCoverageLabel } from './normalize-text.js'
 
 export class UnmatchedCoverageLabelError extends Error {
   public label: string

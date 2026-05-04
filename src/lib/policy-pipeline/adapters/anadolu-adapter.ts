@@ -1,4 +1,4 @@
-import { InsurerAdapter, RequiredCoverageDefinition } from './base-adapter'
+import { InsurerAdapter, RequiredCoverageDefinition } from './base-adapter.js'
 
 export class AnadoluAdapter extends InsurerAdapter {
   constructor() {
