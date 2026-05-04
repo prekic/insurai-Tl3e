@@ -16,3 +16,4 @@
 
 ## Required Workflows
 - **Session Wrap-Up**: Always update `CLAUDE.md` and `SESSION_HANDOFF.md` at the end of a session.
+- **Pre-commit TypeScript Verification**: Run `npm run build:server` (or `npm run build`) before committing any `.ts` change. `npm run typecheck` (`tsc --noEmit`) is root-only and will NOT catch server build errors — see CLAUDE.md § Pre-commit Checks for the full explanation.

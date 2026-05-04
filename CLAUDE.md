@@ -758,7 +758,7 @@ npm run validate      # typecheck + lint + test (full validation)
 # Code Quality
 npm run lint          # ESLint check
 npm run lint:fix      # Auto-fix lint issues
-npm run typecheck     # TypeScript type check
+npm run typecheck     # TypeScript type check (root tsconfig only — bundler resolution; does NOT cover server/tsconfig.json)
 npm run format        # Prettier formatting
 npm run format:check  # Check formatting
 
@@ -2969,8 +2969,23 @@ VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX  # Optional: GA4 analytics
 - Optional GitHub Secrets for real Supabase in E2E build: `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `PROD_SUPABASE_URL`, `PROD_SUPABASE_ANON_KEY` — placeholders used if not set
 
 ### Pre-commit Checks
+
+**TypeScript (required for any `.ts` change):**
 ```bash
-npm run validate  # typecheck + lint + test
+npm run build:server   # verifies server/tsconfig.json (NodeNext resolution, project references)
+npm run build          # full composite build: tsc -b + vite (use this before opening a PR)
+```
+
+> ⚠️ `npm run typecheck` (`tsc --noEmit`) only checks the root `tsconfig.json` with `bundler`
+> resolution. It does **not** follow project references to `server/tsconfig.json` (NodeNext
+> resolution). Code can pass `typecheck` clean while `npm run build:server` fails — this gap
+> masked TS2835 errors for three sessions. Use `tsc -b --noEmit` if you want a type-check-only
+> equivalent that follows project references without producing artifacts.
+
+**Lint + tests:**
+```bash
+npm run lint
+npx vitest run path/to/specific.test.ts   # never npm run test — full suite >10 min
 ```
 
 ---
