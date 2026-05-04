@@ -28,7 +28,7 @@
  * (browser) and Node (qa script) consumers):
  *   - `dedupByTrigramJaccard()` from `policy-converter.ts`
  *   - `extractEkSozlesmeBullets()` from `policy-converter.ts`
- *   - `NAMED_DEDUCTIBLE_SCENARIOS` from `policy-converter.ts`
+ *   - `NAMED_DEDUCTIBLE_SCENARIOS` from `named-scenarios.ts`
  *
  * Two helpers (`bucketSeverityByPercent`, `hasLatentCarveOutSignals`) are
  * INLINED below rather than imported from `evaluator.ts` to break a
@@ -36,11 +36,8 @@
  * detectors into the runtime gate.
  */
 
-import {
-  dedupByTrigramJaccard,
-  extractEkSozlesmeBullets,
-  NAMED_DEDUCTIBLE_SCENARIOS,
-} from '../ai/policy-converter.js'
+import { dedupByTrigramJaccard, extractEkSozlesmeBullets } from '../ai/policy-converter.js'
+import { NAMED_DEDUCTIBLE_SCENARIOS } from './named-scenarios.js'
 import type { Coverage } from '../../types/policy.js'
 import type { QualityFinding, ScenarioCard } from '../policy-evaluation/types.js'
 
@@ -254,28 +251,53 @@ export function checkNamedScenarioCoverage(
   const missing: { label: string; severity: QualityFinding['severity']; percent: number | null }[] =
     []
   for (const scenario of NAMED_DEDUCTIBLE_SCENARIOS) {
-    // All keywords for the scenario must appear somewhere in the text.
-    let firstMatchIndex = -1
-    let allMatch = true
-    for (const kw of scenario.keywords) {
-      const m = rawNormalized.match(kw)
-      if (!m || m.index === undefined) {
-        allMatch = false
-        break
+    let validWindow: string | null = null
+    let matchFound = false
+
+    // Look for all occurrences of the first keyword
+    const firstKw = new RegExp(
+      scenario.keywords[0].source,
+      scenario.keywords[0].flags + (scenario.keywords[0].flags.includes('g') ? '' : 'g')
+    )
+    let match
+    while ((match = firstKw.exec(rawNormalized)) !== null) {
+      // Create a 500-character window centered around the match
+      const windowStart = Math.max(0, match.index - 250)
+      const windowEnd = Math.min(rawNormalized.length, match.index + 250)
+      const window = rawNormalized.slice(windowStart, windowEnd)
+
+      // Ensure all other keywords match within this same window
+      let allOtherMatch = true
+      for (let i = 1; i < scenario.keywords.length; i++) {
+        if (!new RegExp(scenario.keywords[i].source, scenario.keywords[i].flags).test(window)) {
+          allOtherMatch = false
+          break
+        }
       }
-      if (firstMatchIndex === -1 || m.index < firstMatchIndex) firstMatchIndex = m.index
+
+      if (allOtherMatch) {
+        // Enforce that the window actually describes a deductible or exclusion
+        // This prevents false positives when the keywords appear in unrelated contexts (e.g. general info)
+        if (
+          /muaf[iİ]yet|tenzil|k[ıi]sm[iİ]\s*hasar|m[üu][şs]terek|kat[ıi]l[ıi]m\s*pay[ıi]|kapsam\s*d[ıi][şs][ıi]|teminat\s*d[ıi][şs][ıi]|hari[çc]tir|ödenmez/i.test(
+            window
+          )
+        ) {
+          matchFound = true
+          validWindow = window
+          break
+        }
+      }
     }
-    if (!allMatch || firstMatchIndex < 0) continue
+
+    if (!matchFound || !validWindow) continue
 
     // Already extracted? Substring match against existing canonical labels.
     const labelLower = scenario.labelTr.toLowerCase().replace(/i̇/g, 'i')
     if (cdLower.some((cdEntry) => cdEntry.includes(labelLower))) continue
 
-    // Sniff the percent in a window around the first keyword match.
-    const windowStart = Math.max(0, firstMatchIndex - 200)
-    const windowEnd = Math.min(rawNormalized.length, firstMatchIndex + 200)
-    const window = rawNormalized.slice(windowStart, windowEnd)
-    const pctMatch = window.match(/%\s*(\d{1,3})(?!\d)/) || window.match(/(\d{1,3})\s*%/)
+    // Sniff the percent in the matched window
+    const pctMatch = validWindow.match(/%\s*(\d{1,3})(?!\d)/) || validWindow.match(/(\d{1,3})\s*%/)
     let percent: number | null = null
     if (pctMatch) {
       const parsed = parseInt(pctMatch[1], 10)

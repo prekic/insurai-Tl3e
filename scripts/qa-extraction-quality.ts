@@ -203,6 +203,17 @@ function checkConfidenceGateSync(policy: PolicyLike, evaluation: PolicyEvaluatio
     }
   }
 
+  if (
+    typeof evaluation.displayedAiConfidence === 'number' &&
+    evaluation.displayedAiConfidence <= INCOMPLETE_CONFIDENCE_CAP
+  ) {
+    return {
+      check: 'CONFIDENCE_GATE_SYNC',
+      severity: 'pass',
+      detail: `gate active, raw conf ${rawPct}% > cap, but evaluator properly capped displayedAiConfidence to ${Math.round(evaluation.displayedAiConfidence * 100)}%`,
+    }
+  }
+
   const triggers = evaluation.extractionGateTriggers?.join(',') ?? '-'
   return {
     check: 'CONFIDENCE_GATE_SYNC',

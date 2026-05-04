@@ -1,0 +1,16 @@
+{
+  "fixture": "allianz-peugeot.pdf",
+  "temperature": 0,
+  "documentTextLength": 26558,
+  "runs": [
+    {
+      "error": "Extract failed: 429"
+    },
+    {
+      "error": "Extract failed: 429"
+    },
+    {
+      "error": "Extract failed: 429"
+    }
+  ]
+}

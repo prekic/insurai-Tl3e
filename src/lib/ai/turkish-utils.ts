@@ -44,6 +44,15 @@ export function normalizeCoverageName(name: string): string {
 }
 
 /**
+ * Standardize Turkish text handling spaces, special characters, and typical OCR artifacts.
+ * This does not remove punctuation like normalizeCoverageName does.
+ */
+export function normalizeTurkishText(text: string): string {
+  if (!text) return ''
+  return text.replace(/I/g, 'ı').replace(/İ/g, 'i').toLowerCase().trim().replace(/\s+/g, ' ')
+}
+
+/**
  * Check if two coverage names match (fuzzy)
  */
 export function coverageNamesMatch(name1: string, name2: string): boolean {
@@ -245,6 +254,71 @@ const CURRENCY_PATTERNS = [
   // TL 1.234.567,89
   /(?:TL|TRY)\s*([\d.,]+)/i,
 ]
+
+export class OutOfMagnitudeError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'OutOfMagnitudeError'
+  }
+}
+
+export interface MagnitudeOptions {
+  min?: number
+  max?: number
+  throwOnViolation?: boolean
+}
+
+/**
+ * Parse a Turkish number string (e.g. 1.000,50) to a JavaScript number.
+ * Handles both Turkish (1.000,50) and English (1,000.50) formats.
+ * Optionally validates magnitude to prevent inflation bugs.
+ */
+export function parseTurkishNumber(numberStr: string, options?: MagnitudeOptions): number | null {
+  if (!numberStr || typeof numberStr !== 'string') {
+    return null
+  }
+
+  // Remove non-numeric except ., and -
+  const cleaned = numberStr.replace(/[^\d.,-]/g, '')
+  if (!cleaned || cleaned === '-') return null
+
+  const lastDot = cleaned.lastIndexOf('.')
+  const lastComma = cleaned.lastIndexOf(',')
+
+  let normalized: string
+
+  if (lastComma > lastDot) {
+    // Turkish format: 1.234.567,89 -> remove dots, replace comma with dot
+    normalized = cleaned.replace(/\./g, '').replace(',', '.')
+  } else if (lastDot > lastComma) {
+    // International format: 1,234,567.89 -> remove commas
+    normalized = cleaned.replace(/,/g, '')
+  } else if (lastComma !== -1 && lastDot === -1) {
+    // Only comma: 1234,56 -> replace comma with dot
+    normalized = cleaned.replace(',', '.')
+  } else {
+    // Only dots or no separators
+    normalized = cleaned.replace(/\./g, '')
+  }
+
+  const parsed = parseFloat(normalized)
+  if (isNaN(parsed)) return null
+
+  if (options) {
+    if (typeof options.min === 'number' && parsed < options.min) {
+      if (options.throwOnViolation)
+        throw new OutOfMagnitudeError(`Value ${parsed} is below minimum ${options.min}`)
+      return null
+    }
+    if (typeof options.max === 'number' && parsed > options.max) {
+      if (options.throwOnViolation)
+        throw new OutOfMagnitudeError(`Value ${parsed} is above maximum ${options.max}`)
+      return null
+    }
+  }
+
+  return parsed
+}
 
 /**
  * Parse a Turkish currency amount

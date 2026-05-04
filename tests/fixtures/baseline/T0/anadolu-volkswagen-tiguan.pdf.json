@@ -1,0 +1,1142 @@
+{
+  "fixture": "anadolu-volkswagen-tiguan.pdf",
+  "documentTextLength": 60550,
+  "runs": [
+    {
+      "success": true,
+      "data": {
+        "policyNumber": "1680600025",
+        "bağlıPolNo": null,
+        "provider": "ANADOLU ANONİM TÜRK SİGORTA ŞİRKETİ",
+        "policyType": "kasko",
+        "isBundle": true,
+        "bundleProducts": [
+          "Genişletilmiş Kasko",
+          "Koltuk Ferdi Kaza Sigortası",
+          "Artan Mali Sorumluluk Sigortası",
+          "Hukuksal Koruma Sigortası"
+        ],
+        "previousInsurer": "SOMPO JAPAN SİGORTA A.Ş.",
+        "insuredName": "ERİŞ AMBALAJ SANAYİ VE TİCARET LİMİTED ŞİRKETİ",
+        "insuredAddress": "İSTANBUL, ATAŞEHİR, ATAŞEHİR BELEDİYESİ, MUSTAFA KEMAL CAD., NO: 25/1A, ATATÜRK MAH. MUSTAFA KEMAL CAD. No: 25/1A",
+        "insuredEntityType": "corporate",
+        "vehicleUsage": "private",
+        "startDate": "2025-12-28",
+        "endDate": "2026-12-28",
+        "vehicleMake": "VOLKSWAGEN",
+        "vehicleModel": "TIGUAN 1.4 TSI ACT BMT 150 DSG HIGHLINE",
+        "vehicleYear": 2016,
+        "vehiclePlate": "34 RZ9511",
+        "vin": "WVGZZZ5NZHW862628",
+        "tcKimlik": null,
+        "vkn": null,
+        "premium": 31140,
+        "sigortaBedeli": null,
+        "currency": "TRY",
+        "paymentFrequency": "annual",
+        "discounts": {
+          "ncdDiscount": 50,
+          "groupDiscount": null,
+          "otherDiscountPct": null,
+          "evidence": "Hasarsızlık Oranı : %50"
+        },
+        "coverages": [
+          {
+            "name": "Kasko Teminatı",
+            "nameTr": "Kasko Teminatı",
+            "limit": null,
+            "deductible": null,
+            "description": "Market value coverage for the vehicle",
+            "isUnlimited": false,
+            "isMarketValue": true,
+            "category": "main",
+            "included": true,
+            "limitType": null,
+            "page": 8,
+            "clause": "KASKO KAPSAMINDAKİ DEĞERLER",
+            "quote": "Rayiç Değer",
+            "carveOuts": null,
+            "normalizedName": "vehicle comprehensive coverage",
+            "canonicalName": "MAIN_KASKO_COVERAGE",
+            "parsedLimit": null
+          },
+          {
+            "name": "Artan Mali Sorumluluk",
+            "nameTr": "Artan Mali Sorumluluk",
+            "limit": 100000,
+            "deductible": null,
+            "description": "Unlimited liability coverage",
+            "isUnlimited": true,
+            "isMarketValue": false,
+            "category": "liability",
+            "included": true,
+            "limitType": null,
+            "page": 8,
+            "clause": "Artan Mali Sorumluluk",
+            "quote": "Artan Mali Sorumluluk Sınırsız",
+            "carveOuts": [
+              "Havalimanı, liman, akaryakıt deposu, rafineri ve benzeri yerlerde meydana gelen olaylar için azami 2.500.000 TL"
+            ],
+            "normalizedName": "excess liability",
+            "canonicalName": "EXCESS_LIABILITY",
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 100000
+            }
+          },
+          {
+            "name": "Deprem",
+            "canonicalName": "EARTHQUAKE",
+            "normalizedName": "deprem",
+            "nameTr": "Deprem",
+            "limit": null,
+            "parsedLimit": null,
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "isImplicit": false,
+            "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir."
+          },
+          {
+            "name": "Grev, Lokavt, Terör",
+            "canonicalName": "STRIKE_LOCKOUT_TERROR",
+            "normalizedName": "grev, lokavt, terör",
+            "nameTr": "Grev, Lokavt, Terör",
+            "limit": null,
+            "parsedLimit": null,
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "isImplicit": false,
+            "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir."
+          },
+          {
+            "name": "Sel ve Su Baskını",
+            "canonicalName": "FLOOD_WATER_DAMAGE",
+            "normalizedName": "sel ve su baskını",
+            "nameTr": "Sel ve Su Baskını",
+            "limit": null,
+            "parsedLimit": null,
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "isImplicit": false,
+            "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir."
+          },
+          {
+            "name": "Mini Onarım",
+            "nameTr": "Mini Onarım",
+            "limit": null,
+            "deductible": null,
+            "description": "Free minor repair service",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "assistance",
+            "included": true,
+            "limitType": null,
+            "page": 8,
+            "clause": "Mini Onarım",
+            "quote": "Mini Onarım",
+            "carveOuts": null,
+            "normalizedName": "mini repair service",
+            "canonicalName": "MINI_REPAIR",
+            "parsedLimit": null
+          },
+          {
+            "name": "Koltuk Ferdi Kaza - Vefat",
+            "canonicalName": "SEAT_PERSONAL_ACCIDENT_DEATH",
+            "normalizedName": "koltuk ferdi kaza - vefat",
+            "nameTr": "Koltuk Ferdi Kaza - Vefat",
+            "limit": 100000,
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 100000
+            },
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "isImplicit": false,
+            "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir."
+          },
+          {
+            "name": "Koltuk Ferdi Kaza - Sürekli Sakatlık",
+            "canonicalName": "SEAT_PERSONAL_ACCIDENT_DISABILITY",
+            "normalizedName": "koltuk ferdi kaza - sürekli sakatlık",
+            "nameTr": "Koltuk Ferdi Kaza - Sürekli Sakatlık",
+            "limit": 100000,
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 100000
+            },
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "isImplicit": false,
+            "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir."
+          },
+          {
+            "name": "Hukuksal Koruma",
+            "canonicalName": "LEGAL_PROTECTION",
+            "normalizedName": "hukuksal koruma",
+            "nameTr": "Hukuksal Koruma",
+            "limit": 40000,
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 40000
+            },
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "isImplicit": false,
+            "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir."
+          }
+        ],
+        "specialConditions": [
+          "Hasarsızlık İndirimi Koruma - tek hasarda hasarsızlık indirimini koruma",
+          "Cam Hasarı Koruma - ilk cam değişimi hasarsızlık indirimini etkilemez",
+          "Eskisi Yerine Yenisi - ilk yıl içinde çalınma/pert durumunda sıfır araç bedeli",
+          "Evcil Hayvan - kaza durumunda kedi ve köpeklerin tedavi masrafları",
+          "Mini Onarım Hizmeti - küçük ölçekli hasarlar için ücretsiz hizmet"
+        ],
+        "exclusions": [
+          "Salgın ve bulaşıcı hastalıkların doğrudan ve dolaylı olarak neden olacağı kayıp ve hasarlar",
+          "Siber saldırı ve bilgisayar sistemlerinin neden olduğu hasar, kayıp ve sorumluluklar",
+          "Nükleer, biyolojik ve kimyasal rizikolar (çevresel hasar 500,000 TL ile sınırlı)",
+          "BMGK, AB, UK ve ABD yaptırımlarına tabi kişi ve kuruluşlara ilişkin talepler",
+          "Kiralık araç, taksi, dolmuş, kargo/kurye taşımacılığı (%80 muafiyet)",
+          "Anahtarın kontak üzerinde veya araç içinde bırakıldığı sırada çalınma",
+          "Pert araç - daha önce tam hasara uğramış araçlarda %35 muafiyet"
+        ],
+        "exclusionsEn": [
+          "Losses and damages caused directly and indirectly by pandemic and communicable diseases",
+          "Damages, losses and liabilities caused by cyber attacks and computer systems",
+          "Nuclear, biological and chemical risks (environmental damage limited to 500,000 TL)",
+          "Claims related to persons and entities subject to UNSC, EU, UK and US sanctions",
+          "Rental car, taxi, minibus, cargo/courier transportation (80% deductible)",
+          "Theft when keys are left in ignition or inside the vehicle",
+          "Salvage vehicle - 35% deductible for vehicles previously total loss"
+        ],
+        "conditionalDeductibles": [
+          {
+            "trigger": "non-contracted authorized service repair",
+            "rate": "35%",
+            "evidence": "Şirketimizle anlaşmalı olmayan yetkili serviste tamir ettirilmesi halinde, varsa poliçede yer alan diğer muafiyetlerin yanı sıra eksper tarafından belirlenen hasar tutarının %35'i oranında tenzili muafiyet uygulanır"
+          },
+          {
+            "trigger": "salvage vehicle repair with original parts",
+            "rate": "35%",
+            "evidence": "aracın orijinal parçalarla onarımının talep edilmesi halinde ise toplam hasarın %35'i oranında tenzili muafiyet uygulanacaktır"
+          },
+          {
+            "trigger": "salvage vehicle total loss",
+            "rate": "35%",
+            "evidence": "Sigortalı aracın tam hasara uğraması durumunda ise eksper tarafından tespit edilen aracın hasarsız emsal ikinci el değerinin %35'i oranında tenzili muafiyet uygulanarak tazminat ödenecektir"
+          },
+          {
+            "trigger": "rental/rideshare/commercial use",
+            "rate": "80%",
+            "evidence": "her hasarın %80'i, sigortalının kendisi tarafından karşılanmak üzere tazminat bedelinden indirilir"
+          },
+          {
+            "trigger": "LPG not declared or not registered",
+            "rate": "80%",
+            "evidence": "LPG'nin sebep olacağı hasarlarda, her hasarın %80'i, sigortalının kendisi tarafından karşılanmak üzere tazminat bedelinden indirilir"
+          }
+        ],
+        "amendmentInfo": {
+          "isAmendment": false,
+          "amendmentNumber": null,
+          "amendmentDate": null,
+          "basePolicyNumber": null,
+          "amendmentReason": null,
+          "premiumDifference": null
+        },
+        "evidence": {
+          "insights": [
+            {
+              "text": "✓ Sınırsız mali sorumluluk teminatı ile güçlü koruma",
+              "textEn": "✓ Strong protection with unlimited liability coverage",
+              "quote": "Artan Mali Sorumluluk Sınırsız",
+              "quoteTr": null
+            },
+            {
+              "text": "✓ Hasarsızlık indirimi koruma teminatı mevcut",
+              "textEn": "✓ No-claims discount protection coverage available",
+              "quote": "Hasarsızlık İndirimi Koruma",
+              "quoteTr": null
+            },
+            {
+              "text": "✓ Evcil hayvan teminatı ile pet güvenliği",
+              "textEn": "✓ Pet safety with domestic animal coverage",
+              "quote": "Evcil Hayvan",
+              "quoteTr": null
+            }
+          ],
+          "exclusions": [
+            {
+              "text": "Salgın ve bulaşıcı hastalık kaynaklı zararlar hariçtir",
+              "textEn": "Losses from pandemic and communicable diseases are excluded",
+              "quote": "salgın ve/veya bulaşıcı hastalıkların doğrudan ve/veya dolaylı olarak neden olacağı veya, gerçek veya söylenti de olsa, salgın ve/veya bulaşıcı hastalık korkusu ve tehdidinin neden olacağı tüm kayıp, hasar ve bunlara bağlı doğrudan ve/veya dolaylı iş kayıpları",
+              "quoteTr": null
+            },
+            {
+              "text": "Siber saldırı kaynaklı hasarlar kapsam dışıdır",
+              "textEn": "Damages from cyber attacks are excluded",
+              "quote": "bilgisayar, bilgisayar sistemleri, yazılım programları, kötü niyetli yazılımlar, bilgisayar virüsü, bilgisayar işlemleri veya benzeri elektronik sistemlerin doğrudan veya dolaylı olarak sebebiyet verdiği veya katkıda bulunduğu",
+              "quoteTr": null
+            }
+          ]
+        },
+        "clauseGraph": {
+          "edges": [
+            {
+              "sourceId": "Hasarsızlık İndirimi Koruma",
+              "targetId": "Cam Hasarı Koruma",
+              "relationshipType": "endorsement_override",
+              "description": "NCD protection works together with glass damage protection for first glass replacement",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Artan Mali Sorumluluk Sınırsız",
+              "targetId": "Artan Mali Sorumluluk Manevi Tazminat",
+              "relationshipType": "carve_out",
+              "description": "Unlimited liability has specific carve-outs for airports, ports, fuel facilities limited to 2.5M TL",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Pert Araç Klozu",
+              "targetId": "Kasko",
+              "relationshipType": "conditional_restriction",
+              "description": "Salvage vehicle clause applies 35% deductible to main kasko coverage",
+              "isCandidate": false
+            }
+          ]
+        },
+        "confidence": {
+          "overall": 0.95,
+          "policyNumber": 1,
+          "provider": 1,
+          "dates": 1,
+          "premium": 1,
+          "coverages": 0.9
+        },
+        "qualityScore": {
+          "readabilityStructure": 0.9,
+          "completenessKeyFields": 0.95,
+          "numericLimitsReconciled": 0.9,
+          "noGuessingUncertaintiesListed": 0.9,
+          "total": 0.91
+        }
+      },
+      "usage": {
+        "input_tokens": 40011,
+        "output_tokens": 5015
+      },
+      "model": "claude-sonnet-4-20250514",
+      "provider": "anthropic",
+      "cost": null,
+      "requestId": "ext-1777816920309",
+      "route": "/api/ai/extract",
+      "elapsedMs": 80778,
+      "phaseTiming": {
+        "configLoad_ms": 0,
+        "promptLoad_ms": 0,
+        "anthropic_ms": 80777
+      }
+    },
+    {
+      "success": true,
+      "data": {
+        "policyNumber": "1680600025",
+        "bağlıPolNo": null,
+        "provider": "Anadolu Sigorta",
+        "policyType": "kasko",
+        "isBundle": true,
+        "bundleProducts": [
+          "Genişletilmiş Kasko Sigortası",
+          "Koltuk Ferdi Kaza Sigortası",
+          "Artan Mali Sorumluluk Sigortası",
+          "Hukuksal Koruma Sigortası"
+        ],
+        "previousInsurer": "Sompo Japan",
+        "insuredName": "ERİŞ AMBALAJ SANAYİ VE TİCARET LİMİTED ŞİRKETİ",
+        "insuredAddress": "ATATÜRK MAH. MUSTAFA KEMAL CAD. No: 25/1A, ATAŞEHİR, İSTANBUL",
+        "insuredEntityType": "corporate",
+        "vehicleUsage": "private",
+        "startDate": "2025-12-28",
+        "endDate": "2026-12-28",
+        "vehicleMake": "VOLKSWAGEN",
+        "vehicleModel": "TIGUAN 1.4 TSI ACT BMT 150 DSG HIGHLINE",
+        "vehicleYear": 2016,
+        "vehiclePlate": "34 RZ 9511",
+        "vin": "WVGZZZ5NZHW862628",
+        "tcKimlik": null,
+        "vkn": null,
+        "premium": 31140,
+        "sigortaBedeli": null,
+        "currency": "TRY",
+        "paymentFrequency": "annual",
+        "coverages": [
+          {
+            "name": "Kasko Teminatı",
+            "nameTr": "Kasko Teminatı",
+            "limit": null,
+            "deductible": null,
+            "description": "Vehicle covered up to market value (Rayiç Değer).",
+            "isUnlimited": false,
+            "isMarketValue": true,
+            "category": "main",
+            "included": true,
+            "limitType": null,
+            "page": 7,
+            "clause": "Kasko Sigorta Bedeli",
+            "quote": "Sigorta şirketi aracı... hasar tarihi itibariyle rayiç değerine kadar teminat altına almıştır.",
+            "carveOuts": null,
+            "normalizedName": "comprehensive kasko",
+            "canonicalName": "MAIN_KASKO_COVERAGE",
+            "parsedLimit": null
+          },
+          {
+            "name": "Artan Mali Sorumluluk",
+            "nameTr": "Artan Mali Sorumluluk",
+            "limit": 100000,
+            "deductible": null,
+            "description": "Unlimited excess liability; specific hazardous locations and certain vehicle uses capped at 2,500,000 TL per event.",
+            "isUnlimited": true,
+            "isMarketValue": false,
+            "category": "liability",
+            "included": true,
+            "limitType": null,
+            "page": 7,
+            "clause": "Artan Mali Sorumluluk Sınırsız Teminatı Klozu",
+            "quote": "Artan Mali Sorumluluk Sınırsız",
+            "carveOuts": [
+              "Petrol, doğalgaz, hidrokarbon, yakıt depolama/pompalama tesisleri, rafineriler, enerji santralleri, elektrik dağıtım merkezleri, trafolar, kimyevi madde depolama tesisleri, patlayıcı/parlayıcı tesisler, cephanelikler, silah ve mühimmat imalathaneleri ile benzeri tesislerde olay başına toplam 2.500.000,00 TL limit uygulanır.",
+              "Havaalanları, havalimanları, limanlar ve tren garlarının ziyaretçilere/yolculara açık kısımları haricindeki alanlarda olay başına toplam 2.500.000,00 TL limit uygulanır.",
+              "Havalimanı içerisinde kullanılan motorlu araçlar, ralli ve yarış araçları, hız denemesi araçları, itfaiye, ambulans ve güvenlik kuvvetlerine ait araçlar için olay başına toplam 2.500.000,00 TL limit uygulanır."
+            ],
+            "normalizedName": "excess liability",
+            "canonicalName": "EXCESS_LIABILITY",
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 100000
+            }
+          },
+          {
+            "name": "Deprem",
+            "nameTr": "Deprem",
+            "limit": null,
+            "deductible": null,
+            "description": "Included by additional agreement.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 8,
+            "clause": "Ek Sözleşme Maddeleri",
+            "quote": "Deprem",
+            "carveOuts": null,
+            "normalizedName": "earthquake",
+            "canonicalName": "EARTHQUAKE",
+            "parsedLimit": null
+          },
+          {
+            "name": "Grev, Lokavt, Terör",
+            "nameTr": "Grev, Lokavt, Terör",
+            "limit": null,
+            "deductible": null,
+            "description": "Strike, lockout, public movements and terror included.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 8,
+            "clause": "Ek Sözleşme Maddeleri",
+            "quote": "Grev L. H. H. Ve Terör",
+            "carveOuts": null,
+            "normalizedName": "strike, lockout, riot and terror",
+            "canonicalName": "STRIKE_LOCKOUT_TERROR",
+            "parsedLimit": null
+          },
+          {
+            "name": "Sel ve Su Baskını",
+            "nameTr": "Sel ve Su Baskını",
+            "limit": null,
+            "deductible": null,
+            "description": "Included by additional agreement.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 8,
+            "clause": "Ek Sözleşme Maddeleri",
+            "quote": "Sel Su Baskını",
+            "carveOuts": null,
+            "normalizedName": "flood and water inundation",
+            "canonicalName": "FLOOD_WATER_DAMAGE",
+            "parsedLimit": null
+          },
+          {
+            "name": "Mini Onarım",
+            "nameTr": "Mini Onarım",
+            "limit": null,
+            "deductible": null,
+            "description": "Free mini repair service under booklet conditions.",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 8,
+            "clause": "Mini Onarım Hizmeti (Kasko)",
+            "quote": "Mini Onarım Hizmeti ekli kitapçıkta belirtilen koşullarda prim alınmaksızın ve hizmeti verecek firma tarafından herhangi bir ücret talep edilmeksizin sağlanacaktır.",
+            "carveOuts": null,
+            "normalizedName": "mini repair service",
+            "canonicalName": "MINI_REPAIR",
+            "parsedLimit": null
+          },
+          {
+            "name": "Koltuk Ferdi Kaza - Vefat",
+            "canonicalName": "SEAT_PERSONAL_ACCIDENT_DEATH",
+            "normalizedName": "koltuk ferdi kaza - vefat",
+            "nameTr": "Koltuk Ferdi Kaza - Vefat",
+            "limit": 100000,
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 100000
+            },
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "isImplicit": false,
+            "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir."
+          },
+          {
+            "name": "Koltuk Ferdi Kaza - Sürekli Sakatlık",
+            "canonicalName": "SEAT_PERSONAL_ACCIDENT_DISABILITY",
+            "normalizedName": "koltuk ferdi kaza - sürekli sakatlık",
+            "nameTr": "Koltuk Ferdi Kaza - Sürekli Sakatlık",
+            "limit": 100000,
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 100000
+            },
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "isImplicit": false,
+            "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir."
+          },
+          {
+            "name": "Hukuksal Koruma",
+            "nameTr": "Hukuksal Koruma",
+            "limit": 40000,
+            "deductible": null,
+            "description": "40,000 TL per claim / 80,000 TL annual aggregate / 4,000 TL bail / 4,000 TL legal advance",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "legal",
+            "included": true,
+            "limitType": "per_event",
+            "page": 7,
+            "clause": "Hukuksal Koruma",
+            "quote": "Olay Başına Azami Kefalet 4.000,00 / Olay Başına Azami Avans 4.000,00 / Olay Başına Azami Limit 40.000,00 / Sigorta Süresi İçinde Azami Limit 80.000,00",
+            "carveOuts": null,
+            "normalizedName": "legal protection",
+            "canonicalName": "LEGAL_PROTECTION",
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 40000
+            }
+          }
+        ],
+        "specialConditions": [
+          "Pert Araç Klozu applies.",
+          "Engellilere Ait veya Engelliler Üzerinden Satın Alınan ÖTV Muafiyetli Araçlar Klozu included.",
+          "LPG Kullanan Araçlar Klozu included.",
+          "Kullanım Şekli Klozu included.",
+          "Yaptırım Klozu included.",
+          "Salgın ve Bulaşıcı Hastalık İstisnası Klozu included.",
+          "Siber Saldırı İstisna Klozu included.",
+          "Nükleer, Biyolojik ve Kimyasal Rizikolar Klozu included."
+        ],
+        "exclusions": [
+          "Anahtarla çalışan araçlarda, anahtarın kontak üzerinde veya araç içerisinde bırakıldığı sırada gerçekleşen araç çalınmaları teminat kapsamı dışındadır.",
+          "Anahtarsız çalıştırma sistemine sahip araçlarda aracın çalışır vaziyette bırakılması veya aracı çalıştırmak için gerekli kart/aparatın araç içinde bırakılması ya da çalıştırma mesafesinde bulundurulması sonucu oluşan çalınmalar teminat kapsamı dışındadır.",
+          "Araç anahtarının/aracın kendi iradesiyle üçüncü şahıslara teslim edilmesi ve bu kişilerce emniyeti suiistimal yoluyla çalınması teminat kapsamı dışındadır.",
+          "Araca yapılan seramik / folyo vb. kaplamalar ve araca monte edilmeyen donanımlar teminat haricidir.",
+          "Özel tertibatlı aracın ruhsatı adına tescil edilmiş kişi haricinde kullanılması halinde tazminat ödenmeyecektir.",
+          "LPG ruhsata işlenmemişse LPG'nin neden olacağı yanma hasarları teminat haricidir.",
+          "Yaptırıma tabi kişi, kurum, kuruluşlar ve bunlarla doğrudan veya dolaylı ilgili işlemler için teminat sağlanmaz; yaptırımları aşmayı amaçlayan işlemler kapsam dışıdır.",
+          "Salgın ve/veya bulaşıcı hastalıkların doğrudan veya dolaylı neden olduğu kayıp, hasar, iş kaybı, dekontaminasyon/dezenfeksiyon masrafları ve kamusal otorite kapatma/erişim kısıtlaması kaynaklı masraflar istisna edilmiştir.",
+          "Bilgisayar, bilgisayar sistemleri, yazılım programları, kötü niyetli yazılımlar, bilgisayar virüsü, bilgisayar işlemleri veya benzeri elektronik sistemlerin doğrudan veya dolaylı sebebiyet verdiği hasar, kayıp, sorumluluk ve harcamalar teminat haricidir.",
+          "Nükleer, biyolojik ve kimyasal rizikolar nedeniyle çevresel zarar talepleri için olay başına teminat limiti toplam 500.000 TL ile sınırlanmıştır."
+        ],
+        "exclusionsEn": [
+          "Theft of key-operated vehicles while the key is left in the ignition or inside the vehicle is excluded.",
+          "For keyless-start vehicles, theft occurring when the vehicle is left running or when the required card/device is left inside the vehicle or within starting distance is excluded.",
+          "If the vehicle key/vehicle is voluntarily handed over to third parties and then stolen by abuse of trust, it is excluded.",
+          "Ceramic / film coatings applied to the vehicle and equipment not mounted on the vehicle are excluded.",
+          "If the specially equipped vehicle is used by someone other than the person registered on the license, no indemnity will be paid.",
+          "If LPG is not registered on the vehicle license, fire damage caused by LPG is excluded.",
+          "No coverage is provided for sanctioned persons, institutions, organizations, or transactions directly or indirectly involving them; transactions intended to circumvent sanctions are excluded.",
+          "All loss, damage, business interruption, decontamination/disinfection costs, and public-authority closure/access restriction costs directly or indirectly caused by epidemic and/or communicable disease are excluded.",
+          "Loss, damage, liability, and expenses directly or indirectly caused by computers, computer systems, software, malware, computer viruses, computer operations, or similar electronic systems are excluded.",
+          "Environmental damage claims arising from nuclear, biological, and chemical risks are limited to a total of 500,000 TL per event."
+        ],
+        "conditionalDeductibles": [
+          {
+            "trigger": "previous total-loss vehicle detected after policy issuance; original parts requested or detected after repair",
+            "rate": "%35",
+            "evidence": "Aracın daha önce tam hasara uğradığının onarım sonrası tespit edilmesi veya aracın orijinal parçalarla onarımının talep edilmesi halinde ise toplam hasarın %35'i oranında tenzili muafiyet uygulanacaktır."
+          },
+          {
+            "trigger": "previous total-loss vehicle - total loss claim",
+            "rate": "%35",
+            "evidence": "Sigortalı aracın tam hasara uğraması durumunda ise eksper tarafından tespit edilen aracın hasarsız emsal ikinci el değerinin %35'i oranında tenzili muafiyet uygulanarak tazminat ödenecektir."
+          },
+          {
+            "trigger": "repair at non-contracted authorized service",
+            "rate": "%35",
+            "evidence": "Şirketimizle anlaşmalı olmayan yetkili serviste tamir ettirilmesi halinde, varsa poliçede yer alan diğer muafiyetlerin yanı sıra eksper tarafından belirlenen hasar tutarının %35'i oranında tenzili muafiyet uygulanır."
+          },
+          {
+            "trigger": "first glass replacement at non-contracted glass service",
+            "rate": "%35",
+            "evidence": "Şirketimiz ile anlaşmalı cam servislerinin haricinde gerçekleştirilen ilk cam değişiminde %35 muafiyet uygulandığı takdirde bu değişim hasarsızlık indirimini etkilemez."
+          },
+          {
+            "trigger": "undeclared LPG use / LPG-related damage",
+            "rate": "%80",
+            "evidence": "Sigortalı araçta yakıt olarak LPG kullanıldığının beyan edilmemesi ve poliçede aksi bir hüküm olmaması halinde LPG'nin sebep olacağı hasarlarda... her hasarın %80'i, sigortalının kendisi tarafından karşılanmak üzere tazminat bedelinden indirilir."
+          },
+          {
+            "trigger": "vehicle used as rental, replacement car, test drive, taxi/dolmuş, cargo/courier, app-based passenger/load transport or similar transport uses",
+            "rate": "%80",
+            "evidence": "...tespit edilmesi durumunda... her hasarın %80'i, sigortalının kendisi tarafından karşılanmak üzere tazminat bedelinden indirilir."
+          },
+          {
+            "trigger": "vehicle owned by rental business used by unauthorized third persons",
+            "rate": "%80",
+            "evidence": "Sigortalı araç bu kişiler dışında üçüncü şahıslar tarafından kullanılırken hasar oluşursa, her hasarın %80'i, sigortalının kendisi tarafından karşılanmak üzere tazminat bedelinden indirilir."
+          }
+        ],
+        "discounts": {
+          "ncdDiscount": 50,
+          "groupDiscount": null,
+          "otherDiscountPct": null,
+          "evidence": "Hasarsızlık Oranı : %50"
+        },
+        "amendmentInfo": {
+          "isAmendment": false,
+          "amendmentNumber": null,
+          "amendmentDate": null,
+          "basePolicyNumber": null,
+          "amendmentReason": null,
+          "premiumDifference": null
+        },
+        "evidence": {
+          "insights": [
+            {
+              "text": "This is a bundled kasko policy combining four insurance products.",
+              "textEn": "This is a bundled kasko policy combining four insurance products.",
+              "quote": "İşbu ürünü ile Genişletilmiş Kasko Sigortası, Koltuk Ferdi Kaza Sigortası, Artan Mali Sorumluluk Sigortası, Hukuksal Koruma Sigortası teminatları sağlanmaktadır.",
+              "quoteTr": null
+            },
+            {
+              "text": "The vehicle itself is insured on a market value basis.",
+              "textEn": "The vehicle itself is insured on a market value basis.",
+              "quote": "Sigorta şirketi aracı... hasar tarihi itibariyle rayiç değerine kadar teminat altına almıştır.",
+              "quoteTr": null
+            },
+            {
+              "text": "The policy is renewed with prior no-claim history from Sompo Japan.",
+              "textEn": "The policy is renewed with prior no-claim history from Sompo Japan.",
+              "quote": "Şirket Adı : SOMPO JAPAN SİGORTA A.Ş. ... Hasarsızlık Oranı : %50",
+              "quoteTr": null
+            }
+          ],
+          "exclusions": [
+            {
+              "text": "Pandemic / communicable disease related losses and related closure/access restriction costs are excluded.",
+              "textEn": "Pandemic / communicable disease related losses and related closure/access restriction costs are excluded.",
+              "quote": "Salgın ve/veya bulaşıcı hastalıkların doğrudan ve/veya dolaylı olarak neden olacağı... kamusal otoritenin kapatmasından, erişimi kısıtlamasından veya engellemesinden kaynaklanan doğrudan veya dolaylı tüm masraflar istisna edilmiştir.",
+              "quoteTr": null
+            },
+            {
+              "text": "Cyber-related losses caused by computers, systems, software, malware, viruses, or similar electronic systems are excluded.",
+              "textEn": "Cyber-related losses caused by computers, systems, software, malware, viruses, or similar electronic systems are excluded.",
+              "quote": "İşbu sigorta poliçesinde bilgisayar, bilgisayar sistemleri, yazılım programları, kötü niyetli yazılımlar, bilgisayar virüsü, bilgisayar işlemleri veya benzeri elektronik sistemlerin doğrudan veya dolaylı olarak sebebiyet verdiği... hasar, kayıp, sorumluluk ve harcamalar teminat haricidir.",
+              "quoteTr": null
+            },
+            {
+              "text": "Sanctions-related persons, entities, and transactions are excluded from coverage.",
+              "textEn": "Sanctions-related persons, entities, and transactions are excluded from coverage.",
+              "quote": "yukarıda sayılan yaptırımlara tabi kişi ve kuruluşlar ile bunların doğrudan veya dolaylı olarak taraf olduğu işlemlere teminat sağlanmaz, yaptırımları aşmayı amaçlayan hiçbir işleme teminat verilmez",
+              "quoteTr": null
+            },
+            {
+              "text": "NBC environmental damage claims are capped at 500,000 TL per event.",
+              "textEn": "NBC environmental damage claims are capped at 500,000 TL per event.",
+              "quote": "Nükleer, biyolojik ve kimyasal rizikolar... çevresel zararlardan ileri gelen talepler için olay başına teminat limiti toplam 500.000 TL ile sınırlanmıştır.",
+              "quoteTr": null
+            }
+          ]
+        },
+        "clauseGraph": {
+          "edges": [
+            {
+              "sourceId": "Artan Mali Sorumluluk",
+              "targetId": "Artan Mali Sorumluluk Manevi Tazminat",
+              "relationshipType": "coverage_inclusion",
+              "description": "Unlimited excess liability operates together with moral damages extension, but moral damages remain capped.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Artan Mali Sorumluluk",
+              "targetId": null,
+              "relationshipType": "carve_out",
+              "description": "Unlimited liability is reduced to 2,500,000 TL per event in hazardous facilities, restricted transport areas, airports, ports, stations, and certain special vehicle uses.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Hukuksal Koruma",
+              "targetId": "Olay Başına Azami Kefalet",
+              "relationshipType": "sublimit",
+              "description": "Legal protection includes 4,000 TL bail sublimit.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Hukuksal Koruma",
+              "targetId": "Olay Başına Azami Avans",
+              "relationshipType": "sublimit",
+              "description": "Legal protection includes 4,000 TL advance sublimit.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Cam Hasarı Koruma",
+              "targetId": "Hasarsızlık İndirimi",
+              "relationshipType": "endorsement_override",
+              "description": "First glass replacement at contracted services does not affect no-claim discount and is deductible-free.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Hasarsızlık İndirimi Koruma",
+              "targetId": "Hasarsızlık İndirimi",
+              "relationshipType": "endorsement_override",
+              "description": "No-claim discount protection modifies renewal step-down rules after claims under stated repair conditions.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Anadolu Hizmet",
+              "targetId": "İkame Araç",
+              "relationshipType": "service_benefit_linkage",
+              "description": "Anadolu Hizmet package includes Group 2 replacement vehicle service.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Kullanım Şekli Klozu",
+              "targetId": "Kasko",
+              "relationshipType": "deductible_trigger",
+              "description": "Improper commercial/rental/app-based transport use triggers 80% deductible rather than full exclusion.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "LPG Kullanan Araçlar Klozu",
+              "targetId": "Kasko",
+              "relationshipType": "deductible_trigger",
+              "description": "Undeclared LPG-related losses trigger 80% deductible; unregistered LPG fire losses are excluded.",
+              "isCandidate": false
+            }
+          ]
+        },
+        "confidence": {
+          "overall": 0.94,
+          "policyNumber": 0.99,
+          "provider": 0.99,
+          "dates": 0.99,
+          "premium": 0.98,
+          "coverages": 0.92
+        },
+        "qualityScore": {
+          "readabilityStructure": 0.95,
+          "completenessKeyFields": 0.97,
+          "numericLimitsReconciled": 0.92,
+          "noGuessingUncertaintiesListed": 0.93,
+          "total": 0.94
+        }
+      },
+      "usage": {
+        "prompt_tokens": 27119,
+        "completion_tokens": 6758,
+        "total_tokens": 33877,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "model": "gpt-5.4-2026-03-05",
+      "provider": "openai",
+      "fallback": true,
+      "fallbackReason": "ANTHROPIC_UNKNOWN_ERROR",
+      "cost": null,
+      "requestId": "ext-1777817001103",
+      "route": "/api/ai/extract",
+      "elapsedMs": 164531,
+      "phaseTiming": {
+        "configLoad_ms": 0,
+        "promptLoad_ms": 0,
+        "anthropic_ms": 90010,
+        "openai_ms": 74516
+      },
+      "fallbackChain": [
+        {
+          "provider": "anthropic",
+          "success": false,
+          "error_code": "ANTHROPIC_UNKNOWN_ERROR"
+        },
+        {
+          "provider": "openai",
+          "success": true,
+          "duration_ms": 74516
+        }
+      ]
+    },
+    {
+      "success": true,
+      "data": {
+        "policyNumber": "1680600025",
+        "bağlıPolNo": null,
+        "provider": "Anadolu Sigorta",
+        "policyType": "kasko",
+        "isBundle": true,
+        "bundleProducts": [
+          "Genişletilmiş Kasko",
+          "Koltuk Ferdi Kaza",
+          "Artan Mali Sorumluluk",
+          "Hukuksal Koruma"
+        ],
+        "previousInsurer": "Sompo Japan",
+        "insuredName": "ERİŞ AMBALAJ SANAYİ VE TİCARET LİMİTED ŞİRKETİ",
+        "insuredAddress": "İSTANBUL, ATAŞEHİR, ATAŞEHİR BELEDİYESİ, MUSTAFA KEMAL CAD., NO: 25/1A, ATATÜRK MAH. MUSTAFA KEMAL CAD. No: 25/1A",
+        "insuredEntityType": "corporate",
+        "vehicleUsage": "private",
+        "startDate": "2025-12-28",
+        "endDate": "2026-12-28",
+        "vehicleMake": "VOLKSWAGEN",
+        "vehicleModel": "TIGUAN 1.4 TSI ACT BMT 150 DSG HIGHLINE",
+        "vehicleYear": 2016,
+        "vehiclePlate": "34 RZ9511",
+        "vin": "WVGZZZ5NZHW862628",
+        "tcKimlik": null,
+        "vkn": null,
+        "premium": 31140,
+        "sigortaBedeli": null,
+        "currency": "TRY",
+        "paymentFrequency": "annual",
+        "discounts": {
+          "ncdDiscount": 50,
+          "groupDiscount": null,
+          "otherDiscountPct": null,
+          "evidence": "Hasarsızlık Oranı : %50, Hasarsızlık Kademesi : 3"
+        },
+        "coverages": [
+          {
+            "name": "Kasko Teminatı",
+            "nameTr": "Kasko Teminatı",
+            "limit": null,
+            "deductible": null,
+            "description": "Market value coverage",
+            "isUnlimited": false,
+            "isMarketValue": true,
+            "category": "main",
+            "included": true,
+            "limitType": null,
+            "page": null,
+            "clause": "SİGORTA KAPSAMI",
+            "quote": "Rayiç Değer",
+            "carveOuts": null,
+            "normalizedName": "comprehensive kasko",
+            "canonicalName": "MAIN_KASKO_COVERAGE",
+            "parsedLimit": null
+          },
+          {
+            "name": "Artan Mali Sorumluluk",
+            "nameTr": "Artan Mali Sorumluluk",
+            "limit": 100000,
+            "deductible": null,
+            "description": "Unlimited excess liability coverage",
+            "isUnlimited": true,
+            "isMarketValue": false,
+            "category": "liability",
+            "included": true,
+            "limitType": null,
+            "page": null,
+            "clause": "SİGORTA KAPSAMI",
+            "quote": "Artan Mali Sorumluluk Sınırsız",
+            "carveOuts": [
+              "havalimanları, limanlar, akaryakıt depoları, rafineriler için azami 2.500.000 TL"
+            ],
+            "normalizedName": "excess liability",
+            "canonicalName": "EXCESS_LIABILITY",
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 100000
+            }
+          },
+          {
+            "name": "Deprem",
+            "canonicalName": "EARTHQUAKE",
+            "normalizedName": "deprem",
+            "nameTr": "Deprem",
+            "limit": null,
+            "parsedLimit": null,
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "isImplicit": false,
+            "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir."
+          },
+          {
+            "name": "Grev, Lokavt, Terör",
+            "canonicalName": "STRIKE_LOCKOUT_TERROR",
+            "normalizedName": "grev, lokavt, terör",
+            "nameTr": "Grev, Lokavt, Terör",
+            "limit": null,
+            "parsedLimit": null,
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "isImplicit": false,
+            "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir."
+          },
+          {
+            "name": "Sel ve Su Baskını",
+            "canonicalName": "FLOOD_WATER_DAMAGE",
+            "normalizedName": "sel ve su baskını",
+            "nameTr": "Sel ve Su Baskını",
+            "limit": null,
+            "parsedLimit": null,
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "isImplicit": false,
+            "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir."
+          },
+          {
+            "name": "Mini Onarım",
+            "nameTr": "Mini Onarım",
+            "limit": null,
+            "deductible": null,
+            "description": "Free mini repair service once per policy period",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": null,
+            "clause": "SİGORTA KAPSAMI",
+            "quote": "Mini Onarım",
+            "carveOuts": null,
+            "normalizedName": "mini repair service",
+            "canonicalName": "MINI_REPAIR",
+            "parsedLimit": null
+          },
+          {
+            "name": "Koltuk Ferdi Kaza - Vefat",
+            "canonicalName": "SEAT_PERSONAL_ACCIDENT_DEATH",
+            "normalizedName": "koltuk ferdi kaza - vefat",
+            "nameTr": "Koltuk Ferdi Kaza - Vefat",
+            "limit": 100000,
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 100000
+            },
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "isImplicit": false,
+            "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir."
+          },
+          {
+            "name": "Koltuk Ferdi Kaza - Sürekli Sakatlık",
+            "canonicalName": "SEAT_PERSONAL_ACCIDENT_DISABILITY",
+            "normalizedName": "koltuk ferdi kaza - sürekli sakatlık",
+            "nameTr": "Koltuk Ferdi Kaza - Sürekli Sakatlık",
+            "limit": 100000,
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 100000
+            },
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "isImplicit": false,
+            "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir."
+          },
+          {
+            "name": "Hukuksal Koruma",
+            "canonicalName": "LEGAL_PROTECTION",
+            "normalizedName": "hukuksal koruma",
+            "nameTr": "Hukuksal Koruma",
+            "limit": 40000,
+            "parsedLimit": {
+              "type": "numeric",
+              "amount": 40000
+            },
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "isImplicit": false,
+            "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir."
+          }
+        ],
+        "specialConditions": [
+          "Cam Hasarı Koruma - İlk cam değişimi hasarsızlığı etkilemez",
+          "Hasarsızlık İndirimi Koruma - Tek hasarda %65'e varan hasarsızlık indirimi korunur",
+          "AS+ Yetkili Servis Ağı - 5.000 TL üzeri onarımlar hasarsızlığı etkilemez",
+          "Eskisi Yerine Yenisi - İlk yıl çalınma/pert durumunda sıfır araç bedeli ödenir",
+          "Mini Onarım Hizmeti - Küçük hasarlar ücretsiz onarılır",
+          "Evcil Hayvan - Araçta bulunan kedi/köpek tedavi masrafları karşılanır"
+        ],
+        "exclusions": [
+          "Pert Araç Klozu - Daha önce tam hasara uğramış araçlarda %35 tenzili muafiyet",
+          "Kullanım Şekli Klozu - Kiralık, taksi, kargo kullanımında %80 muafiyet",
+          "Yaptırım Klozu - BMGK, AB, ABD, UK yaptırımlarına tabi kişi/kuruluşlar için teminat yoktur",
+          "Salgın ve Bulaşıcı Hastalık İstisnası - Pandemi kaynaklı hasarlar teminat dışı",
+          "Siber Saldırı İstisna Klozu - Bilgisayar sistemleri kaynaklı hasarlar teminat dışı",
+          "Nükleer, Biyolojik ve Kimyasal Rizikolar - NBC riskleri çevresel hasar 500.000 TL ile sınırlı"
+        ],
+        "exclusionsEn": [
+          "Total Loss Vehicle Clause - 35% reduced deductible for previously totaled vehicles",
+          "Usage Type Clause - 80% deductible for rental, taxi, cargo usage",
+          "Sanctions Clause - No coverage for UNSC, EU, US, UK sanctioned persons/entities",
+          "Pandemic and Communicable Disease Exclusion - Pandemic-related damages excluded",
+          "Cyber Attack Exclusion Clause - Computer system-related damages excluded",
+          "Nuclear, Biological and Chemical Risks - NBC risks with environmental damage limited to 500,000 TL"
+        ],
+        "conditionalDeductibles": [
+          {
+            "trigger": "previously totaled vehicle repair",
+            "rate": "%35",
+            "evidence": "Aracın daha önce tam hasara uğradığının onarım sonrası tespit edilmesi veya aracın orijinal parçalarla onarımının talep edilmesi halinde ise toplam hasarın %35'i oranında tenzili muafiyet uygulanacaktır"
+          },
+          {
+            "trigger": "non-contracted authorized service",
+            "rate": "%35",
+            "evidence": "Şirketimizle anlaşmalı olmayan yetkili serviste tamir ettirilmesi halinde, varsa poliçede yer alan diğer muafiyetlerin yanı sıra eksper tarafından belirlenen hasar tutarının %35'i oranında tenzili muafiyet uygulanır"
+          },
+          {
+            "trigger": "rental/taxi/cargo usage",
+            "rate": "%80",
+            "evidence": "Sigortalı aracın kısa veya uzun süreli araç kiralama hizmetlerinde kullanılıyor olduğunun veya sigorta ettiren/sigortalı/ruhsat sahibinin bu işlerle iştigal ettiğinin veya servislerin müşterilerine ikame araç veya test sürüşü aracı taşımacılığında, mobil uygulamalar / internet aracılığı ile yolcu/yük taşımacılığında kullanıldığının tespit edilmesi durumunda, her hasarın %80'i, sigortalının kendisi tarafından karşılanmak üzere tazminat bedelinden indirilir"
+          },
+          {
+            "trigger": "LPG undisclosed usage",
+            "rate": "%80",
+            "evidence": "Sigortalı araçta yakıt olarak LPG kullanıldığının beyan edilmemesi ve poliçede aksi bir hüküm olmaması halinde LPG'nin sebep olacağı hasarlarda, her hasarın %80'i, sigortalının kendisi tarafından karşılanmak üzere tazminat bedelinden indirilir"
+          },
+          {
+            "trigger": "non-contracted glass service",
+            "rate": "%35",
+            "evidence": "Şirketimiz ile anlaşmalı cam servislerinin haricinde gerçekleştirilen ilk cam değişiminde %35 muafiyet uygulandığı takdirde bu değişim hasarsızlık indirimini etkilemez"
+          }
+        ],
+        "amendmentInfo": {
+          "isAmendment": false,
+          "amendmentNumber": null,
+          "amendmentDate": null,
+          "basePolicyNumber": null,
+          "amendmentReason": null,
+          "premiumDifference": null
+        },
+        "evidence": {
+          "insights": [
+            {
+              "text": "✓ Sınırsız Artan Mali Sorumluluk teminatı ile geniş koruma",
+              "textEn": "✓ Unlimited Excess Liability coverage provides comprehensive protection",
+              "quote": "Artan Mali Sorumluluk Sınırsız",
+              "quoteTr": null
+            },
+            {
+              "text": "✓ Cam hasarı koruma ile ilk cam değişimi hasarsızlığı etkilemez",
+              "textEn": "✓ Glass damage protection - first glass replacement doesn't affect no-claims discount",
+              "quote": "Cam Hasarı Koruma teminatı bulunan poliçelerde, aracın sadece camında hasar oluştuğu hallerde, anlaşmalı tüm servislerde hasara bağlı ilk cam değişimi muafiyetsiz olarak gerçekleştirilecek ve hasarsızlık indirimi etkilenmeyecektir",
+              "quoteTr": null
+            },
+            {
+              "text": "✓ %50 hasarsızlık indirimi ile avantajlı primlenme",
+              "textEn": "✓ Advantageous premium with 50% no-claims discount",
+              "quote": "Hasarsızlık Oranı : %50",
+              "quoteTr": null
+            }
+          ],
+          "exclusions": [
+            {
+              "text": "Salgın ve bulaşıcı hastalık kaynaklı hasarlar teminat dışı",
+              "textEn": "Pandemic and communicable disease related damages are excluded",
+              "quote": "salgın ve/veya bulaşıcı hastalıkların doğrudan ve/veya dolaylı olarak neden olacağı veya, gerçek veya söylenti de olsa, salgın ve/veya bulaşıcı hastalık korkusu ve tehdidinin neden olacağı tüm kayıp, hasar ve bunlara bağlı doğrudan ve/veya dolaylı iş kayıpları istisna edilmiştir",
+              "quoteTr": null
+            },
+            {
+              "text": "Siber saldırı ve elektronik sistem hasarları kapsam dışı",
+              "textEn": "Cyber attacks and electronic system damages are excluded",
+              "quote": "bilgisayar, bilgisayar sistemleri, yazılım programları, kötü niyetli yazılımlar, bilgisayar virüsü, bilgisayar işlemleri veya benzeri elektronik sistemlerin doğrudan veya dolaylı olarak sebebiyet verdiği veya katkıda bulunduğu veya söz konusu program/sistemlerin zarar verecek şekilde kullanımından kaynaklanan hasar, kayıp, sorumluluk ve harcamalar teminat haricidir",
+              "quoteTr": null
+            }
+          ]
+        },
+        "clauseGraph": {
+          "edges": [
+            {
+              "sourceId": "Hasarsızlık İndirimi Koruma",
+              "targetId": "Cam Hasarı Koruma",
+              "relationshipType": "endorsement_override",
+              "description": "Glass damage protection works together with NCD protection to preserve discount",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Artan Mali Sorumluluk Sınırsız",
+              "targetId": "Special Facilities",
+              "relationshipType": "carve_out",
+              "description": "Unlimited liability is capped at 2.5M TL for airports, fuel facilities, etc.",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Pert Araç Klozu",
+              "targetId": "Kasko",
+              "relationshipType": "conditional_restriction",
+              "description": "35% reduced deductible applies to previously totaled vehicles",
+              "isCandidate": false
+            }
+          ]
+        },
+        "confidence": {
+          "overall": 0.95,
+          "policyNumber": 1,
+          "provider": 1,
+          "dates": 1,
+          "premium": 1,
+          "coverages": 0.9
+        },
+        "qualityScore": {
+          "readabilityStructure": 0.9,
+          "completenessKeyFields": 0.95,
+          "numericLimitsReconciled": 0.9,
+          "noGuessingUncertaintiesListed": 0.85,
+          "total": 0.9
+        }
+      },
+      "usage": {
+        "input_tokens": 40011,
+        "output_tokens": 5221
+      },
+      "model": "claude-sonnet-4-20250514",
+      "provider": "anthropic",
+      "cost": null,
+      "requestId": "ext-1777817165660",
+      "route": "/api/ai/extract",
+      "elapsedMs": 87719,
+      "phaseTiming": {
+        "configLoad_ms": 273,
+        "promptLoad_ms": 92,
+        "anthropic_ms": 87353
+      }
+    }
+  ]
+}

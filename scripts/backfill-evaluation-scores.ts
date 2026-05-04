@@ -5,6 +5,7 @@ import { evaluatePolicy } from '../src/lib/policy-evaluation'
 import { initializeBenchmarks } from '../src/lib/policy-evaluation/benchmark-service'
 import type { Policy } from '../src/types/policy'
 import type { Database } from '../src/lib/supabase/types'
+import { classifyExclusions } from '../src/lib/ai/policy-converter'
 
 dotenv.config()
 
@@ -79,6 +80,11 @@ export function reconstructPolicySafely(row: any): { policy?: Policy; skipReason
       included: c.included !== false, // undefined/null → true
     })),
     exclusions: Array.isArray(raw.exclusions) ? raw.exclusions : [],
+    conditionalDeductibles:
+      Array.isArray(raw.conditionalDeductibles) && raw.conditionalDeductibles.length > 0
+        ? raw.conditionalDeductibles
+        : classifyExclusions(Array.isArray(raw.exclusions) ? raw.exclusions : [])
+            .conditionalDeductibles,
     specialConditions: Array.isArray(raw.specialConditions) ? raw.specialConditions : [],
     insuranceLine: raw.insuranceLine || 'unknown',
     vehicleInfo: raw.vehicleInfo,

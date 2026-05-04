@@ -1,0 +1,1049 @@
+{
+  "fixture": "anadolu-volkswagen-golf.pdf",
+  "temperature": 0,
+  "documentTextLength": 30297,
+  "runs": [
+    {
+      "success": true,
+      "data": {
+        "policyNumber": "T155336589",
+        "bağlıPolNo": null,
+        "provider": "ANADOLU ANONİM TÜRK SİGORTA ŞİRKETİ",
+        "policyType": "kasko",
+        "isBundle": true,
+        "bundleProducts": [
+          "Genişletilmiş Kasko",
+          "Koltuk Ferdi Kaza Sigortası",
+          "Artan Mali Sorumluluk Sigortası",
+          "Hukuksal Koruma Sigortası"
+        ],
+        "previousInsurer": null,
+        "insuredName": "GÜNEŞ UZ",
+        "insuredAddress": "D: 0 KARŞIYAKA / İZMİR",
+        "insuredEntityType": null,
+        "vehicleUsage": "private",
+        "startDate": null,
+        "endDate": null,
+        "vehicleMake": "VOLKSWAGEN",
+        "vehicleModel": "GOLF 1.6 COMFORT",
+        "vehicleYear": 2001,
+        "vehiclePlate": "35 PR 962",
+        "vin": "WVZZZ1JZ1W484917",
+        "tcKimlik": null,
+        "vkn": null,
+        "premium": 1150,
+        "sigortaBedeli": null,
+        "currency": "TRY",
+        "paymentFrequency": "monthly",
+        "discounts": null,
+        "coverages": [
+          {
+            "name": "Market Value Coverage",
+            "nameTr": "Rayiç Değer Teminatı",
+            "limit": null,
+            "deductible": null,
+            "description": "Vehicle coverage up to market value as of claim date",
+            "isUnlimited": false,
+            "isMarketValue": true,
+            "category": "main",
+            "included": true,
+            "limitType": null,
+            "page": 4,
+            "clause": "Kasko Sigortası",
+            "quote": "Sigorta şirketi aracı, hasar tarihi itibariyle rayiç değerine kadar teminat altına almıştır.",
+            "carveOuts": null
+          },
+          {
+            "name": "Personal Effects",
+            "nameTr": "Kişisel Eşya",
+            "limit": 1000,
+            "deductible": null,
+            "description": "Coverage for personal belongings in the vehicle",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Kişisel Eşya 1.000",
+            "carveOuts": null
+          },
+          {
+            "name": "Excess Liability - Combined Single Limit",
+            "nameTr": "Artan Mali Sorumluluk - Kombine Tek Limit",
+            "limit": 100000,
+            "deductible": null,
+            "description": "Excess liability coverage above mandatory limits",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "liability",
+            "included": true,
+            "limitType": null,
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Artan Mali Sorumluluk - Kombine Tek Limit 100.000",
+            "carveOuts": null
+          },
+          {
+            "name": "Personal Accident - Death",
+            "nameTr": "Koltuk Ferdi Kaza - Ölüm",
+            "limit": 5000,
+            "deductible": null,
+            "description": "Death coverage per seat",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": "per_event",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Koltuk Ferdi Kaza - Ölüm 5.000",
+            "carveOuts": null
+          },
+          {
+            "name": "Personal Accident - Permanent Disability",
+            "nameTr": "Koltuk Ferdi Kaza - Sürekli Sakatlık",
+            "limit": 5000,
+            "deductible": null,
+            "description": "Permanent disability coverage per seat",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": "per_event",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Koltuk Ferdi Kaza - Sürekli Sakatlık 5.000",
+            "carveOuts": null
+          },
+          {
+            "name": "Personal Accident - Medical Treatment",
+            "nameTr": "Koltuk Ferdi Kaza - Tedavi",
+            "limit": 500,
+            "deductible": null,
+            "description": "Medical treatment coverage per seat",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": "per_event",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Koltuk Ferdi Kaza - Tedavi 500",
+            "carveOuts": null
+          },
+          {
+            "name": "Legal Protection - Maximum Advance per Event",
+            "nameTr": "Hukuksal Koruma - Olay Başına Azami Avans",
+            "limit": 50,
+            "deductible": null,
+            "description": "Legal fee advance per claim",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "legal",
+            "included": true,
+            "limitType": "per_event",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Hukuksal Koruma - Olay Başına Azami Avans 75 50",
+            "carveOuts": null
+          },
+          {
+            "name": "Legal Protection - Maximum Bail per Event",
+            "nameTr": "Hukuksal Koruma - Olay Başına Azami Kefalet",
+            "limit": 75,
+            "deductible": null,
+            "description": "Bail security per claim",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "legal",
+            "included": true,
+            "limitType": "per_event",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Hukuksal Koruma - Olay Başına Azami Kefalet 75",
+            "carveOuts": null
+          },
+          {
+            "name": "Legal Protection - Maximum Limit per Event",
+            "nameTr": "Hukuksal Koruma - Olay Başına Azami Limit",
+            "limit": 3750,
+            "deductible": null,
+            "description": "Total legal protection per claim",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "legal",
+            "included": true,
+            "limitType": "per_event",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Hukuksal Koruma - Olay Başına Azami Limit 3.750",
+            "carveOuts": null
+          },
+          {
+            "name": "Legal Protection - Maximum Limit During Insurance Period",
+            "nameTr": "Hukuksal Koruma - Sigorta Süresi İçinde Azami Limit",
+            "limit": 11000,
+            "deductible": null,
+            "description": "Annual aggregate legal protection limit",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "legal",
+            "included": true,
+            "limitType": "aggregate",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Hukuksal Koruma - Sigorta Süresi İçinde Azami Limit 11.000",
+            "carveOuts": null
+          }
+        ],
+        "specialConditions": [
+          "Kullanım Şekli Klozu - Hususi otomobil kullanımı dışında kullanılması durumunda her hasarın %80'i sigortalı tarafından karşılanır",
+          "Münhasıran araç cam hasarlarında tamir edilmesi halinde hasarsızlık indirimi etkilenmez",
+          "Anlaşmalı cam servisinde 1 adet marka logosuz cam değişimi hasarsızlık indirimini etkilemez",
+          "Enflasyondan Korunma - TÜFE ve ÜFE artış ortalamasının %25 fazlasına kadar koruma",
+          "Mini Onarım Hizmeti - Auto King firması tarafından yılda 1 kez bedelsiz hizmet"
+        ],
+        "exclusions": [],
+        "exclusionsEn": [],
+        "conditionalDeductibles": [
+          {
+            "trigger": "Kiralık araç, taksi, dolmuş olarak kullanım",
+            "rate": "%80",
+            "evidence": "Sigortalı aracın kısa veya uzun süreli araç kiralama hizmetlerinde kullanılıyor olduğunun tespit edilmesi... durumunda... her hasarın %80%, sigortalının kendisi tarafından karşılanmak üzere tazminat bedelinden indirilir."
+          },
+          {
+            "trigger": "Anlaşmalı cam servisi harici cam değişimi",
+            "rate": "%25",
+            "evidence": "Şirketimiz ile anlaşmalı cam servislerinin haricinde gerçekleştirilen ilk cam değişiminde %25 muafiyet uygulandığı takdirde bu değişim hasarsızlık indirimini etkilemez."
+          }
+        ],
+        "amendmentInfo": {
+          "isAmendment": false,
+          "amendmentNumber": null,
+          "amendmentDate": null,
+          "basePolicyNumber": null,
+          "amendmentReason": null,
+          "premiumDifference": null
+        },
+        "evidence": {
+          "insights": [
+            {
+              "text": "✓ Kapsamlı birleşik kasko paketi - 4 ayrı sigorta ürünü tek poliçede",
+              "textEn": "✓ Comprehensive combined kasko package - 4 separate insurance products in one policy",
+              "quote": "İş bu BİRLEŞİK KASKO SİGORTA TEKLİFİ \"GENİŞLETİLMİŞ KASKO\" ürünü ile, Kasko Sigortası, Koltuk Ferdi Kaza Sigortası, Artan Mali Sorumluluk Sigortası, Hukuksal Koruma Sigortası teminatları sağlanmaktadır.",
+              "quoteTr": null
+            },
+            {
+              "text": "✓ Rayiç değer koruması - araç hasar tarihindeki piyasa değerine kadar teminat",
+              "textEn": "✓ Market value protection - coverage up to vehicle market value as of claim date",
+              "quote": "Sigorta şirketi aracı, hasar tarihi itibariyle rayiç değerine kadar teminat altına almıştır.",
+              "quoteTr": null
+            },
+            {
+              "text": "✓ Cam hasar koruma avantajı - hasarsızlık indirimi etkilenmez",
+              "textEn": "✓ Glass damage protection advantage - no-claims discount unaffected",
+              "quote": "Münhasıran araç cam hasarlarında, tamir adedine bakılmaksızın camın tamir edilmesi halinde hasarsızlık indirimi etkilenmez.",
+              "quoteTr": null
+            }
+          ],
+          "exclusions": []
+        },
+        "clauseGraph": {
+          "edges": [
+            {
+              "sourceId": "Kullanım Şekli Klozu",
+              "targetId": "Kasko Ana Teminat",
+              "relationshipType": "conditional_restriction",
+              "description": "80% deductible applied if vehicle used for commercial purposes beyond private use",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Hasarsızlık İndirimi Koruma",
+              "targetId": "Cam Hasarları",
+              "relationshipType": "endorsement_override",
+              "description": "Glass damage repairs and single replacement do not affect no-claims discount",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Enflasyondan Korunma Klozu",
+              "targetId": "Kasko Ana Teminat",
+              "relationshipType": "coverage_inclusion",
+              "description": "Automatic inflation protection up to 125% of TUFE/UFE average increase",
+              "isCandidate": false
+            }
+          ]
+        },
+        "confidence": {
+          "overall": 0.85,
+          "policyNumber": 0.95,
+          "provider": 0.95,
+          "dates": 0.3,
+          "premium": 0.9,
+          "coverages": 0.8
+        },
+        "qualityScore": {
+          "readabilityStructure": 0.8,
+          "completenessKeyFields": 0.7,
+          "numericLimitsReconciled": 0.85,
+          "noGuessingUncertaintiesListed": 0.9,
+          "total": 0.8125
+        }
+      },
+      "usage": {
+        "input_tokens": 26938,
+        "output_tokens": 3698
+      },
+      "model": "claude-sonnet-4-20250514",
+      "provider": "anthropic",
+      "cost": null,
+      "requestId": "ext-1777819138125",
+      "route": "/api/ai/extract",
+      "elapsedMs": 57126,
+      "phaseTiming": {
+        "configLoad_ms": 114,
+        "promptLoad_ms": 112,
+        "anthropic_ms": 56900
+      }
+    },
+    {
+      "success": true,
+      "data": {
+        "policyNumber": "T155336589",
+        "bağlıPolNo": null,
+        "provider": "ANADOLU ANONİM TÜRK SİGORTA ŞİRKETİ",
+        "policyType": "kasko",
+        "isBundle": true,
+        "bundleProducts": [
+          "Genişletilmiş Kasko",
+          "Koltuk Ferdi Kaza Sigortası",
+          "Artan Mali Sorumluluk Sigortası",
+          "Hukuksal Koruma Sigortası"
+        ],
+        "previousInsurer": null,
+        "insuredName": "GÜNEŞ UZ",
+        "insuredAddress": "D: 0 KARŞIYAKA / İZMİR",
+        "insuredEntityType": null,
+        "vehicleUsage": "private",
+        "startDate": null,
+        "endDate": null,
+        "vehicleMake": "VOLKSWAGEN",
+        "vehicleModel": "GOLF 1.6 COMFORT",
+        "vehicleYear": 2001,
+        "vehiclePlate": "35 PR 962",
+        "vin": "WVZZZ1JZ1W484917",
+        "tcKimlik": null,
+        "vkn": null,
+        "premium": 1150,
+        "sigortaBedeli": null,
+        "currency": "TRY",
+        "paymentFrequency": "monthly",
+        "discounts": null,
+        "coverages": [
+          {
+            "name": "Kasko",
+            "nameTr": "Kasko",
+            "limit": null,
+            "deductible": null,
+            "description": "Main kasko coverage with market value",
+            "isUnlimited": false,
+            "isMarketValue": true,
+            "category": "main",
+            "included": true,
+            "limitType": null,
+            "page": null,
+            "clause": null,
+            "quote": "Sigorta şirketi aracı, hasar tarihi itibariyle rayiç değerine kadar teminat altına almıştır.",
+            "carveOuts": null
+          },
+          {
+            "name": "Personal Property",
+            "nameTr": "Kişisel Eşya",
+            "limit": 1000,
+            "deductible": null,
+            "description": "Personal belongings coverage",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Kişisel Eşya - 1.000",
+            "carveOuts": null
+          },
+          {
+            "name": "Excess Liability Combined Limit",
+            "nameTr": "Artan Mali Sorumluluk - Kombine Tek Limit",
+            "limit": 100000,
+            "deductible": null,
+            "description": "Combined single limit for excess liability",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "liability",
+            "included": true,
+            "limitType": "combined",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Artan Mali Sorumluluk - Kombine Tek Limit - 100.000",
+            "carveOuts": null
+          },
+          {
+            "name": "Seat Personal Accident - Death",
+            "nameTr": "Koltuk Ferdi Kaza - Ölüm",
+            "limit": 5000,
+            "deductible": null,
+            "description": "Death coverage per seat",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": "per_event",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Koltuk Ferdi Kaza - Ölüm - 5.000",
+            "carveOuts": null
+          },
+          {
+            "name": "Seat Personal Accident - Permanent Disability",
+            "nameTr": "Koltuk Ferdi Kaza - Sürekli Sakatlık",
+            "limit": 5000,
+            "deductible": null,
+            "description": "Permanent disability coverage per seat",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": "per_event",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Koltuk Ferdi Kaza - Sürekli Sakatlık - 5.000",
+            "carveOuts": null
+          },
+          {
+            "name": "Seat Personal Accident - Medical Treatment",
+            "nameTr": "Koltuk Ferdi Kaza - Tedavi",
+            "limit": 500,
+            "deductible": null,
+            "description": "Medical treatment coverage per seat",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": "per_event",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Koltuk Ferdi Kaza - Tedavi - 500",
+            "carveOuts": null
+          },
+          {
+            "name": "Legal Protection - Maximum Advance per Event",
+            "nameTr": "Hukuksal Koruma - Olay Başına Azami Avans",
+            "limit": 75,
+            "deductible": null,
+            "description": "Maximum legal fee advance per claim",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "legal",
+            "included": true,
+            "limitType": "per_event",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Hukuksal Koruma - Olay Başına Azami Avans - 75",
+            "carveOuts": null
+          },
+          {
+            "name": "Legal Protection - Maximum Bail per Event",
+            "nameTr": "Hukuksal Koruma - Olay Başına Azami Kefalet",
+            "limit": 50,
+            "deductible": null,
+            "description": "Maximum bail security per claim",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "legal",
+            "included": true,
+            "limitType": "per_event",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Hukuksal Koruma - Olay Başına Azami Kefalet - 50",
+            "carveOuts": null
+          },
+          {
+            "name": "Legal Protection - Maximum Limit per Event",
+            "nameTr": "Hukuksal Koruma - Olay Başına Azami Limit",
+            "limit": 3750,
+            "deductible": null,
+            "description": "Maximum total per event limit for legal protection",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "legal",
+            "included": true,
+            "limitType": "per_event",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Hukuksal Koruma - Olay Başına Azami Limit - 3.750",
+            "carveOuts": null
+          },
+          {
+            "name": "Legal Protection - Maximum Aggregate Limit",
+            "nameTr": "Hukuksal Koruma - Sigorta Süresi İçinde Azami Limit",
+            "limit": 11000,
+            "deductible": null,
+            "description": "Maximum annual aggregate limit for legal protection",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "legal",
+            "included": true,
+            "limitType": "aggregate",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Hukuksal Koruma - Sigorta Süresi İçinde Azami Limit - 11.000",
+            "carveOuts": null
+          },
+          {
+            "name": "Cigarette and Similar Substance Damage",
+            "nameTr": "Sigara ve Benzeri Madde Zararları",
+            "limit": null,
+            "deductible": null,
+            "description": "Damage from cigarettes and similar substances",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 7,
+            "clause": "Ek Sözleşme Maddeleri",
+            "quote": "Sigara ve Benzeri Madde Zararları",
+            "carveOuts": null
+          },
+          {
+            "name": "Unauthorized Towing",
+            "nameTr": "Yetkili Olmayan Kişilerce Çekilme",
+            "limit": null,
+            "deductible": null,
+            "description": "Damage from unauthorized towing",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 7,
+            "clause": "Ek Sözleşme Maddeleri",
+            "quote": "Yetkili Olmayan Kişilerce Çekilme",
+            "carveOuts": null
+          },
+          {
+            "name": "Theft due to Key Acquisition",
+            "nameTr": "Anahtarın Ele Geçirilmesi Nedeniyle Çalınma",
+            "limit": null,
+            "deductible": null,
+            "description": "Theft due to key being acquired by unauthorized persons",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 7,
+            "clause": "Ek Sözleşme Maddeleri",
+            "quote": "Anahtarın Ele Geçirilmesi Nedeniyle Çalınma",
+            "carveOuts": null
+          },
+          {
+            "name": "Lock Mechanism Replacement",
+            "nameTr": "Kilit Mekanizmasının Değiştirilmesi",
+            "limit": 600,
+            "deductible": null,
+            "description": "Lock mechanism replacement coverage with annual and per event limit",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": "per_event",
+            "page": 2,
+            "clause": "Kilit Mekanizmasının Değiştirilmesi Klozu",
+            "quote": "Poliçede belirtilecek yıllık ve olay başına azami limit 600 TL olarak belirlenmiştir.",
+            "carveOuts": null
+          },
+          {
+            "name": "Betterment Deduction Waiver",
+            "nameTr": "Kıymet Kazanma Tenzili İstisnası",
+            "limit": null,
+            "deductible": null,
+            "description": "Waiver of betterment deduction",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 7,
+            "clause": "Ek Sözleşme Maddeleri",
+            "quote": "Kıymet Kazanma Tenzili İstisnası",
+            "carveOuts": null
+          },
+          {
+            "name": "Flood and Water Damage",
+            "nameTr": "Sel Su Baskını",
+            "limit": null,
+            "deductible": null,
+            "description": "Coverage for flood and water damage",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 7,
+            "clause": "Ek Sözleşme Maddeleri",
+            "quote": "Sel Su Baskını",
+            "carveOuts": null
+          },
+          {
+            "name": "Natural Disasters",
+            "nameTr": "Deprem, heyelan, fırtına, dolu, yıldırım",
+            "limit": null,
+            "deductible": 0,
+            "description": "Earthquake, landslide, storm, hail, lightning coverage - no deductible",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 7,
+            "clause": "Ek Sözleşme Maddeleri",
+            "quote": "Deprem, toprak kayması, fırtına, dolu, yıldırım veya yanardağ püskürmesi nedeni ile meydana gelen hasarlarda muafiyet uygulanmayacaktır.",
+            "carveOuts": null
+          },
+          {
+            "name": "Strike, Lockout, Civil Commotion and Terror",
+            "nameTr": "Grev L.H.H. ve Terör",
+            "limit": null,
+            "deductible": null,
+            "description": "Strike, lockout, civil commotion and terror coverage",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": null,
+            "page": 7,
+            "clause": "Ek Sözleşme Maddeleri",
+            "quote": "Grev L.H.H. ve Terör",
+            "carveOuts": null
+          }
+        ],
+        "specialConditions": [
+          "Münhasıran araç cam hasarlarında, tamir adedine bakılmaksızın camın tamir edilmesi halinde hasarsızlık indirimi etkilenmez",
+          "Anlaşmalı cam servisinde gerçekleştirilecek 1 adet marka logosuz cam değişimi hasarsızlık indirimini etkilemez",
+          "Şirketimiz ile anlaşmalı cam servislerinin haricinde gerçekleştirilen ilk cam değişiminde %25 muafiyet uygulandığı takdirde bu değişim hasarsızlık indirimini etkilemez",
+          "Enflasyondan korunma klozu hükümleri çerçevesinde TÜFE ve ÜFE artış oranlarının ortalamasının %25 fazlasına kadar koruma",
+          "Mini Onarım Hizmeti prim alınmaksızın sağlanacaktır"
+        ],
+        "exclusions": [],
+        "exclusionsEn": [],
+        "conditionalDeductibles": [
+          {
+            "trigger": "hususi otomobil dışında kullanım",
+            "rate": "%80",
+            "evidence": "Sigortalı aracın kısa veya uzun süreli araç kiralama hizmetlerinde kullanılıyor olduğunun tespit edilmesi veya sigorta ettiren/sigortalı/ruhsat sahibinin bu işlerle iştigal ettiğinin tespiti veya aracın taksi/dolmuş ya da korsan taksi olarak tabir edilen taşımacılıkta kullanılmasının tespit edilmesi durumunda, Kasko Sigortası Genel Şartlarıhın C.2. ve C.3. maddelerinde yer alan hükümlerin uygulanması hakkı saklı kalmak üzere, her hasarın %80%, sigortalının kendisi tarafından karşılanmak üzere tazminat bedelinden indirilir."
+          },
+          {
+            "trigger": "anlaşmasız cam servisi",
+            "rate": "%25",
+            "evidence": "Şirketimiz ile anlaşmalı cam servislerinin haricinde gerçekleştirilen ilk cam değişiminde %25 muafiyet uygulandığı takdirde bu değişim hasarsızlık indirimini etkilemez."
+          }
+        ],
+        "amendmentInfo": {
+          "isAmendment": false,
+          "amendmentNumber": null,
+          "amendmentDate": null,
+          "basePolicyNumber": null,
+          "amendmentReason": null,
+          "premiumDifference": null
+        },
+        "evidence": {
+          "insights": [
+            {
+              "text": "✓ Kapsamlı birleşik kasko paketi - 4 farklı sigorta ürünü tek poliçede",
+              "textEn": "✓ Comprehensive combined kasko package - 4 different insurance products in one policy",
+              "quote": "İş bu BİRLEŞİK KASKO SİGORTA TEKLİFİ \"GENİŞLETİLMİŞ KASKO\" ürünü ile, Kasko Sigortası, Koltuk Ferdi Kaza Sigortası, Artan Mali Sorumluluk Sigortası, Hukuksal Koruma Sigortası teminatları sağlanmaktadır.",
+              "quoteTr": null
+            },
+            {
+              "text": "✓ Cam hasarları için özel koruma - anlaşmalı serviste ilk cam değişimi hasarsızlığı etkilemez",
+              "textEn": "✓ Special protection for glass damage - first glass replacement at contracted service doesn't affect NCD",
+              "quote": "anlaşmalı cam servisinde gerçekleştirilecek 1 adet marka logosuz cam değişimi hasarsızlık indirimini etkilemez",
+              "quoteTr": null
+            },
+            {
+              "text": "✓ Enflasyona karşı koruma - TÜFE ve ÜFE ortalamasının %25 fazlasına kadar",
+              "textEn": "✓ Protection against inflation - up to 25% above CPI and PPI average",
+              "quote": "Poliçede belirtilen araç ile araca ilave edilen değerler, poliçe başlangıç tarihi ile hasar tarihi arasında geçen sürede gerçekleşen TÜFE ve ÜFE artış oranlarının ortalamasının % 25 fazlasına kadar, hasar tarihindeki piyasa değerini geçmemek kaydıyla otomatik olarak enflasyondan korunma klozu hükümleri çerçevesinde koruma altındadır.",
+              "quoteTr": null
+            }
+          ],
+          "exclusions": []
+        },
+        "clauseGraph": {
+          "edges": [
+            {
+              "sourceId": "Hasarsızlık İndirimi",
+              "targetId": "Cam Hasarları",
+              "relationshipType": "conditional_restriction",
+              "description": "Glass repairs don't affect NCD, first contracted glass replacement doesn't affect NCD",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Kullanım Şekli",
+              "targetId": "Kasko",
+              "relationshipType": "conditional_restriction",
+              "description": "80% deductible if used for rental, taxi or commercial purposes instead of private use",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Kilit Mekanizması",
+              "targetId": "Anahtarın Ele Geçirilmesi",
+              "relationshipType": "coverage_inclusion",
+              "description": "Lock mechanism replacement is covered when keys are acquired by unauthorized persons",
+              "isCandidate": false
+            }
+          ]
+        },
+        "confidence": {
+          "overall": 0.85,
+          "policyNumber": 0.95,
+          "provider": 0.95,
+          "dates": 0.3,
+          "premium": 0.9,
+          "coverages": 0.8
+        },
+        "qualityScore": {
+          "readabilityStructure": 0.8,
+          "completenessKeyFields": 0.75,
+          "numericLimitsReconciled": 0.85,
+          "noGuessingUncertaintiesListed": 0.9,
+          "total": 0.825
+        }
+      },
+      "usage": {
+        "input_tokens": 26938,
+        "output_tokens": 5488
+      },
+      "model": "claude-sonnet-4-20250514",
+      "provider": "anthropic",
+      "cost": null,
+      "requestId": "ext-1777819195269",
+      "route": "/api/ai/extract",
+      "elapsedMs": 78559,
+      "phaseTiming": {
+        "configLoad_ms": 0,
+        "promptLoad_ms": 0,
+        "anthropic_ms": 78553
+      }
+    },
+    {
+      "success": true,
+      "data": {
+        "policyNumber": "T155336589",
+        "bağlıPolNo": null,
+        "provider": "ANADOLU ANONİM TÜRK SİGORTA ŞİRKETİ",
+        "policyType": "kasko",
+        "isBundle": true,
+        "bundleProducts": [
+          "Genişletilmiş Kasko",
+          "Koltuk Ferdi Kaza Sigortası",
+          "Artan Mali Sorumluluk Sigortası",
+          "Hukuksal Koruma Sigortası"
+        ],
+        "previousInsurer": null,
+        "insuredName": "GÜNEŞ UZ",
+        "insuredAddress": "D: 0 KARŞIYAKA / İZMİR",
+        "insuredEntityType": "individual",
+        "vehicleUsage": "private",
+        "startDate": null,
+        "endDate": null,
+        "vehicleMake": "VOLKSWAGEN",
+        "vehicleModel": "GOLF 1.6 COMFORT",
+        "vehicleYear": 2001,
+        "vehiclePlate": "35 PR 962",
+        "vin": "WVZZZ1JZ1W484917",
+        "tcKimlik": null,
+        "vkn": null,
+        "premium": 1150,
+        "sigortaBedeli": null,
+        "currency": "TRY",
+        "paymentFrequency": "monthly",
+        "discounts": null,
+        "coverages": [
+          {
+            "name": "Comprehensive Vehicle Coverage",
+            "nameTr": "Kasko",
+            "limit": null,
+            "deductible": null,
+            "description": "Market value coverage for vehicle",
+            "isUnlimited": false,
+            "isMarketValue": true,
+            "category": "main",
+            "included": true,
+            "limitType": null,
+            "page": 1,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Sigorta şirketi aracı, hasar tarihi itibariyle rayiç değerine kadar teminat altına almıştır.",
+            "carveOuts": null
+          },
+          {
+            "name": "Personal Belongings",
+            "nameTr": "Kişisel Eşya",
+            "limit": 1000,
+            "deductible": null,
+            "description": "Personal belongings coverage",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": "per_event",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Kişisel Eşya 1.000",
+            "carveOuts": null
+          },
+          {
+            "name": "Excess Third Party Liability",
+            "nameTr": "Artan Mali Sorumluluk",
+            "limit": 100000,
+            "deductible": null,
+            "description": "Combined single limit",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "liability",
+            "included": true,
+            "limitType": "combined",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Kombine Tek Limit 100.000",
+            "carveOuts": null
+          },
+          {
+            "name": "Personal Accident - Death",
+            "nameTr": "Koltuk Ferdi Kaza - Ölüm",
+            "limit": 5000,
+            "deductible": null,
+            "description": "Death benefit per seat",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": "per_event",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Ölüm 5.000",
+            "carveOuts": null
+          },
+          {
+            "name": "Personal Accident - Permanent Disability",
+            "nameTr": "Koltuk Ferdi Kaza - Sürekli Sakatlık",
+            "limit": 5000,
+            "deductible": null,
+            "description": "Permanent disability benefit per seat",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": "per_event",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Sürekli Sakatlık 5.000",
+            "carveOuts": null
+          },
+          {
+            "name": "Personal Accident - Medical Treatment",
+            "nameTr": "Koltuk Ferdi Kaza - Tedavi",
+            "limit": 500,
+            "deductible": null,
+            "description": "Medical treatment coverage per seat",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "supplementary",
+            "included": true,
+            "limitType": "per_event",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Tedavi 500",
+            "carveOuts": null
+          },
+          {
+            "name": "Legal Protection - Maximum Advance",
+            "nameTr": "Hukuksal Koruma - Olay Başına Azami Avans",
+            "limit": 75,
+            "deductible": null,
+            "description": "Maximum advance per event",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "legal",
+            "included": true,
+            "limitType": "per_event",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Olay Başına Azami Avans 75",
+            "carveOuts": null
+          },
+          {
+            "name": "Legal Protection - Maximum Bail",
+            "nameTr": "Hukuksal Koruma - Olay Başına Azami Kefalet",
+            "limit": 50,
+            "deductible": null,
+            "description": "Maximum bail per event",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "legal",
+            "included": true,
+            "limitType": "per_event",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Olay Başına Azami Kefalet 50",
+            "carveOuts": null
+          },
+          {
+            "name": "Legal Protection - Per Event Maximum",
+            "nameTr": "Hukuksal Koruma - Olay Başına Azami Limit",
+            "limit": 3750,
+            "deductible": null,
+            "description": "Maximum limit per event",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "legal",
+            "included": true,
+            "limitType": "per_event",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Olay Başına Azami Limit 3.750",
+            "carveOuts": null
+          },
+          {
+            "name": "Legal Protection - Annual Maximum",
+            "nameTr": "Hukuksal Koruma - Sigorta Süresi İçinde Azami Limit",
+            "limit": 11000,
+            "deductible": null,
+            "description": "Maximum limit during insurance period",
+            "isUnlimited": false,
+            "isMarketValue": false,
+            "category": "legal",
+            "included": true,
+            "limitType": "aggregate",
+            "page": 7,
+            "clause": "Sigorta Kapsamı",
+            "quote": "Sigorta Süresi İçinde Azami Limit 11.000",
+            "carveOuts": null
+          }
+        ],
+        "specialConditions": [
+          "Kullanım Şekli Klozu - hususi otomobil kullanımı dışında %80 muafiyet",
+          "Kilit Mekanizmasının Değiştirilmesi - yıllık 600 TL limit",
+          "Cam hasarları için özel düzenlemeler",
+          "Arıza durumunda çekme kurtarma yılda 1 kere sınırlı",
+          "İkame araç anlaşmalı servis koşulu",
+          "Mini Onarım Hizmeti yılda 1 kez",
+          "Enflasyondan korunma - TÜFE/ÜFE artışının %25 fazlası"
+        ],
+        "exclusions": [],
+        "exclusionsEn": [],
+        "conditionalDeductibles": [
+          {
+            "trigger": "non-private vehicle usage (rental, taxi, commercial transport)",
+            "rate": "80%",
+            "evidence": "Sigortalı aracın kısa veya uzun süreli araç kiralama hizmetlerinde kullanılıyor olduğunun tespit edilmesi veya sigorta ettiren/sigortalı/ruhsat sahibinin bu işlerle iştigal ettiğinin tespiti veya aracın taksi/dolmuş ya da korsan taksi olarak tabir edilen taşımacılıkta kullanılmasının tespit edilmesi durumunda, Kasko Sigortası Genel Şartlarıhın C.2. ve C.3. maddelerinde yer alan hükümlerin uygulanması hakkı saklı kalmak üzere, her hasarın %80%, sigortalının kendisi tarafından karşılanmak üzere tazminat bedelinden indirilir."
+          },
+          {
+            "trigger": "non-contracted glass service",
+            "rate": "25%",
+            "evidence": "Şirketimiz ile anlaşmalı cam servislerinin haricinde gerçekleştirilen ilk cam değişiminde %25 muafiyet uygulandığı takdirde bu değişim hasarsızlık indirimini etkilemez."
+          }
+        ],
+        "amendmentInfo": {
+          "isAmendment": false,
+          "amendmentNumber": null,
+          "amendmentDate": null,
+          "basePolicyNumber": null,
+          "amendmentReason": null,
+          "premiumDifference": null
+        },
+        "evidence": {
+          "insights": [
+            {
+              "text": "✓ Kapsamlı birleşik kasko paketi - dört ayrı sigorta ürünü tek poliçede",
+              "textEn": "✓ Comprehensive combined kasko package - four separate insurance products in one policy",
+              "quote": "İş bu BİRLEŞİK KASKO SİGORTA TEKLİFİ \"GENİŞLETİLMİŞ KASKO\" ürünü ile, Kasko Sigortası, Koltuk Ferdi Kaza Sigortası, Artan Mali Sorumluluk Sigortası, Hukuksal Koruma Sigortası teminatları sağlanmaktadır.",
+              "quoteTr": null
+            },
+            {
+              "text": "✓ Rayiç değer koruması - aracın hasar tarihindeki piyasa değerine kadar teminat",
+              "textEn": "✓ Market value protection - coverage up to vehicle's market value at time of loss",
+              "quote": "Sigorta şirketi aracı, hasar tarihi itibariyle rayiç değerine kadar teminat altına almıştır.",
+              "quoteTr": null
+            },
+            {
+              "text": "✓ Hasarsızlık indirimi koruması - cam hasarlarında özel avantajlar",
+              "textEn": "✓ No-claims discount protection - special advantages for glass damages",
+              "quote": "Münhasıran araç cam hasarlarında, tamir adedine bakılmaksızın camın tamir edilmesi halinde hasarsızlık indirimi etkilenmez.",
+              "quoteTr": null
+            }
+          ],
+          "exclusions": []
+        },
+        "clauseGraph": {
+          "edges": [
+            {
+              "sourceId": "Kullanım Şekli Klozu",
+              "targetId": "Kasko",
+              "relationshipType": "conditional_restriction",
+              "description": "80% deductible applies if vehicle used for commercial purposes",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Cam Hasar Koruma",
+              "targetId": "Hasarsızlık İndirimi",
+              "relationshipType": "endorsement_override",
+              "description": "Glass damage repairs don't affect no-claims discount",
+              "isCandidate": false
+            },
+            {
+              "sourceId": "Anadolu Hizmet",
+              "targetId": "İkame Araç",
+              "relationshipType": "service_benefit_linkage",
+              "description": "Replacement vehicle service linked to contracted service network",
+              "isCandidate": false
+            }
+          ]
+        },
+        "confidence": {
+          "overall": 0.95,
+          "policyNumber": 1,
+          "provider": 1,
+          "dates": 0.3,
+          "premium": 1,
+          "coverages": 0.95
+        },
+        "qualityScore": {
+          "readabilityStructure": 0.9,
+          "completenessKeyFields": 0.85,
+          "numericLimitsReconciled": 0.95,
+          "noGuessingUncertaintiesListed": 0.9,
+          "total": 0.9
+        }
+      },
+      "usage": {
+        "input_tokens": 26938,
+        "output_tokens": 3647
+      },
+      "model": "claude-sonnet-4-20250514",
+      "provider": "anthropic",
+      "cost": null,
+      "requestId": "ext-1777819273836",
+      "route": "/api/ai/extract",
+      "elapsedMs": 58832,
+      "phaseTiming": {
+        "configLoad_ms": 0,
+        "promptLoad_ms": 1,
+        "anthropic_ms": 58831
+      }
+    }
+  ]
+}
