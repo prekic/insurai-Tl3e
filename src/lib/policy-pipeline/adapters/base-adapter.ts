@@ -1,4 +1,4 @@
-import { CanonicalCoverageConcept } from '../types/canonical-concepts'
+import { CanonicalCoverageConcept } from '../types/canonical-concepts.js'
 
 export interface StandardizedCoverage {
   concept: CanonicalCoverageConcept
