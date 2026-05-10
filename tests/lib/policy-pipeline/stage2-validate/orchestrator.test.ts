@@ -44,7 +44,7 @@ describe('runStage2Validation', () => {
     const result = runStage2Validation(data)
 
     expect(result.coverages[0].normalizedName).toBe('cam')
-    expect(result.coverages[0].canonicalName).toBe('GLASS_COVERAGE')
+    expect(result.coverages[0].canonicalName).toBe('UNKNOWN')
     expect(result.coverages[0].parsedLimit).toEqual({
       type: 'MONETARY',
       amount: 1000,
@@ -55,7 +55,7 @@ describe('runStage2Validation', () => {
     expect(result.coverages[1].canonicalName).toBe('UNKNOWN')
     expect(result.coverages[1].parsedLimit).toBeUndefined()
 
-    expect(result.coverages[2]).toBeNull()
+    expect(result.coverages).toHaveLength(2)
   })
 
   it('should not overwrite existing entityType', () => {

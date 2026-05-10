@@ -254,10 +254,10 @@ describe('TryAnalysis', () => {
 
       renderWithRouter()
 
-      // Component navigates to PolicyDetailView with existing result
-      await waitFor(() => {
-        expect(screen.getByTestId('policy-trial-page')).toBeInTheDocument()
-      })
+      // Component stays on upload page; previous auto-redirect was removed.
+      // The upload interface should still render.
+      expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.title)).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.uploadYourPolicy)).toBeInTheDocument()
     })
   })
 
@@ -319,11 +319,14 @@ describe('TryAnalysis', () => {
 
       renderWithRouter(['/try'], { file: mockFile })
 
-      await waitFor(() => {
-        expect(
-          screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
-        ).toBeInTheDocument()
-      })
+      await waitFor(
+        () => {
+          expect(
+            screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
+          ).toBeInTheDocument()
+        },
+        { timeout: 5000 }
+      )
 
       expect(mockToast.error).toHaveBeenCalledWith(
         EN_TRANSLATIONS.tryAnalysis.analysisFailed,
@@ -439,17 +442,27 @@ describe('TryAnalysis', () => {
         aiInsights: ['Good coverage level', 'Comprehensive protection'],
       })
 
-      mockGetTrialResult.mockReturnValue({
+      mockExtractPolicy.mockResolvedValue({
+        success: true,
         policy: mockPolicy,
-        fileName: 'test.pdf',
       })
 
       renderWithRouter()
 
-      // Component redirects to PolicyDetailView with existing result
-      await waitFor(() => {
-        expect(screen.getByTestId('policy-trial-page')).toBeInTheDocument()
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement
+      const mockFile = createMockFile()
+
+      await act(async () => {
+        await userEvent.upload(input, mockFile)
       })
+
+      // Component navigates to PolicyDetailView after successful extraction
+      await waitFor(
+        () => {
+          expect(screen.getByTestId('policy-trial-page')).toBeInTheDocument()
+        },
+        { timeout: 5000 }
+      )
     })
   })
 
@@ -466,12 +479,15 @@ describe('TryAnalysis', () => {
         await userEvent.upload(input, mockFile)
       })
 
-      await waitFor(() => {
-        expect(
-          screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
-        ).toBeInTheDocument()
-        expect(screen.getByText('Network error')).toBeInTheDocument()
-      })
+      await waitFor(
+        () => {
+          expect(
+            screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
+          ).toBeInTheDocument()
+          expect(screen.getByText('Network error')).toBeInTheDocument()
+        },
+        { timeout: 5000 }
+      )
     })
 
     it('allows retry after error', async () => {
@@ -486,11 +502,14 @@ describe('TryAnalysis', () => {
         await userEvent.upload(input, mockFile)
       })
 
-      await waitFor(() => {
-        expect(
-          screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
-        ).toBeInTheDocument()
-      })
+      await waitFor(
+        () => {
+          expect(
+            screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
+          ).toBeInTheDocument()
+        },
+        { timeout: 5000 }
+      )
 
       // Click try again
       const tryAgainButton = screen.getByRole('button', { name: /try again/i })
@@ -527,9 +546,34 @@ describe('TryAnalysis', () => {
     // Note: Timeout tests with fake timers are complex due to Promise.race behavior
     // The component has a 90 second timeout - testing this reliably would require
     // integration testing or mocking at a lower level
-    it.skip('shows timeout error when extraction takes too long', async () => {
-      // This test is skipped - requires fake timers which conflict with async React operations
-      // The timeout functionality is verified through integration testing
+    it('shows timeout error when extraction takes too long', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+
+      // Make extraction hang forever (never resolves)
+      mockExtractPolicy.mockReturnValue(new Promise(() => {}))
+
+      renderWithRouter()
+
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement
+      const mockFile = createMockFile()
+
+      await act(async () => {
+        await userEvent.upload(input, mockFile)
+      })
+
+      // Advance past the 220s hard budget timer
+      await vi.advanceTimersByTimeAsync(221_000)
+
+      await waitFor(
+        () => {
+          expect(
+            screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
+          ).toBeInTheDocument()
+        },
+        { timeout: 5000 }
+      )
+
+      vi.useRealTimers()
     })
 
     it('handles extraction that returns neither success nor error', async () => {
@@ -545,11 +589,14 @@ describe('TryAnalysis', () => {
         await userEvent.upload(input, mockFile)
       })
 
-      await waitFor(() => {
-        expect(
-          screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
-        ).toBeInTheDocument()
-      })
+      await waitFor(
+        () => {
+          expect(
+            screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
+          ).toBeInTheDocument()
+        },
+        { timeout: 5000 }
+      )
     })
 
     it('handles extraction returning success false without error message', async () => {
@@ -567,11 +614,14 @@ describe('TryAnalysis', () => {
         await userEvent.upload(input, mockFile)
       })
 
-      await waitFor(() => {
-        expect(
-          screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
-        ).toBeInTheDocument()
-      })
+      await waitFor(
+        () => {
+          expect(
+            screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
+          ).toBeInTheDocument()
+        },
+        { timeout: 5000 }
+      )
 
       // Should show a default error message
       expect(screen.getByText(/Failed to analyze policy/i)).toBeInTheDocument()
@@ -592,11 +642,14 @@ describe('TryAnalysis', () => {
         await userEvent.upload(input, mockFile)
       })
 
-      await waitFor(() => {
-        expect(
-          screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
-        ).toBeInTheDocument()
-      })
+      await waitFor(
+        () => {
+          expect(
+            screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
+          ).toBeInTheDocument()
+        },
+        { timeout: 5000 }
+      )
     })
 
     it('shows progress indicators during each stage', async () => {

@@ -125,10 +125,7 @@ export function generateNicheKlozeCountInsight(data: ExtractedPolicyData): strin
 export function generateInsurerTransferInsight(data: ExtractedPolicyData): string | null {
   // Tier 1 — structured field (strongest signal)
   if (typeof data.previousInsurer === 'string' && data.previousInsurer.trim().length > 0) {
-    const haystack = [
-      ...(data.specialConditions ?? []),
-      ...(data.exclusions ?? []),
-    ]
+    const haystack = [...(data.specialConditions ?? []), ...(data.exclusions ?? [])]
       .join(' ')
       .toLowerCase()
     const hasNcdSignal = /hasars[ıi]zl[ıi]k\s*(indir|kademe)|no[\s-]?claims\s*discount/i.test(
@@ -142,19 +139,19 @@ export function generateInsurerTransferInsight(data: ExtractedPolicyData): strin
   }
 
   // Tier 2 — text-pattern fallback
-  const haystack = [
-    ...(data.specialConditions ?? []),
-    ...(data.exclusions ?? []),
-  ]
+  const haystack = [...(data.specialConditions ?? []), ...(data.exclusions ?? [])]
     .join(' ')
     .toLowerCase()
 
   if (haystack.length === 0) return null
 
-  const hasTransfer = /yenilen(?:m|d)i[şs]|önceki\s*sigort|geçi[şs]\s*pol|devi(?:r|rd)|carry[\s-]?over|transfer/i.test(
+  const hasTransfer =
+    /yenilen(?:m|d)i[şs]|yenileme(?:dir|den)|önceki\s*sigort|geçi[şs]\s*pol|devi(?:r|rd)|carry[\s-]?over|transfer/i.test(
+      haystack
+    )
+  const hasNcdSignal = /hasars[ıi]zl[ıi]k\s*(indir|kademe)|no[\s-]?claims\s*discount/i.test(
     haystack
   )
-  const hasNcdSignal = /hasars[ıi]zl[ıi]k\s*(indir|kademe)|no[\s-]?claims\s*discount/i.test(haystack)
 
   if (hasTransfer && hasNcdSignal) {
     return 'Önceki sigortacıdan devir/yenileme tespit edildi — hasarsızlık indirim kademesinin korunduğu ve devir sırasında bilgi farklılığı olmadığı doğrulanmalı'
@@ -180,9 +177,8 @@ export function generateNetworkBenefitInsight(data: ExtractedPolicyData): string
     .toLowerCase()
 
   // AS+ network signal: "AS+", "Anlaşmalı Servis Ağı", "Yetkili Servis Ağı"
-  const hasAsPlus = /\bas\+|anla[şs]mal[ıi]\s*servis\s*a[ğg][ıi]?|yetkili\s*servis\s*a[ğg][ıi]?/i.test(
-    coverageText
-  )
+  const hasAsPlus =
+    /\bas\+|anla[şs]mal[ıi]\s*servis\s*a[ğg][ıi]?|yetkili\s*servis\s*a[ğg][ıi]?/i.test(coverageText)
 
   if (!hasAsPlus) return null
 

@@ -97,13 +97,13 @@ describe('EXTRACTION_JSON_SCHEMA Required Fields', () => {
     expect(required).toContain('clauseGraph')
   })
 
-  it('should have exactly 32 required fields', () => {
+  it('should have exactly 35 required fields', () => {
     // 17 original + exclusionsEn + conditionalDeductibles (#331) + discounts
     // + insuredEntityType + vehicleUsage + amendmentInfo + evidence + qualityScore
     // + vehicleMake + vehicleModel + vehicleYear + vehiclePlate + vin + tcKimlik + vkn
-    // + bağlıPolNo + sigortaBedeli
+    // + bağlıPolNo + sigortaBedeli + isBundle + bundleProducts + previousInsurer
     // All nullable types so the LLM can return null.
-    expect(required.length).toBe(32)
+    expect(required.length).toBe(35)
   })
 
   it('should require discounts', () => {

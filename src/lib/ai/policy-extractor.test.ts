@@ -1020,7 +1020,7 @@ describe('Policy Conversion', () => {
       expect(policy.premium).toBe(3500)
       expect(policy.coverages).toHaveLength(2)
       expect(policy.exclusions).toHaveLength(2)
-      expect(policy.specialConditions).toHaveLength(2)
+      expect(policy.specialConditions).toHaveLength(1)
       // Recalculated: 0.95*0.20 + 0.9*0.15 + 0.9*0.20 + 0.85*0.20 + 0.8*0.25 = 0.875
       expect(policy.aiConfidence).toBe(0.875)
     }

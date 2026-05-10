@@ -126,7 +126,7 @@ describe('generateInsurerTransferInsight (PR-S2.4)', () => {
     }
     const result = generateInsurerTransferInsight(data)
     expect(result).not.toBeNull()
-    expect(result).toContain('devir/yenileme görünüyor')
+    expect(result).toContain('devri/yenileme görünüyor')
   })
 
   it('returns null when only NCD signal but no transfer indicator', () => {
@@ -218,9 +218,7 @@ describe('generateNetworkBenefitInsight (PR-S2.4)', () => {
   it('emits insight when "AS+" appears in coverage name', () => {
     const data: ExtractedPolicyData = {
       ...baseData,
-      coverages: [
-        cov({ name: 'AS+ Yetkili Servis Ağı', nameTr: 'AS+ Yetkili Servis Ağı' }),
-      ],
+      coverages: [cov({ name: 'AS+ Yetkili Servis Ağı', nameTr: 'AS+ Yetkili Servis Ağı' })],
     }
     const result = generateNetworkBenefitInsight(data)
     expect(result).not.toBeNull()
@@ -234,7 +232,7 @@ describe('generateNetworkBenefitInsight (PR-S2.4)', () => {
         cov({
           name: 'Service Network Benefit',
           nameTr: 'Servis Ağı Avantajı',
-          description: 'Anlaşmalı Servis Ağı kapsamında küçük onarımlar NCD\'yi etkilemez',
+          description: "Anlaşmalı Servis Ağı kapsamında küçük onarımlar NCD'yi etkilemez",
         }),
       ],
     }

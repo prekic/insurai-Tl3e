@@ -49,7 +49,9 @@ describe('generateAnadoluHizmetGloss (PR-S3.4)', () => {
 
   it('overwrites a placeholder/short description (under 30 chars)', () => {
     // Short / placeholder description → still apply the gloss
-    expect(generateAnadoluHizmetGloss('Anadolu Hizmet', 'Anadolu Hizmet', 'Included')).not.toBeNull()
+    expect(
+      generateAnadoluHizmetGloss('Anadolu Hizmet', 'Anadolu Hizmet', 'Included')
+    ).not.toBeNull()
     expect(generateAnadoluHizmetGloss('Anadolu Hizmet', 'Anadolu Hizmet', 'Yes')).not.toBeNull()
     expect(
       generateAnadoluHizmetGloss('Anadolu Hizmet', 'Anadolu Hizmet', 'Asistans hizmeti dahil')
@@ -58,7 +60,9 @@ describe('generateAnadoluHizmetGloss (PR-S3.4)', () => {
 
   it('matches case-insensitively', () => {
     expect(generateAnadoluHizmetGloss('ANADOLU HIZMET', 'ANADOLU HIZMET', '')).not.toBeNull()
-    expect(generateAnadoluHizmetGloss('anadolu hizmet hususi', 'anadolu hizmet hususi', '')).not.toBeNull()
+    expect(
+      generateAnadoluHizmetGloss('anadolu hizmet hususi', 'anadolu hizmet hususi', '')
+    ).not.toBeNull()
   })
 
   it('contains both Turkish and English variants for bilingual rendering', () => {
@@ -73,8 +77,12 @@ describe('generateAnadoluHizmetGloss (PR-S3.4)', () => {
   })
 
   it('does NOT trigger on similarly-named non-Anadolu services', () => {
-    expect(generateAnadoluHizmetGloss('Anadolu Sigorta Genel Hizmet', 'Anadolu Sigorta Genel Hizmet', '')).not.toBeNull()
-    // The Anadolu+Hizmet pair fires — but unrelated "Hizmet" alone shouldn't
+    // "Anadolu Hizmet" must appear adjacent (\s*) — "Anadolu Sigorta Genel Hizmet"
+    // has intervening words so it does NOT match.
+    expect(
+      generateAnadoluHizmetGloss('Anadolu Sigorta Genel Hizmet', 'Anadolu Sigorta Genel Hizmet', '')
+    ).toBeNull()
+    // Unrelated "Hizmet" alone shouldn't trigger
     expect(generateAnadoluHizmetGloss('Hizmet Paketi', 'Hizmet Paketi', '')).toBeNull()
     expect(generateAnadoluHizmetGloss('Yol Yardım Hizmeti', 'Yol Yardım Hizmeti', '')).toBeNull()
   })

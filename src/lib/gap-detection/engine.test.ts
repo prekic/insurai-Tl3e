@@ -58,14 +58,16 @@ describe('Gap Detection Engine', () => {
       expect(analysis.gaps.length).toBeGreaterThan(0)
     })
 
-    it('should detect critical temporal gaps for expired policy', async () => {
+    it('should detect temporal gaps for expired policy', async () => {
       const analysis = await analyzeGapsComprehensive(EXPIRED_POLICY)
 
       const temporalGaps = analysis.gapsByCategory.temporal
       expect(temporalGaps.length).toBeGreaterThan(0)
 
-      const criticalGap = temporalGaps.find(g => g.severity === 'critical')
-      expect(criticalGap).toBeDefined()
+      // Expired policy is now classified as info (not critical)
+      const expiredGap = temporalGaps.find((g) => g.subCategory === 'coverage_lapse')
+      expect(expiredGap).toBeDefined()
+      expect(expiredGap!.severity).toBe('info')
     })
 
     it('should categorize gaps correctly', async () => {
@@ -110,8 +112,9 @@ describe('Gap Detection Engine', () => {
 
       if (analysis.prioritizedGaps.length > 1) {
         for (let i = 1; i < analysis.prioritizedGaps.length; i++) {
-          expect(analysis.prioritizedGaps[i - 1].priorityScore)
-            .toBeGreaterThanOrEqual(analysis.prioritizedGaps[i].priorityScore)
+          expect(analysis.prioritizedGaps[i - 1].priorityScore).toBeGreaterThanOrEqual(
+            analysis.prioritizedGaps[i].priorityScore
+          )
         }
       }
     })
@@ -185,7 +188,9 @@ describe('Gap Detection Engine', () => {
       const analysis = await analyzeGapsComprehensive(POORLY_COVERED_HOME_POLICY)
 
       // Check for duplicate gaps
-      const gapKeys = analysis.gaps.map(g => `${g.category}-${g.affectedCoverage}-${g.subCategory}`)
+      const gapKeys = analysis.gaps.map(
+        (g) => `${g.category}-${g.affectedCoverage}-${g.subCategory}`
+      )
       const uniqueKeys = new Set(gapKeys)
 
       expect(gapKeys.length).toBe(uniqueKeys.size)
@@ -308,7 +313,7 @@ describe('Gap Detection Engine', () => {
       const analysis = await analyzeGapsComprehensive(policy)
 
       const temporalGaps = analysis.gapsByCategory.temporal
-      const expiringGap = temporalGaps.find(g => g.subCategory === 'expiring_soon')
+      const expiringGap = temporalGaps.find((g) => g.subCategory === 'expiring_soon')
 
       expect(expiringGap).toBeDefined()
       expect(expiringGap?.severity).toBe('critical')
@@ -319,7 +324,7 @@ describe('Gap Detection Engine', () => {
       const analysis = await analyzeGapsComprehensive(policy)
 
       const temporalGaps = analysis.gapsByCategory.temporal
-      const expiringGap = temporalGaps.find(g => g.subCategory === 'expiring_soon')
+      const expiringGap = temporalGaps.find((g) => g.subCategory === 'expiring_soon')
 
       expect(expiringGap).toBeDefined()
       expect(expiringGap?.severity).toBe('high')
@@ -330,7 +335,7 @@ describe('Gap Detection Engine', () => {
       const analysis = await analyzeGapsComprehensive(policy)
 
       const temporalGaps = analysis.gapsByCategory.temporal
-      const expiringGap = temporalGaps.find(g => g.subCategory === 'expiring_soon')
+      const expiringGap = temporalGaps.find((g) => g.subCategory === 'expiring_soon')
 
       expect(expiringGap).toBeUndefined()
     })

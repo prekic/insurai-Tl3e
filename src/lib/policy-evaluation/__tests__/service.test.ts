@@ -9,11 +9,11 @@ import type { Policy } from '@/types/policy'
 vi.mock('../../policy-evaluation/benchmark-service', async (importOriginal) => {
   const actual = await importOriginal()
   return {
-    ...actual as any,
+    ...(actual as any),
     getPremiumBenchmarkWithFallback: vi.fn().mockImplementation((...args) => {
       const result = (actual as any).getPremiumBenchmarkWithFallback(...args)
       return { ...result, benchmarkStatus: 'trusted', source: 'database' }
-    })
+    }),
   }
 })
 
@@ -62,7 +62,13 @@ function createHighScorePolicy(): Policy {
       { name: 'Theft', nameTr: 'Hırsızlık', limit: 300000, deductible: 500, included: true },
       { name: 'Fire', nameTr: 'Yangın', limit: 300000, deductible: 0, included: true },
       { name: 'Glass', nameTr: 'Cam', limit: 20000, deductible: 0, included: true },
-      { name: 'Roadside Assistance', nameTr: 'Yol Yardım', limit: 5000, deductible: 0, included: true },
+      {
+        name: 'Roadside Assistance',
+        nameTr: 'Yol Yardım',
+        limit: 5000,
+        deductible: 0,
+        included: true,
+      },
     ],
   })
 }
@@ -76,7 +82,19 @@ function createLowScorePolicy(): Policy {
     coverages: [
       { name: 'Collision', nameTr: 'Çarpışma', limit: 100000, deductible: 10000, included: true },
     ],
-    exclusions: ['Theft', 'Fire', 'Natural disasters', 'Glass', 'Vandalism', 'Flooding', 'Hail', 'Parking', 'Key loss', 'Personal effects', 'Legal'],
+    exclusions: [
+      'Theft',
+      'Fire',
+      'Natural disasters',
+      'Glass',
+      'Vandalism',
+      'Flooding',
+      'Hail',
+      'Parking',
+      'Key loss',
+      'Personal effects',
+      'Legal',
+    ],
   })
 }
 
@@ -96,14 +114,19 @@ function createMediumScorePolicy(): Policy {
 
 function createNonCompliantPolicy(): Policy {
   const now = new Date()
-  const startDate = new Date(now.getTime() - 400 * 24 * 60 * 60 * 1000)
-  const expiryDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) // Expired
+  const startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+  const expiryDate = new Date(now.getTime() + 335 * 24 * 60 * 60 * 1000)
 
+  // Traffic policy with coverage far below SEDDK minimum limits triggers critical compliance issue
   return createMockPolicy({
     id: 'non-compliant',
+    type: 'traffic',
+    typeTr: 'Trafik Sigortası',
     startDate: startDate.toISOString(),
     expiryDate: expiryDate.toISOString(),
-    status: 'expired',
+    status: 'active',
+    coverage: 10000, // Below minimum SEDDK limits — triggers critical compliance issue
+    coverages: [],
   })
 }
 
@@ -268,8 +291,8 @@ describe('PolicyEvaluationService', () => {
       const result = service.quickCompare(policies)
 
       // High score policy should win
-      const highScoreResult = result.scores.find(s => s.policyId === 'high-score')
-      const lowScoreResult = result.scores.find(s => s.policyId === 'low-score')
+      const highScoreResult = result.scores.find((s) => s.policyId === 'high-score')
+      const lowScoreResult = result.scores.find((s) => s.policyId === 'low-score')
 
       expect(highScoreResult?.score).toBeGreaterThan(lowScoreResult?.score ?? 0)
     })
@@ -292,7 +315,7 @@ describe('PolicyEvaluationService', () => {
       const result = service.compareCoverage(policies, 'Glass')
 
       // Only high-score has Glass
-      expect(result.available.some(a => a.policyId === 'high-score')).toBe(true)
+      expect(result.available.some((a) => a.policyId === 'high-score')).toBe(true)
       expect(result.notAvailable).toContain('low-score')
     })
 
@@ -344,7 +367,9 @@ describe('PolicyEvaluationService', () => {
       expect(sorted[0].policy.id).toBe('high-score')
       // Scores should be in descending order
       for (let i = 1; i < sorted.length; i++) {
-        expect(sorted[i - 1].evaluation.overallScore).toBeGreaterThanOrEqual(sorted[i].evaluation.overallScore)
+        expect(sorted[i - 1].evaluation.overallScore).toBeGreaterThanOrEqual(
+          sorted[i].evaluation.overallScore
+        )
       }
     })
 
@@ -352,7 +377,7 @@ describe('PolicyEvaluationService', () => {
       const policies = [createLowScorePolicy(), createHighScorePolicy()]
       const sorted = service.sortByScore(policies)
 
-      sorted.forEach(item => {
+      sorted.forEach((item) => {
         expect(item.policy).toBeDefined()
         expect(item.evaluation).toBeDefined()
         expect(item.evaluation.policyId).toBe(item.policy.id)
@@ -407,7 +432,7 @@ describe('PolicyEvaluationService', () => {
       const policies = [createHighScorePolicy(), createNonCompliantPolicy()]
       const nonCompliant = service.getNonCompliant(policies)
 
-      expect(nonCompliant.some(p => p.id === 'non-compliant')).toBe(true)
+      expect(nonCompliant.some((p) => p.id === 'non-compliant')).toBe(true)
     })
 
     it('should not include compliant policies', () => {

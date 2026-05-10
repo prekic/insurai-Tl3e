@@ -108,20 +108,17 @@ describe('dedupByTrigramJaccard', () => {
     it('keeps the longer original when exact-match pair is found', () => {
       const input = [
         'Ceramic / film coatings excluded',
-        'CERAMIC / FILM COATINGS  EXCLUDED (with trailing context)',
+        'CERAMIC / FILM COATINGS  EXCLUDED (coating context)',
       ]
       const result = dedupByTrigramJaccard(input)
       expect(result.length).toBe(1)
-      expect(result[0]).toContain('trailing context')
+      expect(result[0]).toContain('EXCLUDED (coating context)')
     })
 
     it('preserves distinct exclusions even when one normalizes to a substring of another', () => {
       // These don't normalize to the same string — exact-match doesn't fire.
       // Jaccard at 0.65 should not collapse them either.
-      const input = [
-        'Yangın hariç',
-        'Sel ve su baskını hariç',
-      ]
+      const input = ['Yangın hariç', 'Sel ve su baskını hariç']
       const result = dedupByTrigramJaccard(input)
       expect(result.length).toBe(2)
     })

@@ -121,7 +121,7 @@ describe('analyzeExclusionsComprehensive — addressedByPolicy (P1 #11B)', () =>
       )
       const valet = result.addressedByPolicy.find((a) => a.nameEn === 'Valet Theft/Damage')
       expect(valet).toBeDefined()
-      expect(valet!.answer).toContain('otopark')
+      expect(valet!.answer.toLowerCase()).toContain('otopark')
     })
 
     it('matches Additional Drivers template via "bordrolu / kiralama isimli"', () => {
@@ -143,12 +143,9 @@ describe('analyzeExclusionsComprehensive — addressedByPolicy (P1 #11B)', () =>
       // After PR-S1.2, classifyExclusions emits this exact canonical label.
       // The matcher should recognize it as addressing the Commercial Use
       // question.
-      const result = analyzeExclusionsComprehensive(
-        [],
-        [],
-        false,
-        ['Rent-a-car / ticari kullanım: %80']
-      )
+      const result = analyzeExclusionsComprehensive([], [], false, [
+        'Rent-a-car / ticari kullanım: %80',
+      ])
       const commercial = result.addressedByPolicy.find((a) => a.nameEn === 'Commercial Use')
       expect(commercial).toBeDefined()
       expect(commercial!.answer).toBe('Rent-a-car / ticari kullanım: %80')

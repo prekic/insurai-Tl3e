@@ -28,10 +28,7 @@ describe('SpecialProvisionsPanel', () => {
 
   it('renders nothing when isUnverified is true even with provisions present', () => {
     const { container } = render(
-      <SpecialProvisionsPanel
-        provisions={['Anlaşmalı olmayan servis: %35']}
-        isUnverified={true}
-      />
+      <SpecialProvisionsPanel provisions={['Anlaşmalı olmayan servis: %35']} isUnverified={true} />
     )
     expect(container.firstChild).toBeNull()
   })
@@ -51,16 +48,13 @@ describe('SpecialProvisionsPanel', () => {
     // Header label
     expect(screen.getByText('Special Provisions')).toBeInTheDocument()
     // Collapsed-state hint message
-    expect(screen.getByText(/3 scenarios/i)).toBeInTheDocument()
+    expect(screen.getByText(/3 named-deductible scenarios/i)).toBeInTheDocument()
   })
 
   it('expands on click and renders each provision split into label + percentage', () => {
     render(
       <SpecialProvisionsPanel
-        provisions={[
-          'Anlaşmalı olmayan servis: %35',
-          'Pert araç muafiyeti: %20',
-        ]}
+        provisions={['Anlaşmalı olmayan servis: %35', 'Pert araç muafiyeti: %20']}
       />
     )
     const toggleButton = screen.getByRole('button')
@@ -82,11 +76,7 @@ describe('SpecialProvisionsPanel', () => {
   })
 
   it('toggles expanded state on each click', () => {
-    render(
-      <SpecialProvisionsPanel
-        provisions={['Anlaşmalı olmayan servis: %35']}
-      />
-    )
+    render(<SpecialProvisionsPanel provisions={['Anlaşmalı olmayan servis: %35']} />)
     const toggleButton = screen.getByRole('button')
 
     // Initially collapsed — count text visible, list not

@@ -26,14 +26,20 @@ describe('updateProcessingLog client retry on 404', () => {
     vi.useRealTimers()
   })
 
-  it('retries once on 404 then succeeds on second attempt', async () => {
+  it('retries on 404 then succeeds on subsequent attempt', async () => {
     // First call: 404 (CREATE hasn't committed yet)
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 404,
       statusText: 'Not Found',
     })
-    // Second call: 200 (CREATE has committed)
+    // Second call: 404
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+    })
+    // Third call: 200 (CREATE has committed)
     mockFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -42,23 +48,23 @@ describe('updateProcessingLog client retry on 404', () => {
 
     const promise = updateProcessingLog('doc-1', { status: 'completed' } as never)
 
-    // Advance past the 500ms retry delay
-    await vi.advanceTimersByTimeAsync(600)
+    // Exponential backoff: 500ms + 1000ms = 1500ms total before 3rd attempt
+    await vi.advanceTimersByTimeAsync(2000)
 
     const result = await promise
     expect(result).toEqual({ document_id: 'doc-1', status: 'completed' })
-    expect(mockFetch).toHaveBeenCalledTimes(2)
+    expect(mockFetch).toHaveBeenCalledTimes(3)
 
-    // Verify both calls used PATCH method to the correct URL
-    const [call1, call2] = mockFetch.mock.calls
-    expect(call1[0]).toContain('/api/ai/processing-log/doc-1')
-    expect(call1[1].method).toBe('PATCH')
-    expect(call2[0]).toContain('/api/ai/processing-log/doc-1')
-    expect(call2[1].method).toBe('PATCH')
+    // Verify calls used PATCH method to the correct URL
+    const calls = mockFetch.mock.calls
+    for (const call of calls) {
+      expect(call[0]).toContain('/api/ai/processing-log/doc-1')
+      expect(call[1].method).toBe('PATCH')
+    }
   })
 
   it('returns null after retry still fails with 404', async () => {
-    // Both attempts return 404
+    // All attempts return 404
     mockFetch.mockResolvedValue({
       ok: false,
       status: 404,
@@ -66,12 +72,13 @@ describe('updateProcessingLog client retry on 404', () => {
     })
 
     const promise = updateProcessingLog('nonexistent', { status: 'completed' } as never)
-    await vi.advanceTimersByTimeAsync(600)
+    // Exponential backoff: 500ms + 1000ms + 2000ms = 3500ms total
+    await vi.advanceTimersByTimeAsync(4000)
 
     const result = await promise
     expect(result).toBeNull()
-    // 1 initial attempt + 1 retry = 2 calls
-    expect(mockFetch).toHaveBeenCalledTimes(2)
+    // 1 initial attempt + 3 retries = 4 calls
+    expect(mockFetch).toHaveBeenCalledTimes(4)
   })
 
   it('does not retry on non-404 errors (e.g., 500)', async () => {

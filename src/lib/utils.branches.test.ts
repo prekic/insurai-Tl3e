@@ -13,14 +13,14 @@ describe('formatCurrencyCompact', () => {
 
   it('formats millions natively', () => {
     const formatted = formatCurrencyCompact(25_800_000, 'TRY')
-    // 25,8 Mn ₺ or ₺25.8M
-    expect(formatted.replace(/\s+/g, ' ')).toMatch(/25,8 Mn ₺|₺25\.8M|₺26 M/)
+    // ₺25,8 Mn in tr-TR locale
+    expect(formatted.replace(/\s+/g, ' ')).toMatch(/₺25,8 Mn|₺25\.8M|₺26 M/)
   })
 
   it('formats thousands natively', () => {
     const formatted = formatCurrencyCompact(150_000, 'TRY')
-    // 150 B ₺ or ₺150K
-    expect(formatted.replace(/\s+/g, ' ')).toMatch(/150 B ₺|₺150K|₺150 Bin/)
+    // ₺150 B in tr-TR locale
+    expect(formatted.replace(/\s+/g, ' ')).toMatch(/₺150 B|₺150K|₺150 Bin/)
   })
 
   it('handles fractional small amounts', () => {

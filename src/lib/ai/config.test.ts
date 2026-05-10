@@ -25,6 +25,19 @@ vi.mock('@/lib/env', () => ({
 }))
 
 // ---------------------------------------------------------------------------
+// Mock @/lib/config — extractViaProxy now dynamically imports getAIConfig
+// to determine the client fetch timeout. If we don't mock this, it will try
+// to bootstrap the full ConfigurationService with its Supabase dependency.
+// ---------------------------------------------------------------------------
+const mockGetAIConfig = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ clientFetchTimeoutMs: 135_000 })
+)
+
+vi.mock('@/lib/config', () => ({
+  getAIConfig: mockGetAIConfig,
+}))
+
+// ---------------------------------------------------------------------------
 // Mock dynamic imports for OpenAI and Anthropic SDKs
 // ---------------------------------------------------------------------------
 const mockOpenAIInstance = { chat: { completions: { create: vi.fn() } } }
@@ -600,6 +613,7 @@ describe('AI Config (config.ts)', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
+        headers: { get: () => '' },
         json: async () => serverResponse,
       })
 
@@ -618,7 +632,10 @@ describe('AI Config (config.ts)', () => {
         'http://localhost:4001/api/ai/extract',
         expect.objectContaining({
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+            Accept: 'text/event-stream',
+          }),
           body: JSON.stringify({ documentText: 'document text', systemPrompt: 'system prompt' }),
         })
       )
@@ -630,6 +647,7 @@ describe('AI Config (config.ts)', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
+        headers: { get: () => '' },
         json: async () => ({
           success: true,
           data: { policyNumber: 'POL-002' },
@@ -652,6 +670,7 @@ describe('AI Config (config.ts)', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
+        headers: { get: () => '' },
         json: async () => ({
           success: true,
           data: { policyNumber: 'POL-003' },
@@ -673,6 +692,7 @@ describe('AI Config (config.ts)', () => {
         ok: false,
         status: 500,
         statusText: 'Internal Server Error',
+        headers: { get: () => '' },
         json: async () => ({
           error: 'Extraction failed',
           details: 'Provider returned invalid JSON',
@@ -692,6 +712,7 @@ describe('AI Config (config.ts)', () => {
         ok: false,
         status: 429,
         statusText: 'Too Many Requests',
+        headers: { get: () => '' },
         json: async () => ({ error: 'Rate limit exceeded' }),
       })
 
@@ -707,6 +728,7 @@ describe('AI Config (config.ts)', () => {
         ok: false,
         status: 400,
         statusText: 'Bad Request',
+        headers: { get: () => '' },
         json: async () => ({}),
       })
 
@@ -722,6 +744,7 @@ describe('AI Config (config.ts)', () => {
         ok: false,
         status: 500,
         statusText: 'Internal Server Error',
+        headers: { get: () => '' },
         json: async () => ({ details: 'some details' }),
       })
 
@@ -737,6 +760,7 @@ describe('AI Config (config.ts)', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
+        headers: { get: () => '' },
         json: async () => ({ success: true }),
       })
 
@@ -1025,6 +1049,7 @@ describe('AI Config (config.ts)', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
+        headers: { get: () => '' },
         json: async () => ({
           success: true,
           data: 'raw string data',
@@ -1045,6 +1070,7 @@ describe('AI Config (config.ts)', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
+        headers: { get: () => '' },
         json: async () => ({
           success: true,
           data: null,
