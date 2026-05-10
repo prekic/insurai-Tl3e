@@ -35,7 +35,7 @@ if (typeof File !== 'undefined' && !File.prototype.arrayBuffer) {
 describe('multi-provider integration tests (requires PDF fixtures)', () => {
   test('multi-provider extraction', async () => {
     const filename = process.env.PDF_FILENAME || 'KASKO POLİÇESİ.pdf'
-    const filePath = path.join(process.cwd(), 'upload/real-kasko-pdf', filename)
+    const filePath = path.join(process.cwd(), 'policies', filename)
     console.log(`Extracting from ${filePath}`)
 
     const buf = await fs.readFile(filePath)

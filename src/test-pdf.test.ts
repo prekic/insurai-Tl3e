@@ -40,7 +40,7 @@ describe('pdf integration tests (requires PDF fixtures)', () => {
     // NOTE: You must provide a valid PDF file path here
     // If the file doesn't exist, the test will log a message and skip
     const filename = process.env.PDF_FILENAME || 'KASKO POLİÇESİ.pdf'
-    const filePath = path.join(process.cwd(), 'upload/real-kasko-pdf', filename)
+    const filePath = path.join(process.cwd(), 'policies', filename)
     console.log(`Extracting from ${filePath}`)
 
     const buf = await fs.readFile(filePath)

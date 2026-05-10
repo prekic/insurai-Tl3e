@@ -1,0 +1,125 @@
+{
+  "success": true,
+  "policy": {
+    "id": "ed49ddf0-d91c-4b8b-937b-1382e70eebd6",
+    "policyNumber": "SGK-2024-003456",
+    "provider": "Mapfre Sigorta",
+    "logo": "🟡",
+    "type": "health",
+    "typeTr": "Sağlık Sigortası",
+    "coverage": 250000,
+    "premium": 8400,
+    "monthlyPremium": 700,
+    "deductible": 500,
+    "startDate": "2024-02-01",
+    "expiryDate": "2025-02-01",
+    "status": "expiring",
+    "uploadDate": "2026-05-10",
+    "fileName": "mapfre_saglik_2024.pdf",
+    "documentType": "pdf",
+    "insuredPerson": "Zeynep Arslan",
+    "location": "Istanbul",
+    "beneficiary": "Family",
+    "policyTerm": "12 months",
+    "paymentFrequency": "Monthly",
+    "insuranceLine": "health",
+    "coverages": [
+      {
+        "name": "Inpatient",
+        "nameTr": "Yatarak Tedavi",
+        "limit": 250000,
+        "deductible": 500,
+        "included": true
+      },
+      {
+        "name": "Outpatient",
+        "nameTr": "Ayakta Tedavi",
+        "limit": 25000,
+        "deductible": 100,
+        "included": true
+      },
+      {
+        "name": "Dental",
+        "nameTr": "Diş",
+        "limit": 5000,
+        "deductible": 200,
+        "included": true
+      },
+      {
+        "name": "Maternity",
+        "nameTr": "Doğum",
+        "limit": 50000,
+        "deductible": 0,
+        "included": true
+      }
+    ],
+    "exclusions": [
+      "Pre-existing conditions (first 2 years)",
+      "Cosmetic surgery",
+      "Experimental treatments"
+    ],
+    "specialConditions": [
+      "Network hospitals only for 100% coverage",
+      "30-day waiting period for new conditions"
+    ],
+    "aiConfidence": 0.5,
+    "aiInsights": [
+      "Policy expiring in 45 days - renewal recommended",
+      "Dental coverage is below average for this tier",
+      "Good maternity benefits included"
+    ],
+    "marketComparison": {
+      "averagePremium": 9000,
+      "averageCoverage": 200000,
+      "percentile": 80
+    },
+    "documentUrl": "blob:nodedata:8af1ecd1-9423-4a65-a746-5de8db842811"
+  },
+  "extractedData": {
+    "policyNumber": null,
+    "provider": null,
+    "policyType": null,
+    "insuredName": null,
+    "insuredAddress": null,
+    "startDate": null,
+    "endDate": null,
+    "premium": null,
+    "currency": null,
+    "paymentFrequency": null,
+    "coverages": [],
+    "specialConditions": [],
+    "exclusions": [],
+    "amendmentInfo": {
+      "isAmendment": false,
+      "amendmentNumber": null,
+      "amendmentDate": null,
+      "basePolicyNumber": null,
+      "amendmentReason": null,
+      "premiumDifference": null
+    },
+    "vehicleMake": null,
+    "vehicleModel": null,
+    "vehicleYear": null,
+    "vehiclePlate": null,
+    "vin": null,
+    "tcKimlik": null,
+    "vkn": null,
+    "insuredEntityType": null,
+    "vehicleUsage": null,
+    "discounts": {
+      "ncdDiscount": null,
+      "groupDiscount": null,
+      "otherDiscountPct": null,
+      "evidence": null
+    },
+    "confidence": {
+      "overall": 0,
+      "policyNumber": 0,
+      "provider": 0,
+      "dates": 0,
+      "premium": 0,
+      "coverages": 0
+    }
+  },
+  "source": "fallback"
+}
