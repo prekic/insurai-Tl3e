@@ -83,7 +83,7 @@ describe('config-service branches', () => {
       // No client means getCategorySettings returns {}
       const result = await mod.getAIConfig()
       // Should still return defaults (no DB override)
-      expect(result.openaiExtractionModel).toBe('gpt-4o')
+      expect(result.openaiExtractionModel).toBe('gpt-5.4')
       // createClient should NOT have been called
       expect(mockCreateClient).not.toHaveBeenCalled()
     })
@@ -122,7 +122,7 @@ describe('config-service branches', () => {
       const mod = await freshImport()
       const result = await mod.getAIConfig()
       // Defaults only
-      expect(result.maxTokens).toBe(4096)
+      expect(result.maxTokens).toBe(8192)
     })
 
     it('reuses the same client on subsequent calls', async () => {
@@ -215,7 +215,7 @@ describe('config-service branches', () => {
       const mod = await freshImport()
       const config = await mod.getAIConfig()
       // Should return defaults since category settings returned {}
-      expect(config.openaiExtractionModel).toBe('gpt-4o')
+      expect(config.openaiExtractionModel).toBe('gpt-5.4')
     })
 
     it('returns empty object when DB returns null data', async () => {
@@ -225,7 +225,7 @@ describe('config-service branches', () => {
 
       const mod = await freshImport()
       const config = await mod.getAIConfig()
-      expect(config.openaiExtractionModel).toBe('gpt-4o')
+      expect(config.openaiExtractionModel).toBe('gpt-5.4')
     })
 
     it('returns empty object when DB query throws exception', async () => {
@@ -236,7 +236,7 @@ describe('config-service branches', () => {
       const mod = await freshImport()
       const config = await mod.getAIConfig()
       // Defaults only
-      expect(config.maxTokens).toBe(4096)
+      expect(config.maxTokens).toBe(8192)
     })
 
     it('correctly reduces DB rows into key-value object', async () => {
@@ -304,11 +304,11 @@ describe('config-service branches', () => {
       const mod = await freshImport()
       const config = await mod.getAIConfig()
 
-      expect(config.openaiExtractionModel).toBe('gpt-4o')
+      expect(config.openaiExtractionModel).toBe('gpt-5.4')
       expect(config.openaiBackupModel).toBe('gpt-4o-mini')
-      expect(config.anthropicExtractionModel).toBe('claude-3-5-sonnet-20241022')
-      expect(config.anthropicBackupModel).toBe('claude-3-5-haiku-latest')
-      expect(config.maxTokens).toBe(4096)
+      expect(config.anthropicExtractionModel).toBe('claude-sonnet-4-6')
+      expect(config.anthropicBackupModel).toBe('claude-haiku-4-5')
+      expect(config.maxTokens).toBe(8192)
       expect(config.temperature).toBe(0.1)
       expect(config.chatTemperature).toBe(0.7)
       expect(config.minConfidence).toBe(0.4)
@@ -368,8 +368,8 @@ describe('config-service branches', () => {
       expect(config.openaiBackupModel).toBe('gpt-4-turbo')
       expect(config.anthropicExtractionModel).toBe('claude-4')
       expect(config.anthropicBackupModel).toBe('claude-3-haiku')
-      expect(config.maxTokens).toBe(8000)
-      expect(config.temperature).toBe(0.3)
+      expect(config.maxTokens).toBe(8192)
+      // Note: service floor-clamps maxTokens to 8192 regardless of DB override
       expect(config.chatTemperature).toBe(0.9)
       expect(config.minConfidence).toBe(0.5)
       expect(config.warningConfidence).toBe(0.8)

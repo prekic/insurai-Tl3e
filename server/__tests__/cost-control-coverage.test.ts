@@ -23,11 +23,7 @@ import type { Request, Response } from 'express'
 // =============================================================================
 // HOISTED MOCKS
 // =============================================================================
-const {
-  mockFrom,
-  mockRpc,
-  mockSupabaseClient,
-} = vi.hoisted(() => {
+const { mockFrom, mockRpc, mockSupabaseClient } = vi.hoisted(() => {
   const mockFrom = vi.fn()
   const mockRpc = vi.fn()
   const mockSupabaseClient = { from: mockFrom, rpc: mockRpc }
@@ -38,12 +34,18 @@ const {
 let useDbClient = true
 
 vi.mock('@supabase/supabase-js', () => ({
-  createClient: vi.fn(() => useDbClient ? mockSupabaseClient : null),
+  createClient: vi.fn(() => (useDbClient ? mockSupabaseClient : null)),
 }))
 
 vi.mock('../lib/logger.js', () => {
   const noop = vi.fn()
-  const child = { debug: noop, info: noop, warn: noop, error: noop, child: vi.fn().mockReturnThis() }
+  const child = {
+    debug: noop,
+    info: noop,
+    warn: noop,
+    error: noop,
+    child: vi.fn().mockReturnThis(),
+  }
   return { logger: child, default: child }
 })
 
@@ -104,9 +106,20 @@ describe('Cost Control Coverage (DB paths)', () => {
     })
 
     it('calculates for all known providers', () => {
-      const models = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo',
-        'claude-3-5-sonnet', 'claude-3-5-haiku', 'claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku',
-        'gemini-1.5-pro', 'gemini-1.5-flash']
+      const models = [
+        'gpt-4o',
+        'gpt-4o-mini',
+        'gpt-4-turbo',
+        'gpt-4',
+        'gpt-3.5-turbo',
+        'claude-3-5-sonnet',
+        'claude-3-5-haiku',
+        'claude-3-opus',
+        'claude-3-sonnet',
+        'claude-3-haiku',
+        'gemini-1.5-pro',
+        'gemini-1.5-flash',
+      ]
       for (const model of models) {
         const result = mod.calculateCost(model, 1000, 1000)
         expect(result.totalCost).toBeGreaterThan(0)
@@ -137,19 +150,21 @@ describe('Cost Control Coverage (DB paths)', () => {
   describe('getActiveBudgets (DB path)', () => {
     it('returns mapped budgets from DB', async () => {
       const chain = buildChain({
-        data: [{
-          id: 'b1',
-          name: 'Daily Budget',
-          budget_type: 'daily',
-          limit_amount: '100',
-          current_usage: '25',
-          alert_threshold_percent: 80,
-          action_on_exceed: 'warn',
-          applies_to: 'all',
-          is_active: true,
-          created_at: '2026-01-01',
-          updated_at: '2026-01-01',
-        }],
+        data: [
+          {
+            id: 'b1',
+            name: 'Daily Budget',
+            budget_type: 'daily',
+            limit_amount: '100',
+            current_usage: '25',
+            alert_threshold_percent: 80,
+            action_on_exceed: 'warn',
+            applies_to: 'all',
+            is_active: true,
+            created_at: '2026-01-01',
+            updated_at: '2026-01-01',
+          },
+        ],
         error: null,
       })
       mockFrom.mockReturnValue(chain)
@@ -328,7 +343,8 @@ describe('Cost Control Coverage (DB paths)', () => {
 
       const selectChain = buildChain({ data: { current_usage: 10 }, error: null })
       const updateChain = buildChain({ data: null, error: null })
-      updateChain.then = (resolve: (v: unknown) => void) => resolve({ error: { message: 'update failed' } })
+      updateChain.then = (resolve: (v: unknown) => void) =>
+        resolve({ error: { message: 'update failed' } })
 
       let callCount = 0
       mockFrom.mockImplementation(() => {
@@ -370,23 +386,26 @@ describe('Cost Control Coverage (DB paths)', () => {
   describe('getRecentAlerts (DB path)', () => {
     it('returns mapped alerts from DB', async () => {
       const chain = buildChain({ data: null, error: null })
-      chain.then = (resolve: (v: unknown) => void) => resolve({
-        data: [{
-          id: 'alert-1',
-          budget_id: 'b1',
-          budget_name: 'Daily',
-          alert_type: 'threshold_warning',
-          current_usage: '45',
-          limit_amount: '50',
-          percent_used: 90,
-          message: 'Test alert',
-          created_at: '2026-01-01T00:00:00Z',
-          acknowledged: false,
-          acknowledged_by: null,
-          acknowledged_at: null,
-        }],
-        error: null,
-      })
+      chain.then = (resolve: (v: unknown) => void) =>
+        resolve({
+          data: [
+            {
+              id: 'alert-1',
+              budget_id: 'b1',
+              budget_name: 'Daily',
+              alert_type: 'threshold_warning',
+              current_usage: '45',
+              limit_amount: '50',
+              percent_used: 90,
+              message: 'Test alert',
+              created_at: '2026-01-01T00:00:00Z',
+              acknowledged: false,
+              acknowledged_by: null,
+              acknowledged_at: null,
+            },
+          ],
+          error: null,
+        })
       mockFrom.mockReturnValue(chain)
 
       const alerts = await mod.getRecentAlerts(10)
@@ -397,7 +416,8 @@ describe('Cost Control Coverage (DB paths)', () => {
 
     it('falls back to in-memory on DB error', async () => {
       const chain = buildChain({ data: null, error: null })
-      chain.then = (resolve: (v: unknown) => void) => resolve({ data: null, error: { message: 'err' } })
+      chain.then = (resolve: (v: unknown) => void) =>
+        resolve({ data: null, error: { message: 'err' } })
       mockFrom.mockReturnValue(chain)
 
       const alerts = await mod.getRecentAlerts()
@@ -477,35 +497,36 @@ describe('Cost Control Coverage (DB paths)', () => {
   describe('getUsageStats (DB path)', () => {
     it('returns aggregated stats from DB', async () => {
       const chain = buildChain({ data: null, error: null })
-      chain.then = (resolve: (v: unknown) => void) => resolve({
-        data: [
-          {
-            provider: 'openai',
-            model: 'gpt-4o',
-            operation: 'extraction',
-            input_tokens: 1000,
-            output_tokens: 500,
-            total_tokens: 1500,
-            input_cost: '0.0025',
-            output_cost: '0.005',
-            total_cost: '0.0075',
-            timestamp: '2026-01-15T10:00:00Z',
-          },
-          {
-            provider: 'anthropic',
-            model: 'claude-3-5-haiku',
-            operation: 'chat',
-            input_tokens: 500,
-            output_tokens: 200,
-            total_tokens: 700,
-            input_cost: '0.000125',
-            output_cost: '0.00025',
-            total_cost: '0.000375',
-            timestamp: '2026-01-15T11:00:00Z',
-          },
-        ],
-        error: null,
-      })
+      chain.then = (resolve: (v: unknown) => void) =>
+        resolve({
+          data: [
+            {
+              provider: 'openai',
+              model: 'gpt-4o',
+              operation: 'extraction',
+              input_tokens: 1000,
+              output_tokens: 500,
+              total_tokens: 1500,
+              input_cost: '0.0025',
+              output_cost: '0.005',
+              total_cost: '0.0075',
+              timestamp: '2026-01-15T10:00:00Z',
+            },
+            {
+              provider: 'anthropic',
+              model: 'claude-3-5-haiku',
+              operation: 'chat',
+              input_tokens: 500,
+              output_tokens: 200,
+              total_tokens: 700,
+              input_cost: '0.000125',
+              output_cost: '0.00025',
+              total_cost: '0.000375',
+              timestamp: '2026-01-15T11:00:00Z',
+            },
+          ],
+          error: null,
+        })
       mockFrom.mockReturnValue(chain)
 
       const stats = await mod.getUsageStats('2026-01-01', '2026-02-01')
@@ -520,7 +541,8 @@ describe('Cost Control Coverage (DB paths)', () => {
 
     it('falls back to in-memory on DB error', async () => {
       const chain = buildChain({ data: null, error: null })
-      chain.then = (resolve: (v: unknown) => void) => resolve({ data: null, error: { message: 'err' } })
+      chain.then = (resolve: (v: unknown) => void) =>
+        resolve({ data: null, error: { message: 'err' } })
       mockFrom.mockReturnValue(chain)
 
       const stats = await mod.getUsageStats('2026-01-01', '2026-02-01')
@@ -529,21 +551,24 @@ describe('Cost Control Coverage (DB paths)', () => {
 
     it('handles null cost fields', async () => {
       const chain = buildChain({ data: null, error: null })
-      chain.then = (resolve: (v: unknown) => void) => resolve({
-        data: [{
-          provider: 'openai',
-          model: 'gpt-4o',
-          operation: 'test',
-          input_tokens: 0,
-          output_tokens: 0,
-          total_tokens: 0,
-          input_cost: null,
-          output_cost: null,
-          total_cost: null,
-          timestamp: '2026-01-15T10:00:00Z',
-        }],
-        error: null,
-      })
+      chain.then = (resolve: (v: unknown) => void) =>
+        resolve({
+          data: [
+            {
+              provider: 'openai',
+              model: 'gpt-4o',
+              operation: 'test',
+              input_tokens: 0,
+              output_tokens: 0,
+              total_tokens: 0,
+              input_cost: null,
+              output_cost: null,
+              total_cost: null,
+              timestamp: '2026-01-15T10:00:00Z',
+            },
+          ],
+          error: null,
+        })
       mockFrom.mockReturnValue(chain)
 
       const stats = await mod.getUsageStats('2026-01-01', '2026-02-01')
@@ -559,19 +584,21 @@ describe('Cost Control Coverage (DB paths)', () => {
     it('skips budgets that do not match userId or provider', async () => {
       // Create a budget that applies to specific user
       const chain = buildChain({
-        data: [{
-          id: 'specific-b1',
-          name: 'User Budget',
-          budget_type: 'daily',
-          limit_amount: '10',
-          current_usage: '0',
-          alert_threshold_percent: 80,
-          action_on_exceed: 'block',
-          applies_to: 'user-other',
-          is_active: true,
-          created_at: '2026-01-01',
-          updated_at: '2026-01-01',
-        }],
+        data: [
+          {
+            id: 'specific-b1',
+            name: 'User Budget',
+            budget_type: 'daily',
+            limit_amount: '10',
+            current_usage: '0',
+            alert_threshold_percent: 80,
+            action_on_exceed: 'block',
+            applies_to: 'user-other',
+            is_active: true,
+            created_at: '2026-01-01',
+            updated_at: '2026-01-01',
+          },
+        ],
         error: null,
       })
       mockFrom.mockReturnValue(chain)
@@ -583,19 +610,21 @@ describe('Cost Control Coverage (DB paths)', () => {
 
     it('applies budget matching userId', async () => {
       const chain = buildChain({
-        data: [{
-          id: 'user-budget',
-          name: 'User Budget',
-          budget_type: 'daily',
-          limit_amount: '1',
-          current_usage: '0',
-          alert_threshold_percent: 80,
-          action_on_exceed: 'block',
-          applies_to: 'user-me',
-          is_active: true,
-          created_at: '2026-01-01',
-          updated_at: '2026-01-01',
-        }],
+        data: [
+          {
+            id: 'user-budget',
+            name: 'User Budget',
+            budget_type: 'daily',
+            limit_amount: '1',
+            current_usage: '0',
+            alert_threshold_percent: 80,
+            action_on_exceed: 'block',
+            applies_to: 'user-me',
+            is_active: true,
+            created_at: '2026-01-01',
+            updated_at: '2026-01-01',
+          },
+        ],
         error: null,
       })
       mockFrom.mockReturnValue(chain)
@@ -607,19 +636,21 @@ describe('Cost Control Coverage (DB paths)', () => {
 
     it('applies budget matching provider', async () => {
       const chain = buildChain({
-        data: [{
-          id: 'provider-budget',
-          name: 'Provider Budget',
-          budget_type: 'daily',
-          limit_amount: '1',
-          current_usage: '0',
-          alert_threshold_percent: 80,
-          action_on_exceed: 'block',
-          applies_to: 'openai',
-          is_active: true,
-          created_at: '2026-01-01',
-          updated_at: '2026-01-01',
-        }],
+        data: [
+          {
+            id: 'provider-budget',
+            name: 'Provider Budget',
+            budget_type: 'daily',
+            limit_amount: '1',
+            current_usage: '0',
+            alert_threshold_percent: 80,
+            action_on_exceed: 'block',
+            applies_to: 'openai',
+            is_active: true,
+            created_at: '2026-01-01',
+            updated_at: '2026-01-01',
+          },
+        ],
         error: null,
       })
       mockFrom.mockReturnValue(chain)
@@ -630,19 +661,21 @@ describe('Cost Control Coverage (DB paths)', () => {
 
     it('triggers threshold warning when at alert threshold', async () => {
       const chain = buildChain({
-        data: [{
-          id: 'threshold-budget',
-          name: 'Threshold Budget',
-          budget_type: 'daily',
-          limit_amount: '100',
-          current_usage: '85', // 85% > 80% threshold
-          alert_threshold_percent: 80,
-          action_on_exceed: 'warn',
-          applies_to: 'all',
-          is_active: true,
-          created_at: '2026-01-01',
-          updated_at: '2026-01-01',
-        }],
+        data: [
+          {
+            id: 'threshold-budget',
+            name: 'Threshold Budget',
+            budget_type: 'daily',
+            limit_amount: '100',
+            current_usage: '85', // 85% > 80% threshold
+            alert_threshold_percent: 80,
+            action_on_exceed: 'warn',
+            applies_to: 'all',
+            is_active: true,
+            created_at: '2026-01-01',
+            updated_at: '2026-01-01',
+          },
+        ],
         error: null,
       })
       mockFrom.mockReturnValue(chain)
@@ -654,19 +687,21 @@ describe('Cost Control Coverage (DB paths)', () => {
 
     it('generates notify alert on exceed without blocking', async () => {
       const chain = buildChain({
-        data: [{
-          id: 'notify-budget',
-          name: 'Notify Budget',
-          budget_type: 'daily',
-          limit_amount: '10',
-          current_usage: '0',
-          alert_threshold_percent: 80,
-          action_on_exceed: 'notify',
-          applies_to: 'all',
-          is_active: true,
-          created_at: '2026-01-01',
-          updated_at: '2026-01-01',
-        }],
+        data: [
+          {
+            id: 'notify-budget',
+            name: 'Notify Budget',
+            budget_type: 'daily',
+            limit_amount: '10',
+            current_usage: '0',
+            alert_threshold_percent: 80,
+            action_on_exceed: 'notify',
+            applies_to: 'all',
+            is_active: true,
+            created_at: '2026-01-01',
+            updated_at: '2026-01-01',
+          },
+        ],
         error: null,
       })
       mockFrom.mockReturnValue(chain)
@@ -678,19 +713,21 @@ describe('Cost Control Coverage (DB paths)', () => {
 
     it('generates warn alert on exceed without blocking', async () => {
       const chain = buildChain({
-        data: [{
-          id: 'warn-budget',
-          name: 'Warn Budget',
-          budget_type: 'daily',
-          limit_amount: '10',
-          current_usage: '0',
-          alert_threshold_percent: 80,
-          action_on_exceed: 'warn',
-          applies_to: 'all',
-          is_active: true,
-          created_at: '2026-01-01',
-          updated_at: '2026-01-01',
-        }],
+        data: [
+          {
+            id: 'warn-budget',
+            name: 'Warn Budget',
+            budget_type: 'daily',
+            limit_amount: '10',
+            current_usage: '0',
+            alert_threshold_percent: 80,
+            action_on_exceed: 'warn',
+            applies_to: 'all',
+            is_active: true,
+            created_at: '2026-01-01',
+            updated_at: '2026-01-01',
+          },
+        ],
         error: null,
       })
       mockFrom.mockReturnValue(chain)
@@ -713,14 +750,26 @@ describe('Cost Control Coverage (DB paths)', () => {
       } as unknown as Request
     }
 
-    function makeRes(): Response & { _status: number; _json: unknown; _headers: Record<string, string> } {
+    function makeRes(): Response & {
+      _status: number
+      _json: unknown
+      _headers: Record<string, string>
+    } {
       const res: any = {
         _status: 200,
         _json: null,
         _headers: {},
-        status(code: number) { res._status = code; return res },
-        json(data: unknown) { res._json = data; return res },
-        setHeader(key: string, value: string) { res._headers[key] = value },
+        status(code: number) {
+          res._status = code
+          return res
+        },
+        json(data: unknown) {
+          res._json = data
+          return res
+        },
+        setHeader(key: string, value: string) {
+          res._headers[key] = value
+        },
       }
       return res
     }
@@ -778,19 +827,21 @@ describe('Cost Control Coverage (DB paths)', () => {
 
     it('blocks request when budget exceeded', async () => {
       const chain = buildChain({
-        data: [{
-          id: 'blocker',
-          name: 'Blocking Budget',
-          budget_type: 'daily',
-          limit_amount: '0.001',
-          current_usage: '0',
-          alert_threshold_percent: 50,
-          action_on_exceed: 'block',
-          applies_to: 'all',
-          is_active: true,
-          created_at: '2026-01-01',
-          updated_at: '2026-01-01',
-        }],
+        data: [
+          {
+            id: 'blocker',
+            name: 'Blocking Budget',
+            budget_type: 'daily',
+            limit_amount: '0.001',
+            current_usage: '0',
+            alert_threshold_percent: 50,
+            action_on_exceed: 'block',
+            applies_to: 'all',
+            is_active: true,
+            created_at: '2026-01-01',
+            updated_at: '2026-01-01',
+          },
+        ],
         error: null,
       })
       mockFrom.mockReturnValue(chain)
@@ -812,19 +863,21 @@ describe('Cost Control Coverage (DB paths)', () => {
 
     it('sets warning headers when budget warnings exist', async () => {
       const chain = buildChain({
-        data: [{
-          id: 'warner',
-          name: 'Warning Budget',
-          budget_type: 'daily',
-          limit_amount: '100',
-          current_usage: '85', // 85% > 80% threshold
-          alert_threshold_percent: 80,
-          action_on_exceed: 'warn',
-          applies_to: 'all',
-          is_active: true,
-          created_at: '2026-01-01',
-          updated_at: '2026-01-01',
-        }],
+        data: [
+          {
+            id: 'warner',
+            name: 'Warning Budget',
+            budget_type: 'daily',
+            limit_amount: '100',
+            current_usage: '85', // 85% > 80% threshold
+            alert_threshold_percent: 80,
+            action_on_exceed: 'warn',
+            applies_to: 'all',
+            is_active: true,
+            created_at: '2026-01-01',
+            updated_at: '2026-01-01',
+          },
+        ],
         error: null,
       })
       mockFrom.mockReturnValue(chain)
@@ -870,13 +923,19 @@ describe('Cost Control Coverage (DB paths)', () => {
     })
 
     it('uses prompt field if message not present', () => {
-      const req = { body: { prompt: 'Analyze this' }, path: '/api/ai/extract' } as unknown as Request
+      const req = {
+        body: { prompt: 'Analyze this' },
+        path: '/api/ai/extract',
+      } as unknown as Request
       const result = mod.estimateTokensFromRequest(req)
       expect(result.inputTokens).toBe(Math.ceil('Analyze this'.length / 4))
     })
 
     it('uses document field if message/prompt not present', () => {
-      const req = { body: { document: 'Long document text here' }, path: '/api/ai/extract' } as unknown as Request
+      const req = {
+        body: { document: 'Long document text here' },
+        path: '/api/ai/extract',
+      } as unknown as Request
       const result = mod.estimateTokensFromRequest(req)
       expect(result.inputTokens).toBe(Math.ceil('Long document text here'.length / 4))
     })
@@ -895,10 +954,7 @@ describe('Cost Control Coverage (DB paths)', () => {
       const req = {
         body: {
           message: 'test',
-          conversationHistory: [
-            { content: 'Hello' },
-            { content: 'World' },
-          ],
+          conversationHistory: [{ content: 'Hello' }, { content: 'World' }],
         },
         path: '/api/ai/chat',
       } as unknown as Request
@@ -921,7 +977,7 @@ describe('Cost Control Coverage (DB paths)', () => {
     it('selects anthropic model for anthropic path', () => {
       const req = { body: {}, path: '/api/ai/extract/anthropic' } as unknown as Request
       const result = mod.estimateTokensFromRequest(req)
-      expect(result.model).toBe('claude-3-5-haiku')
+      expect(result.model).toBe('claude-haiku-4-5')
     })
 
     it('uses provided model when available', () => {

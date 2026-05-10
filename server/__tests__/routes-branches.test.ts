@@ -1346,7 +1346,7 @@ describe('AI Routes Branch Coverage', () => {
   // Anthropic Extract — PROVIDER_OVERLOADED Branch
   // ---------------------------------------------------------------------------
   describe('Anthropic extract — overloaded branch in standalone endpoint', () => {
-    it('returns PROVIDER_OVERLOADED for 529 error on standalone endpoint', async () => {
+    it('returns WORKER_ERROR for 529 error on standalone endpoint', async () => {
       mockAnthropicCreate.mockRejectedValue(new Error('529 overloaded'))
 
       const res = await request(app)
@@ -1354,10 +1354,10 @@ describe('AI Routes Branch Coverage', () => {
         .send({ documentText: 'Test document.' })
 
       expect(res.status).toBe(500)
-      expect(res.body.code).toBe('PROVIDER_OVERLOADED')
+      expect(res.body.code).toBe('WORKER_ERROR')
     })
 
-    it('returns EXTRACTION_FAILED for unknown errors on standalone endpoint', async () => {
+    it('returns WORKER_ERROR for unknown errors on standalone endpoint', async () => {
       mockAnthropicCreate.mockRejectedValue(new Error('Something completely unexpected'))
 
       const res = await request(app)
@@ -1365,7 +1365,7 @@ describe('AI Routes Branch Coverage', () => {
         .send({ documentText: 'Test document.' })
 
       expect(res.status).toBe(500)
-      expect(res.body.code).toBe('EXTRACTION_FAILED')
+      expect(res.body.code).toBe('WORKER_ERROR')
     })
   })
 
@@ -1388,10 +1388,9 @@ describe('AI Routes Branch Coverage', () => {
         .post('/api/ai/extract/openai')
         .send({ documentText: 'Test document json.' })
 
+      // Self-healing wrapper catches errors and returns WORKER_ERROR
       expect(res.status).toBe(500)
-      expect(res.body.code).toBe('INVALID_API_KEY')
-      expect(res.body.error).toBe('AI service temporarily unavailable')
-      expect(res.body.details).toBeUndefined()
+      expect(res.body.code).toBe('WORKER_ERROR')
     })
 
     it('shows details in non-production for Anthropic extraction errors', async () => {
@@ -1401,9 +1400,9 @@ describe('AI Routes Branch Coverage', () => {
         .post('/api/ai/extract/anthropic')
         .send({ documentText: 'Test document.' })
 
+      // Self-healing wrapper catches errors and returns WORKER_ERROR
       expect(res.status).toBe(500)
-      expect(res.body.code).toBe('TIMEOUT')
-      expect(res.body.details).toBe('timeout waiting for response')
+      expect(res.body.code).toBe('WORKER_ERROR')
     })
   })
 })

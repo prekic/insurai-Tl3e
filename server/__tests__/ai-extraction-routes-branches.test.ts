@@ -422,7 +422,13 @@ describe('AI Routes — Error Classifier & Google Vision Branches', () => {
     })
 
     it('production recommendation sanitized when no providers configured', async () => {
-      const app = await createApp({ NODE_ENV: 'production' })
+      const app = await createApp({
+        NODE_ENV: 'production',
+        OPENAI_API_KEY: '',
+        ANTHROPIC_API_KEY: '',
+        GOOGLE_CLOUD_API_KEY: '',
+        GOOGLE_APPLICATION_CREDENTIALS: '',
+      })
       // No AI keys set
 
       const res = await request(app).get('/api/ai/diagnose')

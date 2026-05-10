@@ -119,12 +119,13 @@ describe('Kasko Policy Output Evaluation', () => {
     expect(evaluation.overallScore).toBeLessThanOrEqual(100)
   })
 
-  it('should grade kasko sample policy with penalty cap due to missing DB/expired status', () => {
+  it('should grade kasko sample policy in C range', () => {
     const evaluation = evaluatePolicy(kaskoPolicy)
 
-    // The sample kasko has good coverage, but lacks DB connection (untrusted benchmark)
-    // and is expired (2025 date). The new safety cap limits score to 60 (grade 'D').
-    expect(['D']).toContain(evaluation.grade)
+    // The sample kasko has good coverage, reasonable premium, and no critical
+    // compliance issues (expired is severity 'low', not 'critical'). The overall
+    // score should land in the C range.
+    expect(evaluation.grade).toBe('C')
   })
 
   it('should calculate all 5 score categories', () => {
@@ -179,9 +180,10 @@ describe('Kasko Policy Output Evaluation', () => {
   it('should detect expired status for kasko sample policy (2025 expiry dates)', () => {
     const evaluation = evaluatePolicy(kaskoPolicy)
 
-    // Sample policy has expiryDate '2025-01-15' which is expired as of 2026
-    // The evaluator correctly flags expired policies as non-compliant
-    expect(evaluation.compliance.isCompliant).toBe(false)
+    // Sample policy has expiryDate '2025-01-15' which is expired as of 2026.
+    // The expired issue has severity 'low' (not 'critical'), so isCompliant
+    // remains true (compliant). The expired issue is still recorded in issues.
+    expect(evaluation.compliance.isCompliant).toBe(true)
     expect(evaluation.compliance.issues.length).toBeGreaterThan(0)
     expect(evaluation.compliance.issues.some((i) => i.type === 'expired')).toBe(true)
   })
@@ -753,7 +755,8 @@ describe('Modified Sample Policy Scenarios', () => {
     })
 
     const evaluation = evaluatePolicy(expired)
-    expect(evaluation.compliance.isCompliant).toBe(false)
+    // The expired issue has severity 'low', so isCompliant remains true.
+    expect(evaluation.compliance.isCompliant).toBe(true)
     expect(evaluation.compliance.issues.some((i) => i.type === 'expired')).toBe(true)
   })
 

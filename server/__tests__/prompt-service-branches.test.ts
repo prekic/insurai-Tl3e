@@ -1266,7 +1266,7 @@ describe('Prompt Service — Branch Coverage', () => {
       expect(p!.version).toBe(1)
       expect(p!.variables).toContain('document_text')
       expect(p!.defaultProvider).toBe('openai')
-      expect(p!.defaultModel).toBe('gpt-4o')
+      expect(p!.defaultModel).toBe('gpt-5.4')
       expect(p!.parameters).toEqual({ temperature: 0.1, maxTokens: 4096 })
       expect(p!.systemPrompt).toContain('insurance document analyst')
       expect(p!.userPromptTemplate).toContain('{{document_text}}')

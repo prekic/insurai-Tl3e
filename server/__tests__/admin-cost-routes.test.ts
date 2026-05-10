@@ -154,7 +154,7 @@ const MOCK_ALERT = {
 }
 
 const MOCK_USAGE_STATS = {
-  totalCost: 25.50,
+  totalCost: 25.5,
   totalRequests: 150,
   byProvider: {
     openai: { cost: 15.0, requests: 100 },
@@ -195,11 +195,7 @@ describe('Admin Cost Routes', () => {
 
       await request(app).get('/budgets')
 
-      expect(mockLogAdminAction).toHaveBeenCalledWith(
-        expect.anything(),
-        'view',
-        'budgets'
-      )
+      expect(mockLogAdminAction).toHaveBeenCalledWith(expect.anything(), 'view', 'budgets')
     })
 
     it('returns 500 when service throws', async () => {
@@ -248,13 +244,11 @@ describe('Admin Cost Routes', () => {
       const newBudget = { ...MOCK_BUDGET, id: 'budget-new' }
       mockUpsertBudget.mockResolvedValue(newBudget)
 
-      const res = await request(app)
-        .post('/budgets')
-        .send({
-          name: 'Daily Total Budget',
-          budgetType: 'daily',
-          limitAmount: '50',
-        })
+      const res = await request(app).post('/budgets').send({
+        name: 'Daily Total Budget',
+        budgetType: 'daily',
+        limitAmount: '50',
+      })
 
       expect(res.status).toBe(200)
       expect(res.body.success).toBe(true)
@@ -272,16 +266,14 @@ describe('Admin Cost Routes', () => {
     it('passes custom optional fields', async () => {
       mockUpsertBudget.mockResolvedValue(MOCK_BUDGET)
 
-      await request(app)
-        .post('/budgets')
-        .send({
-          name: 'Custom Budget',
-          budgetType: 'monthly',
-          limitAmount: '500',
-          alertThresholdPercent: 90,
-          actionOnExceed: 'block',
-          appliesTo: 'openai',
-        })
+      await request(app).post('/budgets').send({
+        name: 'Custom Budget',
+        budgetType: 'monthly',
+        limitAmount: '500',
+        alertThresholdPercent: 90,
+        actionOnExceed: 'block',
+        appliesTo: 'openai',
+      })
 
       expect(mockUpsertBudget).toHaveBeenCalledWith({
         name: 'Custom Budget',
@@ -305,17 +297,13 @@ describe('Admin Cost Routes', () => {
     })
 
     it('returns 400 when budgetType is missing', async () => {
-      const res = await request(app)
-        .post('/budgets')
-        .send({ name: 'Budget', limitAmount: '50' })
+      const res = await request(app).post('/budgets').send({ name: 'Budget', limitAmount: '50' })
 
       expect(res.status).toBe(400)
     })
 
     it('returns 400 when limitAmount is missing', async () => {
-      const res = await request(app)
-        .post('/budgets')
-        .send({ name: 'Budget', budgetType: 'daily' })
+      const res = await request(app).post('/budgets').send({ name: 'Budget', budgetType: 'daily' })
 
       expect(res.status).toBe(400)
     })
@@ -324,13 +312,11 @@ describe('Admin Cost Routes', () => {
       const newBudget = { ...MOCK_BUDGET, id: 'budget-new' }
       mockUpsertBudget.mockResolvedValue(newBudget)
 
-      await request(app)
-        .post('/budgets')
-        .send({
-          name: 'New Budget',
-          budgetType: 'daily',
-          limitAmount: '100',
-        })
+      await request(app).post('/budgets').send({
+        name: 'New Budget',
+        budgetType: 'daily',
+        limitAmount: '100',
+      })
 
       expect(mockLogAdminAction).toHaveBeenCalledWith(
         expect.anything(),
@@ -345,13 +331,11 @@ describe('Admin Cost Routes', () => {
     it('returns 500 on error', async () => {
       mockUpsertBudget.mockRejectedValue(new Error('Insert error'))
 
-      const res = await request(app)
-        .post('/budgets')
-        .send({
-          name: 'Budget',
-          budgetType: 'daily',
-          limitAmount: '50',
-        })
+      const res = await request(app).post('/budgets').send({
+        name: 'Budget',
+        budgetType: 'daily',
+        limitAmount: '50',
+      })
 
       expect(res.status).toBe(500)
     })
@@ -363,9 +347,7 @@ describe('Admin Cost Routes', () => {
       const updatedBudget = { ...MOCK_BUDGET, limitAmount: 100 }
       mockUpsertBudget.mockResolvedValue(updatedBudget)
 
-      const res = await request(app)
-        .put('/budgets/daily-total')
-        .send({ limitAmount: 100 })
+      const res = await request(app).put('/budgets/daily-total').send({ limitAmount: 100 })
 
       expect(res.status).toBe(200)
       expect(res.body.success).toBe(true)
@@ -375,9 +357,7 @@ describe('Admin Cost Routes', () => {
       mockGetBudget.mockResolvedValue(MOCK_BUDGET)
       mockUpsertBudget.mockResolvedValue(MOCK_BUDGET)
 
-      await request(app)
-        .put('/budgets/daily-total')
-        .send({ limitAmount: 100 })
+      await request(app).put('/budgets/daily-total').send({ limitAmount: 100 })
 
       expect(mockUpsertBudget).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -391,9 +371,7 @@ describe('Admin Cost Routes', () => {
     it('returns 404 when budget not found', async () => {
       mockGetBudget.mockResolvedValue(null)
 
-      const res = await request(app)
-        .put('/budgets/nonexistent')
-        .send({ limitAmount: 100 })
+      const res = await request(app).put('/budgets/nonexistent').send({ limitAmount: 100 })
 
       expect(res.status).toBe(404)
       expect(res.body.success).toBe(false)
@@ -403,9 +381,7 @@ describe('Admin Cost Routes', () => {
       mockGetBudget.mockResolvedValue(MOCK_BUDGET)
       mockUpsertBudget.mockResolvedValue(MOCK_BUDGET)
 
-      await request(app)
-        .put('/budgets/daily-total')
-        .send({ limitAmount: 100 })
+      await request(app).put('/budgets/daily-total').send({ limitAmount: 100 })
 
       expect(mockLogAdminAction).toHaveBeenCalledWith(
         expect.anything(),
@@ -421,9 +397,7 @@ describe('Admin Cost Routes', () => {
       mockGetBudget.mockResolvedValue(MOCK_BUDGET)
       mockUpsertBudget.mockRejectedValue(new Error('Update error'))
 
-      const res = await request(app)
-        .put('/budgets/daily-total')
-        .send({ limitAmount: 100 })
+      const res = await request(app).put('/budgets/daily-total').send({ limitAmount: 100 })
 
       expect(res.status).toBe(500)
     })
@@ -447,9 +421,7 @@ describe('Admin Cost Routes', () => {
 
       await request(app).delete('/budgets/daily-total')
 
-      expect(mockUpsertBudget).toHaveBeenCalledWith(
-        expect.objectContaining({ isActive: false })
-      )
+      expect(mockUpsertBudget).toHaveBeenCalledWith(expect.objectContaining({ isActive: false }))
     })
 
     it('returns 404 when budget not found', async () => {
@@ -658,7 +630,12 @@ describe('Admin Cost Routes', () => {
     })
 
     it('calculates budget status correctly - healthy', async () => {
-      const healthyBudget = { ...MOCK_BUDGET, currentUsage: 10, limitAmount: 50, alertThresholdPercent: 80 }
+      const healthyBudget = {
+        ...MOCK_BUDGET,
+        currentUsage: 10,
+        limitAmount: 50,
+        alertThresholdPercent: 80,
+      }
       mockGetActiveBudgets.mockResolvedValue([healthyBudget])
       mockGetUsageStats.mockResolvedValue(MOCK_USAGE_STATS)
       mockGetRecentAlerts.mockResolvedValue([])
@@ -670,7 +647,12 @@ describe('Admin Cost Routes', () => {
     })
 
     it('calculates budget status correctly - warning', async () => {
-      const warningBudget = { ...MOCK_BUDGET, currentUsage: 42, limitAmount: 50, alertThresholdPercent: 80 }
+      const warningBudget = {
+        ...MOCK_BUDGET,
+        currentUsage: 42,
+        limitAmount: 50,
+        alertThresholdPercent: 80,
+      }
       mockGetActiveBudgets.mockResolvedValue([warningBudget])
       mockGetUsageStats.mockResolvedValue(MOCK_USAGE_STATS)
       mockGetRecentAlerts.mockResolvedValue([])
@@ -738,8 +720,8 @@ describe('Admin Cost Routes', () => {
 
       await request(app).get('/cost/pricing')
 
-      // 12 models listed in the route
-      expect(mockGetModelPricing).toHaveBeenCalledTimes(12)
+      // 16 models listed in the route (4 current + 12 legacy)
+      expect(mockGetModelPricing).toHaveBeenCalledTimes(16)
     })
 
     it('includes pricing information for each model', async () => {

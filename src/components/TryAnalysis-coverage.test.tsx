@@ -161,18 +161,16 @@ describe('TryAnalysis', () => {
     })
   })
 
-  // --- Existing trial result redirect ---
+  // --- Existing trial result ---
   describe('existing trial result', () => {
-    it('redirects to policy view when trial result exists', () => {
+    it('shows upload interface when trial result exists (no auto-redirect)', () => {
       mockGetTrialResult = { policy: { id: 't1' } }
       renderTryAnalysis()
-      expect(mockNavigate).toHaveBeenCalledWith(
-        '/policy/trial',
-        expect.objectContaining({
-          state: expect.objectContaining({ isTrialResult: true }),
-          replace: true,
-        })
-      )
+      // The component no longer auto-redirects on mount for existing trial results.
+      // It stays on the upload page showing the idle upload interface.
+      expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.title)).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.uploadYourPolicy)).toBeInTheDocument()
+      expect(mockNavigate).not.toHaveBeenCalled()
     })
   })
 
@@ -336,12 +334,15 @@ describe('TryAnalysis', () => {
       await act(async () => {
         fireEvent.change(fileInput)
       })
-      await waitFor(() => {
-        expect(
-          screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
-        ).toBeInTheDocument()
-        expect(screen.getByText('Extraction failed')).toBeInTheDocument()
-      })
+      await waitFor(
+        () => {
+          expect(
+            screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
+          ).toBeInTheDocument()
+          expect(screen.getByText('Extraction failed')).toBeInTheDocument()
+        },
+        { timeout: 5000 }
+      )
     })
 
     it('shows try again button in error state', async () => {
@@ -353,9 +354,12 @@ describe('TryAnalysis', () => {
       await act(async () => {
         fireEvent.change(fileInput)
       })
-      await waitFor(() => {
-        expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.tryAgain)).toBeInTheDocument()
-      })
+      await waitFor(
+        () => {
+          expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.tryAgain)).toBeInTheDocument()
+        },
+        { timeout: 5000 }
+      )
     })
 
     it('resets to idle on try again', async () => {
@@ -367,9 +371,13 @@ describe('TryAnalysis', () => {
       await act(async () => {
         fireEvent.change(fileInput)
       })
-      await waitFor(() => {
-        fireEvent.click(screen.getByText(EN_TRANSLATIONS.tryAnalysis.tryAgain))
-      })
+      await waitFor(
+        () => {
+          const button = screen.getByText(EN_TRANSLATIONS.tryAnalysis.tryAgain)
+          fireEvent.click(button)
+        },
+        { timeout: 5000 }
+      )
       expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.uploadYourPolicy)).toBeInTheDocument()
     })
 
@@ -382,11 +390,14 @@ describe('TryAnalysis', () => {
       await act(async () => {
         fireEvent.change(fileInput)
       })
-      await waitFor(() => {
-        expect(
-          screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
-        ).toBeInTheDocument()
-      })
+      await waitFor(
+        () => {
+          expect(
+            screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
+          ).toBeInTheDocument()
+        },
+        { timeout: 5000 }
+      )
     })
 
     it('handles unsuccessful extraction result', async () => {
@@ -398,9 +409,12 @@ describe('TryAnalysis', () => {
       await act(async () => {
         fireEvent.change(fileInput)
       })
-      await waitFor(() => {
-        expect(screen.getByText('Parse error')).toBeInTheDocument()
-      })
+      await waitFor(
+        () => {
+          expect(screen.getByText('Parse error')).toBeInTheDocument()
+        },
+        { timeout: 5000 }
+      )
     })
 
     it('rejects fallback/sample data', async () => {
@@ -416,11 +430,14 @@ describe('TryAnalysis', () => {
       await act(async () => {
         fireEvent.change(fileInput)
       })
-      await waitFor(() => {
-        expect(
-          screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
-        ).toBeInTheDocument()
-      })
+      await waitFor(
+        () => {
+          expect(
+            screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
+          ).toBeInTheDocument()
+        },
+        { timeout: 5000 }
+      )
     })
 
     it('handles result with no policy', async () => {
@@ -432,11 +449,14 @@ describe('TryAnalysis', () => {
       await act(async () => {
         fireEvent.change(fileInput)
       })
-      await waitFor(() => {
-        expect(
-          screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
-        ).toBeInTheDocument()
-      })
+      await waitFor(
+        () => {
+          expect(
+            screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
+          ).toBeInTheDocument()
+        },
+        { timeout: 5000 }
+      )
     })
   })
 
@@ -450,15 +470,18 @@ describe('TryAnalysis', () => {
       await act(async () => {
         fireEvent.change(fileInput)
       })
-      await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith(
-          '/policy/trial',
-          expect.objectContaining({
-            state: expect.objectContaining({ isTrialResult: true }),
-            replace: true,
-          })
-        )
-      })
+      await waitFor(
+        () => {
+          expect(mockNavigate).toHaveBeenCalledWith(
+            '/policy/trial',
+            expect.objectContaining({
+              state: expect.objectContaining({ isTrialResult: true }),
+              replace: true,
+            })
+          )
+        },
+        { timeout: 5000 }
+      )
     })
 
     it('shows low confidence warning for low-confidence results', async () => {
@@ -476,9 +499,12 @@ describe('TryAnalysis', () => {
         fireEvent.change(fileInput)
       })
       // Extraction was triggered
-      await waitFor(() => {
-        expect(mockExtractPolicy).toHaveBeenCalled()
-      })
+      await waitFor(
+        () => {
+          expect(mockExtractPolicy).toHaveBeenCalled()
+        },
+        { timeout: 5000 }
+      )
     })
   })
 

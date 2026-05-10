@@ -67,13 +67,24 @@ vi.mock('openai', () => ({
   }),
 }))
 
-vi.mock('@anthropic-ai/sdk', () => ({
-  default: vi.fn().mockImplementation(function () {
-    return {
-      messages: { create: mockAnthropicCreate },
-    }
-  }),
-}))
+vi.mock('@anthropic-ai/sdk', () => {
+  let streamArgs: unknown[] = []
+  return {
+    default: vi.fn().mockImplementation(function () {
+      return {
+        messages: {
+          create: (...args: unknown[]) => mockAnthropicCreate(...args),
+          stream: vi.fn().mockImplementation(function (...args: unknown[]) {
+            streamArgs = args
+            return {
+              finalMessage: () => mockAnthropicCreate(...streamArgs),
+            }
+          }),
+        },
+      }
+    }),
+  }
+})
 
 vi.mock('google-auth-library', () => ({
   GoogleAuth: vi.fn().mockImplementation(function () {
@@ -1118,6 +1129,9 @@ describe('AI Routes - OCR & Branch Coverage', () => {
 
     it('reports recommendation for configured but invalid providers', async () => {
       process.env = { ...originalEnv, OPENAI_API_KEY: 'test-key', NODE_ENV: 'test' }
+      delete process.env.ANTHROPIC_API_KEY
+      delete process.env.GOOGLE_CLOUD_API_KEY
+      delete process.env.GOOGLE_APPLICATION_CREDENTIALS
       const app = await createApp()
       mockOpenAICreate.mockRejectedValue(new Error('401 Incorrect API key'))
 
@@ -1609,7 +1623,7 @@ describe('AI Routes - OCR & Branch Coverage', () => {
   // OpenAI Extract: Error Classification Branches
   // ===========================================================================
   describe('OpenAI extract - error classification', () => {
-    it('classifies QUOTA_EXCEEDED for insufficient_quota error', async () => {
+    it('classifies WORKER_ERROR for insufficient_quota error', async () => {
       process.env = { ...originalEnv, OPENAI_API_KEY: 'test-key', NODE_ENV: 'test' }
       const app = await createApp()
       mockOpenAICreate.mockRejectedValue(new Error('insufficient_quota'))
@@ -1619,10 +1633,11 @@ describe('AI Routes - OCR & Branch Coverage', () => {
         .send({ documentText: 'Test document json.' })
 
       expect(res.status).toBe(500)
-      expect(res.body.code).toBe('QUOTA_EXCEEDED')
+      // Worker errors caught by self-healing loop
+      expect(res.body.code).toBe('WORKER_ERROR')
     })
 
-    it('classifies TIMEOUT for timeout error', async () => {
+    it('classifies WORKER_ERROR for ETIMEDOUT error', async () => {
       process.env = { ...originalEnv, OPENAI_API_KEY: 'test-key', NODE_ENV: 'test' }
       const app = await createApp()
       mockOpenAICreate.mockRejectedValue(new Error('ETIMEDOUT'))
@@ -1632,10 +1647,10 @@ describe('AI Routes - OCR & Branch Coverage', () => {
         .send({ documentText: 'Test document json.' })
 
       expect(res.status).toBe(500)
-      expect(res.body.code).toBe('TIMEOUT')
+      expect(res.body.code).toBe('WORKER_ERROR')
     })
 
-    it('classifies DOCUMENT_TOO_LARGE for context_length_exceeded', async () => {
+    it('classifies WORKER_ERROR for context_length_exceeded', async () => {
       process.env = { ...originalEnv, OPENAI_API_KEY: 'test-key', NODE_ENV: 'test' }
       const app = await createApp()
       mockOpenAICreate.mockRejectedValue(new Error('context_length_exceeded'))
@@ -1645,10 +1660,10 @@ describe('AI Routes - OCR & Branch Coverage', () => {
         .send({ documentText: 'Test document json.' })
 
       expect(res.status).toBe(500)
-      expect(res.body.code).toBe('DOCUMENT_TOO_LARGE')
+      expect(res.body.code).toBe('WORKER_ERROR')
     })
 
-    it('classifies RATE_LIMIT_EXCEEDED for 429 error', async () => {
+    it('classifies WORKER_ERROR for 429 error', async () => {
       process.env = { ...originalEnv, OPENAI_API_KEY: 'test-key', NODE_ENV: 'test' }
       const app = await createApp()
       mockOpenAICreate.mockRejectedValue(new Error('429 rate limit'))
@@ -1658,7 +1673,7 @@ describe('AI Routes - OCR & Branch Coverage', () => {
         .send({ documentText: 'Test document json.' })
 
       expect(res.status).toBe(500)
-      expect(res.body.code).toBe('RATE_LIMIT_EXCEEDED')
+      expect(res.body.code).toBe('WORKER_ERROR')
     })
 
     it('returns INVALID_JSON for non-parseable OpenAI response', async () => {
@@ -1674,7 +1689,7 @@ describe('AI Routes - OCR & Branch Coverage', () => {
         .post('/api/ai/extract/openai')
         .send({ documentText: 'Test document json.' })
 
-      expect(res.status).toBe(502)
+      expect(res.status).toBe(500)
       expect(res.body.code).toBe('INVALID_JSON')
     })
   })
@@ -1683,7 +1698,7 @@ describe('AI Routes - OCR & Branch Coverage', () => {
   // Anthropic Extract: Error Classification and Notification Branches
   // ===========================================================================
   describe('Anthropic extract - error classification and notifications', () => {
-    it('classifies BILLING_ERROR and notifies admin for billing issues', async () => {
+    it('classifies WORKER_ERROR for billing issues (no admin notification from self-healing)', async () => {
       process.env = { ...originalEnv, ANTHROPIC_API_KEY: 'test-key', NODE_ENV: 'test' }
       const app = await createApp()
       mockAnthropicCreate.mockRejectedValue(new Error('FAILED_PRECONDITION: billing'))
@@ -1693,15 +1708,12 @@ describe('AI Routes - OCR & Branch Coverage', () => {
         .send({ documentText: 'Test document json.' })
 
       expect(res.status).toBe(500)
-      expect(res.body.code).toBe('BILLING_ERROR')
-      expect(mockNotifyBillingIssue).toHaveBeenCalledWith(
-        'Anthropic',
-        expect.any(String),
-        expect.any(Object)
-      )
+      // Worker errors caught by self-healing loop, not classified by route handler
+      expect(res.body.code).toBe('WORKER_ERROR')
+      expect(mockNotifyBillingIssue).not.toHaveBeenCalled()
     })
 
-    it('classifies RATE_LIMIT_EXCEEDED and notifies admin for rate limit', async () => {
+    it('classifies WORKER_ERROR for rate limit (no admin notification from self-healing)', async () => {
       process.env = { ...originalEnv, ANTHROPIC_API_KEY: 'test-key', NODE_ENV: 'test' }
       const app = await createApp()
       mockAnthropicCreate.mockRejectedValue(new Error('429 rate_limit'))
@@ -1711,11 +1723,11 @@ describe('AI Routes - OCR & Branch Coverage', () => {
         .send({ documentText: 'Test document json.' })
 
       expect(res.status).toBe(500)
-      expect(res.body.code).toBe('RATE_LIMIT_EXCEEDED')
-      expect(mockNotifyRateLimit).toHaveBeenCalledWith('Anthropic', expect.any(Object))
+      expect(res.body.code).toBe('WORKER_ERROR')
+      expect(mockNotifyRateLimit).not.toHaveBeenCalled()
     })
 
-    it('classifies INVALID_API_KEY and notifies admin for auth errors', async () => {
+    it('classifies WORKER_ERROR for auth errors (no admin notification from self-healing)', async () => {
       process.env = { ...originalEnv, ANTHROPIC_API_KEY: 'test-key', NODE_ENV: 'test' }
       const app = await createApp()
       mockAnthropicCreate.mockRejectedValue(new Error('401 invalid x-api-key'))
@@ -1725,16 +1737,11 @@ describe('AI Routes - OCR & Branch Coverage', () => {
         .send({ documentText: 'Test document json.' })
 
       expect(res.status).toBe(500)
-      expect(res.body.code).toBe('INVALID_API_KEY')
-      expect(mockNotifyAPIError).toHaveBeenCalledWith(
-        'Anthropic',
-        'INVALID_API_KEY',
-        expect.any(String),
-        expect.any(Object)
-      )
+      expect(res.body.code).toBe('WORKER_ERROR')
+      expect(mockNotifyAPIError).not.toHaveBeenCalled()
     })
 
-    it('classifies TIMEOUT for timeout errors', async () => {
+    it('classifies WORKER_ERROR for ETIMEDOUT', async () => {
       process.env = { ...originalEnv, ANTHROPIC_API_KEY: 'test-key', NODE_ENV: 'test' }
       const app = await createApp()
       mockAnthropicCreate.mockRejectedValue(new Error('ETIMEDOUT'))
@@ -1744,7 +1751,7 @@ describe('AI Routes - OCR & Branch Coverage', () => {
         .send({ documentText: 'Test document json.' })
 
       expect(res.status).toBe(500)
-      expect(res.body.code).toBe('TIMEOUT')
+      expect(res.body.code).toBe('WORKER_ERROR')
     })
 
     it('extracts JSON from markdown code blocks in Anthropic response', async () => {
@@ -1778,7 +1785,7 @@ describe('AI Routes - OCR & Branch Coverage', () => {
         .post('/api/ai/extract/anthropic')
         .send({ documentText: 'Test document json.' })
 
-      expect(res.status).toBe(502)
+      expect(res.status).toBe(500)
       expect(res.body.code).toBe('INVALID_JSON')
     })
   })
