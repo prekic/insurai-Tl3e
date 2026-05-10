@@ -252,3 +252,4 @@ out.json
 
 # QA reports — contain policy IDs + provider/policy-number pairs; local audit artefacts only.
 reports/
+extraction_*.json
