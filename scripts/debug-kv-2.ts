@@ -4,6 +4,7 @@ import { matchLabeledField } from '../shared/field-aliases'
 async function run() {
   let text = await fs.readFile('gunes_text.txt', 'utf8')
   text = text
+    // eslint-disable-next-line no-control-regex
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
     .replace(/ý/g, 'ı')
     .replace(/þ/g, 'ş')
@@ -11,7 +12,7 @@ async function run() {
     .replace(/Ý/g, 'İ')
     .replace(/Þ/g, 'Ş')
     .replace(/Ð/g, 'Ğ')
-  
+
   const value = matchLabeledField(text, 'make')
   console.log('matchLabeledField(make) =', value)
 }

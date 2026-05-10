@@ -1,17 +1,17 @@
-import { createClient } from '@supabase/supabase-js';
-import * as dotenv from 'dotenv';
-import { execSync } from 'child_process';
-dotenv.config();
+import { createClient } from '@supabase/supabase-js'
+import * as dotenv from 'dotenv'
+import { execSync } from 'child_process'
+dotenv.config()
 
-const url = process.env.SUPABASE_URL;
-const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const url = process.env.SUPABASE_URL
+const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 if (!url || !key) {
-  console.error('Missing env vars');
-  process.exit(1);
+  console.error('Missing env vars')
+  process.exit(1)
 }
 
-const supabase = createClient(url, key);
+const supabase = createClient(url, key)
 
 async function run() {
   const ids = [
@@ -25,37 +25,39 @@ async function run() {
     '14f3378a-810e-4978-9647-d24132362267', // AXA model missing
     '94d1768a-9e4b-4052-ac58-63638ff670ae', // Ray
     '62ee93be-3bcf-42a0-a591-97b24a9fbbde', // Groupama
-    '6dde25cc-ac16-40b0-8d26-7b02346ed344'  // Ray
-  ];
+    '6dde25cc-ac16-40b0-8d26-7b02346ed344', // Ray
+  ]
 
   const { data, error } = await supabase
     .from('policies')
     .select('id, raw_data->>sourceFilename')
-    .in('id', ids);
+    .in('id', ids)
 
   if (error) {
-    console.error('Error fetching:', error);
-    process.exit(1);
+    console.error('Error fetching:', error)
+    process.exit(1)
   }
 
   for (const row of data) {
-    console.log(`\n======================================================`);
-    console.log(`Inspecting ${row.sourceFilename} (ID: ${row.id})`);
-    console.log(`======================================================\n`);
+    console.log(`\n======================================================`)
+    console.log(`Inspecting ${row.sourceFilename} (ID: ${row.id})`)
+    console.log(`======================================================\n`)
     try {
-      const output = execSync(`npx tsx scripts/inspect-pdf-labels.ts "${row.sourceFilename}"`, { encoding: 'utf-8' });
+      const output = execSync(`npx tsx scripts/inspect-pdf-labels.ts "${row.sourceFilename}"`, {
+        encoding: 'utf-8',
+      })
       // We only want the Label-bearing lines section
-      const lines = output.split('\n');
-      const labelIndex = lines.findIndex(l => l.includes('=== Label-bearing lines'));
+      const lines = output.split('\n')
+      const labelIndex = lines.findIndex((l) => l.includes('=== Label-bearing lines'))
       if (labelIndex !== -1) {
-        console.log(lines.slice(labelIndex).join('\n'));
+        console.log(lines.slice(labelIndex).join('\n'))
       } else {
-        console.log('No label section found in output.');
+        console.log('No label section found in output.')
       }
-    } catch (e) {
-      console.error(`Failed to inspect ${row.sourceFilename}`);
+    } catch (_e) {
+      console.error(`Failed to inspect ${row.sourceFilename}`)
     }
   }
 }
 
-run();
+run()

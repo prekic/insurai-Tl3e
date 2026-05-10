@@ -77,7 +77,7 @@ describe('detectImmCarveOut — Sprint 1 PR-S1.4 fallback haystack', () => {
       // No clause / quote / description — empty primary haystack
     }
     const fallback = [
-      "Artan Mali Sorumluluk Sınırsız Teminatı Klozu — olay başına teminat limiti, tüm teminat türleri için toplam 2.500.000,00 TL ile sınırlanmıştır. Bu kapsam havalimanı, liman, akaryakıt depoları gibi yerlerde geçerlidir.",
+      'Artan Mali Sorumluluk Sınırsız Teminatı Klozu — olay başına teminat limiti, tüm teminat türleri için toplam 2.500.000,00 TL ile sınırlanmıştır. Bu kapsam havalimanı, liman, akaryakıt depoları gibi yerlerde geçerlidir.',
     ]
     const result = detectImmCarveOut(coverage, fallback)
     expect(result).not.toBeNull()
@@ -125,9 +125,9 @@ describe('detectImmCarveOut — Sprint 1 PR-S1.4 fallback haystack', () => {
     const fallback = [
       '',
       'Havalimanı ve liman bölgelerinde 2.500.000 TL üst sınır',
-      // @ts-expect-error — defensive guard against legacy fixtures with non-strings
+      // @ts-expect-error — intentionally passing invalid input to test rejection — defensive guard against legacy fixtures with non-strings
       undefined,
-      // @ts-expect-error
+      // @ts-expect-error — intentionally passing invalid input to test rejection
       null,
     ]
     const result = detectImmCarveOut(coverage, fallback as string[])
