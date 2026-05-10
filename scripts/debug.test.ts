@@ -3,13 +3,19 @@ dotenv.config()
 import { createClient } from '@supabase/supabase-js'
 import { test } from 'vitest'
 
-const supabase = createClient(
-  process.env.SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
+const supabaseUrl = process.env.SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-test('debug failures — cross‑reference policies table with PDFs', async () => {
+const isConfigured = !!supabaseUrl && !!supabaseKey
+
+const supabase = isConfigured
+  ? createClient(supabaseUrl, supabaseKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
+  : (null as unknown as ReturnType<typeof createClient>)
+
+const testFn = isConfigured ? test : test.skip
+testFn('debug failures — cross‑reference policies table with PDFs', async () => {
   // List recent policies with their raw_data
   const { data, error } = await supabase
     .from('policies')
