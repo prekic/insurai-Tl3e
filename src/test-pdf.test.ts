@@ -30,7 +30,7 @@ if (typeof File !== 'undefined' && !File.prototype.arrayBuffer) {
   }
 }
 
-describe.skip('pdf integration tests (requires PDF fixtures)', () => {
+describe('pdf integration tests (requires PDF fixtures)', () => {
   test('extract policy from pdf', async () => {
     console.log(
       'ENV CHECK:',

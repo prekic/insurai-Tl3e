@@ -32,7 +32,7 @@ if (typeof File !== 'undefined' && !File.prototype.arrayBuffer) {
   }
 }
 
-describe.skip('multi-provider integration tests (requires PDF fixtures)', () => {
+describe('multi-provider integration tests (requires PDF fixtures)', () => {
   test('multi-provider extraction', async () => {
     const filename = process.env.PDF_FILENAME || 'KASKO POLİÇESİ.pdf'
     const filePath = path.join(process.cwd(), 'upload/real-kasko-pdf', filename)
