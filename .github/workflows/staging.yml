@@ -1,8 +1,9 @@
-name: Staging Deployment
+name: CI - Validate & Deploy
 
 on:
   push:
     branches:
+      - main
       - staging
       - develop
   pull_request:
