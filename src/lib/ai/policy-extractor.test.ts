@@ -1632,8 +1632,8 @@ describe('Document AI Fallback to pdf.js', () => {
     expect(result.success).toBe(false)
     if (!result.success) {
       expect(result.error.code).toBe('OCR_ERROR')
-      expect(result.error.message).toContain('Document AI failed')
-      expect(result.error.message).toContain('pdf.js fallback also failed')
+      expect(result.error.message).toContain('pdf.js extraction failed')
+      expect(result.error.message).toContain('OCR not available')
     }
   })
 
@@ -1653,7 +1653,8 @@ describe('Document AI Fallback to pdf.js', () => {
     expect(result.success).toBe(false)
     if (!result.success) {
       expect(result.error.code).toBe('OCR_ERROR')
-      expect(result.error.message).toContain('Document AI not configured')
+      expect(result.error.message).toContain('pdf.js extraction failed')
+      expect(result.error.message).toContain('OCR not available')
     }
   })
 })
