@@ -1,21 +1,35 @@
 # allianz-police-0001021024147152-TR.pdf
-startedAt: 2026-04-28T03:41:37.846Z
-wallTimeMs: 21377
-finalUrl: https://insurai-production.up.railway.app/try
+startedAt: 2026-05-11T07:16:52.290Z
+wallTimeMs: 55447
+finalUrl: http://localhost:5173/try
 outcome: UI_CRASH
 detail: winner=success but body has no recognizable result or error tokens
-extractStatus: 200
-extractEndpoint: https://insurai-production.up.railway.app/api/ai/ocr/document-ai
+extractStatus: n/a
+extractEndpoint: n/a
 
 ## Console errors / warnings
-[warning] Sentry DSN not configured. Error tracking disabled.
-[error] An SSL certificate error occurred when fetching the script.
-[error] [PWA] Service worker registration failed: SecurityError: Failed to register a ServiceWorker for scope ('https://insurai-production.up.railway.app/') with script ('https://insurai-production.up.railway.app/sw.js'): An SSL certificate error occurred when fetching the script.
+[error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[warning] [Analytics] trial_page_view {}
+[warning] [Analytics] trial_page_view {}
 [warning] [PDF.js] Testing worker URL: /pdfjs/pdf.worker.min.mjs
 [warning] [PDF.js] Found working worker: /pdfjs/pdf.worker.min.mjs
-[warning] [PolicyExtractor] Attempting Document AI extraction...
-[warning] [Document AI] PDF has 9 pages (limit: 10)
+[error] Failed to load resource: the server responded with a status of 401 ()
+[error] Failed to load resource: the server responded with a status of 401 ()
+[error] Failed to load resource: the server responded with a status of 401 ()
+[error] Failed to load resource: the server responded with a status of 401 ()
+[error] Failed to load resource: the server responded with a status of 401 ()
+[error] Failed to load resource: the server responded with a status of 401 ()
 [warning] The resource https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
 
 ## Failed network requests
-(none)
+GET http://localhost:5173/api/translations/locales — net::ERR_ABORTED
+GET http://localhost:5173/api/translations/locales — net::ERR_ABORTED
+GET http://localhost:5173/api/translations/locales — net::ERR_ABORTED
+GET http://localhost:5173/api/translations/locales — net::ERR_ABORTED
+GET http://localhost:5173/api/translations/en — net::ERR_ABORTED
+GET http://localhost:5173/api/translations/en — net::ERR_ABORTED

@@ -12,24 +12,17 @@ Analyze Your Policy
 
 Upload a PDF policy document for instant AI-powered analysis
 
-ANADOLU.PDF
+Upload Your Policy
 
-90 KB
+Drag and drop your PDF here, or click to browse
 
-Elapsed 0:13
+.pdf, .doc, .docx, .png, .jpg, .jpeg up to 10MB
 
-OCR Processing…
+Secure
+AI-Powered
 
-Upload
-888ms
-PDF Extraction
-OCR Processing
-Text Preprocessing
-AI Extraction
-Table Parsing
-Validation
-Save
+Analysis service is temporarily unavailable
 
-💡 Your insured value is being matched against current market rayiç data.
+The analysis service may be starting up. Please try again in a moment.
 
 Already have an account? Sign In
