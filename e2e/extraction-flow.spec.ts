@@ -91,9 +91,9 @@ test.describe('Free Trial Extraction Flow (/try)', () => {
     await page.waitForLoadState('networkidle')
 
     // The landing page should have an upload area
-    const uploadArea = page.locator('input[type="file"]').or(
-      page.getByText(/upload|yükle|drag.*drop|dosya.*seç/i).first()
-    )
+    const uploadArea = page
+      .locator('input[type="file"]')
+      .or(page.getByText(/upload|yükle|drag.*drop|dosya.*seç/i).first())
     await expect(uploadArea.first()).toBeAttached()
   })
 
@@ -102,9 +102,10 @@ test.describe('Free Trial Extraction Flow (/try)', () => {
     await page.waitForLoadState('networkidle')
 
     // Find the file input (may be hidden)
-    const fileInput = page.locator('input[type="file"][accept*="pdf"]').or(
-      page.locator('input[type="file"]')
-    ).first()
+    const fileInput = page
+      .locator('input[type="file"][accept*="pdf"]')
+      .or(page.locator('input[type="file"]'))
+      .first()
 
     // Upload the test PDF
     await fileInput.setInputFiles(TEST_PDF_PATH)
@@ -127,16 +128,15 @@ test.describe('Free Trial Extraction Flow (/try)', () => {
 
     if (page.url().includes('/try')) {
       // Should show progress indicators
-      const progressIndicator = page.getByText(/analiz|extract|process|analyzing|uploading/i).or(
-        page.locator('[role="progressbar"]')
-      ).or(
-        page.getByText(/%/)
-      )
+      const progressIndicator = page
+        .getByText(/analiz|extract|process|analyzing|uploading/i)
+        .or(page.locator('[role="progressbar"]'))
+        .or(page.getByText(/%/))
 
       // Either shows progress or results (if fast enough)
-      const hasProgress = await progressIndicator.count() > 0
-      const hasResults = await page.getByText(/score|grade|coverage|teminat|puan/i).count() > 0
-      const hasError = await page.getByText(/error|hata|failed|timeout/i).count() > 0
+      const hasProgress = (await progressIndicator.count()) > 0
+      const hasResults = (await page.getByText(/score|grade|coverage|teminat|puan/i).count()) > 0
+      const hasError = (await page.getByText(/error|hata|failed|timeout/i).count()) > 0
 
       // One of these states should be visible
       expect(hasProgress || hasResults || hasError).toBe(true)
@@ -157,11 +157,13 @@ test.describe('Free Trial Extraction Flow (/try)', () => {
 
     if (page.url().includes('/try')) {
       // Wait for either results or error (up to 100 seconds for AI extraction)
-      const resultOrError = page.getByText(/score|grade|coverage|teminat|puan|error|hata|failed|timeout|try again/i)
+      const resultOrError = page.getByText(
+        /score|grade|coverage|teminat|puan|error|hata|failed|timeout|try again/i
+      )
       await expect(resultOrError.first()).toBeVisible({ timeout: 100000 })
 
       // Verify it's not showing mock/fallback data (the bug we fixed in issue #71)
-      const hasRealResults = await page.getByText(/score|grade|puan/i).count() > 0
+      const hasRealResults = (await page.getByText(/score|grade|puan/i).count()) > 0
       if (hasRealResults) {
         // Results page should not have mock indicators
         // (Note: "sample" may appear in other UI elements, so we check specifically)
@@ -189,7 +191,7 @@ test.describe('Free Trial Extraction Flow (/try)', () => {
 
       // If timeout occurred, verify the timeout message is user-friendly
       const timeoutMsg = page.getByText(/timeout|timed out|zaman aşımı/i)
-      if (await timeoutMsg.count() > 0) {
+      if ((await timeoutMsg.count()) > 0) {
         // Should have a retry button
         const retryButton = page.getByRole('button', { name: /try again|retry|tekrar/i })
         await expect(retryButton.first()).toBeVisible()
@@ -257,8 +259,31 @@ test.describe('Authenticated Upload Flow (/upload)', () => {
 })
 
 // API health tests require a running Express backend.
-// Skipped in CI where only the static frontend is served.
-test.describe.skip('API Health and Provider Status', () => {
+// In CI, skip entirely. Otherwise, conditionally skip if backend unreachable.
+const isCI = process.env.CI
+
+// Probe backend once, before any API/extraction tests.
+// Playwright doesn't support dynamic describe.skip, so we use individual test.skip inside.
+let backendAvailable = false
+
+test.beforeAll(async () => {
+  if (isCI) return
+  // Hit backend directly (port 4001) to avoid Vite proxy rate limiter
+  try {
+    const res = await fetch('http://localhost:4001/api/health', {
+      signal: AbortSignal.timeout(5000),
+    })
+    backendAvailable = res.ok
+  } catch {
+    backendAvailable = false
+  }
+})
+
+test.describe('API Health and Provider Status', () => {
+  test.beforeEach(async () => {
+    test.skip(isCI || !backendAvailable, 'Backend server not available')
+  })
+
   test('should report backend health', async ({ page }) => {
     const response = await page.request.get('/api/health')
     expect(response.ok()).toBe(true)
@@ -304,9 +329,15 @@ test.describe.skip('API Health and Provider Status', () => {
       if (body[provider]?.configured && !body[provider]?.valid) {
         expect(body[provider]).toHaveProperty('errorCode')
         const validCodes = [
-          'INVALID_CREDENTIALS', 'RATE_LIMITED', 'QUOTA_EXHAUSTED',
-          'PROVIDER_OVERLOADED', 'BILLING_ERROR', 'API_NOT_ENABLED',
-          'NOT_FOUND', 'NETWORK_ERROR', 'UNKNOWN_ERROR'
+          'INVALID_CREDENTIALS',
+          'RATE_LIMITED',
+          'QUOTA_EXHAUSTED',
+          'PROVIDER_OVERLOADED',
+          'BILLING_ERROR',
+          'API_NOT_ENABLED',
+          'NOT_FOUND',
+          'NETWORK_ERROR',
+          'UNKNOWN_ERROR',
         ]
         expect(validCodes).toContain(body[provider].errorCode)
       }
@@ -316,12 +347,16 @@ test.describe.skip('API Health and Provider Status', () => {
 
 // Extraction tests require a running Express backend with AI keys.
 // Skipped in CI where only the static frontend is served.
-test.describe.skip('Extraction Fallback Behavior', () => {
+test.describe('Extraction Fallback Behavior', () => {
+  test.beforeEach(async () => {
+    test.skip(isCI || !backendAvailable, 'Backend server not available')
+  })
   test('should return structured response from extraction endpoint', async ({ page }) => {
     // This test verifies the API contract for the unified extraction endpoint
     const response = await page.request.post('/api/ai/extract', {
       data: {
-        documentText: 'Insurance Policy Number: KSK-2026-001234\nProvider: Allianz\nPremium: 15000 TL',
+        documentText:
+          'Insurance Policy Number: KSK-2026-001234\nProvider: Allianz\nPremium: 15000 TL',
         systemPrompt: 'Extract insurance policy details as JSON.',
       },
       headers: {
