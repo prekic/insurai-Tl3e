@@ -65,6 +65,9 @@ jobs:
       - name: Run tests
         run: npm run test
 
+      - name: Extraction quality gate
+        run: node scripts/extraction-quality-gate.cjs
+
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         if: github.event_name == 'push'

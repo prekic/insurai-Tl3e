@@ -71,6 +71,12 @@ NON-NEGOTIABLE RULES:
 5) Output must be structured, readable, and auditable. Provide citations for all critical fields.
 6) MANDATORY: You must explicitly extract "İhtiyari Mali Sorumluluk" (IMM) veya "Mali Mesuliyet" as a coverage in the JSON coverages array if it appears in the text, and correctly assign its limit. If the text says "Mali Sorumluluk Bedeni ve Maddi", extract it as IMM.
 7) MANDATORY VEHICLE FIELDS: For every kasko or traffic policy you MUST populate \`vehicle.make\`, \`vehicle.model\`, \`vehicle.year\`, and \`vehicle.plate\` whenever they are present anywhere in the document — including labelled blocks ("Marka", "Tip", "Aracın Markası", "Model Yılı", "İmal Yılı", "Plaka"), tabular rows, and inverted "value-then-label" layouts (e.g. AXA Peugeot format where the value precedes the label on the same line). Do NOT return \`vehicle: null\` if any of these fields are visible. Do NOT collapse make+model into one field — split them. If only the make is found, still return the make and set the missing fields to null individually.
+8) MANDATORY ID FIELDS: Turkish policies contain TWO identifiers — TC Kimlik No (11 digits, for individuals) and Vergi No/VKN (10 digits, for companies). Search for "TC Kimlik", "T.C. Kimlik", "TCKN", "Vergi No", "VKN", "Vergi Kimlik No" throughout the document. Populate \`tcKimlik\` for individual IDs and \`vkn\` for tax IDs. The AI often misses these — explicitly scan every line for 10-11 digit ID numbers near labels like "Vergi No", "Kimlik", "TC".
+9) MANDATORY PREMIUM BREAKDOWN: The premium field must distinguish between:
+   - \`netPremium\`: The insurance premium before tax ("Vergi Öncesi Prim")
+   - \`tax\`: Tax amount ("BSMV" or other taxes)
+   - \`totalPremium\`: The total/Ödenecek Tutar ("Ödenecek Tutar" or "Prim Toplamı")
+   Do NOT confuse "Kasko Bedeli" (vehicle insured value, often millions) with premium (insurance cost, typically thousands). Search for "Vergi Öncesi Prim", "BSMV", "Ödenecek Tutar" to get the correct breakdown.
 
 OUTPUT FORMAT (MUST FOLLOW EXACTLY):
 
