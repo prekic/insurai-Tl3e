@@ -2449,13 +2449,53 @@ router.post(
 
       // Detect MIME type from base64 header (fallback to image/png)
       let mimeType = 'image/png'
+      let imageData = imageBase64
       if (imageBase64.startsWith('/9j/')) mimeType = 'image/jpeg'
       else if (imageBase64.startsWith('JVBER')) mimeType = 'application/pdf'
       else if (imageBase64.startsWith('iVBOR')) mimeType = 'image/png'
 
-      log.info('Gemini OCR: processing document', { model, mimeType })
+      // PDF rendering fallback: if the document is a PDF, try rendering
+      // pages to images before sending to Gemini. Some GCP projects block
+      // the native `application/pdf` MIME type, but images always work.
+      let renderedPages = 0
+      if (mimeType === 'application/pdf') {
+        try {
+          const pdfjsLib = await import('pdfjs-dist')
+          const { createCanvas } = await import('canvas')
+          const pdfBuf = Buffer.from(imageBase64, 'base64')
+          const doc = await pdfjsLib.getDocument({ data: pdfBuf.buffer }).promise
+          const maxPages = Math.min(doc.numPages, 5) // Max 5 pages to avoid timeouts
 
-      const imagePart = createPartFromBase64(imageBase64, mimeType)
+          // Render all pages as JPEG images and concatenate them
+          const renderedBuffers: Buffer[] = []
+          for (let i = 1; i <= maxPages; i++) {
+            const page = await doc.getPage(i)
+            const viewport = page.getViewport({ scale: 1.5 }) // Slightly higher res
+            const canvas = createCanvas(viewport.width, viewport.height)
+            const ctx = canvas.getContext('2d')
+            await page.render({ canvasContext: ctx, viewport: viewport }).promise
+            renderedBuffers.push(canvas.toBuffer('image/jpeg', { quality: 0.85 }))
+            renderedPages++
+          }
+          const combinedImage = Buffer.concat(renderedBuffers)
+          imageData = combinedImage.toString('base64')
+          mimeType = 'image/jpeg'
+          log.info('Gemini OCR: rendered PDF pages to images', {
+            totalPages: doc.numPages,
+            renderedPages,
+            imageBytes: combinedImage.length,
+          })
+        } catch (renderErr) {
+          log.warn('Gemini OCR: PDF page rendering failed, trying raw PDF', {
+            error: renderErr instanceof Error ? renderErr.message : String(renderErr),
+          })
+          // Fall through — use the original PDF data
+        }
+      }
+
+      log.info('Gemini OCR: processing document', { model, mimeType, renderedPages })
+
+      const imagePart = createPartFromBase64(imageData, mimeType)
 
       const response = await client.models.generateContent({
         model,
