@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test'
 test.describe('Actuarial Analytics Endpoints', () => {
   // Note: Since this requires an admin JWT, we assume the environment or a setup fixture handles authentication.
   // Ensure APP_URL is pointing to the exact backend or the frontend proxy.
-  const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+  const baseUrl = process.env.E2E_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173'
   let _adminToken: string
 
   test.beforeAll(async () => {

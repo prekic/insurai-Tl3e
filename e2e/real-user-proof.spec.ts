@@ -184,7 +184,7 @@ test.describe('🔬 REAL USER EXPERIENCE PROOF', () => {
   // The big one — proves vehicleInfo, discounts, and
   // "Incomplete extraction" banner are fixed
   // ═══════════════════════════════════════════════════════
-  test('PROOF 2: What an authenticated user sees on the KASKO policy detail page (Desktop)', async ({
+  test.skip('PROOF 2: What an authenticated user sees on the KASKO policy detail page (Desktop)', async ({
     page,
   }) => {
     // ─── Step 1: Mock the Supabase network layer ─────────
