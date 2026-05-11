@@ -292,7 +292,7 @@ export async function extractPolicyFromDocument(
   let ocrFormFields: FormField[] = []
   let ocrTables: Table[] = []
   let usedOCR = false
-  let extractionMethod: 'document-ai' | 'pdf.js' | 'gemini-ocr' | 'none' = 'none'
+  let extractionMethod: 'document-ai' | 'pdf.js' | 'cloud-vision' | 'gemini-ocr' | 'none' = 'none'
   let pageCount = 0
   // Store full Document AI data for result object (when available)
   let documentAIOcrData: {
@@ -448,103 +448,169 @@ export async function extractPolicyFromDocument(
       })
     } else {
       console.error('[PolicyExtractor] pdf.js ALSO FAILED:', pdfResult.error.message)
-      // Both Document AI and pdf.js failed — try Gemini multimodal OCR as last resort
       logger?.failStage(`pdf.js extraction also failed: ${pdfResult.error.message}`)
 
-      // ── Gemini OCR fallback (third attempt) ──────────────────────────
-      // When both Document AI and pdf.js fail (e.g. AXA Sigorta font corruption),
-      // send the raw PDF to Gemini 2.5 Flash for multimodal OCR. Gemini reads
-      // the PDF as an image and extracts text directly, bypassing font encoding.
+      // ── Google Cloud Vision OCR fallback ──────────────────────────
+      // When pdf.js fails (scanned image PDFs, font corruption), send the
+      // document as an image to Google Cloud Vision for text extraction.
+      // This is the primary OCR fallback — cheap ($0.0015/page) and works
+      // with just an API key (no GCP service account needed).
       if (isProxyConfigured()) {
-        const geminiStart = performance.now()
-        console.warn('[PolicyExtractor] Attempting Gemini multimodal OCR fallback...')
-        logger?.startStage('gemini_ocr', {
+        const visionStart = performance.now()
+        console.warn('[PolicyExtractor] Attempting Google Cloud Vision OCR fallback...')
+        logger?.startStage('cloud_vision_ocr', {
           filename: file.name,
           file_size: file.size,
-          fallback_reason: 'document-ai-and-pdfjs-failed',
+          fallback_reason: 'pdfjs-failed',
         })
 
         try {
-          // Convert file to base64 for the Gemini OCR endpoint
+          // Convert first page of PDF to base64 image for Vision API
           const arrayBuffer = await file.arrayBuffer()
           const uint8Array = new Uint8Array(arrayBuffer)
           let binary = ''
           for (let i = 0; i < uint8Array.length; i++) {
             binary += String.fromCharCode(uint8Array[i])
           }
-          const imageBase64 = btoa(binary)
+          const documentBase64 = btoa(binary)
 
-          const geminiResp = await fetch(`${getProxyUrl()}/api/ai/ocr/gemini`, {
+          const visionResp = await fetch(`${getProxyUrl()}/api/ai/ocr`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ imageBase64 }),
-            signal: AbortSignal.timeout(90_000), // 90s timeout for OCR
+            body: JSON.stringify({ imageBase64: documentBase64 }),
+            signal: AbortSignal.timeout(90_000),
           })
 
-          if (geminiResp.ok) {
-            const geminiResult = await geminiResp.json()
-            markClientPhase('geminiOCR_ms', geminiStart)
+          if (visionResp.ok) {
+            const visionResult = await visionResp.json()
+            markClientPhase('cloudVisionOCR_ms', visionStart)
 
-            if (geminiResult.success && geminiResult.data?.text?.length > 50) {
-              documentText = geminiResult.data.text
-              pageCount = geminiResult.data.pageCount || 1
-              extractionMethod = 'gemini-ocr'
+            if (visionResult.success && visionResult.data?.text?.length > 50) {
+              documentText = visionResult.data.text
+              pageCount = visionResult.data.pageCount || 1
+              extractionMethod = 'cloud-vision'
               usedOCR = true
               console.warn(
-                `[PolicyExtractor] Gemini OCR SUCCESS: ${pageCount} pages, ${documentText.length} chars (${clientPhaseTiming['geminiOCR_ms']}ms)`
+                `[PolicyExtractor] Cloud Vision OCR SUCCESS: ${pageCount} pages, ${documentText.length} chars (${clientPhaseTiming['cloudVisionOCR_ms']}ms)`
               )
 
-              logger?.setOCRUsed('gemini-ocr')
+              logger?.setOCRUsed('cloud-vision')
               logger?.setPageCount(pageCount)
               logger?.completeStage({
                 output: {
                   text_length: documentText.length,
                   text_preview: documentText.substring(0, 500) + '...',
                   page_count: pageCount,
-                  confidence: geminiResult.data.confidence,
-                  processing_time_ms: geminiResult.data.processingTimeMs,
+                  confidence: visionResult.data.confidence,
+                  processing_time_ms: visionResult.data.processingTimeMs,
                 },
                 full_output_text: documentText,
               })
             } else {
               throw new Error(
-                `Gemini OCR returned insufficient text (${geminiResult.data?.text?.length || 0} chars)`
+                `Cloud Vision returned insufficient text (${visionResult.data?.text?.length || 0} chars)`
               )
             }
           } else {
-            const errBody = await geminiResp.json().catch(() => ({ error: 'Unknown' }))
-            throw new Error(errBody.error || `Gemini OCR HTTP ${geminiResp.status}`)
+            const errBody = await visionResp.json().catch(() => ({ error: 'Unknown' }))
+            throw new Error(errBody.error || `Cloud Vision HTTP ${visionResp.status}`)
           }
-        } catch (geminiErr) {
-          markClientPhase('geminiOCR_ms', geminiStart)
-          const geminiMsg = geminiErr instanceof Error ? geminiErr.message : String(geminiErr)
-          console.error('[PolicyExtractor] Gemini OCR also FAILED:', geminiMsg)
-          logger?.failStage(`Gemini OCR also failed: ${geminiMsg}`)
+        } catch (visionErr) {
+          markClientPhase('cloudVisionOCR_ms', visionStart)
+          const visionMsg = visionErr instanceof Error ? visionErr.message : String(visionErr)
+          console.error('[PolicyExtractor] Cloud Vision OCR FAILED:', visionMsg)
+          logger?.failStage(`Cloud Vision OCR failed: ${visionMsg}`)
 
-          // All three OCR methods failed — give up
-          if (useFallback) {
-            console.error(
-              '[PolicyExtractor] FALLBACK TRIGGERED: All OCR methods failed (Document AI, pdf.js, Gemini)'
-            )
-            return createFallbackResult(file)
-          }
+          // ── Gemini OCR fallback (final attempt) ────────────────────────
+          // If even the cheap Cloud Vision fails, escalate to Gemini 2.5 Flash
+          // which can handle corrupted fonts and complex layouts natively.
+          console.warn('[PolicyExtractor] Attempting Gemini multimodal OCR as final fallback...')
+          logger?.startStage('gemini_ocr', {
+            filename: file.name,
+            file_size: file.size,
+            fallback_reason: 'cloud-vision-failed',
+          })
 
-          return {
-            success: false,
-            error: {
-              code: 'OCR_ERROR',
-              message: `All text extraction methods failed. Document AI: ${documentAIAvailable ? 'failed' : 'not configured'}. pdf.js: ${pdfResult.error.message}. Gemini OCR: ${geminiMsg}`,
-              details:
-                'The document may have corrupted fonts or contain only images that no OCR service could read',
-            },
-            fallbackAvailable: true,
+          try {
+            const arrayBuffer = await file.arrayBuffer()
+            const uint8Array = new Uint8Array(arrayBuffer)
+            let binary = ''
+            for (let i = 0; i < uint8Array.length; i++) {
+              binary += String.fromCharCode(uint8Array[i])
+            }
+            const imageBase64 = btoa(binary)
+
+            const geminiResp = await fetch(`${getProxyUrl()}/api/ai/ocr/gemini`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ imageBase64 }),
+              signal: AbortSignal.timeout(90_000),
+            })
+
+            if (geminiResp.ok) {
+              const geminiResult = await geminiResp.json()
+              markClientPhase('geminiOCR_ms', visionStart)
+
+              if (geminiResult.success && geminiResult.data?.text?.length > 50) {
+                documentText = geminiResult.data.text
+                pageCount = geminiResult.data.pageCount || 1
+                extractionMethod = 'gemini-ocr'
+                usedOCR = true
+                console.warn(
+                  `[PolicyExtractor] Gemini OCR SUCCESS: ${pageCount} pages, ${documentText.length} chars (${clientPhaseTiming['geminiOCR_ms']}ms)`
+                )
+
+                logger?.setOCRUsed('gemini-ocr')
+                logger?.setPageCount(pageCount)
+                logger?.completeStage({
+                  output: {
+                    text_length: documentText.length,
+                    text_preview: documentText.substring(0, 500) + '...',
+                    page_count: pageCount,
+                    confidence: geminiResult.data.confidence,
+                    processing_time_ms: geminiResult.data.processingTimeMs,
+                  },
+                  full_output_text: documentText,
+                })
+              } else {
+                throw new Error(
+                  `Gemini OCR returned insufficient text (${geminiResult.data?.text?.length || 0} chars)`
+                )
+              }
+            } else {
+              const errBody = await geminiResp.json().catch(() => ({ error: 'Unknown' }))
+              throw new Error(errBody.error || `Gemini OCR HTTP ${geminiResp.status}`)
+            }
+          } catch (geminiErr) {
+            markClientPhase('geminiOCR_ms', visionStart)
+            const geminiMsg = geminiErr instanceof Error ? geminiErr.message : String(geminiErr)
+            console.error('[PolicyExtractor] Gemini OCR also FAILED:', geminiMsg)
+            logger?.failStage(`Gemini OCR also failed: ${geminiMsg}`)
+
+            // All OCR methods failed — give up
+            if (useFallback) {
+              console.error(
+                '[PolicyExtractor] FALLBACK TRIGGERED: All text extraction methods failed (pdf.js, Cloud Vision, Gemini)'
+              )
+              return createFallbackResult(file)
+            }
+
+            return {
+              success: false,
+              error: {
+                code: 'OCR_ERROR',
+                message: `All text extraction methods failed. pdf.js: ${pdfResult.error.message}. Cloud Vision: ${visionMsg}. Gemini OCR: ${geminiMsg}`,
+                details: 'The document may contain only images that no OCR service could read',
+              },
+              fallbackAvailable: true,
+            }
           }
         }
       } else {
-        // No proxy — can't try Gemini OCR
+        // No proxy — can't try any OCR
         if (useFallback) {
           console.error(
-            '[PolicyExtractor] FALLBACK TRIGGERED: Both Document AI and pdf.js text extraction failed'
+            '[PolicyExtractor] FALLBACK TRIGGERED: pdf.js text extraction failed, no OCR proxy configured'
           )
           return createFallbackResult(file)
         }
@@ -553,11 +619,9 @@ export async function extractPolicyFromDocument(
           success: false,
           error: {
             code: 'OCR_ERROR',
-            message: documentAIAvailable
-              ? `Document AI failed and pdf.js fallback also failed: ${pdfResult.error.message}`
-              : `Document AI not configured and pdf.js extraction failed: ${pdfResult.error.message}`,
+            message: `pdf.js extraction failed: ${pdfResult.error.message}. OCR not available — set VITE_API_PROXY_URL and configure backend ocr routes.`,
             details:
-              'Ensure the backend server is running with Document AI configured, or the PDF contains extractable text',
+              'Set up a backend proxy server with Google Cloud Vision API key or GEMINI_API_KEY for OCR',
           },
           fallbackAvailable: true,
         }
