@@ -703,6 +703,26 @@ export async function getAIConfig(): Promise<AIConfig> {
     }
   }
 
+  // Coerce string-typed numeric fields (Supabase stores everything as text)
+  // Prevents "Invalid type for 'temperature': expected a decimal, but got a string" errors
+  const numericFields: (keyof AIConfig)[] = [
+    'temperature',
+    'chatTemperature',
+    'maxTokens',
+    'minConfidence',
+    'warningConfidence',
+    'extractionTimeoutMs',
+  ]
+  for (const field of numericFields) {
+    const value = config[field]
+    if (typeof value === 'string') {
+      const parsed = Number(value)
+      if (!isNaN(parsed)) {
+        ;(config as Record<string, unknown>)[field] = parsed
+      }
+    }
+  }
+
   // Ensure maxTokens is at least 8192 to prevent extraction truncation
   if (config.maxTokens < 8192) {
     config.maxTokens = 8192
