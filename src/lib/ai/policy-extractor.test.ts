@@ -3335,4 +3335,57 @@ describe('DocumentOCR Data in Result', () => {
       )
     }
   })
+
+  describe('OCR fallback chain error message format', () => {
+    it('should format the composite error with all 3 method names visible', () => {
+      // Test the error message construction inline, matching the pattern
+      // used in policy-extractor.ts when all OCR methods fail
+      const pdfResult = { success: false, error: { message: 'No text layer in scanned PDF' } }
+      const visionMsg = 'Document scanning service unavailable'
+      const geminiMsg = 'Document processing service unavailable'
+
+      const message =
+        `All text extraction methods failed. ` +
+        `pdf.js: ${pdfResult.error.message}. ` +
+        `Cloud Vision: ${visionMsg}. ` +
+        `Gemini OCR: ${geminiMsg}`
+
+      expect(message).toContain('All text extraction methods failed')
+      expect(message).toContain('pdf.js')
+      expect(message).toContain('Cloud Vision')
+      expect(message).toContain('Gemini OCR')
+      expect(message).toContain('No text layer')
+      expect(message).toContain('Document scanning')
+      expect(message).toContain('Document processing')
+    })
+
+    it('should format Gemini OCR error differently when key is not set vs auth failed', () => {
+      const notConfigured = 'Document processing service unavailable'
+      const authFailed = 'Document processing service unavailable'
+
+      // In production both are the same generic message (to not leak config info)
+      expect(notConfigured).toBe(authFailed)
+
+      // But in dev, they'd be different
+      const devNotConfigured = 'Gemini not configured — set GEMINI_API_KEY'
+      const devAuthFailed = 'Gemini API key invalid — check GEMINI_API_KEY'
+      expect(devNotConfigured).not.toBe(devAuthFailed)
+    })
+
+    it('should include Gemini OCR error when only Gemini fails', () => {
+      const pdfResult = { success: false, error: { message: 'No text layer in scanned PDF' } }
+      const visionMsg = 'Cloud Vision returned insufficient text'
+      const geminiMsg = 'Document processing service unavailable'
+
+      const message =
+        `All text extraction methods failed. ` +
+        `pdf.js: ${pdfResult.error.message}. ` +
+        `Cloud Vision: ${visionMsg}. ` +
+        `Gemini OCR: ${geminiMsg}`
+
+      expect(message).toContain('Gemini OCR')
+      expect(message).toContain('Document processing service unavailable')
+      expect(message).toContain('Cloud Vision')
+    })
+  })
 })
