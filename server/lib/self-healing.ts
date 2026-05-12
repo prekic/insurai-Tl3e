@@ -104,7 +104,7 @@ export function validateExtractionFields(data: Record<string, any>): FieldValida
   const flat = flattenObject(data)
 
   const check = (
-    field: string,
+    _field: string,
     aliases: string[],
     validator: (v: any) => FieldValidationResult
   ) => {

@@ -2491,7 +2491,7 @@ router.post(
             const viewport = page.getViewport({ scale: 1.5 }) // Slightly higher res
             const canvas = createCanvas(viewport.width, viewport.height)
             const ctx = canvas.getContext('2d')
-            await page.render({ canvasContext: ctx, viewport: viewport }).promise
+            await (page.render as any)({ canvasContext: ctx as any, viewport }).promise
             renderedBuffers.push(canvas.toBuffer('image/jpeg', { quality: 0.85 }))
             renderedPages++
           }

@@ -51,6 +51,7 @@ import {
   Target,
   Calculator,
   Sparkles,
+  Camera,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type {
@@ -73,6 +74,7 @@ const STAGE_ICONS: Record<ProcessingStage, LucideIcon> = {
   ocr_decision: BrainCog,
   ocr_check: Search,
   ocr_processing: ScanLine,
+  cloud_vision_ocr: Camera,
   gemini_ocr: Sparkles,
   text_preprocessing: Wand2,
   ai_extraction: Brain,
@@ -108,6 +110,11 @@ const STAGE_LABELS: Record<ProcessingStage, { en: string; tr: string; descriptio
     en: 'OCR Processing',
     tr: 'OCR İşleme',
     description: 'Optical character recognition for scanned documents',
+  },
+  cloud_vision_ocr: {
+    en: 'Cloud Vision OCR',
+    tr: 'Cloud Vision OCR',
+    description: 'Google Cloud Vision API OCR fallback',
   },
   gemini_ocr: {
     en: 'Gemini OCR',

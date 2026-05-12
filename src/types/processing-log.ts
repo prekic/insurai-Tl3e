@@ -19,6 +19,7 @@ export type ProcessingStage =
   | 'form_field_enhancement' // Document AI form fields applied
   | 'table_parsing' // Coverage table parsing
   | 'validation' // Data validation (Zod, business rules)
+  | 'cloud_vision_ocr' // Google Cloud Vision API OCR fallback
   | 'duplicate_check' // Duplicate/amendment detection
   | 'conflict_resolution' // User resolved duplicate conflict
   | 'database_save' // Save to Supabase
@@ -251,6 +252,15 @@ export const STAGE_CONFIGS: Record<ProcessingStage, StageConfig> = {
     icon: 'Sparkles',
     color: 'cyan',
   },
+  cloud_vision_ocr: {
+    name: 'cloud_vision_ocr',
+    label: 'Cloud Vision OCR',
+    labelTr: 'Cloud Vision OCR',
+    description: 'Google Cloud Vision API OCR fallback',
+    descriptionTr: 'Google Cloud Vision API OCR yedek işlemi',
+    icon: 'Image',
+    color: 'blue',
+  },
   text_preprocessing: {
     name: 'text_preprocessing',
     label: 'Text Preprocessing',
@@ -343,6 +353,7 @@ export const PIPELINE_STAGES: ProcessingStage[] = [
   'ocr_decision',
   'ocr_check', // Legacy - kept for backwards compatibility
   'ocr_processing',
+  'cloud_vision_ocr',
   'gemini_ocr',
   'text_preprocessing',
   'ai_extraction',
