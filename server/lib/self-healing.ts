@@ -80,6 +80,134 @@ export interface JudgeResult {
   qualitativeFeedback: string
 }
 
+// ──────────────────────────────────────────────
+//  Field-level semantic validators
+//  Run BEFORE the AI Judge — cheaper (zero AI cost)
+// ──────────────────────────────────────────────
+
+export interface FieldValidationResult {
+  field: string
+  value: any
+  valid: boolean
+  hint?: string
+}
+
+const TURKISH_PLATE = /^\d{2}\s?[A-Za-z]{1,3}\s?\d{2,4}$/
+const CURRENCIES = new Set(['TL', 'TRY', 'USD', 'EUR', 'GBP'])
+
+/**
+ * Validate individual extraction fields with type-aware rules.
+ * Returns list of failures with hints.
+ */
+export function validateExtractionFields(data: Record<string, any>): FieldValidationResult[] {
+  const results: FieldValidationResult[] = []
+  const flat = flattenObject(data)
+
+  const check = (
+    field: string,
+    aliases: string[],
+    validator: (v: any) => FieldValidationResult
+  ) => {
+    const value = findFieldValue(flat, aliases)
+    results.push(validator(value))
+  }
+
+  check(
+    'policyNumber',
+    ['policyNumber', 'policeno', 'policy_no', 'policenum', 'police', 'policy'],
+    (v) => ({
+      field: 'policyNumber',
+      value: v,
+      valid: typeof v === 'string' && v.length >= 4 && v.length <= 30,
+      hint: typeof v === 'string' ? undefined : 'Policy number must be a non-empty string',
+    })
+  )
+
+  check('startDate', ['startDate', 'baslangic', 'start', 'validfrom'], (v) => {
+    if (!v || typeof v !== 'string')
+      return { field: 'startDate', value: v, valid: false, hint: 'Missing start date' }
+    const d = new Date(v)
+    const year = d.getFullYear()
+    return {
+      field: 'startDate',
+      value: v,
+      valid: !isNaN(d.getTime()) && year >= 2000 && year <= 2030,
+      hint: `Invalid date or year ${year} out of range`,
+    }
+  })
+
+  check('endDate', ['endDate', 'bitis', 'end', 'validto', 'expiry'], (v) => {
+    if (!v || typeof v !== 'string')
+      return { field: 'endDate', value: v, valid: false, hint: 'Missing end date' }
+    const d = new Date(v)
+    const year = d.getFullYear()
+    return {
+      field: 'endDate',
+      value: v,
+      valid: !isNaN(d.getTime()) && year >= 2000 && year <= 2040,
+      hint: `Invalid date or year ${year} out of range`,
+    }
+  })
+
+  check('vehiclePlate', ['vehiclePlate', 'plaka', 'plate', 'plaque', 'license_plate'], (v) => {
+    if (!v || typeof v !== 'string')
+      return { field: 'vehiclePlate', value: v, valid: false, hint: 'Missing plate number' }
+    const cleaned = v.replace(/\s+/g, ' ').trim()
+    return {
+      field: 'vehiclePlate',
+      value: v,
+      valid: TURKISH_PLATE.test(cleaned),
+      hint: `"${v}" doesn't match Turkish plate format (e.g., "35 PR 962")`,
+    }
+  })
+
+  check('currency', ['currency', 'para_birimi', 'doviz', 'doviz', 'birim'], (v) => {
+    if (!v || typeof v !== 'string')
+      return { field: 'currency', value: v, valid: false, hint: 'Missing currency' }
+    return {
+      field: 'currency',
+      value: v,
+      valid: CURRENCIES.has(v.toUpperCase().trim()),
+      hint: `"${v}" is not a supported currency (TL/TRY/USD/EUR)`,
+    }
+  })
+
+  check(
+    'provider',
+    ['provider', 'insurerName', 'sigorta', 'sirket', 'company', 'insurer'],
+    (v) => ({
+      field: 'provider',
+      value: v,
+      valid: typeof v === 'string' && v.length >= 3,
+      hint: typeof v === 'string' ? undefined : 'Provider name must be a non-empty string',
+    })
+  )
+
+  return results.filter((r) => !r.valid)
+}
+
+function flattenObject(obj: any, prefix = ''): Record<string, any> {
+  const result: Record<string, any> = {}
+  if (!obj || typeof obj !== 'object') return result
+  for (const [k, v] of Object.entries(obj)) {
+    const key = prefix ? `${prefix}.${k}` : k
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      Object.assign(result, flattenObject(v, key))
+    } else {
+      result[key] = v
+    }
+  }
+  return result
+}
+
+function findFieldValue(flat: Record<string, any>, aliases: string[]): any {
+  for (const [key, value] of Object.entries(flat)) {
+    const keyLower = key.toLowerCase()
+    if (aliases.some((a) => keyLower.includes(a))) return value
+  }
+  return undefined
+}
+
 export async function executeWithSelfHealingLoop<T>(
   documentText: string,
   initialUserPrompt: string,
@@ -131,7 +259,11 @@ export async function executeWithSelfHealingLoop<T>(
 
     // Parse worker output
     try {
-      log.warn('Worker returned content:', { length: workerResponse.content.length, start: workerResponse.content.substring(0, 100), end: workerResponse.content.substring(workerResponse.content.length - 100) })
+      log.warn('Worker returned content:', {
+        length: workerResponse.content.length,
+        start: workerResponse.content.substring(0, 100),
+        end: workerResponse.content.substring(workerResponse.content.length - 100),
+      })
       lastParsedData = parser(workerResponse.content)
     } catch (_error) {
       log.warn('Worker returned invalid JSON', { attempt, content: workerResponse.content })
@@ -158,7 +290,21 @@ export async function executeWithSelfHealingLoop<T>(
       continue
     }
 
-    // 2. Run Judge
+    // 2. Run semantic field validation (zero AI cost)
+    const fieldFailures = validateExtractionFields(lastParsedData as Record<string, any>)
+    if (fieldFailures.length > 0) {
+      log.warn('Semantic field validation found issues', {
+        attempt,
+        failures: fieldFailures.map((r) => `${r.field}=${JSON.stringify(r.value)} (${r.hint})`),
+      })
+    }
+
+    // 3. If all fields pass semantic validation and no judge is needed, skip the judge
+    //    Only skip when judge already said it's okay but we want fast-path on field validation.
+    //    We still run the judge for hallucination/omission detection, but we inject field
+    //    failures into the prompt for the next attempt.
+
+    // 4. Run Judge
     let judgeResponse: WorkerResponse
     try {
       judgeResponse = await judgeCaller(documentText, workerResponse.content)
@@ -231,13 +377,27 @@ export async function executeWithSelfHealingLoop<T>(
       }
     }
 
+    // Build feedback from both the AI judge and semantic field validation
+    const judgeFeedbackBlock = judgeData.qualitativeFeedback
+      ? `JUDGE FEEDBACK: ${judgeData.qualitativeFeedback}`
+      : ''
+
+    const fieldFeedbackBlock =
+      fieldFailures.length > 0
+        ? `FIELD VALIDATION FAILURES:\n${fieldFailures
+            .map((r) => `- ${r.field}: current value is ${JSON.stringify(r.value)}. ${r.hint}`)
+            .join('\n')}`
+        : ''
+
+    const feedback = [judgeFeedbackBlock, fieldFeedbackBlock].filter(Boolean).join('\n\n')
+
     // Prepare for next attempt
     attempt++
     currentTemperature = Math.min(0.8, baseTemperature + (attempt - 1) * 0.2)
     // Inject feedback into the prompt
     currentUserPrompt =
       initialUserPrompt +
-      `\n\nPREVIOUS ATTEMPT FAILED. JUDGE FEEDBACK: ${judgeData.qualitativeFeedback}\nFix these issues in your next attempt.`
+      `\n\nPREVIOUS ATTEMPT FAILED. ${feedback}\nFix ALL of these issues in your next attempt.`
   }
 
   // Exhausted all retries without passing

@@ -39,6 +39,7 @@ import { getExtractionPrompt } from '../../services/prompt-service.js'
 import { buildAnthropicSchemaPrompt, type ConfidenceWeights } from '../../lib/ai-prompts.js'
 import {
   executeWithSelfHealingLoop,
+  validateExtractionFields,
   JUDGE_JSON_SCHEMA,
   JUDGE_SYSTEM_PROMPT,
 } from '../../lib/self-healing.js'
@@ -476,6 +477,15 @@ router.post(
         }
       })
 
+      // Run semantic field-level validation (zero AI cost, catches format issues)
+      const fieldFailures = validateExtractionFields(parsedData as Record<string, any>)
+      if (fieldFailures.length > 0) {
+        log.warn('Semantic validation found field issues', {
+          requestId,
+          failures: fieldFailures.map((r) => `${r.field}=${r.value} (${r.hint})`),
+        })
+      }
+
       log.info('Extraction successful', {
         requestId,
         inputTokens,
@@ -526,6 +536,14 @@ router.post(
       res.json({
         success: true,
         data: parsedData,
+        fieldValidation:
+          fieldFailures.length > 0
+            ? fieldFailures.map((r) => ({
+                field: r.field,
+                value: r.value,
+                hint: r.hint,
+              }))
+            : undefined,
         usage: {
           prompt_tokens: inputTokens,
           completion_tokens: outputTokens,

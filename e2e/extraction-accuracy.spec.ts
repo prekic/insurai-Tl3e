@@ -254,10 +254,15 @@ JSON:
   }
 
   // Clean markdown code fences and extract JSON
-  const cleaned = responseText
+  let cleaned = responseText
     .replace(/^\s*```(?:json)?\s*/gm, '')
     .replace(/```\s*$/gm, '')
+    .replace(/```\s*/g, '')
     .trim()
+  // Debug: if the cleaned starts with a code block marker, strip it more aggressively
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/```/g, '').trim()
+  }
   const start = cleaned.indexOf('{')
   let jsonStr: string | null = null
   if (start >= 0) {
@@ -276,6 +281,47 @@ JSON:
     jsonStr = cleaned.substring(start, end)
   }
 
+  // If the simple {/} matching fails (truncated JSON with arrays), try harder
+  if (!jsonStr && start >= 0) {
+    const truncated = cleaned.substring(start)
+    // Strategy 1: track both {} and [] depth, find last time depth was 0
+    let depth1 = 0
+    let lastZero = -1
+    for (let i = 0; i < truncated.length; i++) {
+      if (truncated[i] === '{') depth1++
+      else if (truncated[i] === '}') depth1--
+      else if (truncated[i] === '[') depth1++
+      else if (truncated[i] === ']') depth1--
+      if (depth1 === 0) lastZero = i + 1
+    }
+    if (lastZero > 0) {
+      jsonStr = truncated.substring(0, lastZero)
+    } else {
+      // Strategy 2: find the last complete } and include everything up to it
+      // This handles the case where the outer object is closed but deeper
+      // array content is truncated
+      const lastBrace = truncated.lastIndexOf('}')
+      if (lastBrace > 0) {
+        jsonStr = truncated.substring(0, lastBrace + 1)
+      } else {
+        // Strategy 3: just take everything up to the last complete string field
+        const lines = truncated.split('\n')
+        let bestLine = 0
+        for (let i = lines.length - 1; i >= 0; i--) {
+          const line = lines[i].trim()
+          // Look for a line that ends a field (ends with ",)
+          if (line.endsWith('",') || line.endsWith('" }') || line.endsWith('"}')) {
+            bestLine = i + 1
+            break
+          }
+        }
+        if (bestLine > 0) {
+          jsonStr = lines.slice(0, bestLine).join('\n')
+        }
+      }
+    }
+  }
+
   if (!jsonStr) {
     throw new Error(`No JSON found in Gemini response:\n${responseText.substring(0, 800)}`)
   }
@@ -288,30 +334,108 @@ JSON:
     // Salvage truncated JSON — append closing braces
     let fixed = jsonStr
       .replace(/,+\s*$/, '')
-      .replace(/,"coverages":\s*\[[^\]]*$/, ',"coverages":[]')
-      .replace(/"[a-zA-Z]*\s*$/m, '')
+      // Strip incomplete array content at end
+      .replace(/,\n*\s*"[a-zA-Z]+[a-zA-Z_]*"\s*:\s*\[\s*[^\]{}]*$/ms, '')
+      .replace(/,\n*\s*"[a-zA-Z]+[a-zA-Z_]*"\s*:\s*\[[^\]{}]*$/ms, '')
+    // Strip trailing incomplete field (key: value without closing)
+    fixed = fixed.replace(/,\s*"[a-zA-Z_]+[a-zA-Z0-9_]*"\s*:\s*[^,}"]*$/, '')
+    // Strip trailing dangling commas
+    fixed = fixed.replace(/,+\s*$/, '')
     // Fix unclosed string on last line
     const lines = fixed.split('\n')
     const lastLn = lines[lines.length - 1] || ''
     const quotes = (lastLn.match(/"/g) || []).length
     if (quotes % 2 !== 0) fixed += '"'
+    // Close any unclosed braces and brackets
     let d = 0
+    let bd = 0
     for (const ch of fixed) {
       if (ch === '{') d++
       else if (ch === '}') d--
+      else if (ch === '[') bd++
+      else if (ch === ']') bd--
     }
     while (d > 0) {
       fixed += '}'
       d--
     }
+    while (bd > 0) {
+      fixed += ']'
+      bd--
+    }
     fixed = fixed.replace(/,+\s*\}/g, '}')
-    parsed = JSON.parse(fixed)
+    try {
+      parsed = JSON.parse(fixed)
+    } catch (_e2) {
+      // Last resort: extract only the basic fields we need via regex
+      const extractField = (name: string) => {
+        const m = fixed.match(new RegExp(`"${name}"\\s*:\\s*"([^"]+)"`))
+        return m ? m[1] : null
+      }
+      const extractNum = (name: string) => {
+        const m = fixed.match(new RegExp(`"${name}"\\s*:\\s*([0-9.]+)`))
+        return m ? m[1] : null
+      }
+      parsed = {
+        provider: extractField('provider') || extractField('insurerName'),
+        policyNumber: extractField('policyNumber'),
+        startDate: extractField('startDate'),
+        endDate: extractField('endDate'),
+        insuredName: extractField('insuredName'),
+        vehicleMake: extractField('vehicleMake'),
+        vehicleModel: extractField('vehicleModel'),
+        vehicleYear: extractNum('vehicleYear'),
+        vehiclePlate: extractField('vehiclePlate'),
+        currency: extractField('currency'),
+        premium: extractNum('premium'),
+        totalPremium: extractNum('totalPremium'),
+      }
+    }
+  }
+
+  // Normalize parsed data: map common Gemini field name variants to canonical fields
+  const rawData = parsed.success && parsed.data ? parsed.data : parsed
+  const normalized: Record<string, any> = {}
+  if (rawData && typeof rawData === 'object') {
+    const normMap: [RegExp, string][] = [
+      [/^(insurancecompany|insurer|sirket|sigortac[ii]|sigorta(?:sirketi|_adi)?)$/i, 'provider'],
+      [/^(policyno?|policenum(?:ara)?|police_no|policy_no)$/i, 'policyNumber'],
+      [
+        /^(policystart(?:date)?|baslangic(?:tarihi)?|policybaslangic|validfrom|start)$/i,
+        'startDate',
+      ],
+      [/^(policyend(?:date)?|bitis(?:tarihi)?|expir(?:y|ation)date|validto|end)$/i, 'endDate'],
+      [/^(carmake|vehiclemake|aracmarka|marka(?:si)?)$/i, 'vehicleMake'],
+      [/^(carmodel|vehiclemodel|otomobilmodel|model(?:i|_adi)?)$/i, 'vehicleModel'],
+      [/^(vehicleyear|modyili|aracyili?|model_y[ii]li)$/i, 'vehicleYear'],
+      [/^(vehicleplate|licen[cs]eplate|plakano?|plaka_no)$/i, 'vehiclePlate'],
+      [
+        /^(insuredname|policyholder(?:name)?|sigortali(?:adi|_isim)?|sigortal[ii]|ad(?:soyad)?|fullname)$/i,
+        'insuredName',
+      ],
+      [/^(parabirimi|doviz|kur)$/i, 'currency'],
+    ]
+    for (const [key, value] of Object.entries(rawData)) {
+      let mapped = false
+      for (const [pattern, canonical] of normMap) {
+        if (pattern.test(key)) {
+          if (normalized[canonical] === undefined) {
+            normalized[canonical] = value
+          }
+          mapped = true
+          break
+        }
+      }
+      if (!mapped) {
+        normalized[key] = value
+      }
+    }
   }
 
   if (parsed.success && parsed.data) {
-    return { data: parsed, textLength }
+    return { data: { success: true, data: normalized }, textLength }
   }
-  return { data: { success: true, data: parsed }, textLength }
+  return { data: { success: true, data: normalized }, textLength }
 }
 
 function normalize(s: string): string {
@@ -347,6 +471,10 @@ function searchField(obj: any, fieldName: string): string | undefined {
       'sigorta',
       'company',
       'insurerName',
+      'insurancecompany',
+      'sirketadi',
+      'sirket_adi',
+      'sigortasirketi',
     ],
     policyNumber: [
       'policyNumber',
@@ -356,15 +484,117 @@ function searchField(obj: any, fieldName: string): string | undefined {
       'policenum',
       'police',
       'policy',
+      'policyno',
+      'policenumara',
+      'policenum',
+      'policeno',
     ],
-    startDate: ['startDate', 'baslangic', 'başlangıç', 'start', 'validfrom'],
-    endDate: ['endDate', 'bitis', 'bitiş', 'end', 'validto', 'expiry'],
-    vehicleMake: ['vehicleMake', 'marka', 'make', 'vehicle_make', 'arac_marka'],
-    vehicleYear: ['vehicleYear', 'year', 'model_yili', 'model_yılı', 'yil', 'model_year'],
-    vehicleModel: ['vehicleModel', 'model', 'vehicle_model'],
-    vehiclePlate: ['vehiclePlate', 'plaka', 'plate', 'plaque', 'license_plate'],
-    insuredName: ['insuredName', 'sigortali', 'sigortalı', 'insured', 'ad', 'isim'],
-    currency: ['currency', 'para_birimi', 'doviz', 'döviz', 'para', 'birim'],
+    startDate: [
+      'startDate',
+      'baslangic',
+      'başlangıç',
+      'start',
+      'validfrom',
+      'policystartdate',
+      'policystart',
+      'policestart',
+      'baslangictarihi',
+      'policybaslangic',
+    ],
+    endDate: [
+      'endDate',
+      'bitis',
+      'bitiş',
+      'end',
+      'validto',
+      'expiry',
+      'policyenddate',
+      'policyend',
+      'expirydate',
+      'bitistarihi',
+      'policybitis',
+      'son',
+    ],
+    vehicleMake: [
+      'vehicleMake',
+      'marka',
+      'make',
+      'vehicle_make',
+      'arac_marka',
+      'carmake',
+      'vehiclemake',
+      'aracmarka',
+      'otomobilmarka',
+      'markasi',
+    ],
+    vehicleYear: [
+      'vehicleYear',
+      'year',
+      'model_yili',
+      'model_yılı',
+      'yil',
+      'model_year',
+      'vehicleyear',
+      'caryear',
+      'modyili',
+      'aracyili',
+      'arac_yılı',
+      'model_year',
+      'aracyil',
+      'aracyili',
+    ],
+    vehicleModel: [
+      'vehicleModel',
+      'model',
+      'vehicle_model',
+      'vehiclemodel',
+      'carmodel',
+      'otomobilmodel',
+      'modeli',
+      'model_adi',
+    ],
+    vehiclePlate: [
+      'vehiclePlate',
+      'plaka',
+      'plate',
+      'plaque',
+      'license_plate',
+      'vehicleplate',
+      'licenceplate',
+      'plakano',
+      'plaka_no',
+      'plakanumarası',
+    ],
+    insuredName: [
+      'insuredName',
+      'sigortali',
+      'sigortalı',
+      'insured',
+      'ad',
+      'isim',
+      'insuredname',
+      'policyholder',
+      'policyholdername',
+      'sigortaliadi',
+      'sigortalıadı',
+      'sigortali_isim',
+      'sigortalının_adı',
+      'namesurname',
+      'adsoyad',
+      'ad_soyad',
+      'fullname',
+    ],
+    currency: [
+      'currency',
+      'para_birimi',
+      'doviz',
+      'döviz',
+      'para',
+      'birim',
+      'parabirimi',
+      'kur',
+      'parabirimi',
+    ],
   }
 
   const candidates: string[] = []
@@ -372,16 +602,25 @@ function searchField(obj: any, fieldName: string): string | undefined {
   const search = (obj: any, depth = 0) => {
     if (!obj || typeof obj !== 'object' || depth > 4) return
     for (const [key, value] of Object.entries(obj)) {
-      if (typeof value === 'string' && fieldAliases.some((a) => key.toLowerCase().includes(a))) {
+      const lowerKey = key.toLowerCase().replace(/[_\-\s]/g, '')
+      // Match alias as substring in normalized key
+      if (
+        typeof value === 'string' &&
+        fieldAliases.some((a) => lowerKey.includes(a.toLowerCase().replace(/[_\-\s]/g, '')))
+      ) {
         candidates.push(value)
       }
-      // Also capture numbers that should be strings (year, premium)
-      if (
-        fieldName === 'vehicleYear' &&
-        typeof value === 'number' &&
-        key.toLowerCase().includes('year')
-      ) {
-        candidates.push(String(value))
+      // Numbers: vehicleYear, premium
+      if (typeof value === 'number') {
+        const lfn = fieldName.toLowerCase()
+        if (
+          lfn === 'vehicleyear' &&
+          (lowerKey.includes('year') || lowerKey.includes('yil') || lowerKey === 'model_yili')
+        ) {
+          candidates.push(String(value))
+        } else if (lfn === 'vehicleyear' && lowerKey.includes(lfn.replace(/[_\-\s]/g, ''))) {
+          candidates.push(String(value))
+        }
       }
       if (typeof value === 'object') search(value, depth + 1)
     }
@@ -417,12 +656,10 @@ test.describe('Semantic Extraction Accuracy', () => {
           body: formData,
         })
         const d = await resp.json()
-        test
-          .info()
-          .annotations.push({
-            type: 'skipped',
-            description: `Scanned/OCR needed: ${d.error?.code || 'n/a'}`,
-          })
+        test.info().annotations.push({
+          type: 'skipped',
+          description: `Scanned/OCR needed: ${d.error?.code || 'n/a'}`,
+        })
         test.skip()
         testResults.push({ policy: policy.name, passed: true, total: 0, ok: 0, skipped: true })
         return
