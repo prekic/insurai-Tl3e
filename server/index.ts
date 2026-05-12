@@ -13,6 +13,11 @@ import dotenv from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import type { Server } from 'http'
+import ws from 'ws'
+
+// Polyfill WebSocket for Node.js < 22 — required by @supabase/realtime-js
+// Railway uses Node.js 20 which lacks native WebSocket
+globalThis.WebSocket = ws as unknown as typeof globalThis.WebSocket
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url)
