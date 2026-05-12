@@ -2479,7 +2479,15 @@ router.post(
       if (mimeType === 'application/pdf') {
         try {
           const pdfjsLib = await import('pdfjs-dist')
-          const { createCanvas } = await import('canvas')
+          // canvas (node-canvas) is optional — may not be installed in production
+          let createCanvas: any
+          try {
+            const mod = await import('canvas')
+            createCanvas = mod.createCanvas
+          } catch {
+            log.warn('Gemini OCR: canvas module not available, skipping PDF rendering')
+            throw new Error('canvas module not available')
+          }
           const pdfBuf = Buffer.from(imageBase64, 'base64')
           const doc = await pdfjsLib.getDocument({ data: pdfBuf.buffer }).promise
           const maxPages = Math.min(doc.numPages, 5) // Max 5 pages to avoid timeouts
