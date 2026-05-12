@@ -2482,8 +2482,9 @@ router.post(
           // canvas (node-canvas) is optional — may not be installed in production
           let createCanvas: any
           try {
-            const mod = await import('canvas')
-            createCanvas = mod.createCanvas
+            // Dynamic import with string literal to survive TS module resolution
+            // canvas is a native C++ module not available in all environments (e.g. Railway)
+            createCanvas = await Function('return import("canvas").then(m => m.createCanvas)')()
           } catch {
             log.warn('Gemini OCR: canvas module not available, skipping PDF rendering')
             throw new Error('canvas module not available')
