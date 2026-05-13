@@ -304,6 +304,45 @@ Your task is to extract structured information from insurance policy documents.
    - "Rayiç Değer" (Market Value): Set isMarketValue=true and limit=null. This is the vehicle's current market value for kasko policies.
    - For kasko policies: The main coverage is usually "Rayiç Değer" for the vehicle itself
 
+   **CRITICAL - Hidden Sub-Limits Behind "Unlimited" / "Included" Labels**:
+   Turkish policies frequently use "Sınırsız" (Unlimited) or "Dahil" (Included) at the top level
+   but bury actual caps in klozlar later in the document. You MUST:
+   - Scan ALL kloz sections after the coverage summary table
+   - Look for trigger terms like "olay başına azami", "yıllık azami", "toplam ... TL", "ile sınırlıdır",
+     "sınırlanmıştır", "sub-limit", "per-event limit", "annual aggregate"
+   - If a kloz references a named coverage and imposes a cap, add a 'carveOuts' entry to
+     the coverage object
+   - Example: Artan Mali Sorumluluk Sınırsız → has 2.500.000 TL per-event sub-limit
+     for airports, harbors, fuel stations, refineries, etc.
+   - Example: Hatalı Akaryakıt "Dahil" → actual per-event cap of 50.000 TL
+
+   **CRITICAL - Payment Plan / monthly_premium Anti-Hallucination**:
+   - "ÖDEME PLANI" section tells you the REAL payment structure
+   - If you see a single payment (Peşin / Peşinat / Tek Çekim): DO NOT create a monthly_premium
+   - Only create monthly_premium if the ODEME PLANI explicitly lists monthly taksit amounts
+   - Never divide total premium by 12 to fabricate a monthly value
+   - Populate paymentFrequency accurately: 'annual' for single payment, the actual frequency for installments
+
+   **Coverage Categories**:
+   - main: Primary coverage (vehicle value, property value, main insured amount)
+   - liability: Mali Sorumluluk, third-party liability coverages
+   - supplementary: Ek Teminatlar, additional protections (Cam, Hırsızlık, etc.)
+   - assistance: Asistans, İkame Araç, roadside assistance
+   - legal: Hukuki Koruma, legal protection
+   - other: Everything else
+
+   **CRITICAL - Coverage Deduplication**:
+   Some coverages appear under slightly different names (e.g. "Personal Belongings" vs
+   "Personal Effects in Vehicle"). If two coverage entries have the same limit and reference
+   the same clause, merge them into one entry. Duplicates confuse users.
+
+   **CRITICAL - Bundle Product Grouping**:
+   For "Birleşik" (Combined) policies, the coverages table contains items from multiple
+   insurance products (Kasko, Koltuk Ferdi Kaza, Artan Mali Sorumluluk, Hukuksal Koruma).
+   When you encounter a Birlesik Kasko policy, set 'isBundle: true' and populate
+   'bundleProducts' with the four product names. This allows the UI to group coverages
+   by product for clarity.
+
    **Coverage Categories**:
    - main: Primary coverage (vehicle value, property value, main insured amount)
    - liability: Mali Sorumluluk, third-party liability coverages
