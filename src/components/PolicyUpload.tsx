@@ -143,6 +143,14 @@ export function PolicyUpload() {
   // Ref to hold the latest addFiles function to avoid stale closures in useEffect
   const addFilesRef = useRef<((files: File[]) => Promise<void>) | undefined>(undefined)
 
+  // Track analyzing files for iOS background-suspend auto-retry
+  const analyzingFilesRef = useRef<
+    Map<string, { file: File; startedAt: number; currentRetry: number }>
+  >(new Map())
+  const processFileRef = useRef<((fileId: string, file: File) => Promise<void>) | undefined>(
+    undefined
+  )
+
   // Conflict resolution dialog state
   const [conflictDialog, setConflictDialog] = useState<ConflictDialogState>({
     isOpen: false,
@@ -405,6 +413,13 @@ export function PolicyUpload() {
         prev.map((f) => (f.id === fileId ? { ...f, status: 'analyzing', progress: 100 } : f))
       )
 
+      // Register for iOS background-suspend auto-retry
+      analyzingFilesRef.current.set(fileId, {
+        file,
+        startedAt: Date.now(),
+        currentRetry: analyzingFilesRef.current.get(fileId)?.currentRetry ?? 0,
+      })
+
       // Use real AI extraction - pass the logger for tracking
       const result = await extractPolicyFromDocument(file, {
         useFallback: false,
@@ -561,6 +576,9 @@ export function PolicyUpload() {
       // Mark the entire processing as complete
       logger.complete()
 
+      // Unregister from iOS background-suspend auto-retry
+      analyzingFilesRef.current.delete(fileId)
+
       setFiles((prev) =>
         prev.map((f) =>
           f.id === fileId
@@ -592,6 +610,9 @@ export function PolicyUpload() {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+
+      // Unregister from iOS background-suspend auto-retry
+      analyzingFilesRef.current.delete(fileId)
 
       // Log the failure in the processing log
       logger.fail(errorMessage, {
@@ -694,6 +715,9 @@ export function PolicyUpload() {
     }
   }
 
+  // Keep processFileRef updated so the visibility handler can call the latest version
+  processFileRef.current = processFileAsync
+
   const retryFile = async (fileId: string) => {
     // Find the file to get its File object
     const fileToRetry = files.find((f) => f.id === fileId)
@@ -775,6 +799,64 @@ export function PolicyUpload() {
     const failedFiles = files.filter((f) => f.status === 'error')
     failedFiles.forEach((f) => retryFile(f.id))
   }
+
+  // iOS background-suspend auto-retry:
+  // When the user switches to another app (e.g. iPhone), iOS suspends the page JS runtime.
+  // If an extraction was in-flight, the fetch promise dies silently on return.
+  // This handler auto-retries stuck analyzing files when the tab re-gains visibility.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return
+
+      const now = Date.now()
+      const stuckEntries: [string, File][] = []
+
+      analyzingFilesRef.current.forEach((entry, fileId) => {
+        // Only retry if stuck for >20s (allow genuine slow requests)
+        if (now - entry.startedAt < 20_000) return
+        // Cap retries to 2 to avoid infinite loops
+        if (entry.currentRetry >= 2) return
+        stuckEntries.push([fileId, entry.file])
+      })
+
+      if (stuckEntries.length === 0) return
+
+      console.warn(
+        `[PolicyUpload] Tab resumed — auto-retrying ${stuckEntries.length} stuck upload(s)`
+      )
+      toast.info('Resuming upload...', {
+        description: 'Auto-retrying interrupted uploads...',
+        duration: 4000,
+      })
+
+      for (const [fileId, file] of stuckEntries) {
+        // Mark startedAt further in the future to avoid re-triggering
+        const entry = analyzingFilesRef.current.get(fileId)
+        if (entry) {
+          entry.currentRetry++
+          entry.startedAt = now
+        }
+
+        // Clear the stale error state and re-run
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === fileId ? { ...f, status: 'analyzing' as UploadState, error: undefined } : f
+          )
+        )
+
+        // Small delay per file to let the browser reconnect
+        const delay = stuckEntries.indexOf([fileId, file]) * 2000
+        setTimeout(() => {
+          if (isMounted.current) {
+            processFileRef.current?.(fileId, file)
+          }
+        }, delay + 1000)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [])
 
   const handleViewPolicy = (policyId: string) => {
     const safeId = sanitizeId(policyId)
