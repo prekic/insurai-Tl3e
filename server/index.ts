@@ -262,8 +262,33 @@ app.use(cors(corsOptions))
 // AI endpoints have stricter limits (configured in routes)
 app.use('/api/', generalLimiter)
 
-// Body parsing
-app.use(express.json({ limit: '10mb' }))
+// Body parsing — increased to 50MB for multipage OCR payloads
+// express.json sends 413 for oversized bodies; we handle it below.
+app.use(express.json({ limit: '50mb' }))
+
+// 413 Payload Too Large handler — express.json() rejects before routes fire,
+// so we catch the error here via Express error middleware for user-friendly messages.
+app.use(
+  (
+    err: Error & { type?: string; body?: any },
+    _req: express.Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) => {
+    if (err.type === 'entity.too.large') {
+      log.warn('Payload too large', {
+        limit: '50mb',
+        actual: (err as any).body?.length ?? 'unknown',
+      })
+      return res.status(413).json({
+        error: 'Upload too large — the file or extracted text exceeds the maximum payload size.',
+        code: 'PAYLOAD_TOO_LARGE',
+        details: 'Maximum payload size is 50MB. Try a smaller PDF or reduce the number of pages.',
+      })
+    }
+    next(err)
+  }
+)
 
 // API metrics collection — records request timing, status, and provider info
 // Must be after body parsing (needs req.body for provider detection)

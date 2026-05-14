@@ -1078,7 +1078,7 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     trialAlreadyUsed: 'Ücretsiz denemenizi zaten kullandınız.',
     serviceUnavailableToast:
       'Analiz servisi geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin.',
-    pleaseWait: 'Lütfen bekleyin...',
+    pleaseWait: 'Lütfen tekrar deneyin.',
     trialAlreadyUsedTitle: 'Günlük Limit Doldu',
     trialAlreadyUsedDesc: 'Bu oturum için ücretsiz poliçe analizinizi zaten kullandınız.',
     dailyLimitReached:

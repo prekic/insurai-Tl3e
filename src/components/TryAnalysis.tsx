@@ -505,7 +505,25 @@ export function TryAnalysis() {
         const errorCode = (err as Error & { errorCode?: string })?.errorCode
         const requestId = (err as Error & { requestId?: string })?.requestId
 
-        // Log diagnostics to console for developers — don't show to users
+        // Build a user-facing diagnostic string that helps them understand the failure
+        let userDiag = ''
+        if (errorCode) {
+          const diagLabels: Record<string, string> = {
+            NETWORK_ERROR: 'Network connection lost',
+            TIMEOUT: 'AI service timed out — the document may be too large',
+            CLIENT_FETCH_TIMEOUT: 'Connection timed out — the server took too long',
+            RATE_LIMIT_EXCEEDED: 'Too many requests — please wait a moment',
+            BILLING_ERROR: 'AI service billing issue',
+            INVALID_API_KEY: 'AI provider API key is invalid',
+            DOCUMENT_TOO_LARGE: 'Document is too large for the AI service',
+            PAYLOAD_TOO_LARGE: 'File exceeds the maximum upload size',
+            EXTRACTION_TIMEOUT: 'AI analysis timed out — the service may be busy',
+            ALL_PROVIDERS_FAILED: 'All AI providers failed — server issue',
+          }
+          userDiag = diagLabels[errorCode] || `Error code: ${errorCode}`
+        }
+
+        // Log full diagnostics to console for developer debugging
         if (errorCode || requestId || phaseTiming) {
           const diagParts: string[] = []
           if (errorCode) diagParts.push(`code=${errorCode}`)
@@ -519,12 +537,22 @@ export function TryAnalysis() {
           console.warn('[TryAnalysis] Diagnostics:', diagParts.join(' | '))
         }
 
-        // Make timeout errors more user-friendly — no diagnostic codes shown
+        // Build a user-friendly message from diagnostics
+        // Timeout detection checks both the enriched error code and raw message
         const isTimeout =
+          errorCode === 'TIMEOUT' ||
+          errorCode === 'CLIENT_FETCH_TIMEOUT' ||
+          errorCode === 'EXTRACTION_TIMEOUT' ||
+          errorCode === 'BUDGET_EXHAUSTED' ||
           message.includes('timed out') ||
           message.includes('TIMEOUT') ||
           message.includes('BUDGET_EXHAUSTED')
-        if (isTimeout) {
+
+        if (userDiag) {
+          message = isTimeout
+            ? `${t.tryAnalysis.analysisTimedOut} ${t.tryAnalysis.pleaseWait}`
+            : `${userDiag}. ${t.tryAnalysis.pleaseWait}`
+        } else if (isTimeout) {
           message = `${t.tryAnalysis.analysisTimedOut} ${t.tryAnalysis.pleaseWait}`
         }
 

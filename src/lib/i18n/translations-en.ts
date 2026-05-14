@@ -1058,7 +1058,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     analyzingStructure: 'Analyzing document structure...',
     processingWithAI: 'Processing with AI...',
     almostThere: 'Almost there...',
-    analysisTimedOut: 'Analysis timed out. The AI service may be busy. Please try again.',
+    analysisTimedOut: 'Analysis timed out. The AI service may be busy.',
     noResponse: 'No response received from analysis service.',
     analysisFailed: 'Analysis failed',
     aiExtractionFailed: 'AI extraction failed',
@@ -1069,7 +1069,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     analysisSuccessDesc: 'Your policy has been analyzed successfully.',
     trialAlreadyUsed: 'You have already used your free trial.',
     serviceUnavailableToast: 'Analysis service is temporarily unavailable. Please try again later.',
-    pleaseWait: 'Please wait...',
+    pleaseWait: 'Please try again.',
     trialAlreadyUsedTitle: 'Daily Limit Reached',
     trialAlreadyUsedDesc: 'You have already used your free policy analysis for this session.',
     dailyLimitReached:
