@@ -582,10 +582,8 @@ export function TryAnalysis() {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState !== 'visible') return
-      if (!extractionInFlightRef.current) return
       if (!isMounted.current) return
 
-      // Tab became visible again while extraction was in-flight.
       // Check if a result was saved in the background (extraction may have completed).
       const existingResult = getTrialResult()
       if (existingResult) {
@@ -597,10 +595,12 @@ export function TryAnalysis() {
         return
       }
 
-      // No result — the fetch connection was likely killed by the mobile browser.
-      // Auto-retry with the same file instead of showing a confusing timeout error.
+      // Get the last file for retry
       const file = lastFileRef.current
-      if (file && retryCountRef.current < 2) {
+      if (!file) return
+
+      // Case 1: Extraction was in-flight when suspended — retry automatically
+      if (extractionInFlightRef.current && retryCountRef.current < 2) {
         console.warn('[TryAnalysis] Tab resumed during extraction — retrying automatically')
         retryCountRef.current++
         // Clear stale timers from the dead extraction
@@ -612,6 +612,24 @@ export function TryAnalysis() {
         setError(null)
         setProgress(0)
         // Small delay to let the browser reconnect network
+        setTimeout(() => {
+          if (isMounted.current) runExtraction(file)
+        }, 1500)
+        return
+      }
+
+      // Case 2: Extraction timed out while tab was suspended (timer fired before return).
+      // The hard budget or client timeout set error state while user was away.
+      // Auto-retry once to give it another chance.
+      if (retryCountRef.current < 1) {
+        console.warn('[TryAnalysis] Tab resumed after extraction timeout — retrying automatically')
+        retryCountRef.current++
+        if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current)
+        if (intervalIdRef.current) clearInterval(intervalIdRef.current)
+        extractionInFlightRef.current = false
+        setState('idle')
+        setError(null)
+        setProgress(0)
         setTimeout(() => {
           if (isMounted.current) runExtraction(file)
         }, 1500)
