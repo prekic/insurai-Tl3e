@@ -193,6 +193,10 @@ export function TryAnalysis() {
         }
         setError(`${t.tryAnalysis.analysisTimedOut} ${t.tryAnalysis.pleaseWait}`)
         setState('error')
+        trackTrialAnalysisFailed('hard_budget_exceeded')
+        toast.error(t.tryAnalysis.analysisFailed, {
+          description: `${t.tryAnalysis.analysisTimedOut} ${t.tryAnalysis.pleaseWait}`,
+        })
       }, HARD_EXTRACTION_BUDGET_MS)
 
       // Start analysis
@@ -512,6 +516,7 @@ export function TryAnalysis() {
             NETWORK_ERROR: 'Network connection lost',
             TIMEOUT: 'AI service timed out — the document may be too large',
             CLIENT_FETCH_TIMEOUT: 'Connection timed out — the server took too long',
+            CLIENT_TIMEOUT_UMBRELLA: 'Extraction took too long — the server may be busy',
             RATE_LIMIT_EXCEEDED: 'Too many requests — please wait a moment',
             BILLING_ERROR: 'AI service billing issue',
             INVALID_API_KEY: 'AI provider API key is invalid',
