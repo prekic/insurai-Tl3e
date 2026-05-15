@@ -1,0 +1,495 @@
+{
+  "policy": {
+    "policy_no": "1680600025",
+    "sbm_policy_no": "803942275",
+    "provider": "Anadolu Sigorta",
+    "agent": {
+      "code": "325464",
+      "name": "SİGORTA NOKTASI SİGORTA ARACILIK HİZ. LTD. ŞTİ."
+    },
+    "type": "Birleşik Kasko - Genişletilmiş",
+    "products_bundled": ["Kasko", "Koltuk Ferdi Kaza", "Artan Mali Sorumluluk", "Hukuksal Koruma"],
+    "issue_date": "2025-12-26T16:24:00+03:00",
+    "start_date": "2025-12-28",
+    "expiry_date": "2026-12-28",
+    "duration_days": 365,
+    "status": "active",
+    "insured": {
+      "name": "ERİŞ AMBALAJ SANAYİ VE TİCARET LİMİTED ŞİRKETİ",
+      "type": "corporate",
+      "address": "ATATÜRK MAH. MUSTAFA KEMAL CAD. NO: 25/1A, ATAŞEHİR / İSTANBUL"
+    },
+    "vehicle": {
+      "plate": "34 RZ9511",
+      "make": "VOLKSWAGEN",
+      "model": "TIGUAN 1.4 TSI ACT BMT 150 DSG HIGHLINE",
+      "model_year": 2016,
+      "registration_date": "2017-01-01",
+      "use_type": "HUSUSİ OTOMOBİL"
+    },
+    "premium": {
+      "total": 31140.0,
+      "net_premium": 29657.14,
+      "bsmv_tax": 1482.86,
+      "currency": "TRY",
+      "display": "31.140,00 TL"
+    },
+    "payment_plan": {
+      "type": "single",
+      "installments": [{ "date": "2025-12-28", "amount": 31140.0, "method": "Sanal POS" }]
+    },
+    "regulatory": {
+      "cayma_hakki_applicable": false,
+      "cayma_hakki_reason": "Insured is a corporate entity, not consumer (tüketici)"
+    }
+  },
+  "coverages": [
+    {
+      "name_tr": "Kasko - Araç Rayiç Değer",
+      "name_en": "Comprehensive - Vehicle Market Value",
+      "product_group": "Kasko",
+      "limit_type": "market_value",
+      "limit_amount": null,
+      "limit_display": "Rayiç Değer",
+      "currency": "TRY",
+      "deductible_notes": "%35 pert muafiyet, %35 yetkisiz servis muafiyet",
+      "sub_limits": [],
+      "documentation_required": ["Kaza beyanı", "Ruhsat", "Ehliyet", "Eksper raporu"],
+      "clause_page": 4
+    },
+    {
+      "name_tr": "Kişisel Eşya",
+      "name_en": "Personal Belongings",
+      "product_group": "Kasko",
+      "limit_type": "fixed",
+      "limit_amount": 5000.0,
+      "limit_display": "5.000,00 TL",
+      "currency": "TRY",
+      "deductible_notes": null,
+      "sub_limits": [],
+      "documentation_required": [],
+      "clause_page": 8
+    },
+    {
+      "name_tr": "Hatalı Akaryakıt Dolumu",
+      "name_en": "Wrong Fuel Coverage",
+      "product_group": "Kasko",
+      "limit_type": "capped",
+      "limit_amount": 50000.0,
+      "limit_display": "50.000,00 TL per event / 50.000,00 TL annual",
+      "currency": "TRY",
+      "deductible_notes": "Not 'Included' - explicitly capped at 50K per event and annual",
+      "sub_limits": [
+        { "scope": "per_event", "limit": 50000.0, "currency": "TRY" },
+        { "scope": "annual_aggregate", "limit": 50000.0, "currency": "TRY" }
+      ],
+      "documentation_required": [
+        "Akaryakıt faturası",
+        "İstasyon beyanı",
+        "Yetkili servis ekspertiz raporu"
+      ],
+      "clause_page": 10
+    },
+    {
+      "name_tr": "Koltuk Ferdi Kaza - Ölüm (1 sürücü + 4 yolcu)",
+      "name_en": "Seat Personal Accident - Death (1 driver + 4 passengers)",
+      "product_group": "Koltuk Ferdi Kaza",
+      "limit_type": "fixed",
+      "limit_amount": 10000.0,
+      "limit_display": "10.000,00 TL per person",
+      "currency": "TRY",
+      "deductible_notes": "Deprem, Sel, Terör kapsamı dahil",
+      "sub_limits": [],
+      "documentation_required": [],
+      "clause_page": 8
+    },
+    {
+      "name_tr": "Koltuk Ferdi Kaza - Sürekli Sakatlık (1 sürücü + 4 yolcu)",
+      "name_en": "Seat Personal Accident - Permanent Disability (1 driver + 4 passengers)",
+      "product_group": "Koltuk Ferdi Kaza",
+      "limit_type": "fixed",
+      "limit_amount": 10000.0,
+      "limit_display": "10.000,00 TL per person",
+      "currency": "TRY",
+      "deductible_notes": "Deprem, Sel, Terör kapsamı dahil",
+      "sub_limits": [],
+      "documentation_required": [],
+      "clause_page": 8
+    },
+    {
+      "name_tr": "Artan Mali Sorumluluk",
+      "name_en": "Excess Liability",
+      "product_group": "Artan Mali Sorumluluk",
+      "limit_type": "unlimited",
+      "limit_amount": null,
+      "limit_display": "Unlimited (default) / 2.500.000,00 TL in restricted zones",
+      "currency": "TRY",
+      "deductible_notes": "See sub_limits for restricted zone cap",
+      "sub_limits": [
+        {
+          "scope": "restricted_zones",
+          "per_event_limit": 2500000.0,
+          "currency": "TRY",
+          "applies_to": [
+            "airports",
+            "harbors",
+            "fuel stations",
+            "refineries",
+            "power plants",
+            "chemical depots",
+            "ammunition sites",
+            "rally/race vehicles",
+            "fire trucks",
+            "ambulances",
+            "security vehicles"
+          ],
+          "clause_page": 13
+        }
+      ],
+      "documentation_required": [],
+      "clause_page": 8
+    },
+    {
+      "name_tr": "Artan Mali Sorumluluk - Manevi Tazminat",
+      "name_en": "Excess Liability - Moral Compensation",
+      "product_group": "Artan Mali Sorumluluk",
+      "limit_type": "fixed",
+      "limit_amount": 5000000.0,
+      "limit_display": "5.000.000,00 TL per event",
+      "currency": "TRY",
+      "deductible_notes": "Ayrı teminat limiti, AMS toplamı sınırlamasına tabi",
+      "sub_limits": [],
+      "documentation_required": [],
+      "clause_page": 8
+    },
+    {
+      "name_tr": "Hukuksal Koruma - Kefalet (Teminatla Salıverme)",
+      "name_en": "Legal Protection - Bail per Event",
+      "product_group": "Hukuksal Koruma",
+      "limit_type": "fixed",
+      "limit_amount": 4000.0,
+      "limit_display": "4.000,00 TL per event",
+      "currency": "TRY",
+      "deductible_notes": null,
+      "sub_limits": [],
+      "documentation_required": [],
+      "clause_page": 8
+    },
+    {
+      "name_tr": "Hukuksal Koruma - Avans",
+      "name_en": "Legal Protection - Advance per Event",
+      "product_group": "Hukuksal Koruma",
+      "limit_type": "fixed",
+      "limit_amount": 4000.0,
+      "limit_display": "4.000,00 TL per event",
+      "currency": "TRY",
+      "deductible_notes": null,
+      "sub_limits": [],
+      "documentation_required": [],
+      "clause_page": 8
+    },
+    {
+      "name_tr": "Hukuksal Koruma - Olay Başına Limit",
+      "name_en": "Legal Protection - Limit per Event",
+      "product_group": "Hukuksal Koruma",
+      "limit_type": "fixed",
+      "limit_amount": 40000.0,
+      "limit_display": "40.000,00 TL per event",
+      "currency": "TRY",
+      "deductible_notes": null,
+      "sub_limits": [],
+      "documentation_required": [],
+      "clause_page": 8
+    },
+    {
+      "name_tr": "Hukuksal Koruma - Yıllık Azami Limit",
+      "name_en": "Legal Protection - Annual Maximum Limit",
+      "product_group": "Hukuksal Koruma",
+      "limit_type": "fixed",
+      "limit_amount": 80000.0,
+      "limit_display": "80.000,00 TL annual aggregate",
+      "currency": "TRY",
+      "deductible_notes": null,
+      "sub_limits": [],
+      "documentation_required": [],
+      "clause_page": 8
+    },
+    {
+      "name_tr": "İkame Araç (Anadolu Grup 2)",
+      "name_en": "Substitute Vehicle (Anadolu Group 2)",
+      "product_group": "Asistans",
+      "limit_type": "service",
+      "limit_amount": null,
+      "limit_display": "30 days/claim, 2 claims/year, includes pert total-loss",
+      "currency": "TRY",
+      "deductible_notes": null,
+      "sub_limits": [],
+      "documentation_required": [],
+      "clause_page": 10
+    },
+    {
+      "name_tr": "Anadolu Hizmet - Çekme Kurtarma",
+      "name_en": "Towing and Roadside Assistance",
+      "product_group": "Asistans",
+      "limit_type": "service",
+      "limit_amount": null,
+      "limit_display": "Anlaşmalı servise ücretsiz çekim, hasar/arıza",
+      "currency": "TRY",
+      "deductible_notes": null,
+      "sub_limits": [],
+      "documentation_required": [],
+      "clause_page": 8
+    },
+    {
+      "name_tr": "Mini Onarım",
+      "name_en": "Mini Repair Service",
+      "product_group": "Asistans",
+      "limit_type": "service",
+      "limit_amount": null,
+      "limit_display": "Ücretsiz mini onarım hizmeti",
+      "currency": "TRY",
+      "deductible_notes": null,
+      "sub_limits": [],
+      "documentation_required": [],
+      "clause_page": 9
+    }
+  ],
+  "sub_limits": [
+    {
+      "coverage_name": "Hatalı Akaryakıt Dolumu",
+      "scope": "per_event",
+      "per_event_limit": 50000.0,
+      "annual_aggregate_limit": 50000.0,
+      "currency": "TRY",
+      "applies_to": [],
+      "clause_page": 10,
+      "clause_name": "Hatalı Akaryakıt Dolumu Klozu"
+    },
+    {
+      "coverage_name": "Hatalı Akaryakıt Dolumu",
+      "scope": "annual_aggregate",
+      "annual_aggregate_limit": 50000.0,
+      "currency": "TRY",
+      "applies_to": [],
+      "clause_page": 10,
+      "clause_name": "Hatalı Akaryakıt Dolumu Klozu"
+    },
+    {
+      "coverage_name": "Artan Mali Sorumluluk",
+      "scope": "restricted_zones",
+      "per_event_limit": 2500000.0,
+      "currency": "TRY",
+      "applies_to": [
+        "airports",
+        "harbors",
+        "fuel stations",
+        "refineries",
+        "power plants",
+        "chemical depots",
+        "explosives sites",
+        "race vehicles",
+        "emergency vehicles",
+        "railway crossings and similar"
+      ],
+      "clause_page": 13,
+      "clause_name": "Artan Mali Sorumluluk Sınırsız Teminatı Klozu"
+    },
+    {
+      "coverage_name": "NBC Environmental Liability",
+      "scope": "per_event",
+      "per_event_limit": 500000.0,
+      "currency": "TRY",
+      "applies_to": ["nuclear_biological_chemical_environmental_damage"],
+      "clause_page": 12,
+      "clause_name": "Nükleer/Biyolojik/Kimyasal Rizikolar Klozu"
+    }
+  ],
+  "conditional_deductibles": [
+    {
+      "code": "commercial_misuse",
+      "description_tr": "Aracın kiralık araç, taksi, dolmuş, kargo/kurye, mobil uygulama taşımacılığı veya test sürüşü aracı olarak kullanılması halinde her hasarın %80'i tazminattan indirilir",
+      "description_en": "80% co-insurance applies if vehicle used as rental, taxi, courier, ride-share, test-drive or other commercial transport",
+      "type": "tenzili",
+      "rate": 0.8,
+      "basis": "claim_amount",
+      "clause_ref": "Kullanım Şekli Klozu",
+      "clause_page": 12,
+      "applicability_for_this_policy": "high_risk_for_corporate_insured"
+    },
+    {
+      "code": "corporate_third_party_driver",
+      "description_tr": "Şirket adına kayıtlı aracın sigortalı, eşi, annesi, babası, çocukları, şirket ortağı ve bordrolu personel dışında üçüncü şahıslar tarafından kullanılması halinde her hasarın %80'i tazminattan indirilir",
+      "description_en": "80% co-insurance applies for corporate-owned vehicles driven by anyone outside insured + spouse + parents + children + company partner + payroll staff",
+      "type": "tenzili",
+      "rate": 0.8,
+      "basis": "claim_amount",
+      "clause_ref": "Kullanım Şekli Klozu",
+      "clause_page": 12,
+      "applicability_for_this_policy": "high_risk_for_corporate_insured"
+    },
+    {
+      "code": "lpg_not_on_ruhsat",
+      "description_tr": "LPG kullanılmasına rağmen araç ruhsatında LPG ibaresi bulunmuyorsa, LPG'den kaynaklanan yangın hasarlarında her hasarın %80'i tazminattan indirilir",
+      "description_en": "80% co-insurance applies if LPG is used as fuel but not declared on vehicle registration (LPG-caused fire damages only)",
+      "type": "tenzili",
+      "rate": 0.8,
+      "basis": "claim_amount",
+      "clause_ref": "LPG Kullanan Araçlar Klozu",
+      "clause_page": 10,
+      "applicability_for_this_policy": "not_applicable_no_lpg_on_vehicle"
+    },
+    {
+      "code": "pert_vehicle_35",
+      "description_tr": "Aracın daha önce tam hasara (pert total) uğradığının sonradan tespiti halinde kısmi hasarlarda %35 tenzili muafiyet; tam hasarda rayiç değerin %35'i oranında muafiyet",
+      "description_en": "35% deductible if vehicle was previously totaled (pert); applies to partial or total loss",
+      "type": "tenzili",
+      "rate": 0.35,
+      "basis": "claim_amount",
+      "clause_ref": "Pert Araç Klozu",
+      "clause_page": 4,
+      "applicability_for_this_policy": "standard"
+    },
+    {
+      "code": "unauthorized_service_35",
+      "description_tr": "Anlaşmalı olmayan yetkili serviste tamir halinde eksper tarafından belirlenen hasar tutarının %35'i oranında tenzili muafiyet",
+      "description_en": "35% deductible if repaired at non-authorised service center",
+      "type": "tenzili",
+      "rate": 0.35,
+      "basis": "claim_amount",
+      "clause_ref": "Onarım Yapılacak Servis",
+      "clause_page": 7,
+      "applicability_for_this_policy": "standard"
+    },
+    {
+      "code": "glass_change_35",
+      "description_tr": "Anlaşmalı cam servisi haricinde yapılan ilk cam değişiminde %35 muafiyet uygulanırsa hasarsızlık indirimi etkilenmez",
+      "description_en": "35% deductible for first glass change outside contracted glass service; preserves no-claim discount",
+      "type": "tenzili",
+      "rate": 0.35,
+      "basis": "claim_amount",
+      "clause_ref": "Cam Hasarı Notu",
+      "clause_page": 11,
+      "applicability_for_this_policy": "optional"
+    }
+  ],
+  "exclusions": [
+    {
+      "code": "pandemic",
+      "title_tr": "Salgın ve Bulaşıcı Hastalık İstisnası",
+      "title_en": "Pandemic and Communicable Disease Exclusion",
+      "category": "medical_legal",
+      "clause_page": 14
+    },
+    {
+      "code": "cyber_attack",
+      "title_tr": "Siber Saldırı İstisna Klozu",
+      "title_en": "Cyber Attack Exclusion Clause",
+      "category": "technology",
+      "clause_page": 14
+    },
+    {
+      "code": "sanctions",
+      "title_tr": "Yaptırım Klozu (BMGK/AB/Birleşik Krallık/ABD)",
+      "title_en": "Sanctions Clause (UN/EU/UK/US)",
+      "category": "regulatory",
+      "clause_page": 13
+    },
+    {
+      "code": "roof_glass_sunroof",
+      "title_tr": "Araç tavan camı ve sunroof camı hasarları cam hasarı olarak değerlendirilmez",
+      "title_en": "Roof glass and sunroof damage not treated as glass damage for no-claim purposes",
+      "category": "glass",
+      "clause_page": 13
+    },
+    {
+      "code": "driver_license_mismatch",
+      "title_tr": "Aracın gerekli sürücü belgesine sahip olmayan kimseler tarafından kullanılması (Kasko Genel Şartları A.5.4)",
+      "title_en": "Vehicle driven by person without valid driver's license (General Conditions A.5.4)",
+      "category": "driver",
+      "clause_page": 5
+    },
+    {
+      "code": "lpg_not_registered",
+      "title_tr": "LPG kullanan araçlarda ruhsatta LPG kaydı yoksa LPG'den kaynaklı yangın hasarları",
+      "title_en": "LPG-caused fire damage if LPG conversion not registered on vehicle title",
+      "category": "vehicle_condition",
+      "clause_page": 10
+    },
+    {
+      "code": "key_left_inside",
+      "title_tr": "Anahtarın kontak üzerinde veya araç içerisinde bırakılması; anahtarsız çalıştırma sisteminde kart/aparatın araç içinde unutulması",
+      "title_en": "Theft when key left in ignition or vehicle; keyless start card/aparat left in vehicle",
+      "category": "theft",
+      "clause_page": 9
+    },
+    {
+      "code": "ceramic_coating",
+      "title_tr": "Seramik/folyo vb. kaplamalar ve araca monte edilmeyen donanımlar teminat harici",
+      "title_en": "Ceramic/foil coatings and non-mounted equipment not covered",
+      "category": "accessories",
+      "clause_page": 6
+    },
+    {
+      "code": "third_party_voluntary_key",
+      "title_tr": "Araç anahtarının sigortalının kendi iradesiyle 3. şahıslara teslim edilmesi ve emniyeti suiistimal yoluyla çalınması",
+      "title_en": "Theft after voluntarily handing keys to a third party who then misappropriates the vehicle",
+      "category": "theft",
+      "clause_page": 9
+    },
+    {
+      "code": "nbc_environmental_excess",
+      "title_tr": "Nükleer/Biyolojik/Kimyasal çevresel zararlarda Artan Mali Sorumluluk limiti 500.000 TL ile sınırlıdır (aşan kısım teminat dışı)",
+      "title_en": "Nuclear/Biological/Chemical environmental damage excess liability capped at 500,000 TL",
+      "category": "environmental_limit",
+      "clause_page": 12
+    }
+  ],
+  "no_claim_discount": {
+    "current_kademe": 3,
+    "current_discount_rate": 0.5,
+    "previous_insurer": "SOMPO JAPAN SİGORTA A.Ş.",
+    "previous_policy_no": "333000020188830",
+    "tramer_doc_no": "710855217",
+    "tramer_doc_date": "2025-03-16",
+    "transferred": true,
+    "projection": {
+      "no_claims": { "kademe": 4, "rate": 0.6 },
+      "one_claim": { "kademe": 2, "rate": 0.4 },
+      "two_claims": { "kademe": 1, "rate": 0.3 },
+      "three_plus_claims": { "kademe": 0, "rate": 0.0 }
+    }
+  },
+  "insights": [
+    {
+      "severity": "high",
+      "type": "risk_flag",
+      "message_tr": "⚠ Şirket aracı olduğu için, üçüncü şahıslar tarafından kullanılması halinde her hasarda %80 muafiyet uygulanır. Aracı sadece sigortalı, eş, anne, baba, çocuklar, şirket ortağı ve bordrolu personel kullanabilir.",
+      "message_en": "Because this is a corporate vehicle, an 80% co-insurance applies to every claim if anyone outside the immediate family or company-payroll staff drives it."
+    },
+    {
+      "severity": "medium",
+      "type": "renewal_opportunity",
+      "message_tr": "💡 Hasarsız geçen bir yıl sonunda hasarsızlık indirimi %50'den %60'a yükselecek (Kademe 3 → 4).",
+      "message_en": "After one claim-free year, the no-claim discount rises from 50% to 60% (Level 3 → 4)."
+    },
+    {
+      "severity": "high",
+      "type": "hidden_cap",
+      "message_tr": "⚠ 'Sınırsız' Artan Mali Sorumluluk teminatı; havalimanı, liman, akaryakıt istasyonu gibi alanlarda olay başına 2.500.000 TL ile sınırlıdır.",
+      "message_en": "The 'Unlimited' Excess Liability coverage is capped at 2,500,000 TL per event in restricted zones (airports, harbors, fuel stations, etc.)."
+    },
+    {
+      "severity": "medium",
+      "type": "documentation_requirement",
+      "message_tr": "📋 Hatalı akaryakıt hasarında tazminat alabilmek için akaryakıt faturası, istasyon beyanı ve yetkili servis raporu gereklidir.",
+      "message_en": "For wrong fuel claims, a fuel receipt, station declaration, and authorized service expert report are required."
+    },
+    {
+      "severity": "low",
+      "type": "verification_link",
+      "message_tr": "🔍 Poliçenizi SBM üzerinden doğrulayabilirsiniz (SBM Poliçe No: 803942275) - https://www.sbm.org.tr/",
+      "message_en": "Verify your policy via SBM (SBM Policy No: 803942275) - https://www.sbm.org.tr/"
+    }
+  ],
+  "extraction_confidence": 0.85
+}
