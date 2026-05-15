@@ -78,6 +78,13 @@ export abstract class InsurerAdapter {
    * Defines mandatory coverages that must be present for a given product type.
    * If the LLM omits these, the pipeline will deterministically inject them.
    * If the LLM extracts them with non-deterministic values, the 'enforce' flag can standardise them.
+   *
+   * @param productType - The policy type string (e.g. "kasko", "trafik")
+   * @param context - Optional full extraction context including fields like isBundle, bundleProducts,
+   *   so adapters can make decisions based on richer data than just productType.
    */
-  public abstract getRequiredCoverages(productType?: string): RequiredCoverageDefinition[]
+  public abstract getRequiredCoverages(
+    productType?: string,
+    context?: any
+  ): RequiredCoverageDefinition[]
 }

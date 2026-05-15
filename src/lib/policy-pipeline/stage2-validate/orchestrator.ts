@@ -4,6 +4,7 @@ import { normalizeCoverageLabel } from './normalize-text.js'
 import { parseCoverageLimit } from './parse-coverage-limit.js'
 import { getAdapterForInsurer } from '../adapters/adapter-factory.js'
 import { getConceptLabels } from '../types/canonical-concepts.js'
+import { projectNCD } from './ncd-projection.js'
 
 /**
  * Runs the Stage 2 validation process on raw extraction data.
@@ -73,19 +74,21 @@ export function runStage2Validation(data: any): any {
 
   // 3. Inject Missing Mandatory Coverages & Enforce Determinism
   const adapter = getAdapterForInsurer(result.provider)
-  const requiredCoverages = adapter.getRequiredCoverages(result.policyType)
+  // Pass context including isBundle so the adapter can detect Birleşik Kasko
+  // for correct Hukuksal Koruma sub-tier injection (policyType is always "kasko").
+  const reqDefs = adapter.getRequiredCoverages(result.policyType, result)
 
-  if (requiredCoverages.length > 0) {
+  if (reqDefs.length > 0) {
     const existingMap = new Map(result.coverages.map((cov: any) => [cov.canonicalName, cov]))
-    const newCoverages: any[] = []
+    const standardizedRequired: any[] = []
 
-    for (const reqDef of requiredCoverages) {
+    for (const reqDef of reqDefs) {
       const existing = existingMap.get(reqDef.concept)
 
       if (!existing) {
         // Missing: Inject it deterministically
         const labels = getConceptLabels(reqDef.concept)
-        newCoverages.push({
+        standardizedRequired.push({
           name: `${labels.tr}`,
           canonicalName: reqDef.concept,
           normalizedName: labels.tr.toLocaleLowerCase('tr-TR'),
@@ -97,7 +100,7 @@ export function runStage2Validation(data: any): any {
               : null,
           isUnlimited: reqDef.isUnlimited ?? false,
           isMarketValue: reqDef.isMarketValue ?? false,
-          isImplicit: false, // We use false here to match extracted items
+          isImplicit: false,
           description: 'Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir.',
         })
       } else {
@@ -118,12 +121,40 @@ export function runStage2Validation(data: any): any {
           }
         }
 
-        newCoverages.push(strictCov)
+        standardizedRequired.push(strictCov)
       }
     }
 
-    // STRICT DETERMINISM GATE: Strip all optional coverages that aren't in the required set
-    result.coverages = newCoverages
+    // Build set of required canonical names to dedup from the kept set
+    const requiredCanonicalNames = new Set(standardizedRequired.map((cov) => cov.canonicalName))
+
+    // Keep LLM-extracted coverages that are NOT in the required set (was STRICT DETERMINISM GATE)
+    // FIX: Previously this was "result.coverages = standardizedRequired" which dropped all
+    // non-required coverages (about 20 out of 29). Now we preserve them.
+    const keptOptional = result.coverages.filter(
+      (cov: any) => !requiredCanonicalNames.has(cov.canonicalName)
+    )
+
+    // Merge: optional (LLM-only) coverages + required (adapter-driven) coverages
+    result.coverages = [...keptOptional, ...standardizedRequired]
+  }
+
+  // 4. NCD Projection
+  // Enrich the discounts object with future-year projections.
+  // The LLM extracts raw NCD (e.g. 50%, kademe 3). Business logic
+  // projects next year (kademe 4 → 60%) and post-claim values.
+  if (result.discounts && typeof result.discounts === 'object') {
+    const ncdPct = result.discounts.ncdDiscount ?? null
+    // Try to extract kademe from evidence text if available
+    let kademe: number | null = null
+    if (result.discounts.evidence) {
+      const kademeMatch = result.discounts.evidence.match(/Kademesi?\s*:\s*(\d+)/i)
+      if (kademeMatch) {
+        kademe = parseInt(kademeMatch[1], 10)
+      }
+    }
+    const projection = projectNCD(ncdPct, kademe)
+    result.ncdProjection = projection
   }
 
   return result

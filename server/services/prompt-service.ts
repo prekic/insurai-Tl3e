@@ -251,6 +251,34 @@ Your task is to extract structured information from insurance policy documents.
      for airports, harbors, fuel stations, refineries, etc.
    - Example: Hatalı Akaryakıt "Dahil" → actual per-event cap of 50.000 TL
 
+   **CRITICAL - Specific Exclusions Buried in Kloz Clauses** (ROOF GLASS, DRIVER LICENSE):
+   Turkish policies hide specific exclusions in kloz sections, NOT in the coverage
+   summary table. You MUST scan ALL kloz text for:
+
+   1. **Roof Glass / Sunroof (Tavan Camı / Sunroof / Açılır Tavan):**
+      - Many policies explicitly EXCLUDE roof glass from glass coverage (Cam teminatı).
+      - Look for phrases like "tavan camı hariç", "sunroof hariç", "açılır tavan hariç",
+        "tavan camı teminat dışıdır", "sunroof teminat kapsamı dışındadır"
+      - If found, add an exclusion { type: 'ROOF_GLASS_EXCLUDED', text: 'Tavan camı teminat dışıdır',
+        quote: <verbatim text>, evidence: <kloz reference> }
+
+   2. **Driver License Mismatch (Sürücü Belgesi Uyumsuzluğu):**
+      - Policies often exclude coverage if the driver doesn't have a valid license for
+        the vehicle class, or if the driver's license is suspended, expired, or forged.
+      - Look for phrases like "sürücü belgesi olmayan", "ehliyetsiz", "geçersiz ehliyet",
+        "sürücü belgesi uyumsuzluğu", "ehliyet sınıfı uygun değil"
+      - If found, add an exclusion { type: 'DRIVER_LICENSE_MISMATCH',
+        text: 'Sürücü belgesi uyumsuzluğu teminat dışıdır',
+        quote: <verbatim text>, evidence: <kloz reference> }
+
+   3. **Other Common Kloz Exclusions to Scan For:**
+      - Intentional acts / kast (kasten verilen zararlar)
+      - Drunk driving / alkollü araç kullanma
+      - Unauthorized use / izinsiz kullanım
+      - War / nuclear / terrorism (savaş / nükleer / terör)
+      - Racing / track events (yarış / pist etkinlikleri)
+      - Wear and tear / aşınma ve yıpranma
+
    **CRITICAL - Payment Plan / monthly_premium Anti-Hallucination**:
    - "ÖDEME PLANI" section tells you the REAL payment structure
    - If you see a single payment (Peşin / Peşinat / Tek Çekim): DO NOT create a monthly_premium

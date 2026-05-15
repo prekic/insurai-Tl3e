@@ -1619,7 +1619,11 @@ router.post(
 
         let parsedOpenAIData: unknown
         try {
-          parsedOpenAIData = JSON.parse(content)
+          const rawParsed = JSON.parse(content)
+          // Run stage2 validation even on the fallback path (same as Anthropic primary path).
+          // FIX: Previously this path returned raw LLM output without runStage2Validation,
+          // meaning the /extract OpenAI fallback bypassed canonicalization entirely.
+          parsedOpenAIData = runStage2Validation(rawParsed)
         } catch (parseError) {
           log.error('OpenAI returned invalid JSON', {
             requestId,

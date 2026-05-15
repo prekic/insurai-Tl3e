@@ -41,8 +41,12 @@ export class AnadoluAdapter extends InsurerAdapter {
     return coverage.deductible
   }
 
-  public getRequiredCoverages(productType?: string, _context?: any): RequiredCoverageDefinition[] {
-    const isBirlesik = productType && productType.toLowerCase().includes('birleşik')
+  public getRequiredCoverages(productType?: string, context?: any): RequiredCoverageDefinition[] {
+    // Detect Birleşik Kasko from policyType OR isBundle flag.
+    // The LLM extracts isBundle:true but policyType remains "kasko", so
+    // productType check alone misses Birleşik Kasko policies.
+    const isBirlesik =
+      (productType && productType.toLowerCase().includes('birleşik')) || context?.isBundle === true
 
     // Base required coverages for Genişletilmiş Kasko / Birleşik Kasko
     const required: RequiredCoverageDefinition[] = [
@@ -58,14 +62,19 @@ export class AnadoluAdapter extends InsurerAdapter {
       { concept: 'SEAT_PERSONAL_ACCIDENT_DISABILITY', defaultLimit: 100000, enforce: true },
     ]
 
-    // Depending on product type, specific legal protection sub-limits may be required.
-    // Based on the baseline diff, Birleşik Kasko uses specific ones.
+    // Legal Protection sub-limits for Birleşik Kasko.
+    // IMPORTANT: Do NOT set enforce=true with defaultLimit=null here — that would
+    // overwrite the LLM-extracted real limits (4K/4K/40K/80K) with null.
+    // The canonicalization pipeline in runStage2Validation already maps
+    // variations (e.g. "Legal Protection" → LEGAL_PROTECTION) and deduplicates.
+    // We only inject these as REQUIRED_IF_MISSING so missing entries get a
+    // null placeholder; present entries keep their LLM-extracted values.
     if (isBirlesik) {
       required.push(
-        { concept: 'LEGAL_PROTECTION_ADVANCE', defaultLimit: null, enforce: true },
-        { concept: 'LEGAL_PROTECTION_BAIL', defaultLimit: null, enforce: true },
-        { concept: 'LEGAL_PROTECTION_PER_EVENT', defaultLimit: null, enforce: true },
-        { concept: 'LEGAL_PROTECTION_ANNUAL_AGGREGATE', defaultLimit: null, enforce: true }
+        { concept: 'LEGAL_PROTECTION_ADVANCE', defaultLimit: null, enforce: false },
+        { concept: 'LEGAL_PROTECTION_BAIL', defaultLimit: null, enforce: false },
+        { concept: 'LEGAL_PROTECTION_PER_EVENT', defaultLimit: null, enforce: false },
+        { concept: 'LEGAL_PROTECTION_ANNUAL_AGGREGATE', defaultLimit: null, enforce: false }
       )
     } else {
       // Default / standard Legal Protection for standard Kasko (e.g. Golf/Tiguan)
