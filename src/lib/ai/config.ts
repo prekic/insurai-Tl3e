@@ -29,10 +29,17 @@ export function isProxyConfigured(): boolean {
 
 /**
  * Get the API proxy URL
- * In production, auto-detects from window.location.origin if not explicitly set
+ * In production, auto-detects from window.location.origin if not explicitly set.
+ * This is critical for Railway deployments where VITE_API_PROXY_URL might be wrong
+ * or point to a non-existent domain (e.g. api.insurai.app which has no DNS).
  */
 export function getProxyUrl(): string | null {
-  return env.proxyUrl
+  if (env.proxyUrl) return env.proxyUrl
+  // Fallback: same-origin proxy — works for Railway, Vercel, most cloud deployments
+  if (typeof window !== 'undefined') {
+    return window.location.origin
+  }
+  return null
 }
 
 /**
