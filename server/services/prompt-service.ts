@@ -430,8 +430,30 @@ Extract:
 
 ## --- OUTPUT STRUCTURE ---
 
-Return ALL fields of the ExtractedPolicyData schema. Use camelCase for all keys.
-For every coverage item, include: name, nameTr, limit, deductible, isOptional, included, category, isUnlimited, isMarketValue.
+Return ALL fields listed below. Use camelCase for all keys. Use null for any field not explicitly found.
+
+Top-level fields:
+- policyNumber, provider, policyType, isBundle, bundleProducts
+- startDate, endDate
+- currency (3-letter ISO code, e.g. TRY, USD, EUR)
+- premium (total premium as number)
+- premiumNet (net premium before tax / Vergi Oncesi Prim — number)
+- premiumTax (tax amount / BSMV — number)
+- paymentFrequency ('annual', 'monthly', 'quarterly', 'single')
+- vehicleMake, vehicleModel, vehicleYear, vehiclePlate, vin
+- vehicleUsage ('private' or 'commercial' / 'hususi' or 'ticari')
+- insuredEntityType ('individual' or 'corporate' / 'bireysel' or 'tuzel kisi')
+
+Coverage items (array):
+  For each: name, nameTr, limit (number), deductible, isOptional (bool), included (bool),
+  category ('main','liability','supplementary','assistance','legal','other'),
+  isUnlimited (bool), isMarketValue (bool), description, quote, clause, carveOuts (array)
+
+discounts object: ncdDiscount, groupDiscount, otherDiscountPct, evidence
+exclusions array: each with type, text, textEn, quote, evidence
+conditionalDeductibles array: each with trigger, rate, evidence
+amendmentInfo object: isAmendment, amendmentNumber, amendmentDate, basePolicyNumber, amendmentReason, premiumDifference
+evidence object: insights array with text, textEn, quote
 
 Be thorough but accurate. It's better to return null than to guess incorrectly.`,
     userPromptTemplate: `Extract all relevant insurance policy information from this document and return it as JSON:
