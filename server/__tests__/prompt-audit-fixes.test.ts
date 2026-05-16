@@ -48,9 +48,11 @@ describe('Extraction Prompt — Hidden Sub-Limit Rules', () => {
   })
 
   it('cites the Hatali Akaryakit example', () => {
-    expect(serverPromptFile).toContain('Hatalı')
+    const hasServer = serverPromptFile.includes('Hatali') || serverPromptFile.includes('Hatalı')
+    const hasClient = clientPrompt.includes('Hatali') || clientPrompt.includes('Hatalı')
+    expect(hasServer).toBe(true)
     expect(serverPromptFile).toContain('50.000 TL')
-    expect(clientPrompt).toContain('Hatalı')
+    expect(hasClient).toBe(true)
     expect(clientPrompt).toContain('50.000 TL')
   })
 
@@ -76,8 +78,10 @@ describe('Extraction Prompt — Payment Plan Anti-Hallucination', () => {
   })
 
   it('mentions ODEME PLANI section', () => {
-    expect(serverPromptFile).toContain('ODEME PLANI')
-    expect(clientPrompt).toContain('ODEME PLANI')
+    const matchServer = serverPromptFile.includes('ÖDEME PLANI') || serverPromptFile.includes('ODEME PLANI')
+    const matchClient = clientPrompt.includes('ÖDEME PLANI') || clientPrompt.includes('ODEME PLANI')
+    expect(matchServer).toBe(true)
+    expect(matchClient).toBe(true)
   })
 })
 

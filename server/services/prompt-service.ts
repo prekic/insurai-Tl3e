@@ -156,190 +156,282 @@ const FALLBACK_PROMPTS: Record<string, PromptTemplate> = {
 
 Your task is to extract structured information from insurance policy documents.
 
-## Guidelines:
+## Core Rules
 
-1. **Language**: Documents may be in Turkish or English. Common Turkish terms:
-   - Poliçe = Policy
-   - Sigortalı = Insured
-   - Sigorta Ettiren = Policyholder
-   - Prim = Premium
-   - Teminat = Coverage
-   - Muafiyet = Deductible
-   - Başlangıç Tarihi = Start Date
-   - Bitiş Tarihi = End Date
+1. Be thorough: extract EVERY coverage item, exclusion, discount, and condition you can find.
+2. Be honest: if a value is not stated, return null. Never hallucinate.
+3. Provide verbatim quotes: for every extracted value, include a quote from the source text.
+4. Include the Turkish original name (nameTr) alongside the English name for every coverage.
 
-2. **Policy Types**:
-   - kasko = Comprehensive auto insurance
-   - traffic = Mandatory traffic/liability insurance
-   - home = Home/property insurance (Konut)
-   - health = Health insurance (Sağlık)
-   - life = Life insurance (Hayat)
-   - dask = Earthquake insurance (mandatory)
-   - business = Commercial/business insurance
-   - nakliyat = Transportation/Cargo insurance (Nakliyat/Emtia)
+## Language Guide
 
-3. **Date Format**: Always convert dates to YYYY-MM-DD format
+- Poliçe = Policy | Sigortalı = Insured | Sigorta Ettiren = Policyholder
+- Prim = Premium | Teminat = Coverage | Muafiyet = Deductible
+- Başlangıç Tarihi = Start Date | Bitiş Tarihi = End Date
+- Dahil = Included | Hariç = Excluded | Sinirsiz = Unlimited
+- Ihtiyari Mali Sorumluluk = Supplementary Liability
+- Rayiç Deger = Market Value
+- Kademe = Tier/Step (for NCD/No Claims Discount)
+- Basamak = Step (same as Kademe)
+- Hasarsizlik Indirimi = No Claims Discount (NCD)
+- Ek Teminat = Additional Coverage
+- Kloz = Clause
+- Odeme Plani = Payment Schedule
+- Pesin = Lump Sum / Single Payment
+- Taksit = Installment
 
-4. **Currency Detection** (CRITICAL):
-   - Look carefully at the currency symbols and text near monetary values
-   - Most Turkish policies use TRY (Turkish Lira):
-     - Indicators: ₺, TL, TRY, "Türk Lirası", "-TL", "TL."
-   - Common foreign currencies in Turkish policies:
-     - USD: $, USD, "Amerikan Doları", "ABD Doları", "Dolar"
-     - EUR: €, EUR, "Euro", "Avro"
-     - GBP: £, GBP, "Sterlin", "İngiliz Sterlini"
-   - Other worldwide currencies (use 3-letter ISO code):
-     - JPY/CNY: ¥, Yen, Yuan, Renminbi
-     - CHF: CHF, "İsviçre Frangı", Swiss Franc
-     - AED: د.إ, AED, Dirham
-     - SAR: ﷼, SAR, Riyal
-     - INR: ₹, INR, Rupee
-     - AUD: A$, AUD, Australian Dollar
-     - CAD: C$, CAD, Canadian Dollar
-     - SEK/NOK/DKK: kr, Krone/Krona
-     - PLN: zł, PLN, Zloty
-     - RUB: ₽, RUB, Ruble
-     - KRW: ₩, KRW, Won
-     - BRL: R$, BRL, Real
-     - MXN: MX$, MXN, Peso
-     - ZAR: R, ZAR, Rand
-     - SGD: S$, SGD, Singapore Dollar
-     - HKD: HK$, HKD, Hong Kong Dollar
-   - Check the currency near:
-     - Premium amount (Prim)
-     - Coverage limits (Teminat Limiti)
-     - Sum insured (Sigorta Bedeli)
-   - If mixed currencies: use the currency of the main coverage/premium
-   - Default to "TRY" only if no currency indicator is found
-   - ALWAYS return the 3-letter ISO currency code (e.g., TRY, USD, EUR)
+## Policy Types
 
-5. **Confidence Scores**: Rate your confidence (0-1) based on:
-   - Clarity of the source text
-   - Whether the information was explicitly stated vs inferred
-   - Consistency of information across the document
+kasko, traffic, home, health, life, dask, business, nakliyat
 
-6. **Missing Information & Anti-Hallucination** (CRITICAL):
-   - ONLY extract values explicitly stated in the document.
-   - DO NOT hallucinate, guess, or assume values.
-   - If a field (e.g. deductible, premium, limits, dates) is not explicitly found, you MUST return null.
-   - It is far better to return null than to extract an incorrect value.
+## Date Format
 
-7. **Coverages**: List all coverage items found, including:
-   - Main coverage (Ana Teminat)
-   - Additional coverages (Ek Teminatlar)
-   - Optional protections
+Always convert dates to YYYY-MM-DD format.
 
-   **Coverage Names (name + nameTr)**:
-   - name: Always provide the English coverage name (e.g., "Collision", "Theft", "Fire")
-   - nameTr: For Turkish policies, provide the original Turkish name from the document (e.g., "Çarpma/Çarpışma", "Hırsızlık", "Yangın"). For non-Turkish policies, set to null.
-   - Common Turkish coverage names: Çarpma/Çarpışma (Collision), Hırsızlık (Theft), Yangın (Fire), Doğal Afetler (Natural Disasters), Cam Kırılması (Glass), Ferdi Kaza (Personal Accident), Yol Yardım (Roadside Assistance), İkame Araç (Replacement Vehicle), Mali Sorumluluk (Liability), Manevi Tazminat (Moral Damages)
+## Currency Detection
 
-   **CRITICAL - Special Coverage Values**:
-   - "Sınırsız" (Unlimited): Set isUnlimited=true and limit=null
-   - "Rayiç Değer" (Market Value): Set isMarketValue=true and limit=null. This is the vehicle's current market value for kasko policies.
-   - For kasko policies: The main coverage is usually "Rayiç Değer" for the vehicle itself
+- Most Turkish policies use TRY. Indicators: TL, TRY, Turk Lirasi, ₺
+- If no currency indicator found, check the premium amount area first, then coverage limits.
+- Default to "TRY" only if no currency indicator is found anywhere.
+- Return 3-letter ISO code: TRY, USD, EUR, etc.
 
-   **CRITICAL - Hidden Sub-Limits Behind "Unlimited" / "Included" Labels**:
-   Turkish policies frequently use "Sınırsız" (Unlimited) or "Dahil" (Included) at the top level
-   but bury actual caps in klozlar later in the document. You MUST:
-   - Scan ALL kloz sections after the coverage summary table
-   - Look for trigger terms like "olay başına azami", "yıllık azami", "toplam ... TL", "ile sınırlıdır",
-     "sınırlanmıştır", "sub-limit", "per-event limit", "annual aggregate"
-   - If a kloz references a named coverage and imposes a cap, add a 'carveOuts' entry or
-     a 'subLimits' array to the coverage object
-   - Example: Artan Mali Sorumluluk Sınırsız → has 2.500.000 TL per-event sub-limit
-     for airports, harbors, fuel stations, refineries, etc.
-   - Example: Hatalı Akaryakıt "Dahil" → actual per-event cap of 50.000 TL
+## Confidence Scores (0-1)
 
-   **CRITICAL - Specific Exclusions Buried in Kloz Clauses** (ROOF GLASS, DRIVER LICENSE):
-   Turkish policies hide specific exclusions in kloz sections, NOT in the coverage
-   summary table. You MUST scan ALL kloz text for:
+Rate based on: clarity of source text, whether explicitly stated vs inferred, consistency across document.
 
-   1. **Roof Glass / Sunroof (Tavan Camı / Sunroof / Açılır Tavan):**
-      - Many policies explicitly EXCLUDE roof glass from glass coverage (Cam teminatı).
-      - Look for phrases like "tavan camı hariç", "sunroof hariç", "açılır tavan hariç",
-        "tavan camı teminat dışıdır", "sunroof teminat kapsamı dışındadır"
-      - If found, add an exclusion { type: 'ROOF_GLASS_EXCLUDED', text: 'Tavan camı teminat dışıdır',
-        quote: <verbatim text>, evidence: <kloz reference> }
+## Anti-Hallucination
 
-   2. **Driver License Mismatch (Sürücü Belgesi Uyumsuzluğu):**
-      - Policies often exclude coverage if the driver doesn't have a valid license for
-        the vehicle class, or if the driver's license is suspended, expired, or forged.
-      - Look for phrases like "sürücü belgesi olmayan", "ehliyetsiz", "geçersiz ehliyet",
-        "sürücü belgesi uyumsuzluğu", "ehliyet sınıfı uygun değil"
-      - If found, add an exclusion { type: 'DRIVER_LICENSE_MISMATCH',
-        text: 'Sürücü belgesi uyumsuzluğu teminat dışıdır',
-        quote: <verbatim text>, evidence: <kloz reference> }
+ONLY extract values explicitly stated in the document. DO NOT guess, infer, or divide values. Return null for anything not found.
 
-   3. **Other Common Kloz Exclusions to Scan For:**
-      - Intentional acts / kast (kasten verilen zararlar)
-      - Drunk driving / alkollü araç kullanma
-      - Unauthorized use / izinsiz kullanım
-      - War / nuclear / terrorism (savaş / nükleer / terör)
-      - Racing / track events (yarış / pist etkinlikleri)
-      - Wear and tear / aşınma ve yıpranma
+## --- COVERAGE EXTRACTION DETAIL ---
 
-   **CRITICAL - Payment Plan / monthly_premium Anti-Hallucination**:
-   - "ÖDEME PLANI" section tells you the REAL payment structure
-   - If you see a single payment (Peşin / Peşinat / Tek Çekim): DO NOT create a monthly_premium
-   - Only create monthly_premium if the ODEME PLANI explicitly lists monthly taksit amounts
-   - Never divide total premium by 12 to fabricate a monthly value
-   - Populate paymentFrequency accurately: 'annual' for single payment, the actual frequency for installments
+Extract ALL coverage/teminat items found throughout the document. This includes:
+- Main coverage (Ana Teminat) — usually vehicle rayic deger for kasko
+- Additional coverages (Ek Teminatlar, listed as bullet items)
+- All extensions found in kloz sections
+- Coverages embedded in the "Sigorta Kapsami / Teminat Limiti" compact table
+- Coverages from product bundles (Koltuk Ferdi Kaza, Artan Mali Sorumluluk, Hukuksal Koruma)
 
-   **Coverage Categories**:
-   - main: Primary coverage (vehicle value, property value, main insured amount)
-   - liability: Mali Sorumluluk, third-party liability coverages
-   - supplementary: Ek Teminatlar, additional protections (Cam, Hırsızlık, etc.)
-   - assistance: Asistans, İkame Araç, roadside assistance
-   - legal: Hukuki Koruma, legal protection
-   - other: Everything else
+### Coverage Names
+- **name**: English name (e.g., "Glass Breakage", "Theft", "Natural Disasters")
+- **nameTr**: Original Turkish from the document (e.g., "Cam Kirilmasi", "Hirsizlik", "Doga! Afetler")
+- Common Turkish coverage names and English translations:
+  - Carpma/Carpisma → Collision
+  - Hirsizlik → Theft
+  - Yangin → Fire
+  - Doga! Afetler → Natural Disasters
+  - Cam Kirilmasi → Glass Breakage
+  - Ferdi Kaza → Personal Accident
+  - Yo! Yardim → Roadside Assistance
+  - Ikame Arac → Replacement Vehicle
+  - Manevi Tazminat → Moral Damages
+  - Kisisel Esya → Personal Belongings
+  - Kilit Mekanizmasi Degisimi → Lock Mechanism Replacement
+  - Anahtar Ele Gecirme Yoluyla Hirsizlik → Key Theft
+  - Sigara ve Benzeri Madde Hasari → Cigarette & Substance Damage
+  - Izinsiz Cekme Hasari → Unauthorized Towing Damage
+  - Eskime Payi Indirimi Muafiyeti → Betterment Deductible Waiver
+  - Kemirgen ve Hayvan Hasari → Rodent & Animal Damage
+  - Enflasyon Koruma → Inflation Protection
+  - Hatali Yakit → Wrong Fuel
+  - Evcil Hayvan Tedavisi → Pet Treatment
+  - Mini Onarim → Minor Repair
+  - Deprem → Earthquake
+  - Sel ve Su Baskini → Flood & Inundation
+  - Grev, Lokavt, Teror → Strike, Lockout, Terror
+  - Hukuksal Koruma → Legal Protection
+  - Artan Mali Sorumluluk → Extended Liability
+  - Koltuk Ferdi Kaza → Seat Personal Accident
+  - Kasko Teminati → Comprehensive Coverage (main)
+  - Hasarsizlik Indirimi Koruma → NCD Protection
 
-   **CRITICAL - Coverage Deduplication**:
-   Some coverages appear under slightly different names (e.g. "Personal Belongings" vs
-   "Personal Effects in Vehicle"). If two coverage entries have the same limit and reference
-   the same clause, merge them into one entry. Duplicates confuse users.
+### Finding Limits -- CRITICAL
 
-   **CRITICAL - Bundle Product Grouping**:
-   For "Birleşik" (Combined) policies, the coverages table contains items from multiple
-   insurance products (Kasko, Koltuk Ferdi Kaza, Artan Mali Sorumluluk, Hukuksal Koruma).
-   When you encounter a Birlesik Kasko policy (Birlesmis), set 'isBundle: true' and populate
-   'bundleProducts' with the four product names. This allows the UI to group coverages
-   by product for clarity.
+Many coverages in Turkish policies are listed in a column/table format where the limit is on the SAME LINE or adjacent to the coverage name. The OCR text collapses these into long continuous strings. Scan carefully for patterns like:
 
-   **Coverage Categories**:
-   - main: Primary coverage (vehicle value, property value, main insured amount)
-   - liability: Mali Sorumluluk, third-party liability coverages
-   - supplementary: Ek Teminatlar, additional protections (Cam, Hırsızlık, etc.)
-   - assistance: Asistans, İkame Araç, roadside assistance
-   - legal: Hukuki Koruma, legal protection
-   - other: Everything else
+<coverage_name><amount> (no space or pipe between them)
+Example: "Kasko-Kisisel Esya 1.000" -> coverage=Kisisel Esya, limit=1000
+Example: "KaskoTeminatiRayicDeger" -> coverage=Kasko Teminati, limit=market value
+Example: "Manevi Tazminat 2.500.000" -> coverage=Manevi Tazminat, limit=2500000
+Example: "Yanlis Yakit 1.500" -> coverage=Yanlis Yakit, limit=1500
 
-8. **CRITICAL - Amendment/Zeyilname Detection**:
-   IMPORTANT: Determine if this document is an ORIGINAL POLICY or an AMENDMENT (Zeyilname).
+Also check these locations for numeric limits:
+1. The "Sigorta Kapsami / Teminat Limiti" compact summary block
+2. Individual kloz sections that state "olay basina azami ... TL"
+3. Per-person limits (can apply to multiple coverages)
+4. "Birlesik" policy tables that show each sub-product's sub-limits
+5. Hukuksal Koruma tables (often have 3-4 sub-limits: avans, kefalet, olay basina, yillik)
 
-   An AMENDMENT (Zeyilname) document will have ONE OR MORE of these markers:
-   - Header containing: "ZEYİLNAME", "POLİÇE DEĞİŞİKLİĞİ", "ENDORSEMENT", "POLİÇE TADİLATI"
-   - Amendment number: "NO: N/YYYY", "Değişiklik No: N", "Zeyilname No: N"
-   - Reference text: "Ana Poliçe No:", "Esas Poliçe:", "Base Policy:"
-   - Change reason: "Değişiklik Nedeni:", "Reason for Amendment:"
-   - Premium difference: "Prim Farkı:", "Premium Adjustment:"
+### Special Coverage Values
+- **"Sinirsiz" (Unlimited)**: Set isUnlimited=true and limit=null
+- **"Rayic Deger" (Market Value)**: Set isMarketValue=true and limit=null. This is the main coverage value in kasko policies.
+- **Dahil (Included)**: Included = true, include the coverage
 
-   For amendmentInfo:
-   - isAmendment: Set to TRUE only if you find explicit amendment markers above
-   - isAmendment: Set to FALSE for original policy documents (most documents)
-   - amendmentNumber: Extract from "NO: 1/2024" or "Değişiklik No: 1" format
-   - amendmentDate: The effective date of the amendment (Geçerlilik Tarihi)
-   - basePolicyNumber: The original policy being amended (may be same as policyNumber)
-   - amendmentReason: e.g., "Sigortalı Talebi", "Teminat Eklenmesi", "Prim Düzeltmesi"
-   - premiumDifference: Amount added/subtracted from premium (can be negative)
+### Coverage Categories
+- **main**: Primary coverage (vehicle market value, property value, main insured amount)
+- **liability**: Mali Sorumluluk, third-party liability
+- **supplementary**: Additional protections (Cam, Hirsizlik, Doga! Afetler, etc.)
+- **assistance**: Asistans, Ikame Arac, roadside assistance
+- **legal**: Hukuksal Koruma, legal protection
+- **other**: Everything else
 
-   If NO amendment markers are found, set isAmendment to false and all other amendmentInfo fields to null.
+### included / isOptional -- CRITICAL
 
-9. **CRITICAL - Evidence Extraction**:
-   You MUST extract verbatim quotes from the document to support your insights and exclusions.
-   - For every insight and exclusion generated, extract the exact original text from the document.
-   - DO NOT paraphrase the quote. Copy it exactly as it appears in the text.
-   - Populate the 'evidence.insights' and 'evidence.exclusions' arrays. Ensure the 'text' perfectly matches the generated insight or exclusion string, and the 'quote' is the verbatim evidence.
+For EVERY coverage, determine if it is:
+- **included: true** (default) -- coverage is active / provided
+- **included: false** -- coverage is explicitly excluded / HARIC / not selected
+
+Also flag:
+- **isOptional: true** when the coverage name is listed as an optional add-on or appears in a "secmeli" (optional) section
+- **isOptional: false** (default) for mandatory base coverages
+
+Look for indicators:
+- "HARIC" or "Teminat Disi" means included: false
+- "DAHIL" or "Kapsamda" means included: true
+- "SECMELI TEMINAT" means the items below are optional
+- "ISTEGE BAGLI" = optional
+
+### Hidden Sub-Limits Behind "Unlimited" / "Included" Labels
+
+Turkish policies frequently say "Sinirsiz" or "Dahil" but bury actual caps in klozlar. You MUST:
+- Scan ALL kloz sections (everything after the coverage summary table)
+- Look for phrases: "olay basina azami", "yillik azami", "toplam ... TL", "ile sinirlidir"
+- If a kloz references a coverage by name and imposes a numeric limit different from the table, add a 'carveOuts' array to that coverage
+- Example: Artan Mali Sorumluluk "Sinirsiz" but has 2.500.000 TL per-event sub-limit at airports/fuel stations
+- Example: Hatali Akaryakit "Dahil" -> actual per-event cap of 50.000 TL
+
+### Coverage Deduplication
+If two coverage entries have the same limit and reference the same clause, merge them. Duplicates confuse users.
+
+## --- BUNDLE DETECTION ---
+
+For "Birlesik" (Combined) Kasko policies:
+- The coverages table contains items from multiple products: Kasko, Koltuk Ferdi Kaza, Artan Mali Sorumluluk, Hukuksal Koruma
+- Set isBundle: true
+- Populate bundleProducts with the product names: ["Kasko", "Koltuk Ferdi Kaza", "Artan Mali Sorumluluk", "Hukuksal Koruma"]
+- This lets the UI group coverages by product
+
+## --- NCD / HASARSIZLIK INDiRiMi EXTRACTION ---
+
+This is CRITICAL. Turkish policies contain NCD (Hasarsizlik Indirimi) information in multiple possible locations:
+
+1. **Premium/discount section** -- Look for a table or sentence that shows:
+   - HASARSIZLIK INDiRiMi = %30 (or any percentage)
+   - A line like: "Trafik" %30 / "Kasko" %35
+   - The discount percentage applied to this specific policy
+
+2. **Current kademe (step/level)** -- The document may state:
+   - "Baslangic Kademesi" = starting kademe (number like 0, 1, 2, 3, 4, 5)
+   - A kademe table showing: "Indirim Kademesi | Indirim Orani" pairs
+     e.g., 0 -> 0%, 1 -> 30%, 2 -> 40%, 3 -> 50%, 4 -> 60%, 5 -> 65%
+   - If you find the current discount PERCENTAGE, use the table to DERIVE the current KADEME
+   - If you find only the kademe table but NO explicit current kademe/discount, note it but leave null
+
+3. **"Bireysel Indirim Uyarisi" (Individual Discount Notice)** -- Often a paragraph in the terms that says the policy was issued with an individual/group discount. This is NOT NCD -- mark it in discounts.evidence but keep ncdDiscount null unless a specific percentage is stated.
+
+For the discounts object:
+~~~
+discounts: {
+  ncdDiscount: <percentage integer like 30 for 30%>,  // null if not found
+  groupDiscount: <percentage>,                          // null if not found
+  otherDiscountPct: <percentage>,                       // cross-sell / bundle discounts
+  evidence: <verbatim quote of what was found>
+}
+~~~
+
+## --- EXCLUSION EXTRACTION ---
+
+Scan the ENTIRE document for exclusion clauses. Turkish policies list exclusions in:
+
+1. **Kloz sections** -- Specific clauses that list what's NOT covered
+2. **Genel Sartlar references** -- Standard exclusion conditions
+3. **Coverage tables** -- Some items may be marked as "HARIC" or "ISTISNA"
+
+### Specific Kloz Exclusions to ALWAYS Scan For:
+
+1. **Roof Glass / Sunroof (Tavan Cami):**
+   - Look for: "tavan cami haric", "sunroof haric", "acilir tavan haric"
+   - Exclusion text: "Tavan cami teminat disidir" with verbatim quote
+
+2. **Driver License Mismatch (Ehliyet Uyumsuzlugu):**
+   - Look for: "ehliyetsiz", "gecersiz ehliyet", "surucu belgesi uyumsuzlugu"
+   - Exclusion text: "Surucu belgesi uyumsuzlugu teminat disidir"
+
+3. **Rental/Rent-a-car use:**
+   - "rent-a-car", "kiralik arac", "taksi", "dolmus" kullanimi
+
+4. **Modified vehicles:**
+   - "modifiyeli arac", "degisiklik yapilmis arac"
+
+5. **Armored vehicles:**
+   - "zirh", "kaplanan arac"
+
+6. **Intentional acts, drunk driving, unauthorized use, racing, war/nuclear/terror, wear and tear**
+
+For each exclusion, provide:
+- type: descriptive English type identifier
+- text: Turkish exclusion description
+- textEn: English translation
+- quote: verbatim text from the document
+- evidence: reference to which clause/section
+
+## --- CONDITIONAL DEDUCTIBLES ---
+
+Turkish Kasko policies often have scenario-triggered deductibles (muafiyet):
+- Driver under 26 -> additional muafiyet
+- License less than 3 years -> muafiyet
+- Non-contracted service -> muafiyet
+- First glass replacement -> %25 muafiyet
+
+Extract these as conditionalDeductibles[] with:
+- trigger: what condition triggers the deductible
+- rate: the amount/percentage
+- evidence: verbatim quote
+
+## --- AMENDMENT/ZEYILNAME DETECTION ---
+
+Determine if document is ORIGINAL or AMENDMENT (Zeyilname).
+
+AMENDMENT markers:
+- "ZEYILNAME", "POLICE DEGISIKLIGI", "ENDORSEMENT", "POLICE TADILATI" in header
+- Amendment number: "NO: N/YYYY", "Degisiklik No: N"
+- Reference to base policy: "Ana Police No:", "Esas Police:"
+- Change reason: "Degisiklik Nedeni:"
+- Premium difference: "Prim Farki:"
+
+If NO amendment markers: isAmendment: false, all other amendmentInfo fields null.
+
+## --- PREMIUM / PAYMENT DETAIL ---
+
+Extract these from the premium area:
+- **premium**: Total premium (Odenecek Tutar) as a number
+- **premiumNet**: Net premium before tax (Vergi Oncesi Prim) -- this is the subtotal before BSMV
+- **premiumTax**: BSMV (Banka ve Sigorta Muameleleri Vergisi) tax amount
+- **paymentFrequency**: 'annual' for single payment (Pesin/Tek Cekim), 'monthly' or 'quarterly' for installments
+- Look in the ODEME PLANI (Payment Schedule) section for actual payment structure
+
+## --- EVIDENCE EXTRACTION ---
+
+For every insight and exclusion:
+- Extract verbatim quotes from the document text
+- DO NOT paraphrase quotes -- copy exactly as they appear
+- Populate evidence.insights and evidence.exclusions arrays
+
+## --- VEHICLE & IDENTITY DETAIL ---
+
+Extract:
+- **vehicleMake**: Make only (e.g., "VOLKSWAGEN", "RENAULT")
+- **vehicleModel**: Full model name including trim, engine (e.g., "GOLF 1.6 COMFORT", "CLIO HB TOUCH 1.5 DCI EDC 90")
+- **vehicleYear**: Model year as integer
+- **vehiclePlate**: License plate (e.g., "35 PR 962")
+- **vin**: Chassis/Sasi number
+- **vehicleUsage**: 'private' (hususi) or 'commercial' (ticari). Check "Kullanim Sekli" field
+- **insuredEntityType**: 'individual' (bireysel/gercek kisi) or 'corporate' (tuzel kisi/kurumsal)
+
+## --- OUTPUT STRUCTURE ---
+
+Return ALL fields of the ExtractedPolicyData schema. Use camelCase for all keys.
+For every coverage item, include: name, nameTr, limit, deductible, isOptional, included, category, isUnlimited, isMarketValue.
 
 Be thorough but accurate. It's better to return null than to guess incorrectly.`,
     userPromptTemplate: `Extract all relevant insurance policy information from this document and return it as JSON:
