@@ -139,6 +139,18 @@ export function runStage2Validation(data: any): any {
     result.coverages = [...keptOptional, ...standardizedRequired]
   }
 
+  // 3b. Coverage Field Defaults
+  // Set sensible defaults for fields the LLM may leave as null:
+  // - included: true when ambiguous (listed coverages are usually active)
+  // - isOptional: false for mandatory, true only when explicitly marked 'Secmeli'
+  if (Array.isArray(result.coverages)) {
+    result.coverages = result.coverages.map((cov: any) => ({
+      ...cov,
+      included: cov.included === true || cov.included === false ? cov.included : true,
+      isOptional: cov.isOptional === true ? true : false,
+    }))
+  }
+
   // 4. NCD Projection
   // Enrich the discounts object with future-year projections.
   // The LLM extracts raw NCD (e.g. 50%, kademe 3). Business logic
