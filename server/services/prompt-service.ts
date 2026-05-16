@@ -241,9 +241,36 @@ Extract ALL coverage/teminat items found throughout the document. This includes:
   - Grev, Lokavt, Teror → Strike, Lockout, Terror
   - Hukuksal Koruma → Legal Protection
   - Artan Mali Sorumluluk → Extended Liability
-  - Koltuk Ferdi Kaza → Seat Personal Accident
+  - Koltuk Ferdi Kaza → Seat Personal Accident (occupant PA)
+  - Motorlu Araca Bağlı → Vehicle-Attached PA (covers non-occupants injured by vehicle)
+  - Sürücüye Bağlı → Driver Personal Accident (covers driver specifically, DISTINCT from Motorlu Araca Bağlı)
   - Kasko Teminati → Comprehensive Coverage (main)
   - Hasarsizlik Indirimi Koruma → NCD Protection
+
+### CRITICAL: Do NOT conflate similar-named coverages
+
+Turkish Birleşik Kasko policies commonly include these three DISTINCT personal accident coverages with DIFFERENT meanings:
+- **Koltuk Ferdi Kaza** / **Koltuk FK**: Covers PASSENGERS/OCCUPANTS in the insured vehicle (seat-based PA)
+- **Motorlu Araca Bağlı Ferdi Kaza**: Covers NON-OCCUPANTS injured by the vehicle (pedestrians, cyclists, etc.)
+- **Sürücüye Bağlı Ferdi Kaza**: Covers the DRIVER specifically
+
+ALL THREE appear together in many Birleşik Kasko policies, often in the same coverage table with the same limit amount (e.g., all at 50,000 TL). Extract ALL THREE as separate coverage items. Do NOT merge them or drop one. If you see "Motorlu Araca Bağlı" in the table, also check if "Sürücüye Bağlı" appears in the same table.
+
+This is a known systematic failure point: extractors often extract Motorlu Araca Bağlı but drop Sürücüye Bağlı when they share the same limit value. Both must appear in the output.
+
+### AXA Sigorta Coverage Names
+
+AXA Birleşik Kasko policies (corporate/fleet) use different naming from Anadolu Sigorta. Common AXA-specific coverages:
+  - Araç Bilgi Hattı → Vehicle Information Hotline
+  - Yol Kenarında Onarım → Roadside Repair
+  - Lastik Değişimi → Tire Change
+  - Bulunamayan Yedek Parçaların Temini → Unavailable Spare Parts Supply
+  - Aracın Teslim Alınması → Vehicle Pickup
+  - Aracın Emanet ve Muhafazası → Vehicle Safekeeping
+  - Aracın Kaza Geçirmesi veya Arızalanması Halinde Seyahat, Konaklama ve Refakat → Travel/Accommodation/Escort
+  - Refakatçinin Nakli ve Konaklaması → Escort Transport & Accommodation
+  - Cenaze Nakli → Funeral Transport
+  - Bilgi ve Organizasyon Hizmetleri → Information & Organization Services
 
 ### Finding Limits -- CRITICAL
 
@@ -309,6 +336,17 @@ Search the full document for these numbers — they are often stated in a kloz o
 - Surekli Sakatlik (Permanent Disability): typically 5,000 TL (NOT 100,000)
 - Tedavi (Medical Treatment): typically 500 TL
 Do NOT confuse these with the Artan Mali Sorumluluk limit (which can be 100,000 TL).
+
+**Birlesik Kasko coverage table — AXA corporate policies typically show:**
+  KOLTUK FERDI KAZA
+  Ölüm/Sakatlık Hali Kişi Adet  "500.000,00"
+  Tedavi "50.000,00"
+  
+  MOTORLU ARACA BAĞLI FERDİ KAZA (Kaza Başına) "50.000,00"
+  
+  SÜRÜCÜYE BAĞLI FERDİ KAZA (Kaza Başına) "50.000,00"
+Note: The dots (".") are THOUSANDS separators, not decimals. 500.000,00 = five hundred thousand.
+ALL THREE coverages (Koltuk FK, Motorlu Araca Bağlı, Sürücüye Bağlı) appear together in AXA Birleşik Kasko policies as DISTINCT items with their OWN limits. Extract all three.
 
 ### Special Coverage Values
 - **"Sinirsiz" (Unlimited)**: Set isUnlimited=true and limit=null
