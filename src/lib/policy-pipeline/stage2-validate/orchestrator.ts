@@ -194,37 +194,34 @@ export function runStage2Validation(data: any): any {
       // '5,000 TL per claim / 11,000 TL annual aggregate / 750 TL bail / 750 TL legal advance'
       // Extract all numeric amounts with their corresponding labels
       const amounts: { concept: string; amount: number }[] = []
-      const labelMatch = desc.match(
-        /(\d{1,3}(?:\.\d{3})*)\s*tl[^a-z]*([a-z\s]+?)(?:\s*\/|$)/gi
-      )
-      if (labelMatch) {
-        for (const segment of labelMatch) {
-          const numMatch = segment.match(/(\d{1,3}(?:\.\d{3})*)/)
-          if (numMatch) {
-            const amount = parseFloat(numMatch[1].replace(/\./g, ''))
-            if (!isNaN(amount) && amount > 0) {
-              const seg = segment.toLocaleLowerCase('tr-TR')
-              if (
-                seg.includes('claim') ||
-                seg.includes('olay') ||
-                seg.includes('per event') ||
-                seg.includes('per claim')
-              ) {
-                amounts.push({ concept: 'LEGAL_PROTECTION_PER_EVENT', amount })
-              } else if (
-                seg.includes('annual') ||
-                seg.includes('y.l.l.k') ||
-                seg.includes('aggregate') ||
-                seg.includes('sigorta s.resi') ||
-                seg.includes('insurance period')
-              ) {
-                amounts.push({ concept: 'LEGAL_PROTECTION_ANNUAL_AGGREGATE', amount })
-              } else if (seg.includes('bail') || seg.includes('kefalet')) {
-                amounts.push({ concept: 'LEGAL_PROTECTION_BAIL', amount })
-              } else if (seg.includes('advance') || seg.includes('avan') || seg.includes('avans')) {
-                amounts.push({ concept: 'LEGAL_PROTECTION_ADVANCE', amount })
-              }
-            }
+      // Split on / to get segments like '5,000 TL per claim'
+      const parts = desc.split(/\s*\/\s*/)
+      for (const part of parts) {
+        const numMatch = part.match(/([\d,.]+)\s*tl/i)
+        if (!numMatch) continue
+        const raw = numMatch[1].replace(/,/g, '')
+        const amount = parseFloat(raw)
+        if (!isNaN(amount) && amount > 0) {
+          const seg = part.toLocaleLowerCase('tr-TR')
+          if (
+            seg.includes('claim') ||
+            seg.includes('olay') ||
+            seg.includes('per event') ||
+            seg.includes('per claim')
+          ) {
+            amounts.push({ concept: 'LEGAL_PROTECTION_PER_EVENT', amount })
+          } else if (
+            seg.includes('annual') ||
+            seg.includes('y.l.l.k') ||
+            seg.includes('aggregate') ||
+            seg.includes('sigorta s.resi') ||
+            seg.includes('insurance period')
+          ) {
+            amounts.push({ concept: 'LEGAL_PROTECTION_ANNUAL_AGGREGATE', amount })
+          } else if (seg.includes('bail') || seg.includes('kefalet')) {
+            amounts.push({ concept: 'LEGAL_PROTECTION_BAIL', amount })
+          } else if (seg.includes('advance') || seg.includes('avan') || seg.includes('avans')) {
+            amounts.push({ concept: 'LEGAL_PROTECTION_ADVANCE', amount })
           }
         }
       }
