@@ -199,7 +199,13 @@ export function runStage2Validation(data: any): any {
       for (const part of parts) {
         const numMatch = part.match(/([\d,.]+)\s*tl/i)
         if (!numMatch) continue
-        const raw = numMatch[1].replace(/,/g, '')
+        // Handle Turkish thousands format: dot=thousands (5.000 → 5000),
+        // comma=decimal (5.000,50 → 5000.50)
+        let raw = numMatch[1]
+        // Remove dots used as thousands separators (\d{1,3}\.\d{3})
+        raw = raw.replace(/(?<=\d)\.(?=\d{3}(?:[^\d]|$))/g, '')
+        // Replace comma decimal with dot
+        raw = raw.replace(',', '.')
         const amount = parseFloat(raw)
         if (!isNaN(amount) && amount > 0) {
           const seg = part.toLocaleLowerCase('tr-TR')
