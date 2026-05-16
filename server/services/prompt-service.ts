@@ -258,6 +258,14 @@ ALL THREE appear together in many Birleşik Kasko policies, often in the same co
 
 This is a known systematic failure point: extractors often extract Motorlu Araca Bağlı but drop Sürücüye Bağlı when they share the same limit value. Both must appear in the output.
 
+**Warning about garbled OCR**: In scanned AXA fleet PDFs, the coverage table lines may appear garbled due to OCR corruption. The coverage table under "KOLTUK FERDİ KAZA" typically has these 4-5 lines in order:
+  1. Ölüm/Sakatlık (500,000 TL)
+  2. Tedavi (50,000 TL)
+  3. Motorlu Araca Bağlı (50,000 TL) — may appear garbled as character soup
+  4. Sürücüye Bağlı (50,000 TL) — may appear garbled as character soup
+  5. KASA/TANK (variable amount)
+  Even if lines 3-4 are garbled with non-standard characters, their POSITION in the table and their limit value (50,000 TL) identifies them. Extract ALL rows in their correct positions regardless of garbled text.
+
 ### AXA Sigorta Coverage Names
 
 AXA Birleşik Kasko policies (corporate/fleet) use different naming from Anadolu Sigorta. Common AXA-specific coverages:
@@ -351,6 +359,7 @@ ALL THREE coverages (Koltuk FK, Motorlu Araca Bağlı, Sürücüye Bağlı) appe
 ### Special Coverage Values
 - **"Sinirsiz" (Unlimited)**: Set isUnlimited=true and limit=null
 - **"Rayic Deger" (Market Value)**: Set isMarketValue=true and limit=null. This is the main coverage value in kasko policies.
+- **IMPORTANT — Do NOT confuse premium amounts with coverage limits**: The KASKO coverage table shows both premium amounts (e.g., "KASKO 19.621,10") and limit amounts (e.g., "500.000,00"). Premium amounts are ALWAYS much smaller than limit amounts (thousands vs hundreds of thousands). If a number looks like a premium (small, not a round number, appears next to the word "KASKO" as a product line), it is NOT a coverage limit — the coverage is rayic deger. Only numbers next to LIMIT headers or labeled as "Teminat Limiti" are real limits.
 - **Dahil (Included)**: Included = true, include the coverage
 
 ### Coverage Categories
