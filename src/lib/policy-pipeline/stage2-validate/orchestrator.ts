@@ -140,15 +140,20 @@ export function runStage2Validation(data: any): any {
   }
 
   // 3b. Coverage Field Defaults
-  // Set sensible defaults for fields the LLM may leave as null:
+  // Set sensible defaults for fields the LLM may leave as null or undefined:
   // - included: true when ambiguous (listed coverages are usually active)
   // - isOptional: false for mandatory, true only when explicitly marked 'Secmeli'
+  // NOTE: JavaScript spread preserves undefined values, but JSON.stringify drops
+  // them entirely. We must explicitly use null-coalescing or ternary defaults.
   if (Array.isArray(result.coverages)) {
-    result.coverages = result.coverages.map((cov: any) => ({
-      ...cov,
-      included: cov.included === true || cov.included === false ? cov.included : true,
-      isOptional: cov.isOptional === true ? true : false,
-    }))
+    result.coverages = result.coverages.map((cov: any) => {
+      const included =
+        cov.included === true || cov.included === false || cov.included === 'false'
+          ? !!cov.included
+          : true
+      const isOptional = cov.isOptional === true ? true : false
+      return { ...cov, included, isOptional }
+    })
   }
 
   // 4. NCD Projection
