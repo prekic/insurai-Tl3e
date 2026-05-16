@@ -1543,6 +1543,66 @@ router.post(
       })
     }
 
+    // ── Multi-LLM Debate Pipeline ────────────────────────────────
+    // When ?debate=true, run two independent extractors with cross-validation
+    // instead of a single OpenAI call. Up to 3 rounds of debate.
+    if (req.query.debate === 'true' && openaiClient) {
+      log.info('Running multi-LLM debate pipeline', { requestId })
+      try {
+        const { runDebatePipeline } = await import('../../lib/debate-pipeline.js')
+        const debateResult = await runDebatePipeline(
+          openaiClient,
+          openaiSystemPrompt,
+          finalUserPrompt,
+          documentText,
+          {
+            model: aiConfig.openaiExtractionModel,
+            temperature: aiConfig.temperature,
+            maxRounds: 3,
+            extractTimeout: 120_000,
+          }
+        )
+
+        const parsedData = runStage2Validation(debateResult.final.parsed)
+
+        log.info('Debate pipeline completed', {
+          requestId,
+          roundCount: debateResult.roundCount,
+          totalCost: debateResult.totalCost,
+          totalTokens: debateResult.totalTokens,
+          disagreements: debateResult.disagreements.length,
+        })
+
+        return res.json({
+          success: true,
+          data: parsedData,
+          usage: {
+            input_tokens: debateResult.totalTokens,
+            output_tokens: 0,
+            total_cost: debateResult.totalCost,
+          },
+          model: 'debate',
+          provider: 'debate_pipeline',
+          cost: debateResult.totalCost,
+          requestId,
+          route: '/api/ai/extract',
+          elapsedMs: Date.now() - startTime,
+          phaseTiming,
+          debate: {
+            roundCount: debateResult.roundCount,
+            totalCost: debateResult.totalCost,
+            disagreements: debateResult.disagreements,
+          },
+        })
+      } catch (debateError) {
+        log.error('Debate pipeline failed, falling back to single extraction', {
+          requestId,
+          error: debateError instanceof Error ? debateError.message : String(debateError),
+        })
+        // Fall through to regular OpenAI extraction
+      }
+    }
+
     // Try OpenAI (either as fallback or primary)
     if (openaiClient) {
       const openaiStart = Date.now()

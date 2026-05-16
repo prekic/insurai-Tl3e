@@ -255,6 +255,17 @@ Example: "KaskoTeminatiRayicDeger" -> coverage=Kasko Teminati, limit=market valu
 Example: "Manevi Tazminat 2.500.000" -> coverage=Manevi Tazminat, limit=2500000
 Example: "Yanlis Yakit 1.500" -> coverage=Yanlis Yakit, limit=1500
 
+### ROW-LEVEL LIMIT ACCURACY -- CRITICAL
+
+Each coverage table row is INDEPENDENT. The limit immediately following a coverage name belongs ONLY to that coverage. NEVER:
+- Use a limit from one row for another coverage (e.g. "Artan Mali Sorumluluk 100.000" then "Koltuk FK 5.000" -> first is 100k, second is 5k, NOT both 100k)
+- Assume a repeat of the same number in multiple adjacent rows
+- Confuse "5.000" (five thousand) with "100.000" (one hundred thousand) because both end in ".000"
+- Assign a limit to the wrong coverage because it appears close to a different coverage name
+
+Turkish numeric convention: "." is the THOUSANDS separator, not decimal. "5.000" = 5000. "100.000" = 100000.
+Parse each row independently. The limit following the coverage name on the same text line is that coverage's limit.
+
 Also check these locations for numeric limits:
 1. The "Sigorta Kapsami / Teminat Limiti" compact summary block
 2. Individual kloz sections that state "olay basina azami ... TL"
@@ -290,6 +301,10 @@ Look for indicators:
 - "DAHIL" or "Kapsamda" means included: true
 - "SECMELI TEMINAT" means the items below are optional
 - "ISTEGE BAGLI" = optional
+- "SEÇMELİ" or "SECMELI" prefix on the coverage name means isOptional: true
+- If coverage name starts with a number prefix like "1.", "2." in a Secmeli section, all are optional
+- In the coverage table, if a section header says "Secmeli Teminatlar", ALL entries under it are optional
+- Default for standard base coverages (Kasko, Koltuk FK, Hukuksal Koruma) is isOptional: false
 
 ### Hidden Sub-Limits Behind "Unlimited" / "Included" Labels
 
