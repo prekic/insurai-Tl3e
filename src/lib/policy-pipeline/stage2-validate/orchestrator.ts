@@ -122,9 +122,16 @@ export function runStage2Validation(data: any): any {
 
         if (reqDef.enforce) {
           if (reqDef.defaultLimit !== undefined) {
-            strictCov.limit = reqDef.defaultLimit
-            strictCov.parsedLimit =
-              reqDef.defaultLimit !== null ? { type: 'numeric', amount: reqDef.defaultLimit } : null
+            // Only overwrite limit with default if the LLM didn't extract a real limit.
+            // The adapter's defaultLimit is a fallback, not an override.
+            const llmLimit = strictCov.limit ?? strictCov.parsedLimit?.amount ?? null
+            if (llmLimit === null || llmLimit === undefined) {
+              strictCov.limit = reqDef.defaultLimit
+              strictCov.parsedLimit =
+                reqDef.defaultLimit !== null
+                  ? { type: 'numeric', amount: reqDef.defaultLimit }
+                  : null
+            }
           }
           if (reqDef.isUnlimited !== undefined) {
             strictCov.isUnlimited = reqDef.isUnlimited
