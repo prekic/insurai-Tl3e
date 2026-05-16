@@ -122,10 +122,13 @@ export function runStage2Validation(data: any): any {
 
         if (reqDef.enforce) {
           if (reqDef.defaultLimit !== undefined) {
-            // Only overwrite limit with default if the LLM didn't extract a real limit.
+            // Only overwrite limit with default if the LLM didn't extract a real limit
+            // AND the LLM didn't mark it as unlimited/market value.
             // The adapter's defaultLimit is a fallback, not an override.
             const llmLimit = strictCov.limit ?? strictCov.parsedLimit?.amount ?? null
-            if (llmLimit === null || llmLimit === undefined) {
+            const llmIsUnlimited = strictCov.isUnlimited === true
+            const llmIsMarketValue = strictCov.isMarketValue === true
+            if ((llmLimit === null || llmLimit === undefined) && !llmIsUnlimited && !llmIsMarketValue) {
               strictCov.limit = reqDef.defaultLimit
               strictCov.parsedLimit =
                 reqDef.defaultLimit !== null
@@ -174,6 +177,41 @@ export function runStage2Validation(data: any): any {
       const isOptional = cov.isOptional === true ? true : false
       return { ...cov, included, isOptional }
     })
+  }
+
+  // 3c. Propagate Hukuksal Koruma sub-limits from main entry description
+  // The main HK entry has limits in its description field (e.g. "5,000 TL per claim
+  // / 11,000 TL annual aggregate / 750 TL bail / 750 TL advance"). The sub-items
+  // (Avans, Kefalet, Olay Basi, Yillik Toplam) are auto-added by the adapter with
+  // null limits. Extract sub-limits from the main entry and propagate.
+  if (Array.isArray(result.coverages)) {
+    const mainHk = result.coverages.find(
+      (c: any) => c.canonicalName === 'LEGAL_PROTECTION' && c.description && c.description.length > 20
+    )
+    if (mainHk?.description) {
+      const desc = (mainHk.description as string).toLocaleLowerCase('tr-TR')
+      // Extract numeric values for each sub-concept from the description
+      const limitPatterns: Record<string, RegExp> = {
+        LEGAL_PROTECTION_ADVANCE: /(?:^|[\s,/])(\d{1,3}(?:\.\d{3})*)\s*\s*tl?[^a-z]*avan/i,
+        LEGAL_PROTECTION_BAIL: /(?:^|[\s,/])(\d{1,3}(?:\.\d{3})*)\s*\s*tl?[^a-z]*kefalet/i,
+        LEGAL_PROTECTION_PER_EVENT: /(?:^|[\s,/])(\d{1,3}(?:\.\d{3})*)\s*\s*tl?[^a-z]*(?:olay|claim|claim ba.)/i,
+        LEGAL_PROTECTION_ANNUAL_AGGREGATE:
+          /(?:^|[\s,/])(\d{1,3}(?:\.\d{3})*)\s*\s*tl?[^a-z]*(?:y.l.l.k|annual|sigorta s.resi|aggregate)/i,
+      }
+      for (const cov of result.coverages) {
+        const pattern = limitPatterns[cov.canonicalName as string]
+        if (pattern && (cov.limit === null || cov.limit === undefined)) {
+          const match = desc.match(pattern)
+          if (match) {
+            const amount = parseFloat(match[1].replace(/\./g, ''))
+            if (!isNaN(amount) && amount > 0) {
+              cov.limit = amount
+              cov.parsedLimit = { type: 'numeric' as const, amount }
+            }
+          }
+        }
+      }
+    }
   }
 
   // 4. NCD Projection
