@@ -255,16 +255,40 @@ Example: "KaskoTeminatiRayicDeger" -> coverage=Kasko Teminati, limit=market valu
 Example: "Manevi Tazminat 2.500.000" -> coverage=Manevi Tazminat, limit=2500000
 Example: "Yanlis Yakit 1.500" -> coverage=Yanlis Yakit, limit=1500
 
-### ROW-LEVEL LIMIT ACCURACY -- CRITICAL
+### ROW-LEVEL LIMIT ACCURACY -- YOU WILL LOSE MONEY IF YOU GET THIS WRONG
 
-Each coverage table row is INDEPENDENT. The limit immediately following a coverage name belongs ONLY to that coverage. NEVER:
-- Use a limit from one row for another coverage (e.g. "Artan Mali Sorumluluk 100.000" then "Koltuk FK 5.000" -> first is 100k, second is 5k, NOT both 100k)
-- Assume a repeat of the same number in multiple adjacent rows
-- Confuse "5.000" (five thousand) with "100.000" (one hundred thousand) because both end in ".000"
-- Assign a limit to the wrong coverage because it appears close to a different coverage name
+**THIS IS THE #1 SOURCE OF EXTRACTION ERRORS. READ CAREFULLY.**
 
-Turkish numeric convention: "." is the THOUSANDS separator, not decimal. "5.000" = 5000. "100.000" = 100000.
-Parse each row independently. The limit following the coverage name on the same text line is that coverage's limit.
+Each coverage table row is COMPLETELY INDEPENDENT. The limit number that follows a coverage name on the SAME LINE belongs ONLY to that coverage. Here is a specific, real example that extractors regularly fail on:
+
+--- Example table from a real policy ---
+  Artan Mali Sorumluluk   100.000
+  Koltuk Ferdi Kaza - Olum    5.000
+  Koltuk Ferdi Kaza - Surekli Sakatlik    5.000
+--- End of example ---
+
+The CORRECT extraction:
+- Artan Mali Sorumluluk -> limit=100000
+- Koltuk FK Olum -> limit=5000
+- Koltuk FK Sakatlik -> limit=5000
+
+The WRONG extraction (what bad extractors do):
+- ALL THREE -> limit=100000  ❌ (stealing the 100.000 from the Artan row)
+
+**Never steal limits from adjacent rows.** The visual proximity of "100.000" near "Koltuk FK" does NOT mean Koltuk FK has a 100.000 limit. The limit for each row is ONLY the number on THAT row.
+
+Turkish numeric convention: "." is the THOUSANDS separator, not decimal:
+- "5.000" = five thousand (5000)
+- "100.000" = one hundred thousand (100000)
+- These are VERY different values. Do NOT confuse them because both end in ".000".
+- "1.500" = one thousand five hundred (1500), not 1.5
+
+**How to parse correctly:**
+1. Identify each coverage row boundary (newline or bullet)
+2. Find the coverage name on that row
+3. Find the numeric limit appearing AFTER the name on THAT SAME ROW
+4. Assign that limit to that coverage ONLY
+5. Move to the next row. DO NOT carry numbers across rows.
 
 Also check these locations for numeric limits:
 1. The "Sigorta Kapsami / Teminat Limiti" compact summary block
@@ -272,6 +296,19 @@ Also check these locations for numeric limits:
 3. Per-person limits (can apply to multiple coverages)
 4. "Birlesik" policy tables that show each sub-product's sub-limits
 5. Hukuksal Koruma tables (often have 3-4 sub-limits: avans, kefalet, olay basina, yillik)
+
+**Birlesik Kasko Hukuksal Koruma sub-limits — CRITICAL:** Hukuksal Koruma in Birlesik Kasko policies typically has 4 sub-limits:
+- Avans (Advance): e.g. 750 TL
+- Kefalet (Bail): e.g. 750 TL
+- Olay Basi (Per Event/Base): e.g. 3,750 TL
+- Yillik Toplam (Annual Aggregate): e.g. 11,000 TL
+Search the full document for these numbers — they are often stated in a kloz or separate box, NOT in the main coverage table.
+
+**Birlesik Kasko Koltuk Ferdi Kaza sub-limits — CRITICAL:**
+- Vefat (Death): typically 5,000 TL (NOT 100,000)
+- Surekli Sakatlik (Permanent Disability): typically 5,000 TL (NOT 100,000)
+- Tedavi (Medical Treatment): typically 500 TL
+Do NOT confuse these with the Artan Mali Sorumluluk limit (which can be 100,000 TL).
 
 ### Special Coverage Values
 - **"Sinirsiz" (Unlimited)**: Set isUnlimited=true and limit=null
@@ -366,14 +403,17 @@ Scan the ENTIRE document for exclusion clauses. Turkish policies list exclusions
 
 1. **Roof Glass / Sunroof (Tavan Cami):**
    - Look for: "tavan cami haric", "sunroof haric", "acilir tavan haric"
+   - Also check any "Cam" (Glass) kloz for what is excluded
    - Exclusion text: "Tavan cami teminat disidir" with verbatim quote
 
 2. **Driver License Mismatch (Ehliyet Uyumsuzlugu):**
    - Look for: "ehliyetsiz", "gecersiz ehliyet", "surucu belgesi uyumsuzlugu"
+   - Also: "surucu belgesi bulunmayan" or "yetkisiz surucu"
    - Exclusion text: "Surucu belgesi uyumsuzlugu teminat disidir"
 
 3. **Rental/Rent-a-car use:**
    - "rent-a-car", "kiralik arac", "taksi", "dolmus" kullanimi
+   - Look for kloz sections titled "Kullanim Sekli" or usage restrictions
 
 4. **Modified vehicles:**
    - "modifiyeli arac", "degisiklik yapilmis arac"
@@ -381,7 +421,11 @@ Scan the ENTIRE document for exclusion clauses. Turkish policies list exclusions
 5. **Armored vehicles:**
    - "zirh", "kaplanan arac"
 
-6. **Intentional acts, drunk driving, unauthorized use, racing, war/nuclear/terror, wear and tear**
+6. **Pet/animal damage exclusions:**
+   - "evcil hayvan" interior damage
+   - "kus" (bird) damage to paint/bodywork
+
+7. **Intentional acts, drunk driving, unauthorized use, racing, war/nuclear/terror, wear and tear**
 
 For each exclusion, provide:
 - type: descriptive English type identifier
