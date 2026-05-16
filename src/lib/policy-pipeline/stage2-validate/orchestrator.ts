@@ -190,28 +190,66 @@ export function runStage2Validation(data: any): any {
     )
     if (mainHk?.description) {
       const desc = (mainHk.description as string).toLocaleLowerCase('tr-TR')
-      // Extract numeric values for each sub-concept from the description
-      const limitPatterns: Record<string, RegExp> = {
-        LEGAL_PROTECTION_ADVANCE:
-          /(?:^|[\s,/])(\d{1,3}(?:\.\d{3})*)\s*tl[^a-z]*(?:avan|advance|advance|legal advance)/i,
-        LEGAL_PROTECTION_BAIL:
-          /(?:^|[\s,/])(\d{1,3}(?:\.\d{3})*)\s*tl[^a-z]*(?:kefalet|bail)/i,
-        LEGAL_PROTECTION_PER_EVENT:
-          /(?:^|[\s,/])(\d{1,3}(?:\.\d{3})*)\s*tl[^a-z]*(?:olay ba.|per event|per claim|claim ba.)/i,
-        LEGAL_PROTECTION_ANNUAL_AGGREGATE:
-          /(?:^|[\s,/])(\d{1,3}(?:\.\d{3})*)\s*tl[^a-z]*(?:y.l.l.k|annual|sigorta s.resi|aggregate|insurance period)/i,
-      }
-      for (const cov of result.coverages) {
-        const pattern = limitPatterns[cov.canonicalName as string]
-        if (pattern && (cov.limit === null || cov.limit === undefined)) {
-          const match = desc.match(pattern)
-          if (match) {
-            const amount = parseFloat(match[1].replace(/\./g, ''))
+      // HK descriptions follow this pattern:
+      // '5,000 TL per claim / 11,000 TL annual aggregate / 750 TL bail / 750 TL legal advance'
+      // Extract all numeric amounts with their corresponding labels
+      const amounts: { concept: string; amount: number }[] = []
+      const labelMatch = desc.match(
+        /(\d{1,3}(?:\.\d{3})*)\s*tl[^a-z]*([a-z\s]+?)(?:\s*\/|$)/gi
+      )
+      if (labelMatch) {
+        for (const segment of labelMatch) {
+          const numMatch = segment.match(/(\d{1,3}(?:\.\d{3})*)/)
+          if (numMatch) {
+            const amount = parseFloat(numMatch[1].replace(/\./g, ''))
             if (!isNaN(amount) && amount > 0) {
-              cov.limit = amount
-              cov.parsedLimit = { type: 'numeric' as const, amount }
+              const seg = segment.toLocaleLowerCase('tr-TR')
+              if (
+                seg.includes('claim') ||
+                seg.includes('olay') ||
+                seg.includes('per event') ||
+                seg.includes('per claim')
+              ) {
+                amounts.push({ concept: 'LEGAL_PROTECTION_PER_EVENT', amount })
+              } else if (
+                seg.includes('annual') ||
+                seg.includes('y.l.l.k') ||
+                seg.includes('aggregate') ||
+                seg.includes('sigorta s.resi') ||
+                seg.includes('insurance period')
+              ) {
+                amounts.push({ concept: 'LEGAL_PROTECTION_ANNUAL_AGGREGATE', amount })
+              } else if (seg.includes('bail') || seg.includes('kefalet')) {
+                amounts.push({ concept: 'LEGAL_PROTECTION_BAIL', amount })
+              } else if (seg.includes('advance') || seg.includes('avan') || seg.includes('avans')) {
+                amounts.push({ concept: 'LEGAL_PROTECTION_ADVANCE', amount })
+              }
             }
           }
+        }
+      }
+      // Fallback if label matching failed: use positional order
+      // Format is always: [per_event], [annual], [bail], [advance]
+      if (amounts.length === 0) {
+        const nums = desc.match(/(\d{1,3}(?:\.\d{3})*)/g)
+        if (nums && nums.length >= 4) {
+          const order = ['LEGAL_PROTECTION_PER_EVENT', 'LEGAL_PROTECTION_ANNUAL_AGGREGATE', 'LEGAL_PROTECTION_BAIL', 'LEGAL_PROTECTION_ADVANCE']
+          for (let i = 0; i < order.length; i++) {
+            const amount = parseFloat(nums[i].replace(/\./g, ''))
+            if (!isNaN(amount) && amount > 0) {
+              amounts.push({ concept: order[i], amount })
+            }
+          }
+        }
+      }
+      // Apply extracted amounts to matching coverage items
+      for (const entry of amounts) {
+        const cov = result.coverages.find(
+          (c: any) => c.canonicalName === entry.concept && (c.limit === null || c.limit === undefined)
+        )
+        if (cov) {
+          cov.limit = entry.amount
+          cov.parsedLimit = { type: 'numeric' as const, amount: entry.amount }
         }
       }
     }
