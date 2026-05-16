@@ -14,7 +14,7 @@
 
 import OpenAI from 'openai'
 import { EXTRACTION_JSON_SCHEMA } from '../../shared/extraction-schema.js'
-import { calculateCost } from '../../src/lib/ai/cost-tracking/index.js'
+import { calculateCost } from '../middleware/cost-control.js'
 
 export interface DebateConfig {
   model?: string

@@ -23,6 +23,7 @@
     "**/*.test.ts",
     "__tests__/**/*",
     "../shared/**/*.test.ts",
-    "../shared/__tests__/**/*"
+    "../shared/__tests__/**/*",
+    "../src/**"
   ]
 }

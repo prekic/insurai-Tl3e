@@ -425,7 +425,7 @@ router.post(
       // ── Multi-LLM Debate Pipeline (optional) ────────────────────
       // When ?debate=true, run two independent extractors with cross-validation
       // instead of a single extraction + self-healing loop. Up to 3 rounds.
-      if (req.query.debate === 'true' || req.query.debate === true) {
+      if (req.query.debate === 'true' || req.query.debate === '1') {
         log.info('[debate] Running multi-LLM debate pipeline', { requestId })
         try {
           const { runDebatePipeline } = await import('../../lib/debate-pipeline.js')
@@ -1612,7 +1612,7 @@ router.post(
     // When ?debate=true, run two independent extractors with cross-validation
     // instead of a single OpenAI call. Up to 3 rounds of debate.
     log.info('Checking debate flag', { requestId, debateQuery: req.query.debate, debateType: typeof req.query.debate })
-    if ((req.query.debate === 'true' || req.query.debate === true) && openaiClient) {
+    if ((req.query.debate === 'true' || req.query.debate === '1') && openaiClient) {
       log.info('Running multi-LLM debate pipeline', { requestId })
       try {
         const { runDebatePipeline } = await import('../../lib/debate-pipeline.js')
