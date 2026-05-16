@@ -63,7 +63,20 @@ export function runStage2Validation(data: any): any {
           }
         }
       } else {
-        uniqueCoverages.set(`unknown_${Math.random()}`, canonicalized)
+        // Use the original name as key to dedup UNKNOWN coverages
+        // (LLM often outputs Turkish names that don't canonicalize)
+        const unknownKey = cov.name ? `unknown_${cov.name.toLowerCase().trim()}` : `unknown_${Math.random()}`
+        const existing = uniqueCoverages.get(unknownKey)
+        if (!existing) {
+          uniqueCoverages.set(unknownKey, canonicalized)
+        } else {
+          // Merge: keep the entry with higher limit (same logic as known)
+          const existingLimit = existing.parsedLimit?.amount || 0
+          const newLimit = canonicalized.parsedLimit?.amount || 0
+          if (newLimit > existingLimit) {
+            uniqueCoverages.set(unknownKey, canonicalized)
+          }
+        }
       }
     })
 
@@ -165,7 +178,7 @@ export function runStage2Validation(data: any): any {
     // Try to extract kademe from evidence text if available
     let kademe: number | null = null
     if (result.discounts.evidence) {
-      const kademeMatch = result.discounts.evidence.match(/Kademesi?\s*:\s*(\d+)/i)
+      const kademeMatch = result.discounts.evidence.match(/Kademe(?:si)?\s*:\s*(\d+)/i)
       if (kademeMatch) {
         kademe = parseInt(kademeMatch[1], 10)
       }

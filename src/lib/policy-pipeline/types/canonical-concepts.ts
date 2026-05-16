@@ -63,6 +63,10 @@ export type CanonicalCoverageConcept =
   | 'CIGARETTE_DAMAGE'
   | 'ADDITIONAL_EQUIPMENT'
   | 'VOLUNTARY_THIRD_PARTY_LIABILITY'
+  // Basic kasko coverages (added for LLM English output canonicalization)
+  | 'THEFT'
+  | 'FIRE'
+  | 'THIRD_PARTY_LIABILITY'
   // Fallback
   | 'UNKNOWN'
 
@@ -168,6 +172,10 @@ export const CONCEPT_DISPLAY_LABELS: Readonly<
     tr: 'İhtiyari Mali Sorumluluk',
     en: 'Voluntary Third Party Liability',
   },
+  // Basic kasko
+  THEFT: { tr: 'Hırsızlık', en: 'Theft' },
+  FIRE: { tr: 'Yangın', en: 'Fire' },
+  THIRD_PARTY_LIABILITY: { tr: 'Üçüncü Şahıs Mali Mesuliyet', en: 'Third Party Liability' },
   // Fallback
   UNKNOWN: { tr: 'Bilinmeyen Teminat', en: 'Unknown Coverage' },
 } as const

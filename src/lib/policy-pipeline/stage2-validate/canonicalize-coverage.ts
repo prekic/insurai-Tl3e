@@ -47,6 +47,33 @@ export function canonicalizeCoverage(
   if (normalized === 'hukuksal koruma' || normalizedEn === 'legal protection')
     return 'LEGAL_PROTECTION'
 
+  // Basic kasko coverages that LLM outputs in English
+  if (
+    normalizedEn.includes('collision') ||
+    normalizedEn.includes('comprehensive') ||
+    normalizedEn.includes('kasko coverage')
+  )
+    return 'MAIN_KASKO_COVERAGE'
+
+  if (
+    normalizedEn.includes('fires') ||
+    normalizedEn.includes('fire damage') ||
+    normalized === 'yangın' ||
+    normalized === 'fire'
+  )
+    return 'FIRE' // needs concept pair, fallback okay
+
+  if (normalized === 'hırsızlık' || normalizedEn === 'theft')
+    return 'THEFT'
+
+  if (
+    normalizedEn.includes('third party liability') ||
+    normalizedEn.includes('third party') ||
+    normalized.includes('üçüncü şahıs') ||
+    normalized.includes('ucuncu sahis')
+  )
+    return 'THIRD_PARTY_LIABILITY'
+
   if (
     normalized.includes('ölüm') ||
     normalized.includes('vefat') ||
