@@ -192,11 +192,14 @@ export function runStage2Validation(data: any): any {
       const desc = (mainHk.description as string).toLocaleLowerCase('tr-TR')
       // Extract numeric values for each sub-concept from the description
       const limitPatterns: Record<string, RegExp> = {
-        LEGAL_PROTECTION_ADVANCE: /(?:^|[\s,/])(\d{1,3}(?:\.\d{3})*)\s*\s*tl?[^a-z]*avan/i,
-        LEGAL_PROTECTION_BAIL: /(?:^|[\s,/])(\d{1,3}(?:\.\d{3})*)\s*\s*tl?[^a-z]*kefalet/i,
-        LEGAL_PROTECTION_PER_EVENT: /(?:^|[\s,/])(\d{1,3}(?:\.\d{3})*)\s*\s*tl?[^a-z]*(?:olay|claim|claim ba.)/i,
+        LEGAL_PROTECTION_ADVANCE:
+          /(?:^|[\s,/])(\d{1,3}(?:\.\d{3})*)\s*tl[^a-z]*(?:avan|advance|advance|legal advance)/i,
+        LEGAL_PROTECTION_BAIL:
+          /(?:^|[\s,/])(\d{1,3}(?:\.\d{3})*)\s*tl[^a-z]*(?:kefalet|bail)/i,
+        LEGAL_PROTECTION_PER_EVENT:
+          /(?:^|[\s,/])(\d{1,3}(?:\.\d{3})*)\s*tl[^a-z]*(?:olay ba.|per event|per claim|claim ba.)/i,
         LEGAL_PROTECTION_ANNUAL_AGGREGATE:
-          /(?:^|[\s,/])(\d{1,3}(?:\.\d{3})*)\s*\s*tl?[^a-z]*(?:y.l.l.k|annual|sigorta s.resi|aggregate)/i,
+          /(?:^|[\s,/])(\d{1,3}(?:\.\d{3})*)\s*tl[^a-z]*(?:y.l.l.k|annual|sigorta s.resi|aggregate|insurance period)/i,
       }
       for (const cov of result.coverages) {
         const pattern = limitPatterns[cov.canonicalName as string]
