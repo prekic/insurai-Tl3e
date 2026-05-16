@@ -121,6 +121,16 @@ export const EXTRACTION_JSON_SCHEMA = {
         description:
           'Total premium amount (Prim/Ödenecek Prim). DO NOT confuse with vehicle market value (Rayiç Bedel) which is usually in the millions.',
       },
+      premiumNet: {
+        type: ['number', 'null'],
+        description:
+          'Net premium before tax (Vergi Öncesi Prim). The premium amount before BSMV (Banka ve Sigorta Muameleleri Vergisi) and other taxes/charges are added.',
+      },
+      premiumTax: {
+        type: ['number', 'null'],
+        description:
+          'Premium tax amount (BSMV / Banka ve Sigorta Muameleleri Vergisi). The tax portion of the premium, typically 5% of net premium in Turkey.',
+      },
       sigortaBedeli: {
         type: ['number', 'null'],
         description:
@@ -172,6 +182,11 @@ export const EXTRACTION_JSON_SCHEMA = {
               description:
                 'Set to true if coverage is DAHİL (included/active). Set to false if coverage is HARİÇ (excluded/not purchased). Turkish policies often have a DAHİL/HARİÇ column — use it. Include BOTH DAHİL and HARİÇ coverages in this array. Default to true if status is ambiguous.',
             },
+            isOptional: {
+              type: 'boolean',
+              description:
+                'Set to true if coverage is optional / SECMELI / ISTEGE BAGLI (optional add-on the policyholder can choose). Default to false for standard coverages.',
+            },
             limitType: {
               type: ['string', 'null'],
               enum: ['per_event', 'aggregate', 'combined', null],
@@ -212,6 +227,7 @@ export const EXTRACTION_JSON_SCHEMA = {
             'isMarketValue',
             'category',
             'included',
+            'isOptional',
             'limitType',
             'page',
             'clause',
@@ -517,6 +533,8 @@ export const EXTRACTION_JSON_SCHEMA = {
       'tcKimlik',
       'vkn',
       'premium',
+      'premiumNet',
+      'premiumTax',
       'sigortaBedeli',
       'currency',
       'paymentFrequency',

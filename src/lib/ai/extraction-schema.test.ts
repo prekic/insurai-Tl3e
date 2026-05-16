@@ -103,7 +103,7 @@ describe('EXTRACTION_JSON_SCHEMA Required Fields', () => {
     // + vehicleMake + vehicleModel + vehicleYear + vehiclePlate + vin + tcKimlik + vkn
     // + bağlıPolNo + sigortaBedeli + isBundle + bundleProducts + previousInsurer
     // All nullable types so the LLM can return null.
-    expect(required.length).toBe(35)
+    expect(required.length).toBe(37)
   })
 
   it('should require discounts', () => {

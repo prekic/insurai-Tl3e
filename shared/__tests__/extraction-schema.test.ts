@@ -27,7 +27,8 @@ describe('shared/extraction-schema', () => {
     // gotcha #47 (OpenAI strict-mode required[] completeness).
     // 32→34: added isBundle + bundleProducts for P1 #4 bundle detection.
     // 34→35: added previousInsurer for Round-4 PR-S3.2 (Sompo Japan transfer).
-    expect(schema.required).toHaveLength(35)
+        // 35→37: added premiumNet + premiumTax for net/tax breakdown.
+    expect(schema.required).toHaveLength(37)
   })
 
   it('has discounts object with required sub-fields', () => {
@@ -69,12 +70,13 @@ describe('shared/extraction-schema', () => {
     expect(props.coverages.items.required).toContain('nameTr')
   })
 
-  it('has all 14 coverage item properties in required', () => {
+  it('has all 15 coverage item properties in required', () => {
     // Must be updated alongside every addition/removal of a coverage-item
     // property per gotcha #47. v4: added `carveOuts` (13 → 14).
     const coverageItems = props.coverages.items
     const coverageKeys = Object.keys(coverageItems.properties)
-    expect(coverageKeys).toHaveLength(14)
+        // 14→15: added isOptional for optional coverage detection.
+    expect(coverageKeys).toHaveLength(15)
     for (const key of coverageKeys) {
       expect(coverageItems.required).toContain(key)
     }
