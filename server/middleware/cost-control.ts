@@ -68,6 +68,9 @@ const DEFAULT_COST_PER_1K_TOKENS: Record<string, { input: number; output: number
   'claude-sonnet-4-6': { input: 0.003, output: 0.015 },
   'claude-haiku-4-5': { input: 0.001, output: 0.005 },
   'gemini-2.5-flash': { input: 0.0003, output: 0.0025 },
+  // DeepSeek
+  'deepseek-chat': { input: 0.00027, output: 0.0011 },
+  'deepseek-reasoner': { input: 0.00055, output: 0.00219 },
   // Legacy models (retained for historical cost tracking)
   // OpenAI
   'gpt-4o': { input: 0.0025, output: 0.01 },

@@ -65,6 +65,8 @@ const EXTRACTION_MODEL_ALLOWLIST = new Set([
   'gpt-5.4-mini',
   'gpt-4o',
   'gpt-4o-mini',
+  'deepseek-chat',
+  'deepseek-reasoner',
 ])
 
 /**
@@ -96,6 +98,7 @@ const router = Router()
 // Initialize clients (lazy - only when keys are available)
 let openaiClient: OpenAI | null = null
 let anthropicClient: Anthropic | null = null
+let deepseekClient: OpenAI | null = null
 
 function getOpenAIClient(): OpenAI | null {
   if (!process.env.OPENAI_API_KEY) return null
@@ -111,6 +114,22 @@ function getAnthropicClient(): Anthropic | null {
     anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   }
   return anthropicClient
+}
+
+/**
+ * Get or create an OpenAI-compatible client for DeepSeek API.
+ * DeepSeek is ~10x cheaper than gpt-5.4 and serves as fallback for quota/rate-limit errors.
+ */
+function getDeepSeekClient(): OpenAI | null {
+  const apiKey = process.env.DEEPSEEK_API_KEY
+  if (!apiKey) return null
+  if (!deepseekClient) {
+    deepseekClient = new OpenAI({
+      apiKey,
+      baseURL: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
+    })
+  }
+  return deepseekClient
 }
 
 let geminiClient: GoogleGenAI | null = null
@@ -277,6 +296,7 @@ router.post(
 
     try {
       const client = getOpenAIClient()
+      const deepseekFallback = getDeepSeekClient()
       if (!client) {
         log.warn('OpenAI client not configured', { requestId })
         return res.status(503).json({
@@ -499,6 +519,82 @@ router.post(
         judgeCaller,
         (content) => JSON.parse(content)
       )
+
+      // ── DeepSeek Fallback ──
+      // If primary OpenAI fails (quota exhausted, rate limited, network error)
+      // and DeepSeek is configured, retry with DeepSeek (~10x cheaper).
+      if (!healingResult.success && !healingResult.data && deepseekFallback) {
+        log.warn('[fallback] OpenAI failed, retrying with DeepSeek', {
+          requestId,
+          error: healingResult.error?.substring(0, 200),
+        })
+        const deepSeekWorker = async (userPrompt: string, temperature: number) => {
+          const response = await deepseekFallback.chat.completions.create({
+            model: 'deepseek-chat',
+            messages: [
+              { role: 'system', content: systemPromptWithJson },
+              { role: 'user', content: userPrompt },
+            ],
+            response_format: { type: 'json_object' },
+            max_tokens: aiConfig.maxTokens,
+            temperature,
+          }, { signal: AbortSignal.timeout(300_000) })
+          const inputTokens = response.usage?.prompt_tokens || 0
+          const outputTokens = response.usage?.completion_tokens || 0
+          return {
+            content: response.choices[0]?.message?.content || '',
+            usage: {
+              inputTokens,
+              outputTokens,
+              cost: calculateCost('deepseek-chat', inputTokens, outputTokens).totalCost,
+              model: 'deepseek-chat',
+            },
+          }
+        }
+        const deepSeekJudge = async (_doc: string, workerContent: string) => {
+          const judgePrompt = `Original Document:\n\n${finalUserPrompt}\n\nExtraction Result:\n\n${workerContent}`
+          const response = await deepseekFallback.chat.completions.create({
+            model: 'deepseek-chat',
+            messages: [
+              { role: 'system', content: JUDGE_SYSTEM_PROMPT },
+              { role: 'user', content: judgePrompt },
+            ],
+            response_format: { type: 'json_object' },
+            temperature: 0.0,
+          }, { signal: AbortSignal.timeout(300_000) })
+          const inputTokens = response.usage?.prompt_tokens || 0
+          const outputTokens = response.usage?.completion_tokens || 0
+          return {
+            content: response.choices[0]?.message?.content || '',
+            usage: {
+              inputTokens,
+              outputTokens,
+              cost: calculateCost('deepseek-chat', inputTokens, outputTokens).totalCost,
+              model: 'deepseek-chat',
+            },
+          }
+        }
+        const fallbackResult = await executeWithSelfHealingLoop(
+          documentText,
+          userPromptWithJson,
+          aiConfig.temperature,
+          deepSeekWorker,
+          deepSeekJudge,
+          (content) => JSON.parse(content)
+        )
+        if (fallbackResult.success || fallbackResult.data) {
+          // Use fallback result instead
+          healingResult.success = true
+          healingResult.data = fallbackResult.data
+          healingResult.finalModel = 'deepseek-chat (fallback)'
+          healingResult.totalCost = fallbackResult.totalCost
+          healingResult.totalInputTokens = fallbackResult.totalInputTokens
+          healingResult.totalOutputTokens = fallbackResult.totalOutputTokens
+          log.info('[fallback] DeepSeek fallback succeeded', { requestId })
+        } else {
+          log.error('[fallback] Both OpenAI and DeepSeek failed', { requestId })
+        }
+      }
 
       if (!healingResult.success && !healingResult.data) {
         return res.status(500).json({
