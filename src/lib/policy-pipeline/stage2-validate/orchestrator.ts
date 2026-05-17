@@ -25,6 +25,7 @@ export function runStage2Validation(data: any): any {
   // 2. Canonicalize Coverages
   if (Array.isArray(result.coverages)) {
     const uniqueCoverages = new Map<string, any>()
+    const deferredUnknowns: Array<{canonicalized: any; rawName: string; nameLow: string}> = []
 
     result.coverages.forEach((cov: any) => {
       if (!cov) return
@@ -63,54 +64,42 @@ export function runStage2Validation(data: any): any {
           }
         }
       } else {
-        // ── UNKNOWN De-duplication ──
-        // First check: does this UNKNOWN name match an already-canonicalized
-        // coverage? LLMs often produce variants like "Seat Personal Accident"
-        // when SEAT_PERSONAL_ACCIDENT_DEATH is already in the map. Drop it.
-        const nameLow = (cov.name || '').toLowerCase().trim()
+        // ── UNKNOWN De-duplication (two-pass) ──
+        // LLMs produce variants like "Personal Accident for Seats" when
+        // SEAT_PERSONAL_ACCIDENT_DEATH is already canonicalized. We can't
+        // check against already-processed entries only, because the SEAT
+        // entry may appear later in the list. Instead, we defer UNKNOWNs
+        // to a second pass after ALL coverages are canonicalized.
+        deferredUnknowns.push({
+          canonicalized,
+          rawName: cov.name || '',
+          nameLow: (cov.name || '').toLowerCase().trim()
+        })
+      }
+    })
 
-        // Build fuzzy match: extract key terms from the UNKNOWN name and
-        // see if they overlap with any canonical name already in the map.
-        const nameTokens = nameLow.split(/[\s-/]+/).filter((t: string) => t.length > 3)
-        let isDuplicateOfKnown = false
-        if (nameTokens.length > 0) {
-          for (const [existingCn, existingCov] of uniqueCoverages) {
-            // Skip UNKNOWN coverages in the map (don't compare against them)
-            if (existingCn === 'UNKNOWN' || existingCn.startsWith('unknown_')) continue
-            // Check if most tokens in the UNKNOWN name appear in the canonical label
-            // existingCov.name is replaced with Turkish label (e.g. 'Koltuk Ferdi Kaza')
-            // so check against BOTH the canonical concept (English) AND the Turkish name
-            const existingName = (existingCn + ' ' + (existingCov.name || '')).toLowerCase()
-            const matchingTokens = nameTokens.filter((token: string) =>
-              existingName.includes(token)
-            )
-            if (matchingTokens.length >= nameTokens.length * 0.5) {
-              isDuplicateOfKnown = true
-              break
-            }
-          }
-        }
-
-        if (isDuplicateOfKnown) {
-          // Silently drop — this is just a variant of an already-extracted coverage
-        } else {
-          // Use the original name as key to dedup UNKNOWN coverages
-          // (LLM often outputs Turkish names that don't canonicalize)
-          const unknownKey = cov.name ? `unknown_${nameLow}` : `unknown_${Math.random()}`
-          const existing = uniqueCoverages.get(unknownKey)
-          if (!existing) {
-            uniqueCoverages.set(unknownKey, canonicalized)
-          } else {
-            // Merge: keep the entry with higher limit (same logic as known)
-            const existingLimit = existing.parsedLimit?.amount || 0
-            const newLimit = canonicalized.parsedLimit?.amount || 0
-            if (newLimit > existingLimit) {
-              uniqueCoverages.set(unknownKey, canonicalized)
-            }
+    // ── Second pass: De-duplicate UNKNOWNs against known canonical coverages ──
+    // Since UNKNOWNs may appear before the matching canonical entries in the
+    // first pass, we defer them and process here where all canonicals are known.
+    for (const deferred of deferredUnknowns) {
+      const nameTokens = deferred.nameLow.split(/[\s/]+/).filter((t: string) => t.length > 3)
+      let isDuplicateOfKnown = false
+      if (nameTokens.length > 0) {
+        for (const [existingCn, existingCov] of uniqueCoverages) {
+          if (existingCn === 'UNKNOWN' || existingCn.startsWith('unknown_')) continue
+          const checkStr = (existingCn + ' ' + (existingCov.name || '')).toLowerCase()
+          const matchingTokens = nameTokens.filter((token: string) => checkStr.includes(token))
+          if (matchingTokens.length >= nameTokens.length * 0.5) {
+            isDuplicateOfKnown = true
+            break
           }
         }
       }
-    })
+      if (!isDuplicateOfKnown) {
+        const unknownKey = `unknown_${deferred.nameLow}`
+        uniqueCoverages.set(unknownKey, deferred.canonicalized)
+      }
+    }
 
     result.coverages = Array.from(uniqueCoverages.values())
 
