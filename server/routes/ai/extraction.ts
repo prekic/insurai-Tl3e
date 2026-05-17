@@ -284,6 +284,34 @@ async function getDocumentAIAccessToken(): Promise<string | null> {
  * Validated: documentText required, max 500KB
  * Uses admin-managed prompts from database with fallback
  */
+// Diagnostic: test DeepSeek connectivity right from the Railway process
+router.get('/test-deepseek', async (_req: Request, res: Response) => {
+  const hasKey = !!process.env.DEEPSEEK_API_KEY
+  const keyLen = process.env.DEEPSEEK_API_KEY?.length ?? 0
+  try {
+    const dsClient = new OpenAI({
+      apiKey: process.env.DEEPSEEK_API_KEY || '',
+      baseURL: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
+    })
+    const response = await dsClient.chat.completions.create({
+      model: 'deepseek-chat',
+      messages: [{ role: 'user', content: 'Say hello in JSON like {\"hello\":true}' }],
+      response_format: { type: 'json_object' },
+      max_tokens: 20,
+      temperature: 0,
+    })
+    res.json({
+      ok: true,
+      hasKey,
+      keyLen,
+      model: response.model,
+      content: response.choices[0]?.message?.content,
+    })
+  } catch (err: any) {
+    res.json({ ok: false, hasKey, keyLen, error: err.message })
+  }
+})
+
 router.post(
   '/extract/openai',
   validateJSON,
