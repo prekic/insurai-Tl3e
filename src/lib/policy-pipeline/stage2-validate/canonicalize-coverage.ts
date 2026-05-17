@@ -114,13 +114,34 @@ export function canonicalizeCoverage(
     return 'PERSONAL_ACCIDENT_MEDICAL'
   }
 
-  // AXA-specific patterns — must be before the generic 'sürücü' catch-all below
-  // which would otherwise match 'Sürücüye Bağlı' as SEAT_PERSONAL_ACCIDENT_DEATH
+  // AXA-specific patterns — must be before the generic 'sürücü'/'driver' catch-all below
+  // which would otherwise match 'Sürücüye Bağlı' / 'Driver Personal Accident' as
+  // SEAT_PERSONAL_ACCIDENT_DEATH
   if (normalized.includes('sürücüye bağlı')) return 'DRIVER_PERSONAL_ACCIDENT'
   if (normalized.includes('motorlu araca bağlı')) return 'VEHICLE_ATTACHED_PERSONAL_ACCIDENT'
   if (normalized.includes('kasa') && (normalized.includes('tank') || normalized.includes('depo')))
     return 'TANK_BODY_COVERAGE'
   if (normalized.includes('eksik aşkın') || normalized.includes('excess insurance'))
+    return 'EXCESS_INSURANCE'
+  // English variants (LLM may output these)
+  if (normalizedEn.includes('driver personal accident') || normalizedEn.includes('driver-attached'))
+    return 'DRIVER_PERSONAL_ACCIDENT'
+  if (
+    normalizedEn.includes('personal accident attached') ||
+    normalizedEn.includes('attached to motor vehicle') ||
+    normalizedEn.includes('vehicle-attached')
+  )
+    return 'VEHICLE_ATTACHED_PERSONAL_ACCIDENT'
+  if (
+    normalizedEn.includes('body/tank') ||
+    (normalizedEn.includes('body') && normalizedEn.includes('tank'))
+  )
+    return 'TANK_BODY_COVERAGE'
+  if (
+    normalizedEn.includes('underinsurance') ||
+    normalizedEn.includes('overinsurance') ||
+    normalizedEn.includes('excess insurance')
+  )
     return 'EXCESS_INSURANCE'
 
   // Catch general driver/passenger without explicit death/disability
@@ -352,21 +373,66 @@ export function canonicalizeCoverage(
     return 'MAIN_KASKO_COVERAGE'
 
   // AXA-specific assistance services (mapped to canonical concepts)
-  if (normalized.includes('aracın teslim')) return 'VEHICLE_PICKUP_DELIVERY'
-  if (normalized.includes('emanet') || normalized.includes('muhafaza')) return 'VEHICLE_SAFEKEEPING'
-  if (normalized.includes('araç bilgi hattı')) return 'VEHICLE_INFORMATION_HOTLINE'
-  if (normalized.includes('yol kenarında onarım')) return 'ROADSIDE_REPAIR'
-  if (normalized.includes('yedek parç') || normalized.includes('spare part'))
+  // Note: LLM may output in English (e.g. 'Roadside Repair') or Turkish ('Yol Kenarında Onarım')
+  // We check both normalized (TR locale) and normalizedEn (English safe variant)
+  if (normalized.includes('aracın teslim') || normalizedEn.includes('vehicle retrieval'))
+    return 'VEHICLE_PICKUP_DELIVERY'
+  if (
+    normalized.includes('emanet') ||
+    normalized.includes('muhafaza') ||
+    normalizedEn.includes('vehicle custody') ||
+    (normalizedEn.includes('vehicle') && normalizedEn.includes('safekeeping'))
+  )
+    return 'VEHICLE_SAFEKEEPING'
+  if (
+    normalized.includes('araç bilgi hattı') ||
+    normalizedEn.includes('vehicle information hotline') ||
+    normalizedEn.includes('vehicle info')
+  )
+    return 'VEHICLE_INFORMATION_HOTLINE'
+  if (normalized.includes('yol kenarında onarım') || normalizedEn.includes('roadside repair'))
+    return 'ROADSIDE_REPAIR'
+  if (
+    normalized.includes('yedek parç') ||
+    normalized.includes('spare part') ||
+    normalizedEn.includes('unavailable spare parts') ||
+    normalizedEn.includes('spare parts supply')
+  )
     return 'UNAVAILABLE_SPARE_PARTS'
-  if (normalized.includes('refakatç')) return 'ESCORT_TRANSPORT_ACCOMMODATION'
-  if (normalized.includes('cenaze')) return 'FUNERAL_TRANSPORT'
-  if (normalized.includes('bilgi ve organizasyon')) return 'INFORMATION_ORGANIZATION_SERVICES'
-  if (normalized.includes('konaklama') && normalized.includes('arızalanma'))
+  if (
+    normalized.includes('refakatç') ||
+    normalizedEn.includes('escort transport') ||
+    normalizedEn.includes('companion transport')
+  )
+    return 'ESCORT_TRANSPORT_ACCOMMODATION'
+  if (
+    normalized.includes('cenaze') ||
+    normalizedEn.includes('funeral transport') ||
+    normalizedEn.includes('funeral')
+  )
+    return 'FUNERAL_TRANSPORT'
+  if (
+    normalized.includes('bilgi ve organizasyon') ||
+    normalizedEn.includes('information and organization')
+  )
+    return 'INFORMATION_ORGANIZATION_SERVICES'
+  if (
+    (normalized.includes('konaklama') && normalized.includes('arızalanma')) ||
+    (normalized.includes('konaklama') && normalized.includes('kaza')) ||
+    normalizedEn.includes('accommodation and travel') ||
+    normalizedEn.includes('travel and accommodation')
+  )
     return 'BREAKDOWN_OR_ACCIDENT_TRAVEL_ACCOMMODATION'
-  if (normalized.includes('konaklama') && normalized.includes('kaza'))
-    return 'BREAKDOWN_OR_ACCIDENT_TRAVEL_ACCOMMODATION'
-  if (normalized.includes('lastik')) return 'TIRE_CHANGE'
-  if (normalized.includes('çilingir')) return 'LOCKSMITH_SERVICE'
+  if (
+    normalized.includes('lastik') ||
+    normalizedEn.includes('tire change') ||
+    normalizedEn.includes('tyre change') ||
+    normalizedEn.includes('tire replacement') ||
+    normalizedEn.includes('tyre replacement')
+  )
+    return 'TIRE_CHANGE'
+  if (normalized.includes('çilingir') || normalizedEn.includes('locksmith'))
+    return 'LOCKSMITH_SERVICE'
 
   if (strictMode) {
     throw new UnmatchedCoverageLabelError(rawLabel)
