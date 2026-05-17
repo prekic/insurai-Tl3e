@@ -316,7 +316,7 @@ app.get('/api/health', healthLimiter, async (_req, res) => {
   const response: {
     status: string
     timestamp: string
-    providers: { openai: boolean; anthropic: boolean; google: boolean }
+    providers: { openai: boolean; anthropic: boolean; google: boolean; deepseek: boolean }
     database: boolean
     rateLimits?: {
       general: { windowMs: number; max: number }
@@ -330,6 +330,7 @@ app.get('/api/health', healthLimiter, async (_req, res) => {
       openai: !!process.env.OPENAI_API_KEY,
       anthropic: !!process.env.ANTHROPIC_API_KEY,
       google: !!process.env.GOOGLE_CLOUD_API_KEY,
+      deepseek: !!process.env.DEEPSEEK_API_KEY,
     },
     database: dbHealthy,
   }
