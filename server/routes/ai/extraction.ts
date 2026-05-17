@@ -607,32 +607,13 @@ router.post(
           requestId,
           error: healingResult.error?.substring(0, 200),
         })
+
         const dsClient = deepseekFallback!
-
-        // DeepSeek-optimized prompt — DeepSeek works best with explicit structure examples
-        // in the prompt itself since it uses json_object (no schema validation)
-        const deepSeekSystemPrompt = `${finalSystemPrompt}
-
-## JSON STRUCTURE REQUIREMENT
-
-Output ONLY valid JSON — no preamble, no explanation, no markdown wrappers.
-The JSON structure:
-- coverages: array of objects, each with name, nameTr, canonicalName (English identifier like MAIN_KASKO_COVERAGE), category, included, isOptional, limit (number or null), isUnlimited, isMarketValue, unitValue (string or null), deductible, carveOuts
-- exclusions: array or null, each with type, text, textEn, quote
-- discounts: object with ncdDiscount (number, null), ncdKademe, groupDiscount, evidence
-- vehicle: object with make, model, year, plate, vin, usage, insuredEntityType or null
-- currency: string like "TRY", "USD"
-- All top-level fields: policyNumber, provider, policyType, isBundle, bundleProducts, startDate, endDate, premium, premiumNet, premiumTax, paymentFrequency, isAmendment, amendmentInfo
-- conditionalDeductibles: array or null
-- evidence: { insights: string[], exclusions: string[] } or null
-
-CRITICAL: Extract EVERY coverage you find. Do not skip any. More coverages = better. Include ALL standard Kasko items: Kasko Teminati, Kisisel Esya, Cam Kirilmasi, Ikame Arac, Ferdi Kaza, Manevi Tazminat, Hirsizlik, Yanlis Yakit, Deprem, Sel, Grev/Teror, Evcil Hayvan, Mini Onarim, Anahtar Hirsizligi, Hasarsizlik Indirimi Koruma, Artan Mali Sorumluluk, Hukuksal Koruma with ALL its sub-limits (Avans, Kefalet, Olay Basi, Yillik Toplam).`
-
         const deepSeekWorker = async (userPrompt: string, temperature: number) => {
           const response = await dsClient.chat.completions.create({
             model: 'deepseek-chat',
             messages: [
-              { role: 'system', content: deepSeekSystemPrompt },
+              { role: 'system', content: systemPromptWithJson },
               { role: 'user', content: userPrompt },
             ],
             response_format: { type: 'json_object' },
