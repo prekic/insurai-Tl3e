@@ -609,70 +609,24 @@ router.post(
         })
         const dsClient = deepseekFallback!
 
-        // DeepSeek-optimized system prompt — more explicit about JSON structure
-        // because DeepSeek uses json_object (no schema validation) unlike OpenAI's json_schema
+        // DeepSeek-optimized prompt — DeepSeek works best with explicit structure examples
+        // in the prompt itself since it uses json_object (no schema validation)
         const deepSeekSystemPrompt = `${finalSystemPrompt}
 
-## DeepSeek JSON OUTPUT INSTRUCTIONS
+## JSON STRUCTURE REQUIREMENT
 
-You MUST output valid JSON only. The JSON must match this exact structure:
+Output ONLY valid JSON — no preamble, no explanation, no markdown wrappers.
+The JSON structure:
+- coverages: array of objects, each with name, nameTr, canonicalName (English identifier like MAIN_KASKO_COVERAGE), category, included, isOptional, limit (number or null), isUnlimited, isMarketValue, unitValue (string or null), deductible, carveOuts
+- exclusions: array or null, each with type, text, textEn, quote
+- discounts: object with ncdDiscount (number, null), ncdKademe, groupDiscount, evidence
+- vehicle: object with make, model, year, plate, vin, usage, insuredEntityType or null
+- currency: string like "TRY", "USD"
+- All top-level fields: policyNumber, provider, policyType, isBundle, bundleProducts, startDate, endDate, premium, premiumNet, premiumTax, paymentFrequency, isAmendment, amendmentInfo
+- conditionalDeductibles: array or null
+- evidence: { insights: string[], exclusions: string[] } or null
 
-{
-  "policyNumber": string | null,
-  "provider": string | null,
-  "policyType": string | null,
-  "isBundle": boolean,
-  "bundleProducts": string[] | null,
-  "startDate": string | null,
-  "endDate": string | null,
-  "currency": string,
-  "premium": number | null,
-  "premiumNet": number | null,
-  "premiumTax": number | null,
-  "paymentFrequency": string | null,
-  "isAmendment": boolean,
-  "amendmentInfo": { /* amendment details */ } | null,
-  "discounts": {
-    "ncdDiscount": number | null,
-    "ncdKademe": number | null,
-    "groupDiscount": number | null,
-    "otherDiscountPct": number | null,
-    "evidence": string | null
-  },
-  "vehicle": {
-    "make": string | null,
-    "model": string | null,
-    "year": number | null,
-    "plate": string | null,
-    "vin": string | null,
-    "usage": string | null,
-    "insuredEntityType": string | null
-  } | null,
-  "coverages": [
-    {
-      "name": string,
-      "nameTr": string,
-      "canonicalName": string,
-      "category": string,
-      "included": boolean,
-      "isOptional": boolean,
-      "isUnlimited": boolean,
-      "isMarketValue": boolean,
-      "limit": number | null,
-      "unitValue": string | null,
-      "deductible": string | null,
-      "carveOuts": string[] | null,
-      "parsedLimit": number | null,
-      "normalizedName": string | null,
-      "quotes": string[] | null
-    }
-  ],
-  "exclusions": [ /* array of exclusion objects */ ] | null,
-  "conditionalDeductibles": [ /* array of conditional deductible objects */ ] | null,
-  "evidence": { "insights": string[], "exclusions": string[] } | null
-}
-
-DO NOT add any text before or after the JSON. Output ONLY the JSON object. Use camelCase keys. Use null for missing values.`
+CRITICAL: Extract EVERY coverage you find. Do not skip any. More coverages = better. Include ALL standard Kasko items: Kasko Teminati, Kisisel Esya, Cam Kirilmasi, Ikame Arac, Ferdi Kaza, Manevi Tazminat, Hirsizlik, Yanlis Yakit, Deprem, Sel, Grev/Teror, Evcil Hayvan, Mini Onarim, Anahtar Hirsizligi, Hasarsizlik Indirimi Koruma, Artan Mali Sorumluluk, Hukuksal Koruma with ALL its sub-limits (Avans, Kefalet, Olay Basi, Yillik Toplam).`
 
         const deepSeekWorker = async (userPrompt: string, temperature: number) => {
           const response = await dsClient.chat.completions.create({
