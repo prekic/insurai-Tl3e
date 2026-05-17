@@ -65,7 +65,9 @@ export function runStage2Validation(data: any): any {
       } else {
         // Use the original name as key to dedup UNKNOWN coverages
         // (LLM often outputs Turkish names that don't canonicalize)
-        const unknownKey = cov.name ? `unknown_${cov.name.toLowerCase().trim()}` : `unknown_${Math.random()}`
+        const unknownKey = cov.name
+          ? `unknown_${cov.name.toLowerCase().trim()}`
+          : `unknown_${Math.random()}`
         const existing = uniqueCoverages.get(unknownKey)
         if (!existing) {
           uniqueCoverages.set(unknownKey, canonicalized)
@@ -81,6 +83,34 @@ export function runStage2Validation(data: any): any {
     })
 
     result.coverages = Array.from(uniqueCoverages.values())
+
+    // ── Post-processing: filter out kloz/clause items masquerading as coverages ──
+    // LLMs sometimes extract clause section headings or policy descriptions as
+    // coverage entries with no limit. These are not real coverages.
+    const klozStopWords = [
+      'reinstatement',
+      'continuity of sum',
+      'service network',
+      'agreed network',
+      'authorized service',
+      'external impact',
+      'overturning',
+      'legally incapable',
+      'incapable persons',
+      'attempted theft',
+      'hatalı akaryakıt',
+      'eksper',
+      'muafiyet',
+      'servis uygulama',
+    ]
+    result.coverages = result.coverages.filter((cov: any) => {
+      if (cov.canonicalName !== 'UNKNOWN') return true
+      const label = (cov.normalizedName || cov.name || '').toLowerCase()
+      for (const stop of klozStopWords) {
+        if (label.includes(stop.toLowerCase())) return false
+      }
+      return true
+    })
   } else {
     result.coverages = []
   }
@@ -128,7 +158,11 @@ export function runStage2Validation(data: any): any {
             const llmLimit = strictCov.limit ?? strictCov.parsedLimit?.amount ?? null
             const llmIsUnlimited = strictCov.isUnlimited === true
             const llmIsMarketValue = strictCov.isMarketValue === true
-            if ((llmLimit === null || llmLimit === undefined) && !llmIsUnlimited && !llmIsMarketValue) {
+            if (
+              (llmLimit === null || llmLimit === undefined) &&
+              !llmIsUnlimited &&
+              !llmIsMarketValue
+            ) {
               strictCov.limit = reqDef.defaultLimit
               strictCov.parsedLimit =
                 reqDef.defaultLimit !== null
@@ -169,9 +203,7 @@ export function runStage2Validation(data: any): any {
     const hasMAB = result.coverages.some(
       (c: any) => c.canonicalName === 'VEHICLE_ATTACHED_PERSONAL_ACCIDENT'
     )
-    const hasSDB = result.coverages.some(
-      (c: any) => c.canonicalName === 'DRIVER_PERSONAL_ACCIDENT'
-    )
+    const hasSDB = result.coverages.some((c: any) => c.canonicalName === 'DRIVER_PERSONAL_ACCIDENT')
     if (hasMAB && !hasSDB) {
       const mab = result.coverages.find(
         (c: any) => c.canonicalName === 'VEHICLE_ATTACHED_PERSONAL_ACCIDENT'
@@ -190,7 +222,8 @@ export function runStage2Validation(data: any): any {
         isImplicit: false,
         included: true,
         isOptional: false,
-        description: 'Otomatik olarak tamamlandı: Motorlu Araca Bağlı ile aynı limite sahip Sürücüye Bağlı eklendi.',
+        description:
+          'Otomatik olarak tamamlandı: Motorlu Araca Bağlı ile aynı limite sahip Sürücüye Bağlı eklendi.',
       })
     }
   }
@@ -219,7 +252,8 @@ export function runStage2Validation(data: any): any {
   // null limits. Extract sub-limits from the main entry and propagate.
   if (Array.isArray(result.coverages)) {
     const mainHk = result.coverages.find(
-      (c: any) => c.canonicalName === 'LEGAL_PROTECTION' && c.description && c.description.length > 20
+      (c: any) =>
+        c.canonicalName === 'LEGAL_PROTECTION' && c.description && c.description.length > 20
     )
     if (mainHk?.description) {
       const desc = (mainHk.description as string).toLocaleLowerCase('tr-TR')
@@ -269,7 +303,12 @@ export function runStage2Validation(data: any): any {
       if (amounts.length === 0) {
         const nums = desc.match(/(\d{1,3}(?:\.\d{3})*)/g)
         if (nums && nums.length >= 4) {
-          const order = ['LEGAL_PROTECTION_PER_EVENT', 'LEGAL_PROTECTION_ANNUAL_AGGREGATE', 'LEGAL_PROTECTION_BAIL', 'LEGAL_PROTECTION_ADVANCE']
+          const order = [
+            'LEGAL_PROTECTION_PER_EVENT',
+            'LEGAL_PROTECTION_ANNUAL_AGGREGATE',
+            'LEGAL_PROTECTION_BAIL',
+            'LEGAL_PROTECTION_ADVANCE',
+          ]
           for (let i = 0; i < order.length; i++) {
             const amount = parseFloat(nums[i].replace(/\./g, ''))
             if (!isNaN(amount) && amount > 0) {
@@ -281,7 +320,8 @@ export function runStage2Validation(data: any): any {
       // Apply extracted amounts to matching coverage items
       for (const entry of amounts) {
         const cov = result.coverages.find(
-          (c: any) => c.canonicalName === entry.concept && (c.limit === null || c.limit === undefined)
+          (c: any) =>
+            c.canonicalName === entry.concept && (c.limit === null || c.limit === undefined)
         )
         if (cov) {
           cov.limit = entry.amount

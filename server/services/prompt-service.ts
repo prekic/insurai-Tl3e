@@ -394,8 +394,13 @@ Look for indicators:
 
 Turkish policies frequently say "Sinirsiz" or "Dahil" but bury actual caps in klozlar. You MUST:
 - Scan ALL kloz sections (everything after the coverage summary table)
-- **CRITICAL: Do NOT extract kloz (clause) section headings as coverages.** Labels like "Hasar Ek Belgesi İstisnası Klozu", "Anlaşmalı Servisler Klozu", "Servis Muafiyet Uygulaması" are policy CLAUSE TITLES, not coverage items. They describe terms, conditions, or limitations. Ignore them in the coverages array.
-- Look for phrases: "olay basina azami", "yillik azami", "toplam ... TL", "ile sinirlidir"
+- **CRITICAL: Do NOT extract kloz (clause) section headings or descriptions as coverages.** Labels like "Hasar Ek Belgesi İstisnası Klozu", "Anlaşmalı Servisler Klozu", "Servis Muafiyet Uygulaması" are policy CLAUSE TITLES — they describe terms, conditions, or limitations. Ignore them in the coverages array.
+- Specific kloz items that are NOT coverages (NEVER extract these):
+  * "Reinstatement of sum insured" or "Hasar Ekbelgesi İstisnası" — this is a clause about automatic limit restoration
+  * "Agreed/authorized service network" or "Anlaşmalı Servisler" — this is a repair shop clause
+  * "Continuity of sum insured" — another variation of the reinstatement clause
+  * Generic sub-risks already covered by MAIN_KASKO_COVERAGE (theft, fire, collision, external impact, overturning, falling, damage by legally incapable persons, etc.) — these are the sub-descriptions of what Kasko covers, NOT separate coverage items
+- Look ONLY for specific numeric limits in kloz sections. Phrases: "olay basina azami", "yillik azami", "toplam ... TL", "ile sinirlidir"
 - If a kloz references a coverage by name and imposes a numeric limit different from the table, add a 'carveOuts' array to that coverage
 - Example: Artan Mali Sorumluluk "Sinirsiz" but has 2.500.000 TL per-event sub-limit at airports/fuel stations
 - Example: Hatali Akaryakit "Dahil" -> actual per-event cap of 50.000 TL

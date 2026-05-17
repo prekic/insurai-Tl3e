@@ -438,6 +438,39 @@ export function canonicalizeCoverage(
   if (normalized.includes('çilingir') || normalizedEn.includes('locksmith'))
     return 'LOCKSMITH_SERVICE'
 
+  // ── Catch-all for trailer liability (Römork Mali Mesuliyet) ─────
+  if (normalizedEn.includes('trailer') && normalizedEn.includes('liability'))
+    return 'THIRD_PARTY_LIABILITY'
+
+  // ── Catch-all for kloz/clause items (not actual coverages) ─────
+  // These are clause section headings or descriptions that LLMs
+  // mistakenly extract as coverages. Route them to EXCESS_LIABILITY
+  // as a best-effort (they describe policy terms, not coverage limits).
+  const klozPatterns = [
+    'reinstatement of sum',
+    'continuity of sum',
+    'sum insured',
+    'service network',
+    'agreed network',
+    'authorized service',
+    'external impact',
+    'overturning',
+    'falling.*(object|causes)',
+    'legally incapable',
+    'incapable persons',
+    'attempted theft',
+  ]
+  for (const p of klozPatterns) {
+    if (normalizedEn.includes(p)) {
+      // These are clause descriptions, not coverages with limits.
+      // Return UNKNOWN but the orchestrator can choose to skip them.
+      if (strictMode) {
+        throw new UnmatchedCoverageLabelError(rawLabel)
+      }
+      return 'UNKNOWN'
+    }
+  }
+
   if (strictMode) {
     throw new UnmatchedCoverageLabelError(rawLabel)
   }
