@@ -62,6 +62,7 @@ const EXTRACTION_MODEL_ALLOWLIST = new Set([
   'claude-sonnet-4-6',
   'claude-sonnet-4-6-20251022',
   'gpt-5.4',
+  'gpt-5.4-mini',
   'gpt-4o',
   'gpt-4o-mini',
 ])
