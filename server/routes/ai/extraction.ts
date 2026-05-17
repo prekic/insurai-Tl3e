@@ -436,6 +436,9 @@ router.post(
             documentText,
             {
               model: model || aiConfig.openaiExtractionModel,
+              // When Claude is unavailable, use a different model for extractor B
+              // so the two extractors genuinely diverge and debate is meaningful
+              modelB: aiConfig.openaiBackupModel || 'gpt-4o-mini',
               temperature: aiConfig.temperature,
               maxRounds: 3,
               extractTimeout: 180_000,
@@ -1611,7 +1614,11 @@ router.post(
     // ── Multi-LLM Debate Pipeline ────────────────────────────────
     // When ?debate=true, run two independent extractors with cross-validation
     // instead of a single OpenAI call. Up to 3 rounds of debate.
-    log.info('Checking debate flag', { requestId, debateQuery: req.query.debate, debateType: typeof req.query.debate })
+    log.info('Checking debate flag', {
+      requestId,
+      debateQuery: req.query.debate,
+      debateType: typeof req.query.debate,
+    })
     if ((req.query.debate === 'true' || req.query.debate === '1') && openaiClient) {
       log.info('Running multi-LLM debate pipeline', { requestId })
       try {
@@ -1623,6 +1630,7 @@ router.post(
           documentText,
           {
             model: aiConfig.openaiExtractionModel,
+            modelB: aiConfig.openaiBackupModel || 'gpt-4o-mini',
             temperature: aiConfig.temperature,
             maxRounds: 3,
             extractTimeout: 120_000,

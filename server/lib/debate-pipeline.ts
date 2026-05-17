@@ -18,6 +18,10 @@ import { calculateCost } from '../middleware/cost-control.js'
 
 export interface DebateConfig {
   model?: string
+  /** Model for extractor B — defaults to model (same). When Claude is unavailable,
+   *  set this to a different OpenAI model (e.g. gpt-4o-mini) so the two extractors
+   *  diverge and genuine debate can happen. */
+  modelB?: string
   maxRounds?: number // 1-3, default 3
   temperature?: number
   extractTimeout?: number // per call, default 180s
@@ -202,18 +206,19 @@ export async function runDebatePipeline(
   let totalTokens = 0
 
   // ── Round 1: Two independent extractions in parallel ────────────────
+  // Extractor A uses model, Extractor B uses modelB (if set) or model
+  const configA = { ...debateConfig, source: 'extractor_a' as const, round: 1 }
+  const configB = {
+    ...debateConfig,
+    model: debateConfig.modelB || debateConfig.model,
+    source: 'extractor_b' as const,
+    round: 1,
+  }
+  delete (configB as any).modelB
 
   const [extractorA, extractorB] = await Promise.all([
-    callExtractor(client, systemPrompt, userPrompt, {
-      ...debateConfig,
-      source: 'extractor_a',
-      round: 1,
-    }),
-    callExtractor(client, systemPrompt, userPrompt, {
-      ...debateConfig,
-      source: 'extractor_b',
-      round: 1,
-    }),
+    callExtractor(client, systemPrompt, userPrompt, configA),
+    callExtractor(client, systemPrompt, userPrompt, configB),
   ])
 
   results.push(extractorA, extractorB)
@@ -259,17 +264,18 @@ export async function runDebatePipeline(
   const round2PromptB_extra = `\n\n${ROUND2_PROMPT_SUFFIX}${JSON.stringify(extractorA.parsed, null, 2)}`
   const round2PromptA_extra = `\n\n${ROUND2_PROMPT_SUFFIX}${JSON.stringify(extractorB.parsed, null, 2)}`
 
+  const configA2 = { ...debateConfig, source: 'extractor_a' as const, round: 2 }
+  const configB2 = {
+    ...debateConfig,
+    model: debateConfig.modelB || debateConfig.model,
+    source: 'extractor_b' as const,
+    round: 2,
+  }
+  delete (configB2 as any).modelB
+
   const [revisedA, revisedB] = await Promise.all([
-    callExtractor(client, systemPrompt, userPrompt + round2PromptA_extra, {
-      ...debateConfig,
-      source: 'extractor_a',
-      round: 2,
-    }),
-    callExtractor(client, systemPrompt, userPrompt + round2PromptB_extra, {
-      ...debateConfig,
-      source: 'extractor_b',
-      round: 2,
-    }),
+    callExtractor(client, systemPrompt, userPrompt + round2PromptA_extra, configA2),
+    callExtractor(client, systemPrompt, userPrompt + round2PromptB_extra, configB2),
   ])
 
   results.push(revisedA, revisedB)
