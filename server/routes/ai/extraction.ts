@@ -523,6 +523,14 @@ router.post(
       // ── DeepSeek Fallback ──
       // If primary OpenAI fails (quota exhausted, rate limited, network error)
       // and DeepSeek is configured, retry with DeepSeek (~10x cheaper).
+      log.debug('[fallback-debug] checking conditions', {
+        requestId,
+        success: healingResult.success,
+        hasData: !!healingResult.data,
+        hasDeepSeek: !!deepseekFallback,
+        code: healingResult.code,
+        error: healingResult.error?.substring(0, 100),
+      })
       if (!healingResult.success && !healingResult.data && deepseekFallback) {
         log.warn('[fallback] OpenAI failed, retrying with DeepSeek', {
           requestId,
