@@ -63,20 +63,48 @@ export function runStage2Validation(data: any): any {
           }
         }
       } else {
-        // Use the original name as key to dedup UNKNOWN coverages
-        // (LLM often outputs Turkish names that don't canonicalize)
-        const unknownKey = cov.name
-          ? `unknown_${cov.name.toLowerCase().trim()}`
-          : `unknown_${Math.random()}`
-        const existing = uniqueCoverages.get(unknownKey)
-        if (!existing) {
-          uniqueCoverages.set(unknownKey, canonicalized)
+        // ── UNKNOWN De-duplication ──
+        // First check: does this UNKNOWN name match an already-canonicalized
+        // coverage? LLMs often produce variants like "Seat Personal Accident"
+        // when SEAT_PERSONAL_ACCIDENT_DEATH is already in the map. Drop it.
+        const nameLow = (cov.name || '').toLowerCase().trim()
+
+        // Build fuzzy match: extract key terms from the UNKNOWN name and
+        // see if they overlap with any canonical name already in the map.
+        const nameTokens = nameLow.split(/[\s-/]+/).filter((t: string) => t.length > 3)
+        let isDuplicateOfKnown = false
+        if (nameTokens.length > 0) {
+          for (const [existingCn, existingCov] of uniqueCoverages) {
+            // Skip UNKNOWN coverages in the map (don't compare against them)
+            if (existingCn === 'UNKNOWN' || existingCn.startsWith('unknown_')) continue
+            // Check if most tokens in the UNKNOWN name appear in the canonical label
+            const existingName = ((existingCov.name || '') + ' ' + existingCn).toLowerCase()
+            const matchingTokens = nameTokens.filter((token: string) =>
+              existingName.includes(token)
+            )
+            if (matchingTokens.length >= nameTokens.length * 0.5) {
+              isDuplicateOfKnown = true
+              break
+            }
+          }
+        }
+
+        if (isDuplicateOfKnown) {
+          // Silently drop — this is just a variant of an already-extracted coverage
         } else {
-          // Merge: keep the entry with higher limit (same logic as known)
-          const existingLimit = existing.parsedLimit?.amount || 0
-          const newLimit = canonicalized.parsedLimit?.amount || 0
-          if (newLimit > existingLimit) {
+          // Use the original name as key to dedup UNKNOWN coverages
+          // (LLM often outputs Turkish names that don't canonicalize)
+          const unknownKey = cov.name ? `unknown_${nameLow}` : `unknown_${Math.random()}`
+          const existing = uniqueCoverages.get(unknownKey)
+          if (!existing) {
             uniqueCoverages.set(unknownKey, canonicalized)
+          } else {
+            // Merge: keep the entry with higher limit (same logic as known)
+            const existingLimit = existing.parsedLimit?.amount || 0
+            const newLimit = canonicalized.parsedLimit?.amount || 0
+            if (newLimit > existingLimit) {
+              uniqueCoverages.set(unknownKey, canonicalized)
+            }
           }
         }
       }
