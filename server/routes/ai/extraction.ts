@@ -124,10 +124,20 @@ function getDeepSeekClient(): OpenAI | null {
   const apiKey = process.env.DEEPSEEK_API_KEY
   if (!apiKey) return null
   if (!deepseekClient) {
-    deepseekClient = new OpenAI({
-      apiKey,
-      baseURL: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
-    })
+    // DEEPSEEK_BASE_URL might contain an api key instead of a URL (misconfiguration)
+    const rawBase = process.env.DEEPSEEK_BASE_URL
+    const validUrl = rawBase && rawBase.startsWith('http') && !rawBase.startsWith('sk-')
+      ? rawBase
+      : 'https://api.deepseek.com'
+    try {
+      deepseekClient = new OpenAI({
+        apiKey,
+        baseURL: validUrl,
+      })
+    } catch {
+      log.warn('Failed to create DeepSeek client', { rawBase, validUrl })
+      return null
+    }
   }
   return deepseekClient
 }
@@ -290,7 +300,9 @@ router.get('/test-deepseek', async (_req: Request, res: Response) => {
   const keyLen = process.env.DEEPSEEK_API_KEY?.length ?? 0
   try {
     const rawBaseUrl = process.env.DEEPSEEK_BASE_URL
-    const baseUrlResolved = (rawBaseUrl && rawBaseUrl.trim()) ? rawBaseUrl.trim() : 'https://api.deepseek.com'
+    const baseUrlResolved = rawBaseUrl && rawBaseUrl.startsWith('http') && !rawBaseUrl.startsWith('sk-')
+      ? rawBaseUrl
+      : 'https://api.deepseek.com'
     const dsClient = new OpenAI({
       apiKey: process.env.DEEPSEEK_API_KEY || '',
       baseURL: baseUrlResolved,
@@ -576,11 +588,20 @@ router.post(
       if (!healingResult.success && !healingResult.data && (deepseekFallback || hasDeepSeekKey)) {
         // Re-create client if needed (belt-and-suspenders)
         if (!deepseekFallback && hasDeepSeekKey) {
-          log.warn('[fallback] deepseekFallback was null, recreating client from env directly')
-          deepseekFallback = new OpenAI({
-            apiKey: process.env.DEEPSEEK_API_KEY!,
-            baseURL: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
-          })
+          const rawBase = process.env.DEEPSEEK_BASE_URL
+          const validUrl = rawBase && rawBase.startsWith('http') && !rawBase.startsWith('sk-')
+            ? rawBase
+            : 'https://api.deepseek.com'
+          log.warn('[fallback] deepseekFallback was null, recreating client from env directly', { validUrl })
+          try {
+            deepseekFallback = new OpenAI({
+              apiKey: process.env.DEEPSEEK_API_KEY!,
+              baseURL: validUrl,
+            })
+          } catch (recreateErr: any) {
+            log.error('[fallback] Failed to recreate DeepSeek client', { error: recreateErr.message })
+            deepseekFallback = null
+          }
         }
         log.warn('[fallback] OpenAI failed, retrying with DeepSeek', {
           requestId,
