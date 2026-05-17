@@ -78,7 +78,9 @@ export function runStage2Validation(data: any): any {
             // Skip UNKNOWN coverages in the map (don't compare against them)
             if (existingCn === 'UNKNOWN' || existingCn.startsWith('unknown_')) continue
             // Check if most tokens in the UNKNOWN name appear in the canonical label
-            const existingName = ((existingCov.name || '') + ' ' + existingCn).toLowerCase()
+            // existingCov.name is replaced with Turkish label (e.g. 'Koltuk Ferdi Kaza')
+            // so check against BOTH the canonical concept (English) AND the Turkish name
+            const existingName = (existingCn + ' ' + (existingCov.name || '')).toLowerCase()
             const matchingTokens = nameTokens.filter((token: string) =>
               existingName.includes(token)
             )
