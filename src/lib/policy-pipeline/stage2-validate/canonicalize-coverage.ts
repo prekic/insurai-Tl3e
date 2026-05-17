@@ -129,7 +129,11 @@ export function canonicalizeCoverage(
   if (
     normalizedEn.includes('personal accident attached') ||
     normalizedEn.includes('attached to motor vehicle') ||
-    normalizedEn.includes('vehicle-attached')
+    normalizedEn.includes('vehicle-attached') ||
+    normalizedEn.includes('linked to motor vehicle') ||
+    (normalizedEn.includes('personal accident') &&
+      normalizedEn.includes('motor') &&
+      normalizedEn.includes('vehicle'))
   )
     return 'VEHICLE_ATTACHED_PERSONAL_ACCIDENT'
   if (
