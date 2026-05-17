@@ -296,7 +296,7 @@ router.post(
 
     try {
       const client = getOpenAIClient()
-      const deepseekFallback = getDeepSeekClient()
+      let deepseekFallback = getDeepSeekClient()
       if (!client) {
         log.warn('OpenAI client not configured', { requestId })
         return res.status(503).json({
@@ -523,21 +523,33 @@ router.post(
       // ── DeepSeek Fallback ──
       // If primary OpenAI fails (quota exhausted, rate limited, network error)
       // and DeepSeek is configured, retry with DeepSeek (~10x cheaper).
-      log.debug('[fallback-debug] checking conditions', {
+      // Force check: always retry with DeepSeek on WORKER_ERROR if key exists
+      const hasDeepSeekKey = !!process.env.DEEPSEEK_API_KEY
+      log.warn('[fallback] Healing result', {
         requestId,
         success: healingResult.success,
         hasData: !!healingResult.data,
-        hasDeepSeek: !!deepseekFallback,
+        hasDeepSeekClient: !!deepseekFallback,
+        hasDeepSeekKey,
         code: healingResult.code,
-        error: healingResult.error?.substring(0, 100),
+        error: healingResult.error?.substring(0, 150),
       })
-      if (!healingResult.success && !healingResult.data && deepseekFallback) {
+      if (!healingResult.success && !healingResult.data && (deepseekFallback || hasDeepSeekKey)) {
+        // Re-create client if needed (belt-and-suspenders)
+        if (!deepseekFallback && hasDeepSeekKey) {
+          log.warn('[fallback] deepseekFallback was null, recreating client from env directly')
+          deepseekFallback = new OpenAI({
+            apiKey: process.env.DEEPSEEK_API_KEY!,
+            baseURL: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
+          })
+        }
         log.warn('[fallback] OpenAI failed, retrying with DeepSeek', {
           requestId,
           error: healingResult.error?.substring(0, 200),
         })
+        const dsClient = deepseekFallback!
         const deepSeekWorker = async (userPrompt: string, temperature: number) => {
-          const response = await deepseekFallback.chat.completions.create({
+          const response = await dsClient.chat.completions.create({
             model: 'deepseek-chat',
             messages: [
               { role: 'system', content: systemPromptWithJson },
@@ -561,7 +573,7 @@ router.post(
         }
         const deepSeekJudge = async (_doc: string, workerContent: string) => {
           const judgePrompt = `Original Document:\n\n${finalUserPrompt}\n\nExtraction Result:\n\n${workerContent}`
-          const response = await deepseekFallback.chat.completions.create({
+          const response = await dsClient.chat.completions.create({
             model: 'deepseek-chat',
             messages: [
               { role: 'system', content: JUDGE_SYSTEM_PROMPT },
