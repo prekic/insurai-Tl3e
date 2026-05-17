@@ -148,12 +148,29 @@ export function canonicalizeCoverage(
   )
     return 'EXCESS_INSURANCE'
 
-  // Catch general driver/passenger without explicit death/disability
+  // Generic Personal Accident (no sub-type) — covers 'Ferdi Kaza' or 'Personal Accident'
+  // without death/disability/medical subtype or seat/driver/passenger context.
+  // Must be AFTER 'motorlu araca bağlı' / 'sürücüye bağlı' checks above.
+  if (
+    (normalized.includes('ferdi kaza') || normalized.includes('kişisel kaza') ||
+     normalizedEn === 'personal accident' || normalizedEn.includes('personal accident')) &&
+    !normalized.includes('vefat') && !normalized.includes('ölüm') &&
+    !normalized.includes('sakatlık') && !normalized.includes('tedavi') &&
+    !normalized.includes('koltuk') && !normalized.includes('sürücü') && !normalized.includes('yolcu') &&
+    !normalizedEn.includes('death') && !normalizedEn.includes('disability') && !normalizedEn.includes('medical') &&
+    !normalizedEn.includes('seat') && !normalizedEn.includes('driver') && !normalizedEn.includes('passenger')
+  ) {
+    return 'PERSONAL_ACCIDENT_DEATH'
+  }
+
+  // Catch general seat/driver/passenger without explicit death/disability
   if (
     normalized.includes('sürücü') ||
     normalized.includes('yolcu') ||
+    normalized.includes('koltuk') ||
     normalizedEn.includes('driver') ||
-    normalizedEn.includes('passenger')
+    normalizedEn.includes('passenger') ||
+    normalizedEn.includes('seat')
   ) {
     return 'SEAT_PERSONAL_ACCIDENT_DEATH'
   }
@@ -357,6 +374,15 @@ export function canonicalizeCoverage(
     normalizedEn.includes('no claim')
   )
     return 'NCD_PROTECTION'
+
+  if (
+    normalized.includes('eskisi') ||
+    normalized.includes('yenisiyle') ||
+    normalizedEn.includes('new for old') ||
+    normalizedEn.includes('replacement with new') ||
+    normalizedEn.includes('replace with new')
+  )
+    return 'NEW_FOR_OLD_REPLACEMENT'
 
   if (
     normalized.includes('hatalı') ||
