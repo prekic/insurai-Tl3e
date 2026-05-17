@@ -394,6 +394,7 @@ Look for indicators:
 
 Turkish policies frequently say "Sinirsiz" or "Dahil" but bury actual caps in klozlar. You MUST:
 - Scan ALL kloz sections (everything after the coverage summary table)
+- **CRITICAL: Do NOT extract kloz (clause) section headings as coverages.** Labels like "Hasar Ek Belgesi İstisnası Klozu", "Anlaşmalı Servisler Klozu", "Servis Muafiyet Uygulaması" are policy CLAUSE TITLES, not coverage items. They describe terms, conditions, or limitations. Ignore them in the coverages array.
 - Look for phrases: "olay basina azami", "yillik azami", "toplam ... TL", "ile sinirlidir"
 - If a kloz references a coverage by name and imposes a numeric limit different from the table, add a 'carveOuts' array to that coverage
 - Example: Artan Mali Sorumluluk "Sinirsiz" but has 2.500.000 TL per-event sub-limit at airports/fuel stations

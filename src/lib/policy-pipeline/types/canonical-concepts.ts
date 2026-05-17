@@ -33,6 +33,17 @@ export type CanonicalCoverageConcept =
   | 'ROADSIDE_ASSISTANCE'
   | 'REPLACEMENT_VEHICLE'
   | 'MINI_REPAIR'
+  | 'TIRE_CHANGE'
+  | 'LOCKSMITH_SERVICE'
+  | 'VEHICLE_PICKUP_DELIVERY'
+  | 'VEHICLE_SAFEKEEPING'
+  | 'VEHICLE_INFORMATION_HOTLINE'
+  | 'ROADSIDE_REPAIR'
+  | 'UNAVAILABLE_SPARE_PARTS'
+  | 'ESCORT_TRANSPORT_ACCOMMODATION'
+  | 'FUNERAL_TRANSPORT'
+  | 'INFORMATION_ORGANIZATION_SERVICES'
+  | 'BREAKDOWN_OR_ACCIDENT_TRAVEL_ACCOMMODATION'
   // Glass
   | 'GLASS_DAMAGE_PROTECTION'
   // Legal protection
@@ -43,6 +54,9 @@ export type CanonicalCoverageConcept =
   | 'LEGAL_PROTECTION_ANNUAL_AGGREGATE'
   // Supplementary coverages
   | 'TANK_BODY_COVERAGE'
+  | 'VEHICLE_ATTACHED_PERSONAL_ACCIDENT'
+  | 'DRIVER_PERSONAL_ACCIDENT'
+  | 'EXCESS_INSURANCE'
   | 'WRONG_FUEL'
   | 'LOCK_REPLACEMENT'
   | 'PET_INJURY'
@@ -124,6 +138,17 @@ export const CONCEPT_DISPLAY_LABELS: Readonly<
   ROADSIDE_ASSISTANCE: { tr: 'Yol Yardım', en: 'Roadside Assistance' },
   REPLACEMENT_VEHICLE: { tr: 'İkame Araç', en: 'Replacement Vehicle' },
   MINI_REPAIR: { tr: 'Mini Onarım', en: 'Mini Repair Service' },
+  TIRE_CHANGE: { tr: 'Lastik Değişimi', en: 'Tire Change Service' },
+  LOCKSMITH_SERVICE: { tr: 'Çilingir Hizmeti', en: 'Locksmith Service' },
+  VEHICLE_PICKUP_DELIVERY: { tr: 'Aracın Teslim Alınması', en: 'Vehicle Pickup and Delivery' },
+  VEHICLE_SAFEKEEPING: { tr: 'Aracın Emanet ve Muhafazası', en: 'Vehicle Safekeeping' },
+  VEHICLE_INFORMATION_HOTLINE: { tr: 'Araç Bilgi Hattı', en: 'Vehicle Information Hotline' },
+  ROADSIDE_REPAIR: { tr: 'Yol Kenarında Onarım', en: 'Roadside Repair Service' },
+  UNAVAILABLE_SPARE_PARTS: { tr: 'Bulunamayan Yedek Parçaların Temini', en: 'Unavailable Spare Parts Supply' },
+  ESCORT_TRANSPORT_ACCOMMODATION: { tr: 'Refakatçinin Nakli ve Konaklaması', en: 'Escort Transport and Accommodation' },
+  FUNERAL_TRANSPORT: { tr: 'Cenaze Nakli', en: 'Funeral Transport' },
+  INFORMATION_ORGANIZATION_SERVICES: { tr: 'Bilgi ve Organizasyon Hizmetleri', en: 'Information and Organization Services' },
+  BREAKDOWN_OR_ACCIDENT_TRAVEL_ACCOMMODATION: { tr: 'Aracın Kaza Geçirmesi veya Arızalanması Nedeniyle Konaklama ve Seyahat', en: 'Breakdown or Accident Travel and Accommodation' },
   // Glass
   GLASS_DAMAGE_PROTECTION: { tr: 'Cam Kırılması', en: 'Glass Damage Protection' },
   // Legal protection
@@ -140,6 +165,9 @@ export const CONCEPT_DISPLAY_LABELS: Readonly<
   },
   // Supplementary
   TANK_BODY_COVERAGE: { tr: 'Depo ve Kasa Teminatı', en: 'Tank Body Coverage' },
+  VEHICLE_ATTACHED_PERSONAL_ACCIDENT: { tr: 'Motorlu Araca Bağlı Ferdi Kaza', en: 'Vehicle-Attached Personal Accident' },
+  DRIVER_PERSONAL_ACCIDENT: { tr: 'Sürücüye Bağlı Ferdi Kaza', en: 'Driver Personal Accident' },
+  EXCESS_INSURANCE: { tr: 'Eksik Aşkın Sigorta', en: 'Excess Insurance' },
   WRONG_FUEL: { tr: 'Yanlış Yakıt', en: 'Wrong Fuel Filling' },
   LOCK_REPLACEMENT: { tr: 'Kilit Mekanizması Değişimi', en: 'Lock Mechanism Replacement' },
   PET_INJURY: { tr: 'Evcil Hayvan Tedavisi', en: 'Pet Injury Treatment' },

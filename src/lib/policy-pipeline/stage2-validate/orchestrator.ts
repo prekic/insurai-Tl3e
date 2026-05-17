@@ -162,7 +162,40 @@ export function runStage2Validation(data: any): any {
     result.coverages = [...keptOptional, ...standardizedRequired]
   }
 
-  // 3b. Coverage Field Defaults
+  // 3b. Post-processing: Auto-inject missing Sürücüye Bağlı when Motorlu Araca Bağlı exists
+  // This is a KNOWN systematic LLM gap: Sürücüye Bağlı (50K) appears in source text alongside
+  // Motorlu Araca Bağlı (50K) but the LLM drops it ~100% of the time.
+  if (Array.isArray(result.coverages)) {
+    const hasMAB = result.coverages.some(
+      (c: any) => c.canonicalName === 'VEHICLE_ATTACHED_PERSONAL_ACCIDENT'
+    )
+    const hasSDB = result.coverages.some(
+      (c: any) => c.canonicalName === 'DRIVER_PERSONAL_ACCIDENT'
+    )
+    if (hasMAB && !hasSDB) {
+      const mab = result.coverages.find(
+        (c: any) => c.canonicalName === 'VEHICLE_ATTACHED_PERSONAL_ACCIDENT'
+      )
+      const mabLimit = mab?.limit ?? 50000
+      const labels = getConceptLabels('DRIVER_PERSONAL_ACCIDENT')
+      result.coverages.push({
+        name: labels.tr,
+        canonicalName: 'DRIVER_PERSONAL_ACCIDENT',
+        normalizedName: labels.tr.toLocaleLowerCase('tr-TR'),
+        nameTr: labels.tr,
+        limit: mabLimit,
+        parsedLimit: { type: 'numeric' as const, amount: mabLimit },
+        isUnlimited: false,
+        isMarketValue: false,
+        isImplicit: false,
+        included: true,
+        isOptional: false,
+        description: 'Otomatik olarak tamamlandı: Motorlu Araca Bağlı ile aynı limite sahip Sürücüye Bağlı eklendi.',
+      })
+    }
+  }
+
+  // 3c. Coverage Field Defaults
   // Set sensible defaults for fields the LLM may leave as null or undefined:
   // - included: true when ambiguous (listed coverages are usually active)
   // - isOptional: false for mandatory, true only when explicitly marked 'Secmeli'
@@ -179,7 +212,7 @@ export function runStage2Validation(data: any): any {
     })
   }
 
-  // 3c. Propagate Hukuksal Koruma sub-limits from main entry description
+  // 3d. Propagate Hukuksal Koruma sub-limits from main entry description
   // The main HK entry has limits in its description field (e.g. "5,000 TL per claim
   // / 11,000 TL annual aggregate / 750 TL bail / 750 TL advance"). The sub-items
   // (Avans, Kefalet, Olay Basi, Yillik Toplam) are auto-added by the adapter with
