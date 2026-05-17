@@ -289,9 +289,11 @@ router.get('/test-deepseek', async (_req: Request, res: Response) => {
   const hasKey = !!process.env.DEEPSEEK_API_KEY
   const keyLen = process.env.DEEPSEEK_API_KEY?.length ?? 0
   try {
+    const rawBaseUrl = process.env.DEEPSEEK_BASE_URL
+    const baseUrlResolved = (rawBaseUrl && rawBaseUrl.trim()) ? rawBaseUrl.trim() : 'https://api.deepseek.com'
     const dsClient = new OpenAI({
       apiKey: process.env.DEEPSEEK_API_KEY || '',
-      baseURL: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
+      baseURL: baseUrlResolved,
     })
     const response = await dsClient.chat.completions.create({
       model: 'deepseek-chat',
@@ -307,8 +309,17 @@ router.get('/test-deepseek', async (_req: Request, res: Response) => {
       model: response.model,
       content: response.choices[0]?.message?.content,
     })
+    res.json({
+      ok: true,
+      hasKey,
+      keyLen,
+      rawBaseUrl: process.env.DEEPSEEK_BASE_URL || '(empty)',
+      baseUrlResolved,
+      model: response.model,
+      content: response.choices[0]?.message?.content,
+    })
   } catch (err: any) {
-    res.json({ ok: false, hasKey, keyLen, error: err.message })
+    res.json({ ok: false, hasKey, keyLen, rawBaseUrl: process.env.DEEPSEEK_BASE_URL || '(empty)', error: err.message })
   }
 })
 
