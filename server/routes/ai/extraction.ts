@@ -608,11 +608,77 @@ router.post(
           error: healingResult.error?.substring(0, 200),
         })
         const dsClient = deepseekFallback!
+
+        // DeepSeek-optimized system prompt — more explicit about JSON structure
+        // because DeepSeek uses json_object (no schema validation) unlike OpenAI's json_schema
+        const deepSeekSystemPrompt = `${finalSystemPrompt}
+
+## DeepSeek JSON OUTPUT INSTRUCTIONS
+
+You MUST output valid JSON only. The JSON must match this exact structure:
+
+{
+  "policyNumber": string | null,
+  "provider": string | null,
+  "policyType": string | null,
+  "isBundle": boolean,
+  "bundleProducts": string[] | null,
+  "startDate": string | null,
+  "endDate": string | null,
+  "currency": string,
+  "premium": number | null,
+  "premiumNet": number | null,
+  "premiumTax": number | null,
+  "paymentFrequency": string | null,
+  "isAmendment": boolean,
+  "amendmentInfo": { /* amendment details */ } | null,
+  "discounts": {
+    "ncdDiscount": number | null,
+    "ncdKademe": number | null,
+    "groupDiscount": number | null,
+    "otherDiscountPct": number | null,
+    "evidence": string | null
+  },
+  "vehicle": {
+    "make": string | null,
+    "model": string | null,
+    "year": number | null,
+    "plate": string | null,
+    "vin": string | null,
+    "usage": string | null,
+    "insuredEntityType": string | null
+  } | null,
+  "coverages": [
+    {
+      "name": string,
+      "nameTr": string,
+      "canonicalName": string,
+      "category": string,
+      "included": boolean,
+      "isOptional": boolean,
+      "isUnlimited": boolean,
+      "isMarketValue": boolean,
+      "limit": number | null,
+      "unitValue": string | null,
+      "deductible": string | null,
+      "carveOuts": string[] | null,
+      "parsedLimit": number | null,
+      "normalizedName": string | null,
+      "quotes": string[] | null
+    }
+  ],
+  "exclusions": [ /* array of exclusion objects */ ] | null,
+  "conditionalDeductibles": [ /* array of conditional deductible objects */ ] | null,
+  "evidence": { "insights": string[], "exclusions": string[] } | null
+}
+
+DO NOT add any text before or after the JSON. Output ONLY the JSON object. Use camelCase keys. Use null for missing values.`
+
         const deepSeekWorker = async (userPrompt: string, temperature: number) => {
           const response = await dsClient.chat.completions.create({
             model: 'deepseek-chat',
             messages: [
-              { role: 'system', content: systemPromptWithJson },
+              { role: 'system', content: deepSeekSystemPrompt },
               { role: 'user', content: userPrompt },
             ],
             response_format: { type: 'json_object' },
