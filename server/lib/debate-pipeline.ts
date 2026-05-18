@@ -173,7 +173,7 @@ export async function runDebatePipeline(
   ])
 
   results.push(extractorAres, extractorBres)
-  totalCost += extractorAres.usage.cost + extractorBres.usage.cost
+  totalCost += (extractorAres.usage.cost || 0) + (extractorBres.usage.cost || 0)
   totalTokens += extractorAres.usage.inputTokens + extractorAres.usage.outputTokens
   totalTokens += extractorBres.usage.inputTokens + extractorBres.usage.outputTokens
 
@@ -224,7 +224,7 @@ export async function runDebatePipeline(
   ])
 
   results.push(revisedA, revisedB)
-  totalCost += revisedA.usage.cost + revisedB.usage.cost
+  totalCost += (revisedA.usage.cost || 0) + (revisedB.usage.cost || 0)
   totalTokens += revisedA.usage.inputTokens + revisedA.usage.outputTokens
   totalTokens += revisedB.usage.inputTokens + revisedB.usage.outputTokens
 
@@ -273,7 +273,7 @@ export async function runDebatePipeline(
   )
 
   results.push(arbitratorResult)
-  totalCost += arbitratorResult.usage.cost
+  totalCost += arbitratorResult.usage.cost || 0
   totalTokens += arbitratorResult.usage.inputTokens + arbitratorResult.usage.outputTokens
 
   return {
