@@ -54,10 +54,15 @@ export function TryAnalysis() {
   const lastFileRef = useRef<File | null>(null)
   const retryCountRef = useRef(0)
   const hardBudgetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     return () => {
       isMounted.current = false
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+        abortControllerRef.current = null
+      }
       if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current)
       if (intervalIdRef.current) clearInterval(intervalIdRef.current)
       if (hardBudgetTimerRef.current) clearTimeout(hardBudgetTimerRef.current)
@@ -338,11 +343,14 @@ export function TryAnalysis() {
         intervalIdRef.current = progressInterval
 
         // Run extraction with timeout - useFallback: false to surface real errors instead of mock data
+        // Create AbortController so previous SSE can be aborted on tab-resume retry
+        abortControllerRef.current = new AbortController()
         const extractionResult = await Promise.race([
           extractPolicyFromDocument(file, {
             useFallback: false,
             logger,
             userId: user?.id,
+            signal: abortControllerRef.current.signal,
           }),
           timeoutPromise,
         ])
@@ -424,6 +432,7 @@ export function TryAnalysis() {
 
         // Always save the result locally — even if the user navigated away.
         extractionInFlightRef.current = false
+        abortControllerRef.current = null
         if (hardBudgetTimerRef.current) {
           clearTimeout(hardBudgetTimerRef.current)
           hardBudgetTimerRef.current = null
@@ -492,6 +501,7 @@ export function TryAnalysis() {
         }
 
         extractionInFlightRef.current = false
+        abortControllerRef.current = null
         if (hardBudgetTimerRef.current) {
           clearTimeout(hardBudgetTimerRef.current)
           hardBudgetTimerRef.current = null
@@ -606,6 +616,11 @@ export function TryAnalysis() {
       if (extractionInFlightRef.current && retryCountRef.current < 2) {
         console.warn('[TryAnalysis] Tab resumed during extraction — retrying automatically')
         retryCountRef.current++
+        // Abort the previous SSE connection to prevent ERR_CONNECTION_RESET
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort()
+          abortControllerRef.current = null
+        }
         // Clear stale timers from the dead extraction
         if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current)
         if (intervalIdRef.current) clearInterval(intervalIdRef.current)
@@ -627,6 +642,10 @@ export function TryAnalysis() {
       if (retryCountRef.current < 1) {
         console.warn('[TryAnalysis] Tab resumed after extraction timeout — retrying automatically')
         retryCountRef.current++
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort()
+          abortControllerRef.current = null
+        }
         if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current)
         if (intervalIdRef.current) clearInterval(intervalIdRef.current)
         extractionInFlightRef.current = false
