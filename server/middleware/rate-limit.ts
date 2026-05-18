@@ -260,7 +260,7 @@ function skip(req: Request): boolean {
 export const generalLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: config.general.windowMs,
   max: () => getConfigSync().general.max,
-  message: { error: 'Too many requests, please try again later' },
+  message: { error: 'Too many requests, please try again later', code: 'RATE_LIMIT_EXCEEDED' },
   standardHeaders: true, // Return rate limit info in headers
   legacyHeaders: false, // Disable X-RateLimit-* headers
   keyGenerator,
