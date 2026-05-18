@@ -156,9 +156,29 @@ export async function convertToAnalyzedPolicy(
   if (!data.exclusions || !Array.isArray(data.exclusions)) {
     data.exclusions = []
   }
+
+  // Normalize exclusions: the live API may return objects ({description, clauseReference})
+  // instead of plain strings. Flatten them to strings to prevent downstream .toLowerCase() crash.
+  data.exclusions = data.exclusions.map((e: unknown) =>
+    typeof e === 'string'
+      ? (e as string)
+      : ((e as Record<string, unknown>)?.description ??
+        (e as Record<string, unknown>)?.text ??
+        (e as Record<string, unknown>)?.name ??
+        String(e))
+  )
   if (!data.specialConditions || !Array.isArray(data.specialConditions)) {
     data.specialConditions = []
   }
+
+  // Normalize specialConditions the same way (objects → strings)
+  data.specialConditions = data.specialConditions.map((c: unknown) =>
+    typeof c === 'string'
+      ? (c as string)
+      : ((c as Record<string, unknown>)?.description ??
+        (c as Record<string, unknown>)?.text ??
+        String(c))
+  )
 
   // Determine status based on dates
   // Handle both camelCase (endDate) and snake_case (end_date) from AI
