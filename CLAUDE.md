@@ -1,5 +1,202 @@
 # CLAUDE.md
 
+# ━━━ AGENT BEHAVIOR RULES — READ FIRST ━━━
+# CLAUDE.md — Core Rules for This Project
+*Read this file completely at the start of every session before accepting any task.*
+
+---
+
+## 0. SESSION START CHECKLIST (mandatory, every time)
+
+Before doing anything else:
+1. Read this file (`CLAUDE.md`)
+2. Read `memory/USER.md`
+3. Read `memory/SOUL.md`
+4. Read the most recent `memory/YYYY-MM-DD.md` if it exists
+5. Summarize active state in 3–5 bullet points to confirm context
+6. Ask for Railway API token if not already in context (see §Railway)
+
+Only then accept tasks.
+
+---
+
+## 1. RAILWAY — ALWAYS CONNECT PROACTIVELY
+
+**At session start:** If `railway.json`, `nixpacks.toml`, or a GitHub Actions deploy workflow exists → immediately ask:
+> "I see this project deploys to Railway. Share the Railway API token so I can check build status and env vars directly."
+
+**Railway token:**
+- Env var name is `RAILWAY_API_TOKEN` (not `RAILWAY_TOKEN`, not `RAILWAY_API_KEY`)
+- Token location in Railway UI: Account → API Tokens (not OAuth Apps — those UUIDs are wrong)
+- After `railway link`, always verify the linked service name before any `railway up`
+- Deploy command: `RAILWAY_API_TOKEN=<token> railway up` from project directory
+
+**After every `git push` or `railway up`:**
+- Do NOT say "deployed." Poll the build result (Railway API or GitHub Actions) until confirmed green or red.
+- Check `last-modified` header on `/api/health` to confirm new build is live — not just that push succeeded.
+- If build result unavailable: "I've pushed. Please paste the Railway build result before we proceed."
+
+**Git push ≠ Railway deployment.** Railway's webhook may not fire from sandbox git proxy. Always verify separately.
+
+---
+
+## 2. RAILWAY ENV VARS — STRICT PROTOCOL
+
+Every time you touch Railway env vars:
+1. List all existing vars first — check for duplicates before setting anything
+2. Delete duplicates before upserting (duplicate keys → Railway uses oldest, not newest)
+3. List all vars again after change to confirm final state
+4. Confirm the next deployment picks up the change (redeploy if needed)
+
+Railway env state can drift from local `.env`. Never assume they match.
+
+**Env var validation rule:** Before using any third-party client (OpenAI, DeepSeek, Supabase, etc.), validate that the URL env var is actually a URL (starts with `http`), not accidentally set to an API key. This is a real failure mode. Add a startup validation that logs: `baseURL format: OK / INVALID`.
+
+---
+
+## 3. HEALTH CHECK ≠ CLIENT WORKING
+
+A health endpoint that checks `!!process.env.DEEPSEEK_API_KEY` tells you the env var exists. It does not tell you the client can make API calls.
+
+**Health check must:**
+- Validate URL-format vars (`baseURL` starts with `http`)
+- Report key length/prefix (not the key itself) for each provider
+- Ideally make a real lightweight call (e.g., list models) to confirm the client is functional
+
+**Never say a provider is "working" based only on env var presence.**
+
+---
+
+## 4. FALLBACK PATHS — ALWAYS TEST INDEPENDENTLY
+
+After adding a fallback to any route:
+1. Identify ALL routes users actually hit (trace: frontend → proxy → API)
+2. Test the fallback on every one of those routes independently
+3. Do not assume "works on `/extract/openai`" means it works on `/extract` (unified)
+
+The frontend path is the ground truth. If a test doesn't cover the frontend → backend path it's testing the wrong thing.
+
+After any route change: test via exact frontend request headers/body (or curl mimicking the frontend), not just direct API calls.
+
+---
+
+## 5. CODE FIX vs PROMPT FIX — DECISION RULE
+
+Before writing a prompt fix, ask:
+> "Is this output systematically wrong (same error every run) or nondeterministic (varies between runs)?"
+
+- **Systematic error** (same field always wrong/missing) → code fix, not prompt. Prompts cannot override LLM's systematic table-reading failures.
+- **Nondeterministic** (coverage count varies ±20%) → establish baseline variance first, then decide. Do not treat run variance as a bug.
+
+Run the same input 3 times before treating a count change as a regression.
+
+Prompt fix budget: if a prompt fix hasn't worked after 2 deploys, switch to code.
+
+---
+
+## 6. BENCHMARK BEFORE OPTIMIZING
+
+Before writing a "model-optimized" or "provider-specific" prompt:
+1. Run 1 test with the shared prompt to get a baseline
+2. Only proceed with optimization if baseline shows clear gap
+
+Default assumption: shared prompt outperforms custom prompt. Prove otherwise before spending deploys.
+
+---
+
+## 7. PRODUCTION SMOKE TEST — REQUIRED BEFORE "DONE"
+
+Never say any variant of "working," "done," "you can test now" without completing:
+1. Hit `/api/health` on live Railway URL → all configured providers show correctly
+2. Send a real document through the full pipeline → get a structured result
+3. Check last N lines of live logs for errors
+4. Confirm the result came from the expected route/provider
+
+If any step fails: fix it first, then report done.
+
+---
+
+## 8. TEST COMPLETENESS — USER PATH IS GROUND TRUTH
+
+"All N tests pass" is only meaningful if those tests cover the actual user path.
+
+After any backend change:
+- Identify what the frontend calls (route, headers, body format)
+- Ensure at least one test covers that exact call
+- "Tests pass" + "user gets error" = tests are testing the wrong thing. Fix the tests, not just the bug.
+
+Erdem's rule: **"Tests should support users, not just tick boxes."**
+
+---
+
+## 9. NATIVE MODULES IN CLOUD ENVIRONMENTS
+
+Before `npm install <package>` that requires native compilation (canvas, sharp, sqlite3, bcrypt, etc.):
+1. Check whether nixpacks/Railway includes the required system libraries (libcairo, libpango, etc.)
+2. If not: add `nixpacks.toml` with required apt packages, OR choose a pure-JS alternative
+3. Never ship native deps without build-environment verification
+
+---
+
+## 10. NODE.JS MODULE LOAD ORDER
+
+When fixing "global state must be set before X initializes" (polyfills, global config, WebSocket shims):
+- The fix must be literally the first executable statement in the entry file
+- Verify with: "Is this guaranteed to run before any module that depends on it is evaluated?"
+- In Node.js, imports are hoisted. `import X from 'y'` at the top of the file runs before any code you write above it. Use `require()` for polyfills that must run first, or use a dedicated entry shim file.
+
+---
+
+## 11. SECURITY — CREDENTIALS IN CHAT
+
+Every time a credential appears in a Telegram message:
+1. Immediately: "Please delete that message from Telegram."
+2. Note: the key is now in session context — will not persist beyond this session.
+3. Offer safer alternative: set it directly in Railway Variables without transiting chat.
+
+This is a hard rule, not occasional behavior.
+
+---
+
+## 12. PROGRESS REPORTING — NO PREMATURE COMPLETION
+
+- Never report "fixed" based on sub-agent logs alone — run the specific tests
+- If a fix requires follow-up iterations: "S18 deployed — 1 remaining issue, fixing now." Do not re-declare completion for each sub-release.
+- "All N tests pass" requires actually running those tests after the fix, not trusting previous run output
+
+---
+
+## 13. STANDING "CONTINUE" INSTRUCTION
+
+When Erdem says "keep working," "continue until done," "you don't sleep, you finish," or similar:
+- This is a standing instruction until explicitly cancelled
+- Do not checkpoint and wait after each unit of work
+- Report progress inline, continue to next task automatically
+- Only stop when: task complete, blocker requires Erdem (e.g., Railway token, billing), or rate limit hit
+
+---
+
+## 14. REPORT DELIVERY — VERIFY SEND
+
+After generating any report or summary:
+- Do not announce "report sent" without confirmation the message actually delivered
+- If using a tool call to send (Telegram, email, etc.), check the response status
+- If delivery fails: say "send failed — here is the content directly"
+
+---
+
+## 15. LANGUAGE
+
+Communicate with Erdem in **English only**, regardless of project subject matter (Turkish insurance app, Turkish UI, etc.). User language is determined by how Erdem writes — he writes in English. Never infer operator language from project domain.
+
+---
+
+## 16. SEARCH THIS FILE BEFORE DEBUGGING
+
+Before investigating any new bug, search this file for related patterns. Many bugs have been seen before and documented here. Checking CLAUDE.md first costs 30 seconds; rediscovering a documented bug costs hours.
+
+
+# ━━━ PROJECT-SPECIFIC CONTEXT BELOW ━━━
 > Context file for Claude Code sessions on the insurai project
 
 ## ⚠️ Next Session Instructions
