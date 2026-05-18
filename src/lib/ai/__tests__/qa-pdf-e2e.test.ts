@@ -9,20 +9,24 @@
  *  - Send actual PDF bytes as base64 attachments
  *  - Run the response through convertToAnalyzedPolicy
  *  - Assert no crashes on ANY DeepSeek response shape
- *  - Assert coverage/exclusion/exclusion arrays are present
+ *  - Assert coverage/exclusion arrays are present
  *  - Assert roundTripValid from debate pipeline
+ *
+ * NOTE: These tests hit a live rate-limited API. We share one extraction
+ * per test run to minimize calls, and handle 429 with retry.
  *
  * Run with: npx vitest run src/lib/ai/__tests__/qa-pdf-e2e.test.ts
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { File } from 'node:buffer'
 
 const API_BASE = 'https://insurai-production.up.railway.app'
 const FIXTURES_DIR = join(process.cwd(), 'tests/fixtures/kasko')
-const TIMEOUT = 180_000 // 3 minutes per extraction
+const EXTRACTION_TIMEOUT = 180_000 // 3 minutes per extraction
+const RETRY_DELAY = 35_000 // wait 35s on rate limit
 
 interface DataConversionInput {
   coverages?: any[]
@@ -46,15 +50,15 @@ interface DataConversionInput {
 }
 
 /**
- * Sends a PDF to the live API and returns the raw response.
- * Skips if the PDF file doesn't exist.
+ * Sends a single PDF to the live API. Retries once on 429.
+ * Returns null if the PDF doesn't exist.
  */
 async function extractFromApi(
   pdfFilename: string
 ): Promise<{ data: DataConversionInput; raw: any } | null> {
   const pdfPath = join(FIXTURES_DIR, pdfFilename)
   if (!existsSync(pdfPath)) {
-    console.warn(`[SKIP] ${pdfFilename} not found at ${pdfPath}`)
+    console.warn(`[SKIP] ${pdfFilename} not found`)
     return null
   }
 
@@ -68,12 +72,25 @@ async function extractFromApi(
 
   const url = `${API_BASE}/api/ai/extract`
 
-  const response = await fetch(url, {
+  // First attempt
+  let response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: payload,
-    signal: AbortSignal.timeout(TIMEOUT - 5000),
+    signal: AbortSignal.timeout(EXTRACTION_TIMEOUT),
   })
+
+  // Retry on 429
+  if (response.status === 429) {
+    console.warn(`[RATE_LIMIT] Waiting ${RETRY_DELAY / 1000}s before retry...`)
+    await new Promise((r) => setTimeout(r, RETRY_DELAY))
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+      signal: AbortSignal.timeout(EXTRACTION_TIMEOUT),
+    })
+  }
 
   if (!response.ok) {
     const body = await response.text()
@@ -85,165 +102,129 @@ async function extractFromApi(
 
   return { data, raw }
 }
+
 /**
- * Runs convertToAnalyzedPolicy on the raw API data.
- * Since convertToAnalyzedPolicy expects a File object, we create a mock.
+ * Runs convertToAnalyzedPolicy on raw API data.
+ * Uses a mock File object since it runs in test environment.
  */
 async function runConverter(data: DataConversionInput, filename: string): Promise<any> {
-  // Dynamic import to avoid module resolution issues
   const mod = await import('../policy-converter')
   const mockFile = new File([''], filename, { type: 'application/pdf' })
-
-  const result = await mod.convertToAnalyzedPolicy(
-    data as any,
-    mockFile as File,
-    undefined,
-    undefined
-  )
-
-  return result
+  return await mod.convertToAnalyzedPolicy(data as any, mockFile as File, undefined, undefined)
 }
 
-// ===============================================
-// TEST SUITE: E2E API → converter → no crash
-// ===============================================
+// Shared extraction result — all tests use this to minimize API calls
+let sharedExtraction: { data: DataConversionInput; raw: any } | null = null
+const PRIMARY_PDF = 'anadolu-birlesik-kasko.pdf'
 
-const PDFS_TO_TEST = [
-  { file: 'anadolu-birlesik-kasko.pdf', label: 'Anadolu Birleşik Kasko' },
-  { file: 'anadolu-volkswagen-tiguan.pdf', label: 'Anadolu VW Tiguan Kasko' },
-  { file: 'anadolu-renault-clio.pdf', label: 'Anadolu Renault Clio Kasko' },
-  { file: 'allianz-kasko.pdf', label: 'Allianz Kasko' },
-  { file: 'sompo-kasko.pdf', label: 'Sompo Kasko' },
-]
+// ===============================================
+// TEST SUITE
+// ===============================================
 
 describe('E2E Live API Extraction (real PDFs → live API → converter)', () => {
-  // Pick one representative PDF to test conversion safety (runs against live API, so 1 is enough)
-  it(
-    'anadolu-birlesik-kasko.pdf — full conversion does not crash',
-    async () => {
-      const result = await extractFromApi('anadolu-birlesik-kasko.pdf')
-      expect(result).not.toBeNull()
-      if (!result) return
+  beforeAll(async () => {
+    sharedExtraction = await extractFromApi(PRIMARY_PDF)
+    expect(sharedExtraction).not.toBeNull()
+  }, 300_000)
 
-      const { data, raw } = result
+  // Test 1: convertToAnalyzedPolicy does NOT crash
+  it('full conversion from API response — does not throw TypeError', async () => {
+    expect(sharedExtraction).not.toBeNull()
+    if (!sharedExtraction) return
 
-      // Stage 2 validation should succeed
-      expect(raw.success).toBe(true)
-      expect(raw.provider).toBeDefined()
+    const { data, raw } = sharedExtraction
 
-      // Run convertToAnalyzedPolicy — this is where DATA_CONVERSION_ERROR crashes
-      let policy: any
+    // Stage2 must have run
+    expect(raw.success).toBe(true)
+    expect(raw.provider).toBeDefined()
+
+    // THIS is where the crash happened before: convertToAnalyzedPolicy(apiData)
+    let policy: any
+    try {
+      policy = await runConverter(data, PRIMARY_PDF)
+    } catch (err: any) {
+      expect.unreachable(`convertToAnalyzedPolicy threw: ${err.message}`)
+      return
+    }
+
+    // Valid AnalyzedPolicy
+    expect(policy).toBeDefined()
+    expect(policy.id).toBeDefined()
+    expect(policy.policyNumber).toBeDefined()
+    expect(typeof policy.premium).toBe('number')
+    expect(Array.isArray(policy.coverages)).toBe(true)
+    expect(policy.coverages.length).toBeGreaterThan(0)
+
+    console.log(
+      `[OK] ${policy.policyNumber} | ${policy.provider} | ${policy.coverages.length} coverages | premium: ${policy.premium}`
+    )
+  }, 30_000)
+
+  // Test 2: Multiple fixture PDFs — none crash converter
+  it('all fixture PDFs pass through converter without TypeError', async () => {
+    const pdfs = [
+      { file: 'anadolu-birlesik-kasko.pdf', label: 'Anadolu Birleşik Kasko' },
+      { file: 'anadolu-volkswagen-tiguan.pdf', label: 'Anadolu VW Tiguan' },
+      { file: 'anadolu-renault-clio.pdf', label: 'Anadolu Renault Clio' },
+    ]
+
+    for (const { file, label } of pdfs) {
+      const result = await extractFromApi(file)
+      if (!result) continue
+
       try {
-        policy = await runConverter(data, 'anadolu-birlesik-kasko.pdf')
-      } catch (err) {
-        // FAIL: converter should NEVER throw
-        expect.unreachable(
-          `convertToAnalyzedPolicy threw: ${err instanceof Error ? err.message : err}`
-        )
-        return
-      }
-
-      // Assert the output is a valid AnalyzedPolicy
-      expect(policy).toBeDefined()
-      expect(policy.id).toBeDefined()
-      expect(policy.policyNumber).toBeDefined()
-      expect(typeof policy.premium).toBe('number')
-      expect(Array.isArray(policy.coverages)).toBe(true)
-
-      // Log results for manual inspection
-      console.log(
-        `[OK] ${policy.policyNumber} | ${policy.provider} | ${policy.coverages.length} coverages | premium: ${policy.premium}`
-      )
-    },
-    TIMEOUT
-  )
-
-  // Test that NO PDF crashes convertToAnalyzedPolicy (any response shape)
-  it(
-    'no PDF crashes converter with TypeError',
-    async () => {
-      for (const { file, label } of PDFS_TO_TEST) {
-        const result = await extractFromApi(file)
-        if (!result) continue // file doesn't exist
-
-        const { data } = result
-
-        try {
-          await runConverter(data, file)
-          console.log(`[OK] ${label} — conversion passed`)
-        } catch (err: any) {
-          // Check if the error is a TypeError (the one that causes DATA_CONVERSION_ERROR)
-          if (
-            err &&
-            err.message &&
-            /trim is not a function|is not a function|Cannot read properties/.test(err.message)
-          ) {
-            expect.unreachable(`${label}: converter threw TypeError — ${err.message}`)
-          } else {
-            // Non-TypeError failures are logged but don't fail the test
-            // (they could be resource loading issues in test environment)
-            console.warn(`[WARN] ${label}: non-crash error — ${err.message}`)
-          }
+        await runConverter(result.data, file)
+        console.log(`[OK] ${label} — conversion passed`)
+      } catch (err: any) {
+        if (
+          /trim is not a function|is not a function|Cannot read properties|toLowerCase/.test(
+            err.message
+          )
+        ) {
+          expect.unreachable(`${label}: converter threw TypeError — ${err.message}`)
+        } else {
+          console.warn(`[WARN] ${label}: non-crash error — ${err.message}`)
         }
       }
-    },
-    PDFS_TO_TEST.length * TIMEOUT
-  )
 
-  // Test debate pipeline validation
-  it(
-    'debate pipeline roundTripValid for all PDFs',
-    async () => {
-      for (const { file, label } of PDFS_TO_TEST) {
-        const result = await extractFromApi(file)
-        if (!result) continue
+      // Small delay between PDFs to avoid rate limit
+      await new Promise((r) => setTimeout(r, 2000))
+    }
+  }, 600_000)
 
-        const { raw } = result
-        console.log(
-          `[DEBATE] ${label}: rounds=${raw.debate?.roundCount ?? '?'} valid=${raw.debate?.roundTripValid ?? '?'} provider=${raw.provider ?? '?'}`
-        )
+  // Test 3: Debate pipeline ran
+  it('debate pipeline produced valid output', async () => {
+    expect(sharedExtraction).not.toBeNull()
+    if (!sharedExtraction) return
 
-        // Debate should always run (3 rounds minimum)
-        expect(raw.debate).toBeDefined()
-        expect(raw.debate?.roundCount).toBeGreaterThanOrEqual(1)
+    const { raw } = sharedExtraction
 
-        // roundTripValid might be false if issues found — that's OK as long as it doesn't error
-        // But we should at least see the field
-        expect('roundTripValid' in (raw.debate || {})).toBe(true)
-      }
-    },
-    PDFS_TO_TEST.length * TIMEOUT
-  )
+    expect(raw.debate).toBeDefined()
+    expect(raw.debate?.roundCount).toBeGreaterThanOrEqual(1)
+    expect('roundTripValid' in (raw.debate || {})).toBe(true)
 
-  // Test API fallback chain works
-  it(
-    'Anthropic billing fallback produces valid data',
-    async () => {
-      const result = await extractFromApi('anadolu-birlesik-kasko.pdf')
-      expect(result).not.toBeNull()
-      if (!result) return
+    console.log(`[DEBATE] rounds=${raw.debate?.roundCount} valid=${raw.debate?.roundTripValid}`)
+  }, 10_000)
 
-      const { raw } = result
+  // Test 4: Fallback produces valid data
+  it('fallback chain (Anthropic → DeepSeek) produces valid data', async () => {
+    expect(sharedExtraction).not.toBeNull()
+    if (!sharedExtraction) return
 
-      // Should fallback because Anthropic billing is broken
-      // But the data must still be valid
-      expect(raw.provider).toBeDefined()
-      expect(raw.data?.coverages).toBeDefined()
-      expect(Array.isArray(raw.data?.coverages)).toBe(true)
-      expect((raw.data?.coverages || []).length).toBeGreaterThan(0)
+    const { raw } = sharedExtraction
 
-      // Run through converter to ensure no crash
-      try {
-        const policy = await runConverter(raw.data, 'anadolu-birlesik-kasko.pdf')
-        expect(policy.coverages.length).toBeGreaterThan(0)
-      } catch (err: any) {
-        expect.unreachable(`Fallback data crashed converter: ${err.message}`)
-      }
+    expect(raw.data?.coverages).toBeDefined()
+    expect(Array.isArray(raw.data?.coverages)).toBe(true)
+    expect(raw.data?.coverages?.length).toBeGreaterThan(0)
 
-      console.log(
-        `[FALLBACK] provider=${raw.provider} reason=${raw.fallbackReason ?? 'none'} coverages=${raw.data?.coverages?.length}`
-      )
-    },
-    TIMEOUT
-  )
+    // Ensure conversion doesn't crash
+    try {
+      const policy = await runConverter(raw.data, PRIMARY_PDF)
+      expect(policy.coverages.length).toBeGreaterThan(0)
+    } catch (err: any) {
+      expect.unreachable(`Fallback data crashed converter: ${err.message}`)
+    }
+
+    console.log(`[FALLBACK] provider=${raw.provider} reason=${raw.fallbackReason ?? 'none'}`)
+  }, 30_000)
 })
