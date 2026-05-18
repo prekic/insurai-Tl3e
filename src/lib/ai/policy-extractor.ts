@@ -1520,7 +1520,8 @@ export async function extractPolicyFromDocument(
     } else if (
       errorMessage.includes('429') ||
       errorMessage.includes('rate_limit') ||
-      errorMessage.includes('Rate limit')
+      errorMessage.includes('Rate limit') ||
+      errorMessage.includes('Too many requests')
     ) {
       errorCode = 'RATE_LIMIT_EXCEEDED'
     } else if (

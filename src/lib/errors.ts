@@ -15,6 +15,7 @@ export const ERROR_CODES = {
   // AI/Analysis errors
   AI_ANALYSIS_FAILED: 'AI_ANALYSIS_FAILED',
   OCR_FAILED: 'OCR_FAILED',
+  RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
 
   // Policy errors
   POLICY_NOT_FOUND: 'POLICY_NOT_FOUND',
@@ -24,7 +25,7 @@ export const ERROR_CODES = {
   UNKNOWN_ERROR: 'UNKNOWN_ERROR',
 } as const
 
-export type ErrorCode = typeof ERROR_CODES[keyof typeof ERROR_CODES]
+export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES]
 
 export interface AppError {
   code: ErrorCode
@@ -49,7 +50,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, { title: string; description: str
   },
   [ERROR_CODES.FILE_PROCESSING_FAILED]: {
     title: 'Processing failed',
-    description: 'We couldn\'t process your file. Please ensure it\'s a valid document.',
+    description: "We couldn't process your file. Please ensure it's a valid document.",
   },
   [ERROR_CODES.NETWORK_ERROR]: {
     title: 'Connection error',
@@ -65,11 +66,15 @@ export const ERROR_MESSAGES: Record<ErrorCode, { title: string; description: str
   },
   [ERROR_CODES.AI_ANALYSIS_FAILED]: {
     title: 'Analysis failed',
-    description: 'We couldn\'t analyze your policy. Please try uploading again.',
+    description: "We couldn't analyze your policy. Please try uploading again.",
+  },
+  [ERROR_CODES.RATE_LIMIT_EXCEEDED]: {
+    title: 'Too many requests',
+    description: 'You have exceeded the request limit. Please wait a moment and try again.',
   },
   [ERROR_CODES.OCR_FAILED]: {
     title: 'Text extraction failed',
-    description: 'We couldn\'t read the text from your document. Try uploading a clearer image.',
+    description: "We couldn't read the text from your document. Try uploading a clearer image.",
   },
   [ERROR_CODES.POLICY_NOT_FOUND]: {
     title: 'Policy not found',
@@ -77,7 +82,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, { title: string; description: str
   },
   [ERROR_CODES.POLICY_DELETE_FAILED]: {
     title: 'Delete failed',
-    description: 'We couldn\'t delete the policy. Please try again.',
+    description: "We couldn't delete the policy. Please try again.",
   },
   [ERROR_CODES.UNKNOWN_ERROR]: {
     title: 'Something went wrong',
@@ -150,10 +155,17 @@ export function getErrorMessage(code: ErrorCode): { title: string; description: 
 }
 
 // Create an AppError from an unknown error
-export function createAppError(error: unknown, defaultCode: ErrorCode = ERROR_CODES.UNKNOWN_ERROR): AppError {
+export function createAppError(
+  error: unknown,
+  defaultCode: ErrorCode = ERROR_CODES.UNKNOWN_ERROR
+): AppError {
   if (error instanceof Error) {
     // Check for network errors
-    if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Network')) {
+    if (
+      error.message.includes('fetch') ||
+      error.message.includes('network') ||
+      error.message.includes('Network')
+    ) {
       return {
         code: ERROR_CODES.NETWORK_ERROR,
         message: ERROR_MESSAGES[ERROR_CODES.NETWORK_ERROR].description,
