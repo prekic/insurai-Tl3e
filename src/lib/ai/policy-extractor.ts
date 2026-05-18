@@ -25,6 +25,7 @@ import {
   getProxyUrl,
   isAIConfigured,
   isProxyConfigured,
+  extractViaProxy,
   type AIProvider,
 } from './config'
 import {
@@ -1608,6 +1609,38 @@ async function extractWithProvider(
   notifyUserId?: string,
   signal?: AbortSignal
 ): Promise<ExtractedPolicyData> {
+  // When a backend proxy is configured, use the unified route which has
+  // automatic DeepSeek fallback when both Anthropic and OpenAI are unavailable.
+  // This makes the frontend resilient to any individual provider outages.
+  if (isProxyConfigured()) {
+    const proxyResult = await extractViaProxy(
+      provider,
+      documentText,
+      EXTRACTION_SYSTEM_PROMPT,
+      notifyUserId,
+      signal
+    )
+    if (!proxyResult.success || !proxyResult.data) {
+      const errorMsg = proxyResult.error || 'Unified extraction failed'
+      const proxyError = new Error(errorMsg) as Error & { errorCode?: string; requestId?: string }
+      proxyError.errorCode = proxyResult.errorCode
+      proxyError.requestId = proxyResult.requestId
+      throw proxyError
+    }
+    // Attach proxy metadata for observability
+    const data = proxyResult.data as unknown as ExtractedPolicyData
+    data._proxyMeta = {
+      provider: proxyResult.provider,
+      fallback: proxyResult.fallback,
+      fallbackReason: proxyResult.fallbackReason,
+      requestId: proxyResult.requestId,
+      route: proxyResult.route,
+      fallbackChain: proxyResult.fallbackChain,
+    }
+    return data
+  }
+
+  // Without proxy, call provider directly from the browser
   switch (provider) {
     case 'openai':
       return extractWithOpenAI(documentText, notifyUserId, signal)

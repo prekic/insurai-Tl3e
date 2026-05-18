@@ -53,7 +53,7 @@ const defaultConfig = {
   // General API limits
   general: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10), // 15 minutes
-    max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
+    max: parseInt(process.env.RATE_LIMIT_MAX || '500', 10),
   },
   // AI extraction limits (expensive operations)
   ai: {
