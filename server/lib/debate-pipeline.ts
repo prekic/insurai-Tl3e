@@ -103,11 +103,11 @@ const ROUND3_PROMPT_SUFFIX = `\n\nYou are extracting this data a FINAL time. Two
 
 // ─── Default Comparator (OpenAI) ──────────────────────────────────────────────
 
-export function createOpenAIComparator(client: OpenAI): ComparatorFn {
+export function createOpenAIComparator(client: OpenAI, model = 'deepseek-chat'): ComparatorFn {
   return async (a, b) => {
     const response = await client.chat.completions.create(
       {
-        model: 'gpt-4o',
+        model,
         messages: [
           { role: 'system', content: COMPARATOR_SYSTEM_PROMPT },
           {
