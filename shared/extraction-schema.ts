@@ -37,6 +37,11 @@ export const EXTRACTION_JSON_SCHEMA = {
         type: ['string', 'null'],
         description: 'Insurance company name (e.g., Allianz, Axa, Mapfre)',
       },
+      insurer: {
+        type: ['string', 'null'],
+        description:
+          'Full insurer company name as stated on the policy (Sigorta Sirketi Unvani, e.g. "ANADOLU ANONIM TURK SIGORTA SIRKETI")',
+      },
       policyType: {
         type: ['string', 'null'],
         enum: ['kasko', 'traffic', 'home', 'health', 'life', 'dask', 'business', 'nakliyat', null],
@@ -515,6 +520,7 @@ export const EXTRACTION_JSON_SCHEMA = {
       'policyNumber',
       'bağlıPolNo',
       'provider',
+      'insurer',
       'policyType',
       'isBundle',
       'bundleProducts',

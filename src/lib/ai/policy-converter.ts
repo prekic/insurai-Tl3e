@@ -527,12 +527,21 @@ export async function convertToAnalyzedPolicy(
           ? extractVehicleInfoFromText(rawText)
           : undefined
 
+      // Some LLMs (DeepSeek) return vehicle as a nested object {make, model, year, plate}
+      // instead of flat fields like data.vehicleMake. Unpack if present.
+      const dataAny = data as unknown as Record<string, unknown>
+      const vehicleObj: Record<string, unknown> | null =
+        dataAny.vehicle && typeof dataAny.vehicle === 'object' && !Array.isArray(dataAny.vehicle)
+          ? (dataAny.vehicle as Record<string, unknown>)
+          : null
+
       const hasLlmData = !!(
         data.vehicleMake ||
         data.vehicleModel ||
         data.vehicleYear ||
         data.vehiclePlate ||
-        data.vehicleUsage
+        data.vehicleUsage ||
+        vehicleObj
       )
 
       if (!baseInfo && !hasLlmData) {
@@ -549,6 +558,12 @@ export async function convertToAnalyzedPolicy(
         ...(data.vehicleYear ? { year: data.vehicleYear } : {}),
         ...(data.vehiclePlate ? { plate: data.vehiclePlate } : {}),
         ...(data.vehicleUsage ? { usage: data.vehicleUsage } : {}),
+        // Fallback: unpack from nested vehicle object if flat fields are empty
+        ...(!data.vehicleMake && vehicleObj?.make ? { make: String(vehicleObj.make) } : {}),
+        ...(!data.vehicleModel && vehicleObj?.model ? { model: String(vehicleObj.model) } : {}),
+        ...(!data.vehicleYear && vehicleObj?.year ? { year: Number(vehicleObj.year) } : {}),
+        ...(!data.vehiclePlate && vehicleObj?.plate ? { plate: String(vehicleObj.plate) } : {}),
+        ...(!data.vehicleUsage && vehicleObj?.usage ? { usage: String(vehicleObj.usage) } : {}),
       }
     })(),
     coverages,

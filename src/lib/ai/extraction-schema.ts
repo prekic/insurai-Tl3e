@@ -8,6 +8,8 @@ export interface ExtractedPolicyData {
   // Basic policy information
   policyNumber: string | null
   provider: string | null
+  /** Insurer/Sigorta Sirketi Unvani (e.g. "ANADOLU ANONIM TURK SIGORTA SIRKETI") */
+  insurer?: string | null
   policyType: PolicyType | null
 
   // Bundle detection — true when policy is a multi-product "Birleşik" / "Combined"

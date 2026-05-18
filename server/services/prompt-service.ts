@@ -539,22 +539,36 @@ Extract:
 - **vin**: Chassis/Sasi number
 - **vehicleUsage**: 'private' (hususi) or 'commercial' (ticari). Check "Kullanim Sekli" field
 - **insuredEntityType**: 'individual' (bireysel/gercek kisi) or 'corporate' (tuzel kisi/kurumsal)
+- **insurer**: Full company name of the insurer (Sigorta Sirketi Unvani, e.g. "ANADOLU ANONIM TURK SIGORTA SIRKETI")
+- **insuredName**: Full name/company of the insured (Sigortali Adi/Unvani)
+- **location**: Province/city where the insured or risk is located
+- **NCD**: Current hasarsizlik indirimi as a % number (e.g. 50 for 50%)
+- **NCDKademe**: Current hasarsizlik kademesi/step number (e.g. 3)
+- **SBMNumber**: SBM Police No (9 digits found near SBM BIM Ref No)
+- **paymentMethod**: How premium was paid ("Sanal POS", "Kredi Karti", "Nakit", "Banka Havalesi")
 
 ## --- OUTPUT STRUCTURE ---
 
 Return ALL fields listed below. Use camelCase for all keys. Use null for any field not explicitly found.
 
 Top-level fields:
-- policyNumber, provider, policyType, isBundle, bundleProducts
+- policyNumber, provider, insurer (Sigortaci), policyType, isBundle, bundleProducts
 - startDate, endDate
 - currency (3-letter ISO code, e.g. TRY, USD, EUR)
 - premium (total premium as number)
 - premiumNet (net premium before tax / Vergi Oncesi Prim — number)
 - premiumTax (tax amount / BSMV — number)
 - paymentFrequency ('annual', 'monthly', 'quarterly', 'single')
+- paymentMethod (payment method e.g. 'Sanal POS', 'Kredi Karti', 'Nakit', 'Banka Havalesi')
 - vehicleMake, vehicleModel, vehicleYear, vehiclePlate, vin
 - vehicleUsage ('private' or 'commercial' / 'hususi' or 'ticari')
 - insuredEntityType ('individual' or 'corporate' / 'bireysel' or 'tuzel kisi')
+- insuredName: Full name/company name of the insured (Sigortali / Sigorta Ettiren)
+- insuredAddress: Address of the insured
+- location: Province/city of the insured or risk (e.g. Istanbul)
+- NCD (hasarsizlik indirimi): Current NCD percentage as a number (e.g. 50 for 50%)
+- NCDKademe (hasarsizlik kademesi): Current NCD tier/step (e.g. 3)
+- SBMNumber (SBM Police No): 9-digit SBM reference number
 
 Coverage items (array):
   For each: name, nameTr, limit (number), deductible, isOptional (bool), included (bool),
