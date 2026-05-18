@@ -612,6 +612,7 @@ export async function convertToAnalyzedPolicy(
 
       if (data.evidence?.insights) {
         data.evidence.insights.forEach((i) => {
+          if (typeof i.text !== 'string') return
           const key = i.text.trim().toLowerCase()
           insights[key] = i.quote
           if ('quoteTr' in i && typeof i.quoteTr === 'string') {
@@ -621,6 +622,7 @@ export async function convertToAnalyzedPolicy(
       }
       if (data.evidence?.exclusions) {
         data.evidence.exclusions.forEach((e) => {
+          if (typeof e.text !== 'string') return
           const key = e.text.trim().toLowerCase()
           exclusions[key] = e.quote
           if ('quoteTr' in e && typeof e.quoteTr === 'string') {
