@@ -402,6 +402,8 @@ export async function convertToAnalyzedPolicy(
     data.insuredName ??
     data.insured_name ??
     data.insuredPerson ??
+    data.insured ??
+    data.insured_person ??
     data.policyholder ??
     data.sigortalı ??
     data.sigortali ??

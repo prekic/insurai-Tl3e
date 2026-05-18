@@ -30,6 +30,8 @@ export interface ExtractedPolicyData {
   // Policyholder information
   insuredName: string | null
   insuredAddress: string | null
+  insured?: string | null
+  insured_person?: string | null
 
   // Dates
   startDate: string | null // ISO date string

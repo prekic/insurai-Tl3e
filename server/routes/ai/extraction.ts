@@ -1793,7 +1793,7 @@ router.post(
           const variantSuffix =
             variant === 'slightly_different'
               ? '\n\nNOTE: Pay extra attention to coverage limit amounts, deductibles, and exclusions. List them with maximum detail.'
-              : '\n\nNOTE: Focus on policy metadata (dates, premium, provider, vehicle) and ensure all top-level fields are populated.'
+              : '\n\nNOTE: Focus on policy metadata — extract insurer/sigortacı company name, insured/sigortalı name, dates, premium, provider, vehicle. Ensure ALL top-level fields are populated.'
 
           const response = await dsNarrow.chat.completions.create(
             {
@@ -1887,11 +1887,14 @@ router.post(
             roundTripValid = false
             roundTripWarning = 'Policy number is missing or looks like a fallback timestamp'
           }
-          if (!finalParsed.insurer || finalParsed.insurer === 'MISSING') {
+          // LLM often uses 'provider' rather than 'insurer' — check both
+          const insCompany = finalParsed.insurer || finalParsed.insuredBy || finalParsed.provider
+          if (!insCompany || insCompany === 'MISSING') {
             roundTripValid = false
             roundTripWarning = (roundTripWarning || '') + ' Insurer missing'
           }
-          if (!finalParsed.insuredName && !finalParsed.insuredPerson) {
+          // LLM often uses 'insured' rather than 'insuredName'/'insuredPerson'
+          if (!finalParsed.insuredName && !finalParsed.insuredPerson && !finalParsed.insured) {
             roundTripValid = false
             roundTripWarning = (roundTripWarning || '') + ' Insured name missing'
           }
