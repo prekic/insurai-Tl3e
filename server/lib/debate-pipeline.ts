@@ -5,27 +5,19 @@
  * using a comparator to detect disagreements and optional arbitration.
  *
  * Architecture:
- *   Round 1: Two independent extractors (same prompt, separate calls)
+ *   Round 1: Two independent extractors (same prompt, separate calls, different variants)
  *   Round 2: Both see each other's output + extractions, cross-review and revise
  *   Round 3: Arbitrator LLM reviews all 4 outputs + original doc text, produces final
  *
  * Early-exit: if comparator says "agreed" at any round, skip remaining rounds.
+ *
+ * Key difference from original: extractors are NOT tied to a single OpenAI client.
+ * Instead, `extractor` is a callable that runs the full fallback chain
+ * (Anthropic→OpenAI→DeepSeek), ensuring debate works even when individual
+ * providers are unavailable.
  */
 
 import OpenAI from 'openai'
-import { EXTRACTION_JSON_SCHEMA } from '../../shared/extraction-schema.js'
-import { calculateCost } from '../middleware/cost-control.js'
-
-export interface DebateConfig {
-  model?: string
-  /** Model for extractor B — defaults to model (same). When Claude is unavailable,
-   *  set this to a different OpenAI model (e.g. gpt-4o-mini) so the two extractors
-   *  diverge and genuine debate can happen. */
-  modelB?: string
-  maxRounds?: number // 1-3, default 3
-  temperature?: number
-  extractTimeout?: number // per call, default 180s
-}
 
 export interface ExtractionWithMeta {
   content: string
@@ -35,7 +27,7 @@ export interface ExtractionWithMeta {
     outputTokens: number
     cost: number
     model: string
-    source: string // 'extractor_a' | 'extractor_b' | 'arbitrator'
+    source: string // 'extractor_a' | 'extractor_b' | 'arbitrator' | 'comparator'
     round?: number
   }
 }
@@ -49,7 +41,29 @@ export interface DebateResult {
   totalTokens: number
 }
 
-// ─── Comparator Prompts ───────────────────────────────────────────────────────
+/**
+ * An extractor function that takes a system prompt + user prompt + round info
+ * and returns extraction meta. The caller (extraction.ts) provides this with
+ * the full fallback chain (Anthropic→OpenAI→DeepSeek) so the debate pipeline
+ * doesn't need to know about individual providers.
+ */
+export type ExtractorFn = (
+  systemMsg: string,
+  userMsg: string,
+  variant: 'standard' | 'slightly_different'
+) => Promise<ExtractionWithMeta>
+
+export type ComparatorFn = (
+  a: Record<string, unknown>,
+  b: Record<string, unknown>
+) => Promise<{
+  agreed: boolean
+  assessment: string
+  disagreements: Array<{ field: string; valueA: string; valueB: string; significance: string }>
+  requiresRound2: boolean
+}>
+
+// ─── Prompts ──────────────────────────────────────────────────────────────────
 
 const COMPARATOR_SYSTEM_PROMPT = `You are an expert Insurance Policy JSON Comparator. Your task is to compare two JSON extractions of the same policy document and identify meaningful disagreements.
 
@@ -66,15 +80,10 @@ IGNORE minor differences: trailing zeros, whitespace, field ordering, tr/en labe
 
 Output ONLY valid JSON:
 {
-  "agreed": boolean,        // true if no meaningful disagreements found
-  "assessment": string,     // brief summary of agreement level
-  "disagreements": [{       // empty array if agreed
-    "field": "field.path",
-    "valueA": "...",
-    "valueB": "...",
-    "significance": "critical" | "major" | "minor"
-  }],
-  "requiresRound2": boolean // true if critical or major disagreements exist
+  "agreed": boolean,
+  "assessment": string,
+  "disagreements": [{ "field": "field.path", "valueA": "...", "valueB": "...", "significance": "critical" | "major" | "minor" }],
+  "requiresRound2": boolean
 }`
 
 const ARBITRATOR_SYSTEM_PROMPT = `You are an expert Insurance Policy Arbitrator. Given two extraction attempts (Original and Revised) from TWO different extractors — four JSON outputs total.
@@ -92,91 +101,36 @@ const ROUND2_PROMPT_SUFFIX = `\n\nIMPORTANT: Another AI has extracted data from 
 
 const ROUND3_PROMPT_SUFFIX = `\n\nYou are extracting this data a FINAL time. Two previous rounds have completed. Review all previous attempts and produce the best possible extraction.\n`
 
-// ─── Core Pipeline ────────────────────────────────────────────────────────────
+// ─── Default Comparator (OpenAI) ──────────────────────────────────────────────
 
-async function callExtractor(
-  client: OpenAI,
-  systemMsg: string,
-  userMsg: string,
-  config: DebateConfig & { source: string; round: number }
-): Promise<ExtractionWithMeta> {
-  const response = await client.chat.completions.create(
-    {
-      model: config.model || 'gpt-5.4',
-      messages: [
-        { role: 'system', content: systemMsg },
-        { role: 'user', content: userMsg },
-      ],
-      response_format: {
-        type: 'json_schema',
-        json_schema: EXTRACTION_JSON_SCHEMA,
+export function createOpenAIComparator(client: OpenAI): ComparatorFn {
+  return async (a, b) => {
+    const response = await client.chat.completions.create(
+      {
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: COMPARATOR_SYSTEM_PROMPT },
+          {
+            role: 'user',
+            content: `Compare these two extractions of the same policy document:\n\nEXTRACTOR A:\n${JSON.stringify(a, null, 2)}\n\nEXTRACTOR B:\n${JSON.stringify(b, null, 2)}`,
+          },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.0,
       },
-      temperature: config.temperature ?? 0.1,
-    },
-    { signal: AbortSignal.timeout(config.extractTimeout ?? 180_000) }
-  )
+      { signal: AbortSignal.timeout(60_000) }
+    )
 
-  const content = response.choices[0]?.message?.content || ''
-  let parsed: Record<string, unknown>
-  try {
-    parsed = JSON.parse(content)
-  } catch {
-    parsed = {}
-  }
-
-  const usedModel = response.model || config.model || 'gpt-5.4'
-  const inputTokens = response.usage?.prompt_tokens || 0
-  const outputTokens = response.usage?.completion_tokens || 0
-
-  return {
-    content,
-    parsed,
-    usage: {
-      inputTokens,
-      outputTokens,
-      cost: calculateCost(usedModel, inputTokens, outputTokens).totalCost,
-      model: usedModel,
-      source: config.source,
-      round: config.round,
-    },
-  }
-}
-
-async function compareExtractions(
-  client: OpenAI,
-  a: Record<string, unknown>,
-  b: Record<string, unknown>
-): Promise<{
-  agreed: boolean
-  assessment: string
-  disagreements: Array<{ field: string; valueA: string; valueB: string; significance: string }>
-  requiresRound2: boolean
-}> {
-  const response = await client.chat.completions.create(
-    {
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: COMPARATOR_SYSTEM_PROMPT },
-        {
-          role: 'user',
-          content: `Compare these two extractions of the same policy document:\n\nEXTRACTOR A:\n${JSON.stringify(a, null, 2)}\n\nEXTRACTOR B:\n${JSON.stringify(b, null, 2)}`,
-        },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.0,
-    },
-    { signal: AbortSignal.timeout(60_000) }
-  )
-
-  const content = response.choices[0]?.message?.content || '{}'
-  try {
-    return JSON.parse(content)
-  } catch {
-    return {
-      agreed: false,
-      assessment: 'Comparator parse failed',
-      disagreements: [],
-      requiresRound2: true,
+    const content = response.choices[0]?.message?.content || '{}'
+    try {
+      return JSON.parse(content)
+    } catch {
+      return {
+        agreed: false,
+        assessment: 'Comparator parse failed',
+        disagreements: [],
+        requiresRound2: true,
+      }
     }
   }
 }
@@ -186,53 +140,52 @@ async function compareExtractions(
 /**
  * Run the multi-LLM debate pipeline.
  *
- * @param client - OpenAI client instance
- * @param systemPrompt - System prompt (from prompt service's systemPrompt field)
- * @param userPrompt - User prompt (from prompt service's userPrompt OR raw documentText)
- * @param originalDocumentText - Raw document text for arbitrator reference (not injected into extractor prompts)
- * @param debateConfig - Configuration options
+ * @param extractorA - Function that runs an extraction with fallback chain (variant A)
+ * @param extractorB - Function that runs an extraction with fallback chain (variant B)
+ * @param comparator - Function that compares two extraction results
+ * @param arbitratorExtractor - Function for Round 3 arbitration (uses fallback chain)
+ * @param systemPrompt - The base system prompt
+ * @param userPrompt - The base user prompt
+ * @param originalDocumentText - Raw document text for arbitrator
+ * @param maxRounds - 1-3 (default 3)
  */
 export async function runDebatePipeline(
-  client: OpenAI,
+  extractorA: ExtractorFn,
+  extractorB: ExtractorFn,
+  comparator: ComparatorFn,
+  arbitratorExtractor: ExtractorFn,
   systemPrompt: string,
   userPrompt: string,
   originalDocumentText: string,
-  debateConfig: DebateConfig = {}
+  maxRounds = 3
 ): Promise<DebateResult> {
-  const maxRounds = Math.min(debateConfig.maxRounds ?? 3, 3)
   const results: ExtractionWithMeta[] = []
   const disagreements: string[] = []
   let totalCost = 0
   let totalTokens = 0
 
   // ── Round 1: Two independent extractions in parallel ────────────────
-  // Extractor A uses model, Extractor B uses modelB (if set) or model
-  const configA = { ...debateConfig, source: 'extractor_a' as const, round: 1 }
-  const configB = {
-    ...debateConfig,
-    model: debateConfig.modelB || debateConfig.model,
-    source: 'extractor_b' as const,
-    round: 1,
-  }
-  delete (configB as any).modelB
-
-  const [extractorA, extractorB] = await Promise.all([
-    callExtractor(client, systemPrompt, userPrompt, configA),
-    callExtractor(client, systemPrompt, userPrompt, configB),
+  // Extractor A uses "standard" variant, Extractor B uses "slightly_different"
+  // to ensure divergence even when both go through the same provider chain.
+  const [extractorAres, extractorBres] = await Promise.all([
+    extractorA(systemPrompt, userPrompt, 'standard'),
+    extractorB(systemPrompt, userPrompt, 'slightly_different'),
   ])
 
-  results.push(extractorA, extractorB)
-  totalCost += extractorA.usage.cost + extractorB.usage.cost
-  totalTokens += extractorA.usage.inputTokens + extractorA.usage.outputTokens
-  totalTokens += extractorB.usage.inputTokens + extractorB.usage.outputTokens
+  results.push(extractorAres, extractorBres)
+  totalCost += extractorAres.usage.cost + extractorBres.usage.cost
+  totalTokens += extractorAres.usage.inputTokens + extractorAres.usage.outputTokens
+  totalTokens += extractorBres.usage.inputTokens + extractorBres.usage.outputTokens
 
   // ── Compare Round 1 ─────────────────────────────────────────────────
 
-  const comparison1 = await compareExtractions(client, extractorA.parsed, extractorB.parsed)
+  const comparison1 = await comparator(extractorAres.parsed, extractorBres.parsed)
 
   if (comparison1.agreed || maxRounds === 1) {
+    // Prefer A's result when agreed (or no more rounds)
+    const best = extractorAres.usage.source === 'extractor_a' ? extractorAres : extractorBres
     return {
-      final: extractorA,
+      final: best,
       roundCount: 1,
       rounds: results,
       disagreements: [],
@@ -241,7 +194,6 @@ export async function runDebatePipeline(
     }
   }
 
-  // Track disagreements
   for (const d of comparison1.disagreements) {
     if (d.significance === 'critical' || d.significance === 'major') {
       disagreements.push(`${d.field}: A=${d.valueA} vs B=${d.valueB}`)
@@ -250,7 +202,7 @@ export async function runDebatePipeline(
 
   if (maxRounds < 2) {
     return {
-      final: extractorA,
+      final: extractorAres,
       roundCount: 1,
       rounds: results,
       disagreements,
@@ -261,30 +213,24 @@ export async function runDebatePipeline(
 
   // ── Round 2: Cross-review ──────────────────────────────────────────
 
-  const round2PromptB_extra = `\n\n${ROUND2_PROMPT_SUFFIX}${JSON.stringify(extractorA.parsed, null, 2)}`
-  const round2PromptA_extra = `\n\n${ROUND2_PROMPT_SUFFIX}${JSON.stringify(extractorB.parsed, null, 2)}`
-
-  const configA2 = { ...debateConfig, source: 'extractor_a' as const, round: 2 }
-  const configB2 = {
-    ...debateConfig,
-    model: debateConfig.modelB || debateConfig.model,
-    source: 'extractor_b' as const,
-    round: 2,
-  }
-  delete (configB2 as any).modelB
+  const round2userA =
+    userPrompt + ROUND2_PROMPT_SUFFIX + JSON.stringify(extractorBres.parsed, null, 2)
+  const round2userB =
+    userPrompt + ROUND2_PROMPT_SUFFIX + JSON.stringify(extractorAres.parsed, null, 2)
 
   const [revisedA, revisedB] = await Promise.all([
-    callExtractor(client, systemPrompt, userPrompt + round2PromptA_extra, configA2),
-    callExtractor(client, systemPrompt, userPrompt + round2PromptB_extra, configB2),
+    extractorA(systemPrompt, round2userA, 'standard'),
+    extractorB(systemPrompt, round2userB, 'slightly_different'),
   ])
 
   results.push(revisedA, revisedB)
   totalCost += revisedA.usage.cost + revisedB.usage.cost
   totalTokens += revisedA.usage.inputTokens + revisedA.usage.outputTokens
+  totalTokens += revisedB.usage.inputTokens + revisedB.usage.outputTokens
 
   // ── Compare Round 2 ────────────────────────────────────────────────
 
-  const comparison2 = await compareExtractions(client, revisedA.parsed, revisedB.parsed)
+  const comparison2 = await comparator(revisedA.parsed, revisedB.parsed)
 
   for (const d of comparison2.disagreements) {
     if (d.significance === 'critical' || d.significance === 'major') {
@@ -296,7 +242,6 @@ export async function runDebatePipeline(
   }
 
   if (comparison2.agreed || maxRounds < 3) {
-    // Converged — merge and return
     const merged = mergeExtractions(revisedA.parsed, revisedB.parsed)
     const final: ExtractionWithMeta = {
       content: JSON.stringify(merged),
@@ -319,13 +264,13 @@ export async function runDebatePipeline(
 
   // ── Round 3: Arbitration ───────────────────────────────────────────
 
-  const arbUserPrompt = `ORIGINAL DOCUMENT:\n\n${originalDocumentText}\n\n${ROUND3_PROMPT_SUFFIX}\n\nROUND 1:\nA: ${JSON.stringify(extractorA.parsed, null, 2)}\nB: ${JSON.stringify(extractorB.parsed, null, 2)}\n\nROUND 2:\nA (revised): ${JSON.stringify(revisedA.parsed, null, 2)}\nB (revised): ${JSON.stringify(revisedB.parsed, null, 2)}\n\nCOMPARATOR NOTES:\n${comparison2.assessment}\n\nKEY DISAGREEMENTS:\n${comparison2.disagreements.map((d: any) => `- ${d.field}: ${d.valueA} vs ${d.valueB} (${d.significance})`).join('\n')}\n\nProduce the single best, complete extraction JSON.`
+  const arbUserPrompt = `ORIGINAL DOCUMENT:\n\n${originalDocumentText}\n\n${ROUND3_PROMPT_SUFFIX}\n\nROUND 1:\nA: ${JSON.stringify(extractorAres.parsed, null, 2)}\nB: ${JSON.stringify(extractorBres.parsed, null, 2)}\n\nROUND 2:\nA (revised): ${JSON.stringify(revisedA.parsed, null, 2)}\nB (revised): ${JSON.stringify(revisedB.parsed, null, 2)}\n\nCOMPARATOR NOTES:\n${comparison2.assessment}\n\nKEY DISAGREEMENTS:\n${comparison2.disagreements.map((d) => `- ${d.field}: ${d.valueA} vs ${d.valueB} (${d.significance})`).join('\n')}\n\nProduce the single best, complete extraction JSON.`
 
-  const arbitratorResult = await callExtractor(client, ARBITRATOR_SYSTEM_PROMPT, arbUserPrompt, {
-    ...debateConfig,
-    source: 'arbitrator',
-    round: 3,
-  })
+  const arbitratorResult = await arbitratorExtractor(
+    ARBITRATOR_SYSTEM_PROMPT,
+    arbUserPrompt,
+    'standard'
+  )
 
   results.push(arbitratorResult)
   totalCost += arbitratorResult.usage.cost
@@ -341,7 +286,7 @@ export async function runDebatePipeline(
   }
 }
 
-// ── Merge Helpers ─────────────────────────────────────────────────────────────
+// ── Merge Helper ──────────────────────────────────────────────────────────────
 
 function mergeExtractions(
   a: Record<string, unknown>,

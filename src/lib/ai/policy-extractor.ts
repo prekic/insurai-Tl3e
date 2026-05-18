@@ -749,8 +749,7 @@ export async function extractPolicyFromDocument(
   markClientPhase('textPreprocessing_ms', preprocessStart)
   const aiExtractionStart = performance.now()
   const configuredProviders = getConfiguredProviders()
-  // When proxy is configured, bypass consensus - the unified endpoint handles Anthropic→OpenAI fallback
-  const useMultiProvider = useConsensus && configuredProviders.length > 1 && !isProxyConfigured()
+  const useMultiProvider = useConsensus && configuredProviders.length > 1
   const provider = primaryProvider || configuredProviders[0]
 
   // Set extraction mode for observability

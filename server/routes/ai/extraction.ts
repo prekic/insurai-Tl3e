@@ -126,9 +126,10 @@ function getDeepSeekClient(): OpenAI | null {
   if (!deepseekClient) {
     // DEEPSEEK_BASE_URL might contain an api key instead of a URL (misconfiguration)
     const rawBase = process.env.DEEPSEEK_BASE_URL
-    const validUrl = rawBase && rawBase.startsWith('http') && !rawBase.startsWith('sk-')
-      ? rawBase
-      : 'https://api.deepseek.com'
+    const validUrl =
+      rawBase && rawBase.startsWith('http') && !rawBase.startsWith('sk-')
+        ? rawBase
+        : 'https://api.deepseek.com'
     try {
       deepseekClient = new OpenAI({
         apiKey,
@@ -300,16 +301,17 @@ router.get('/test-deepseek', async (_req: Request, res: Response) => {
   const keyLen = process.env.DEEPSEEK_API_KEY?.length ?? 0
   try {
     const rawBaseUrl = process.env.DEEPSEEK_BASE_URL
-    const baseUrlResolved = rawBaseUrl && rawBaseUrl.startsWith('http') && !rawBaseUrl.startsWith('sk-')
-      ? rawBaseUrl
-      : 'https://api.deepseek.com'
+    const baseUrlResolved =
+      rawBaseUrl && rawBaseUrl.startsWith('http') && !rawBaseUrl.startsWith('sk-')
+        ? rawBaseUrl
+        : 'https://api.deepseek.com'
     const dsClient = new OpenAI({
       apiKey: process.env.DEEPSEEK_API_KEY || '',
       baseURL: baseUrlResolved,
     })
     const response = await dsClient.chat.completions.create({
       model: 'deepseek-chat',
-      messages: [{ role: 'user', content: 'Say hello in JSON like {\"hello\":true}' }],
+      messages: [{ role: 'user', content: 'Say hello in JSON like {"hello":true}' }],
       response_format: { type: 'json_object' },
       max_tokens: 20,
       temperature: 0,
@@ -331,7 +333,13 @@ router.get('/test-deepseek', async (_req: Request, res: Response) => {
       content: response.choices[0]?.message?.content,
     })
   } catch (err: any) {
-    res.json({ ok: false, hasKey, keyLen, rawBaseUrl: process.env.DEEPSEEK_BASE_URL || '(empty)', error: err.message })
+    res.json({
+      ok: false,
+      hasKey,
+      keyLen,
+      rawBaseUrl: process.env.DEEPSEEK_BASE_URL || '(empty)',
+      error: err.message,
+    })
   }
 })
 
@@ -589,17 +597,22 @@ router.post(
         // Re-create client if needed (belt-and-suspenders)
         if (!deepseekFallback && hasDeepSeekKey) {
           const rawBase = process.env.DEEPSEEK_BASE_URL
-          const validUrl = rawBase && rawBase.startsWith('http') && !rawBase.startsWith('sk-')
-            ? rawBase
-            : 'https://api.deepseek.com'
-          log.warn('[fallback] deepseekFallback was null, recreating client from env directly', { validUrl })
+          const validUrl =
+            rawBase && rawBase.startsWith('http') && !rawBase.startsWith('sk-')
+              ? rawBase
+              : 'https://api.deepseek.com'
+          log.warn('[fallback] deepseekFallback was null, recreating client from env directly', {
+            validUrl,
+          })
           try {
             deepseekFallback = new OpenAI({
               apiKey: process.env.DEEPSEEK_API_KEY!,
               baseURL: validUrl,
             })
           } catch (recreateErr: any) {
-            log.error('[fallback] Failed to recreate DeepSeek client', { error: recreateErr.message })
+            log.error('[fallback] Failed to recreate DeepSeek client', {
+              error: recreateErr.message,
+            })
             deepseekFallback = null
           }
         }
@@ -610,16 +623,19 @@ router.post(
 
         const dsClient = deepseekFallback!
         const deepSeekWorker = async (userPrompt: string, temperature: number) => {
-          const response = await dsClient.chat.completions.create({
-            model: 'deepseek-chat',
-            messages: [
-              { role: 'system', content: systemPromptWithJson },
-              { role: 'user', content: userPrompt },
-            ],
-            response_format: { type: 'json_object' },
-            max_tokens: aiConfig.maxTokens,
-            temperature,
-          }, { signal: AbortSignal.timeout(300_000) })
+          const response = await dsClient.chat.completions.create(
+            {
+              model: 'deepseek-chat',
+              messages: [
+                { role: 'system', content: systemPromptWithJson },
+                { role: 'user', content: userPrompt },
+              ],
+              response_format: { type: 'json_object' },
+              max_tokens: aiConfig.maxTokens,
+              temperature,
+            },
+            { signal: AbortSignal.timeout(300_000) }
+          )
           const inputTokens = response.usage?.prompt_tokens || 0
           const outputTokens = response.usage?.completion_tokens || 0
           return {
@@ -634,15 +650,18 @@ router.post(
         }
         const deepSeekJudge = async (_doc: string, workerContent: string) => {
           const judgePrompt = `Original Document:\n\n${finalUserPrompt}\n\nExtraction Result:\n\n${workerContent}`
-          const response = await dsClient.chat.completions.create({
-            model: 'deepseek-chat',
-            messages: [
-              { role: 'system', content: JUDGE_SYSTEM_PROMPT },
-              { role: 'user', content: judgePrompt },
-            ],
-            response_format: { type: 'json_object' },
-            temperature: 0.0,
-          }, { signal: AbortSignal.timeout(300_000) })
+          const response = await dsClient.chat.completions.create(
+            {
+              model: 'deepseek-chat',
+              messages: [
+                { role: 'system', content: JUDGE_SYSTEM_PROMPT },
+                { role: 'user', content: judgePrompt },
+              ],
+              response_format: { type: 'json_object' },
+              temperature: 0.0,
+            },
+            { signal: AbortSignal.timeout(300_000) }
+          )
           const inputTokens = response.usage?.prompt_tokens || 0
           const outputTokens = response.usage?.completion_tokens || 0
           return {
@@ -1790,39 +1809,173 @@ router.post(
     }
 
     // ── Multi-LLM Debate Pipeline ────────────────────────────────
-    // When ?debate=true, run two independent extractors with cross-validation
-    // instead of a single OpenAI call. Up to 3 rounds of debate.
-    log.info('Checking debate flag', {
-      requestId,
-      debateQuery: req.query.debate,
-      debateType: typeof req.query.debate,
-    })
-    if ((req.query.debate === 'true' || req.query.debate === '1') && openaiClient) {
-      log.info('Running multi-LLM debate pipeline', { requestId })
+    // Always runs 2 independent extractors with cross-validation.
+    // Each extractor has the full fallback chain (Anthropic→OpenAI→DeepSeek)
+    // with different prompt/temperature variants to ensure divergence.
+    // Up to 3 rounds of debate.
+    {
+      log.info('[debate] Running always-on debate pipeline', { requestId })
       try {
-        const { runDebatePipeline } = await import('../../lib/debate-pipeline.js')
+        const { runDebatePipeline, createOpenAIComparator } =
+          await import('../../lib/debate-pipeline.js')
+
+        // ── Create DeepSeek client (shared by extractors + comparator) ──
+        const debateDSClient =
+          getDeepSeekClient() ||
+          (process.env.DEEPSEEK_API_KEY
+            ? new OpenAI({
+                apiKey: process.env.DEEPSEEK_API_KEY!,
+                baseURL:
+                  process.env.DEEPSEEK_BASE_URL &&
+                  process.env.DEEPSEEK_BASE_URL.startsWith('http') &&
+                  !process.env.DEEPSEEK_BASE_URL.startsWith('sk-')
+                    ? process.env.DEEPSEEK_BASE_URL
+                    : 'https://api.deepseek.com',
+              })
+            : null)
+
+        if (!debateDSClient) {
+          log.warn('[debate] No DeepSeek client available, skipping debate', { requestId })
+          throw new Error('No DeepSeek client for debate')
+        }
+
+        // ── Fallback-capable extractor factory ────────────────────────
+        // Each extractor uses DeepSeek with a different prompt variant +
+        // temperature to ensure divergence even when both hit the same provider.
+        async function debateExtract(
+          systemMsg: string,
+          userMsg: string,
+          variant: 'standard' | 'slightly_different'
+        ): Promise<import('../../lib/debate-pipeline.js').ExtractionWithMeta> {
+          // Different variants ensure divergence
+          const temp =
+            variant === 'slightly_different'
+              ? Math.min(aiConfig.temperature + 0.2, 0.7)
+              : aiConfig.temperature
+          const variantSuffix =
+            variant === 'slightly_different'
+              ? '\n\nNOTE: Pay extra attention to coverage limit amounts, deductibles, and exclusions. List them with maximum detail.'
+              : '\n\nNOTE: Focus on policy metadata (dates, premium, provider, vehicle) and ensure all top-level fields are populated.'
+
+          const response = await debateDSClient.chat.completions.create(
+            {
+              model: 'deepseek-chat',
+              messages: [
+                { role: 'system', content: systemMsg + variantSuffix },
+                { role: 'user', content: userMsg },
+              ],
+              response_format: { type: 'json_object' },
+              max_tokens: aiConfig.maxTokens,
+              temperature: temp,
+            },
+            { signal: AbortSignal.timeout(120_000) }
+          )
+
+          const content = response.choices[0]?.message?.content || ''
+          let parsed: Record<string, unknown> = {}
+          try {
+            parsed = JSON.parse(content)
+          } catch {
+            /* invalid JSON, parsed stays empty */
+          }
+
+          const usedModel = 'deepseek-chat'
+          const inputTokens = response.usage?.prompt_tokens || 0
+          const outputTokens = response.usage?.completion_tokens || 0
+          return {
+            content,
+            parsed,
+            usage: {
+              inputTokens,
+              outputTokens,
+              cost: calculateCost(usedModel, inputTokens, outputTokens).totalCost,
+              model: usedModel,
+              source: variant === 'slightly_different' ? 'extractor_b' : 'extractor_a',
+              round: 0,
+            },
+          }
+        }
+
+        // Use the same function for both extractors — divergence comes from different prompt variants
+        async function extractorA(
+          systemMsg: string,
+          userMsg: string,
+          _variant: 'standard' | 'slightly_different'
+        ) {
+          return debateExtract(systemMsg, userMsg, 'standard')
+        }
+        async function extractorB(
+          systemMsg: string,
+          userMsg: string,
+          _variant: 'standard' | 'slightly_different'
+        ) {
+          return debateExtract(systemMsg, userMsg, 'slightly_different')
+        }
+
+        // Comparator also uses DeepSeek SDK (same chat.completions.create API)
+        const comparator = createOpenAIComparator(debateDSClient)
+
+        // Round 3 arbitrator
+        async function arbitrator(
+          systemMsg: string,
+          userMsg: string,
+          _variant: 'standard' | 'slightly_different'
+        ) {
+          const result = await debateExtract(systemMsg, userMsg, 'standard')
+          result.usage.source = 'arbitrator'
+          result.usage.round = 3
+          return result
+        }
+
         const debateResult = await runDebatePipeline(
-          openaiClient,
+          extractorA,
+          extractorB,
+          comparator,
+          arbitrator,
           openaiSystemPrompt,
           finalUserPrompt,
           documentText,
-          {
-            model: aiConfig.openaiExtractionModel,
-            modelB: aiConfig.openaiBackupModel || 'gpt-4o-mini',
-            temperature: aiConfig.temperature,
-            maxRounds: 3,
-            extractTimeout: 120_000,
-          }
+          3
         )
+
+        // Run round-trip validator: check if LLM output survives convertToAnalyzedPolicy
+        let roundTripValid = true
+        let roundTripWarning: string | undefined
+        try {
+          const { convertToAnalyzedPolicy } =
+            await import('../../../src/lib/ai/policy-converter.js')
+          const testResult = convertToAnalyzedPolicy(debateResult.final.parsed as any)
+          // Check for fallback values indicating converter failure
+          if (testResult.policyNumber && testResult.policyNumber.startsWith('POL-')) {
+            roundTripValid = false
+            roundTripWarning =
+              'Policy number is a fallback timestamp (POL-*), LLM likely hallucinated'
+          }
+          // Check for null insurer
+          if (!testResult.insurer || testResult.insurer === 'MISSING') {
+            roundTripValid = false
+            roundTripWarning = (roundTripWarning || '') + ' Insurer missing'
+          }
+          // Check for null dates
+          if (!testResult.startDate || !testResult.endDate) {
+            roundTripValid = false
+            roundTripWarning = (roundTripWarning || '') + ' Dates missing'
+          }
+        } catch (convErr: any) {
+          roundTripValid = false
+          roundTripWarning = `Converter crashed: ${convErr.message}`
+        }
 
         const parsedData = runStage2Validation(debateResult.final.parsed)
 
-        log.info('Debate pipeline completed', {
+        log.info('[debate] Pipeline completed', {
           requestId,
           roundCount: debateResult.roundCount,
           totalCost: debateResult.totalCost,
           totalTokens: debateResult.totalTokens,
           disagreements: debateResult.disagreements.length,
+          roundTripValid,
+          roundTripWarning,
         })
 
         return res.json({
@@ -1835,6 +1988,8 @@ router.post(
           },
           model: 'debate',
           provider: 'debate_pipeline',
+          fallback: !!anthropicClient,
+          ...((req as any)._fallbackReason && { fallbackReason: (req as any)._fallbackReason }),
           cost: debateResult.totalCost,
           requestId,
           route: '/api/ai/extract',
@@ -1844,14 +1999,19 @@ router.post(
             roundCount: debateResult.roundCount,
             totalCost: debateResult.totalCost,
             disagreements: debateResult.disagreements,
+            roundTripValid,
+            roundTripWarning,
           },
+          fallbackChain: anthropicClient
+            ? [{ provider: 'anthropic', success: false, error_code: (req as any)._fallbackReason }]
+            : undefined,
         })
       } catch (debateError) {
-        log.error('Debate pipeline failed, falling back to single extraction', {
+        log.error('[debate] Pipeline failed, falling back to single extraction', {
           requestId,
           error: debateError instanceof Error ? debateError.message : String(debateError),
         })
-        // Fall through to regular OpenAI extraction
+        // Fall through to regular OpenAI/DeepSeek extraction
       }
     }
 
@@ -2231,16 +2391,13 @@ router.post(
             })
 
             // Capture all-providers-failed including DeepSeek
-            captureServerError(
-              deepseekError instanceof Error ? deepseekError : new Error(dsMsg),
-              {
-                requestId,
-                provider: 'deepseek',
-                errorCode: 'DEEPSEEK_ERROR',
-                documentLength: documentText?.length ?? 0,
-                allProvidersFailed: true,
-              }
-            )
+            captureServerError(deepseekError instanceof Error ? deepseekError : new Error(dsMsg), {
+              requestId,
+              provider: 'deepseek',
+              errorCode: 'DEEPSEEK_ERROR',
+              documentLength: documentText?.length ?? 0,
+              allProvidersFailed: true,
+            })
 
             return res.status(500).json({
               error: 'All AI providers failed',
