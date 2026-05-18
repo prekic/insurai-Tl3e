@@ -1940,6 +1940,7 @@ router.post(
           debate: {
             roundCount: debateResult.roundCount,
             totalCost: debateResult.totalCost,
+            totalTokens: debateResult.totalTokens,
             disagreements: debateResult.disagreements,
             roundTripValid,
             roundTripWarning,
