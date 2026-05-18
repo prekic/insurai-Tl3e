@@ -502,73 +502,8 @@ router.post(
         }
       }
 
-      // ── Multi-LLM Debate Pipeline (optional) ────────────────────
-      // When ?debate=true, run two independent extractors with cross-validation
-      // instead of a single extraction + self-healing loop. Up to 3 rounds.
-      if (req.query.debate === 'true' || req.query.debate === '1') {
-        log.info('[debate] Running multi-LLM debate pipeline', { requestId })
-        try {
-          const { runDebatePipeline } = await import('../../lib/debate-pipeline.js')
-          const debateResult = await runDebatePipeline(
-            client,
-            systemPromptWithJson,
-            userPromptWithJson,
-            documentText,
-            {
-              model: model || aiConfig.openaiExtractionModel,
-              // When Claude is unavailable, use a different model for extractor B
-              // so the two extractors genuinely diverge and debate is meaningful
-              modelB: aiConfig.openaiBackupModel || 'gpt-4o-mini',
-              temperature: aiConfig.temperature,
-              maxRounds: 3,
-              extractTimeout: 180_000,
-            }
-          )
-
-          const skipStage2 =
-            req.query.skipStage2 === '1' &&
-            process.env.ALLOW_STAGE2_BYPASS === 'true' &&
-            process.env.NODE_ENV !== 'production'
-          const parsedData = skipStage2
-            ? debateResult.final.parsed
-            : runStage2Validation(debateResult.final.parsed)
-
-          log.info('[debate] Pipeline completed', {
-            requestId,
-            roundCount: debateResult.roundCount,
-            totalCost: debateResult.totalCost,
-            totalTokens: debateResult.totalTokens,
-            disagreements: debateResult.disagreements.length,
-          })
-
-          return res.json({
-            success: true,
-            data: parsedData,
-            usage: {
-              input_tokens: debateResult.totalTokens,
-              output_tokens: 0,
-              total_cost: debateResult.totalCost,
-            },
-            model: 'debate',
-            provider: 'debate_pipeline',
-            cost: debateResult.totalCost,
-            requestId,
-            route: '/api/ai/extract/openai',
-            elapsedMs: Date.now() - startTime,
-            debate: {
-              roundCount: debateResult.roundCount,
-              totalCost: debateResult.totalCost,
-              disagreements: debateResult.disagreements,
-            },
-          })
-        } catch (debateError) {
-          log.error('[debate] Pipeline failed, falling back to single extraction', {
-            requestId,
-            error: debateError instanceof Error ? debateError.message : String(debateError),
-          })
-          // Fall through to standard self-healing loop
-        }
-      }
+      // OLD debate block — removed. The unified /extract route handles debate.
+      // Keeping the debug/test-deepseek route but NOT this dead code.
 
       const healingResult = await executeWithSelfHealingLoop(
         documentText,
@@ -1839,6 +1774,9 @@ router.post(
           throw new Error('No DeepSeek client for debate')
         }
 
+        // Narrow type for closure safety
+        const dsNarrow: OpenAI = debateDSClient
+
         // ── Fallback-capable extractor factory ────────────────────────
         // Each extractor uses DeepSeek with a different prompt variant +
         // temperature to ensure divergence even when both hit the same provider.
@@ -1857,7 +1795,7 @@ router.post(
               ? '\n\nNOTE: Pay extra attention to coverage limit amounts, deductibles, and exclusions. List them with maximum detail.'
               : '\n\nNOTE: Focus on policy metadata (dates, premium, provider, vehicle) and ensure all top-level fields are populated.'
 
-          const response = await debateDSClient.chat.completions.create(
+          const response = await dsNarrow.chat.completions.create(
             {
               model: 'deepseek-chat',
               messages: [
@@ -1913,7 +1851,7 @@ router.post(
         }
 
         // Comparator also uses DeepSeek SDK (same chat.completions.create API)
-        const comparator = createOpenAIComparator(debateDSClient)
+        const comparator = createOpenAIComparator(dsNarrow)
 
         // Round 3 arbitrator
         async function arbitrator(
@@ -1938,32 +1876,36 @@ router.post(
           3
         )
 
-        // Run round-trip validator: check if LLM output survives convertToAnalyzedPolicy
+        // Round-trip validator: check raw LLM output for suspicious values
+        // without importing client-side code (avoids compilation dependency issue).
         let roundTripValid = true
         let roundTripWarning: string | undefined
         try {
-          const { convertToAnalyzedPolicy } =
-            await import('../../../src/lib/ai/policy-converter.js')
-          const testResult = convertToAnalyzedPolicy(debateResult.final.parsed as any)
-          // Check for fallback values indicating converter failure
-          if (testResult.policyNumber && testResult.policyNumber.startsWith('POL-')) {
+          const finalParsed = debateResult.final.parsed as Record<string, unknown>
+          const pn = String(finalParsed.policyNumber || '')
+          if (!pn || pn.startsWith('POL-') || pn.startsWith('pol-')) {
             roundTripValid = false
-            roundTripWarning =
-              'Policy number is a fallback timestamp (POL-*), LLM likely hallucinated'
+            roundTripWarning = 'Policy number is missing or looks like a fallback timestamp'
           }
-          // Check for null insurer
-          if (!testResult.insurer || testResult.insurer === 'MISSING') {
+          if (!finalParsed.insurer || finalParsed.insurer === 'MISSING') {
             roundTripValid = false
             roundTripWarning = (roundTripWarning || '') + ' Insurer missing'
           }
-          // Check for null dates
-          if (!testResult.startDate || !testResult.endDate) {
+          if (!finalParsed.insuredName && !finalParsed.insuredPerson) {
+            roundTripValid = false
+            roundTripWarning = (roundTripWarning || '') + ' Insured name missing'
+          }
+          if (!finalParsed.startDate || !finalParsed.endDate) {
             roundTripValid = false
             roundTripWarning = (roundTripWarning || '') + ' Dates missing'
           }
+          if (!finalParsed.premium) {
+            roundTripValid = false
+            roundTripWarning = (roundTripWarning || '') + ' Premium missing'
+          }
         } catch (convErr: any) {
           roundTripValid = false
-          roundTripWarning = `Converter crashed: ${convErr.message}`
+          roundTripWarning = `Validator crashed: ${convErr.message}`
         }
 
         const parsedData = runStage2Validation(debateResult.final.parsed)
