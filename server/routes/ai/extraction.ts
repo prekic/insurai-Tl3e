@@ -2108,6 +2108,155 @@ router.post(
         }
 
         const isTimeout = openaiErrorCode.includes('TIMEOUT')
+
+        // ── DeepSeek Fallback ──
+        // If both Anthropic and OpenAI failed, and DeepSeek is configured, try it
+        // before giving up. DeepSeek uses json_object (not json_schema like OpenAI).
+        const deepseekClient = getDeepSeekClient()
+        const hasDeepSeekKey = !!process.env.DEEPSEEK_API_KEY
+        if (deepseekClient || hasDeepSeekKey) {
+          const dsClient =
+            deepseekClient ||
+            new OpenAI({
+              apiKey: process.env.DEEPSEEK_API_KEY!,
+              baseURL:
+                process.env.DEEPSEEK_BASE_URL &&
+                process.env.DEEPSEEK_BASE_URL.startsWith('http') &&
+                !process.env.DEEPSEEK_BASE_URL.startsWith('sk-')
+                  ? process.env.DEEPSEEK_BASE_URL
+                  : 'https://api.deepseek.com',
+            })
+
+          try {
+            log.warn('[fallback] Anthropic+OpenAI failed, retrying with DeepSeek', {
+              requestId,
+              anthropicError: (req as any)._fallbackReason,
+              openaiError: openaiErrorCode,
+            })
+
+            const deepseekStart = Date.now()
+            // Ensure prompts ask for JSON (DeepSeek needs json_object response_format)
+            const dsSystemPrompt =
+              openaiSystemPrompt.includes('json') || openaiSystemPrompt.includes('JSON')
+                ? openaiSystemPrompt
+                : openaiSystemPrompt + '\n\nRespond with valid JSON only.'
+            const dsUserPrompt =
+              finalUserPrompt.includes('json') || finalUserPrompt.includes('JSON')
+                ? finalUserPrompt
+                : finalUserPrompt + '\n\nRespond with valid JSON only.'
+
+            const dsResponse = await dsClient.chat.completions.create(
+              {
+                model: 'deepseek-chat',
+                messages: [
+                  { role: 'system', content: dsSystemPrompt },
+                  { role: 'user', content: dsUserPrompt },
+                ],
+                response_format: { type: 'json_object' },
+                max_tokens: aiConfig.maxTokens,
+                temperature: aiConfig.temperature,
+              },
+              { signal: AbortSignal.timeout(120_000) }
+            )
+
+            const dsContent = dsResponse.choices[0]?.message?.content
+            if (!dsContent) throw new Error('Empty response from DeepSeek')
+
+            const dsInputTokens = dsResponse.usage?.prompt_tokens || 0
+            const dsOutputTokens = dsResponse.usage?.completion_tokens || 0
+            const dsCost = calculateCost('deepseek-chat', dsInputTokens, dsOutputTokens)
+
+            recordUsage({
+              provider: 'deepseek',
+              model: 'deepseek-chat',
+              operation: 'extraction',
+              inputTokens: dsInputTokens,
+              outputTokens: dsOutputTokens,
+              totalTokens: dsInputTokens + dsOutputTokens,
+              inputCost: dsCost.inputCost,
+              outputCost: dsCost.outputCost,
+              totalCost: dsCost.totalCost,
+              timestamp: new Date().toISOString(),
+            }).catch((err: any) =>
+              log.warn('Failed to record DeepSeek usage', {
+                requestId,
+                error: err instanceof Error ? err.message : String(err),
+              })
+            )
+
+            let parsedDSData: unknown
+            try {
+              const rawParsed = JSON.parse(dsContent)
+              // Run stage2 validation (same as primary path)
+              parsedDSData = runStage2Validation(rawParsed)
+            } catch (_parseError) {
+              throw new Error('DeepSeek returned invalid JSON')
+            }
+
+            markPhase('deepseek_ms', deepseekStart)
+            log.info('[fallback] DeepSeek fallback succeeded', {
+              requestId,
+              deepseekMs: Date.now() - deepseekStart,
+              phaseTiming,
+            })
+
+            return res.json({
+              success: true,
+              data: parsedDSData,
+              model: 'deepseek-chat',
+              provider: 'deepseek',
+              fallback: true,
+              fallbackChain: [
+                {
+                  provider: 'anthropic',
+                  success: false,
+                  error_code: (req as any)._fallbackReason,
+                },
+                { provider: 'openai', success: false, error_code: openaiErrorCode },
+                { provider: 'deepseek', success: true },
+              ],
+              cost: dsCost.totalCost,
+              requestId,
+              route: '/api/ai/extract',
+              elapsedMs: Date.now() - startTime,
+              phaseTiming,
+            })
+          } catch (deepseekError) {
+            const dsMsg =
+              deepseekError instanceof Error ? deepseekError.message : 'Unknown DeepSeek error'
+            log.error('[fallback] DeepSeek also failed', {
+              requestId,
+              error: dsMsg,
+              phaseTiming,
+            })
+
+            // Capture all-providers-failed including DeepSeek
+            captureServerError(
+              deepseekError instanceof Error ? deepseekError : new Error(dsMsg),
+              {
+                requestId,
+                provider: 'deepseek',
+                errorCode: 'DEEPSEEK_ERROR',
+                documentLength: documentText?.length ?? 0,
+                allProvidersFailed: true,
+              }
+            )
+
+            return res.status(500).json({
+              error: 'All AI providers failed',
+              code: 'ALL_PROVIDERS_FAILED',
+              details:
+                `Anthropic: ${(req as any)._fallbackReason}. ` +
+                `OpenAI: ${message.substring(0, 100)}. ` +
+                `DeepSeek: ${dsMsg}`,
+              elapsedMs: Date.now() - startTime,
+              phaseTiming: { ...phaseTiming, deepseek_ms: Date.now() - startTime },
+              requestId,
+              timestamp: new Date().toISOString(),
+            })
+          }
+        }
+
         return res.status(isTimeout ? 504 : 500).json({
           error: isTimeout
             ? 'Extraction timed out — the AI service took too long to respond. Please try again.'

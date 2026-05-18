@@ -866,7 +866,9 @@ describe('AI Routes Extended', () => {
 
       expect(res.status).toBe(500)
       expect(res.body.code).toBe('ALL_PROVIDERS_FAILED')
-      expect(res.body.details).toBe('OpenAI down')
+      expect(res.body.details).toContain('Anthropic')
+      expect(res.body.details).toContain('OpenAI down')
+      expect(res.body.details).toContain('DeepSeek')
     })
 
     it('notifies admin about OpenAI billing failure in fallback', async () => {
