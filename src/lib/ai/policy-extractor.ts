@@ -1257,13 +1257,72 @@ export async function extractPolicyFromDocument(
 
     // Convert extracted data to AnalyzedPolicy format
     // Store both raw extractedText and processedText for display and analysis
-    let policy = await convertToAnalyzedPolicy(
-      enhancedExtractedData,
-      file,
-      documentText,
-      processedText,
-      safetyResult
-    )
+    let policy: AnalyzedPolicy
+    try {
+      policy = await convertToAnalyzedPolicy(
+        enhancedExtractedData,
+        file,
+        documentText,
+        processedText,
+        safetyResult
+      )
+    } catch (convertErr) {
+      // If conversion fails (e.g., DeepSeek returns non-string for a .trim()-expected field),
+      // produce a minimal valid AnalyzedPolicy so the user sees a partial result
+      // instead of AI_ERROR.
+      console.error('[PolicyExtractor] convertToAnalyzedPolicy threw:', convertErr)
+      console.error('[PolicyExtractor] Input was:', {
+        coveragesCount: enhancedExtractedData.coverages?.length,
+        hasEvidence: !!enhancedExtractedData.evidence,
+        premiumType: typeof enhancedExtractedData.premium,
+        insuredNameType: typeof enhancedExtractedData.insuredName,
+      })
+      policy = {
+        id: crypto.randomUUID(),
+        policyNumber: enhancedExtractedData.policyNumber ?? `POL-${Date.now()}`,
+        type: (enhancedExtractedData.policyType ?? 'home') as PolicyType,
+        typeTr: 'Sigorta',
+        provider: enhancedExtractedData.provider ?? 'Unknown Provider',
+        logo: '',
+        coverage: 0,
+        premium:
+          typeof enhancedExtractedData.premium === 'number' ? enhancedExtractedData.premium : 0,
+        monthlyPremium: 0,
+        deductible: 0,
+        startDate: new Date().toISOString().split('T')[0],
+        expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        status: 'active',
+        uploadDate: new Date().toISOString().split('T')[0],
+        fileName: file.name,
+        documentType: 'PDF',
+        documentUrl: URL.createObjectURL(file),
+        coverages: (enhancedExtractedData.coverages ?? []).map((c: ExtractedCoverage) => ({
+          name: c.name || 'Unknown',
+          nameTr: c.name || 'Unknown',
+          limit: c.limit ?? 0,
+          deductible: c.deductible ?? 0,
+          included: c.included ?? true,
+          category: c.category ?? 'other',
+          importance: 'standard' as const,
+          page: c.page ?? null,
+          clause: c.clause ?? null,
+          quote: c.quote ?? null,
+          carveOuts: c.carveOuts ?? null,
+        })),
+        exclusions: [],
+        specialConditions: [],
+        insuranceLine: 'Kasko',
+        currency: 'TRY',
+        aiConfidence: 0.5,
+        aiInsights: ['Poliçe verileri kısmen çözümlendi — lütfen sonuçları kontrol edin'],
+        aiInsightsTr: ['Poliçe verileri kısmen çözümlendi — lütfen sonuçları kontrol edin'],
+        extractedText: documentText,
+        processedText: processedText || documentText,
+        extractionWarnings: [
+          'Poliçe dönüştürme aşamasında bir hata oluştu — bazı alanlar eksik olabilir',
+        ],
+      }
+    }
 
     // Apply relationship resolution and precedence rules
     const resolverStats = { unresolvedCount: 0 }

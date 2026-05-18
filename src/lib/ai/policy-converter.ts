@@ -617,12 +617,17 @@ export async function convertToAnalyzedPolicy(
   // against user identity (e.g., "This policy owner is not Erdem")
   const aiInsightsEn = [...(basePolicy.aiInsightsEn || [])]
   if (data.evidence?.insights) {
-    const filteredInsights = data.evidence.insights.filter((i) => !isPersonalizationLeak(i.text))
+    const filteredInsights = data.evidence.insights.filter((i) => {
+      if (!i || typeof i.text !== 'string') return false
+      return !isPersonalizationLeak(i.text)
+    })
     basePolicy.aiInsights = [
       ...filteredInsights.map((i) => i.text.trim()),
       ...basePolicy.aiInsights,
     ]
-    const prependEn = filteredInsights.map((i) => i.textEn?.trim() || i.text.trim())
+    const prependEn = filteredInsights.map((i) =>
+      typeof i.textEn === 'string' ? i.textEn.trim() || i.text.trim() : i.text.trim()
+    )
     basePolicy.aiInsightsEn = [...prependEn, ...aiInsightsEn]
   }
 
@@ -705,10 +710,14 @@ export async function convertToAnalyzedPolicy(
     basePolicy.exclusionsEn = basePolicy.exclusionsEn || []
 
     for (const e of data.evidence.exclusions) {
+      if (!e || typeof e.text !== 'string') continue
       if (!existingExclusions.has(e.text.toLowerCase().trim())) {
         basePolicy.exclusions.push(e.text)
       }
-      if (e.textEn && !existingExclusionsEn.has(e.textEn.toLowerCase().trim())) {
+      if (
+        typeof e.textEn === 'string' &&
+        !existingExclusionsEn.has(e.textEn.toLowerCase().trim())
+      ) {
         // Find if this specific exclusion text was already in the Turkish list, if so, put its translation in the same index
         const trIndex = basePolicy.exclusions.findIndex(
           (trEx) => trEx.toLowerCase().trim() === e.text.toLowerCase().trim()

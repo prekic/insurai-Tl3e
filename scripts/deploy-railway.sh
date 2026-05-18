@@ -5,11 +5,15 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-TOKEN_FILE="/data/.railway/config.json"
-TOKEN=$(python3 -c "import json; print(json.load(open('$TOKEN_FILE'))['token'])" 2>/dev/null)
-
-if [ -z "$TOKEN" ]; then
-  echo "Error: No Railway token found in $TOKEN_FILE"
+# The Railway token must be provided via RAILWAY_API_TOKEN env var
+# or stored in /data/.railway/api_token
+TOKEN_FILE="/data/.railway/api_token"
+if [ -f "$TOKEN_FILE" ]; then
+  TOKEN=$(cat "$TOKEN_FILE")
+elif [ -n "$RAILWAY_API_TOKEN" ]; then
+  TOKEN="$RAILWAY_API_TOKEN"
+else
+  echo "Error: No Railway token found. Set RAILWAY_API_TOKEN env var or create /data/.railway/api_token"
   exit 1
 fi
 
