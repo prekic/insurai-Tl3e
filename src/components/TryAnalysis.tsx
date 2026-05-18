@@ -518,6 +518,9 @@ export function TryAnalysis() {
             CLIENT_FETCH_TIMEOUT: 'Connection timed out — the server took too long',
             CLIENT_TIMEOUT_UMBRELLA: 'Extraction took too long — the server may be busy',
             RATE_LIMIT_EXCEEDED: 'Too many requests — please wait a moment',
+            DATA_CONVERSION_ERROR:
+              'AI data could not be processed — unexpected format from provider',
+            LOW_CONFIDENCE: 'AI confidence too low — results may be incomplete',
             BILLING_ERROR: 'AI service billing issue',
             INVALID_API_KEY: 'AI provider API key is invalid',
             DOCUMENT_TOO_LARGE: 'Document is too large for the AI service',

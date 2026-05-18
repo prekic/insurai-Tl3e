@@ -126,6 +126,7 @@ export interface ExtractionError {
       | 'BILLING_ERROR'
       | 'DOCUMENT_TOO_LARGE'
       | 'INVALID_RESPONSE'
+      | 'DATA_CONVERSION_ERROR'
       | 'PROVIDER_OVERLOADED'
     message: string
     details?: string
@@ -1605,6 +1606,14 @@ export async function extractPolicyFromDocument(
       errorMessage.includes('503')
     ) {
       errorCode = 'PROVIDER_OVERLOADED'
+    } else if (
+      errorMessage.includes('trim is not a function') ||
+      errorMessage.includes('is not a function') ||
+      errorMessage.includes('Cannot read properties') ||
+      errorMessage.includes('Cannot convert') ||
+      errorMessage.match(/TypeError/)
+    ) {
+      errorCode = 'DATA_CONVERSION_ERROR'
     }
 
     // Log extraction failure with explicit string for production visibility

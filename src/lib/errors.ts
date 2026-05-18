@@ -16,6 +16,8 @@ export const ERROR_CODES = {
   AI_ANALYSIS_FAILED: 'AI_ANALYSIS_FAILED',
   OCR_FAILED: 'OCR_FAILED',
   RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
+  DATA_CONVERSION_ERROR: 'DATA_CONVERSION_ERROR',
+  LOW_CONFIDENCE: 'LOW_CONFIDENCE',
 
   // Policy errors
   POLICY_NOT_FOUND: 'POLICY_NOT_FOUND',
@@ -71,6 +73,16 @@ export const ERROR_MESSAGES: Record<ErrorCode, { title: string; description: str
   [ERROR_CODES.RATE_LIMIT_EXCEEDED]: {
     title: 'Too many requests',
     description: 'You have exceeded the request limit. Please wait a moment and try again.',
+  },
+  [ERROR_CODES.DATA_CONVERSION_ERROR]: {
+    title: 'Data conversion error',
+    description:
+      'The extraction data could not be processed. Some fields may have unexpected formats.',
+  },
+  [ERROR_CODES.LOW_CONFIDENCE]: {
+    title: 'Low confidence',
+    description:
+      'The AI could not confidently extract the policy data. The results may be incomplete.',
   },
   [ERROR_CODES.OCR_FAILED]: {
     title: 'Text extraction failed',

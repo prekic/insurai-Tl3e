@@ -397,7 +397,8 @@ export async function convertToAnalyzedPolicy(
   const provider = data.provider ?? data.provider ?? 'Unknown Provider'
 
   // Handle insured - check multiple AI response patterns
-  const insuredPerson =
+  // DeepSeek returns policyholder as {name, address} object instead of string
+  const rawInsured: unknown =
     data.insuredName ??
     data.insured_name ??
     data.insuredPerson ??
@@ -405,6 +406,14 @@ export async function convertToAnalyzedPolicy(
     data.sigortalı ??
     data.sigortali ??
     undefined
+  const insuredPerson: string =
+    typeof rawInsured === 'string'
+      ? rawInsured
+      : rawInsured &&
+          typeof rawInsured === 'object' &&
+          'name' in (rawInsured as Record<string, unknown>)
+        ? String((rawInsured as Record<string, string>).name)
+        : ''
   const insuredMissing =
     !insuredPerson ||
     insuredPerson.trim() === '' ||
