@@ -24,6 +24,10 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // Load environment variables first (before Sentry init)
+// dotenv.config() loads .env for local dev. On Railway (NODE_ENV=production)
+// we also load .env.production for config values not set as Railway dashboard vars.
+const envPath = process.env.NODE_ENV === 'production' ? '.env.production' : '.env'
+dotenv.config({ path: envPath })
 dotenv.config()
 
 import aiRoutes from './routes/ai/index.js'
