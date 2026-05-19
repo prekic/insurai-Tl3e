@@ -58,9 +58,9 @@ const defaultConfig = {
   // AI extraction limits (expensive operations)
   ai: {
     windowMs: parseInt(process.env.RATE_LIMIT_AI_WINDOW_MS || '3600000', 10), // 1 hour
-    max: parseInt(process.env.RATE_LIMIT_AI_MAX || '100', 10),
-    // NOTE: Railway V2 doesn't inject env vars from database at runtime despite variableUpsert API.
-    // This 100 default ensures 100/hour even when Railway env injection fails.
+    // 💣 Railway V2 ignores variableUpsert env vars at runtime (confirmed bug).
+    // Hardcoding 100 because the env var path is non-functional on Railway.
+    max: 100,
   },
   // OCR limits (expensive operations)
   ocr: {
