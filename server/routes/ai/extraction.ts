@@ -1876,12 +1876,80 @@ router.post(
           3
         )
 
+        const finalParsed = debateResult.final.parsed as Record<string, unknown>
+
+        // ── Post-debate metadata completeness fix ────────────────────
+        // The debate pipeline always uses DeepSeek with json_object (no strict schema),
+        // which routinely drops non-revenue metadata fields (insurer, insuredName,
+        // vehicle details). Since debate is the final decision-maker, we fill
+        // missing mandatory fields by re-asking DeepSeek for just those fields.
+        const metadataFieldsToCheck = [
+          'insurer',
+          'insuredName',
+          'vehicleMake',
+          'vehicleModel',
+          'vehicleYear',
+          'vehiclePlate',
+          'vin',
+        ]
+        const missingFields = metadataFieldsToCheck.filter(
+          (f) => finalParsed[f] === undefined || finalParsed[f] === null
+        )
+        if (missingFields.length > 0 && dsNarrow) {
+          const currentJson = JSON.stringify(finalParsed, null, 2)
+          const enrichPrompt = `You receive a partial policy extraction JSON (below). The following fields are MISSING: ${missingFields.join(', ')}.
+
+Extract ONLY these missing fields from the original document text and return a JSON object with those fields filled.
+
+If a field's value is not found in the document, use an empty string ("") rather than null.
+
+Return ONLY a JSON object with exactly these fields: ${missingFields.join(', ')}
+
+Partial extraction:
+${currentJson}
+
+Original document:
+${documentText.substring(0, 8000)}`
+          try {
+            const enrich = await dsNarrow.chat.completions.create(
+              {
+                model: 'deepseek-chat',
+                messages: [
+                  {
+                    role: 'system',
+                    content:
+                      'You extract missing metadata fields from insurance policy documents. Return ONLY valid JSON with exactly the requested fields.',
+                  },
+                  { role: 'user', content: enrichPrompt },
+                ],
+                response_format: { type: 'json_object' },
+                max_tokens: 2000,
+                temperature: 0.0,
+              },
+              { signal: AbortSignal.timeout(60_000) }
+            )
+            const enrichRaw = enrich.choices[0]?.message?.content || '{}'
+            const enrichData = JSON.parse(enrichRaw) as Record<string, unknown>
+            for (const field of metadataFieldsToCheck) {
+              const val = enrichData[field]
+              if (val !== undefined && val !== null && val !== '') {
+                finalParsed[field] = val
+              }
+            }
+          } catch (enrichErr: any) {
+            log.warn('[debate] Metadata enrichment failed', {
+              requestId,
+              missingFields: missingFields.join(','),
+              error: enrichErr.message?.substring(0, 100),
+            })
+          }
+        }
+
         // Round-trip validator: check raw LLM output for suspicious values
         // without importing client-side code (avoids compilation dependency issue).
         let roundTripValid = true
         let roundTripWarning: string | undefined
         try {
-          const finalParsed = debateResult.final.parsed as Record<string, unknown>
           const pn = String(finalParsed.policyNumber || '')
           if (!pn || pn.startsWith('POL-') || pn.startsWith('pol-')) {
             roundTripValid = false
@@ -1911,7 +1979,7 @@ router.post(
           roundTripWarning = `Validator crashed: ${convErr.message}`
         }
 
-        const parsedData = runStage2Validation(debateResult.final.parsed)
+        const parsedData = runStage2Validation(finalParsed)
 
         log.info('[debate] Pipeline completed', {
           requestId,
