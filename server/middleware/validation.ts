@@ -86,8 +86,12 @@ export function sanitizeModelName(input: string): string {
 export const openAIExtractionSchema = z.object({
   documentText: z
     .string()
-    .min(1, 'Document text is required')
+    .min(50, 'Document text is required (min 50 chars — extract text from PDF)')
     .max(500000, 'Document text too long (max 500KB)')
+    .refine(
+      (val) => !/^\[PDF\]$|^\[IMAGE\]$|^PLACEHOLDER$/i.test(val.trim()),
+      { message: 'Document text is a placeholder. Extract real text from the PDF and send it as documentText.' }
+    )
     .transform(sanitizeDocumentText),
   systemPrompt: z
     .string()
@@ -107,8 +111,12 @@ export const openAIExtractionSchema = z.object({
 export const anthropicExtractionSchema = z.object({
   documentText: z
     .string()
-    .min(1, 'Document text is required')
+    .min(50, 'Document text is required (min 50 chars — extract text from PDF)')
     .max(500000, 'Document text too long (max 500KB)')
+    .refine(
+      (val) => !/^\[PDF\]$|^\[IMAGE\]$|^PLACEHOLDER$/i.test(val.trim()),
+      { message: 'Document text is a placeholder. Extract real text from the PDF and send it as documentText.' }
+    )
     .transform(sanitizeDocumentText),
   systemPrompt: z
     .string()

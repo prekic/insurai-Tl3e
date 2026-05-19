@@ -21,7 +21,7 @@ import { join } from 'node:path'
 
 const API_BASE = 'https://insurai-production.up.railway.app'
 const FIXTURES_DIR = join(process.cwd(), 'tests/fixtures/kasko')
-const TIMEOUT = 180_000
+const TIMEOUT = 300_000
 
 interface ApiResponse {
   success: boolean
@@ -39,6 +39,18 @@ interface ApiResponse {
   elapsedMs?: number
 }
 
+async function extractTextFromPdf(filename: string): Promise<string> {
+  const filePath = join(FIXTURES_DIR, filename)
+  const buf = readFileSync(filePath)
+  const mod = await import('pdf-parse')
+  const { PDFParse } = mod as unknown as {
+    PDFParse: new (data: Uint8Array) => { getText(): Promise<{ pages: Array<{ text: string }> }> }
+  }
+  const parser = new PDFParse(new Uint8Array(buf))
+  const result = await parser.getText()
+  return result.pages.map((p: any) => p.text).join('\n')
+}
+
 async function postExtract(
   pdfFilename: string
 ): Promise<{ res: Response; raw: any; body: ApiResponse }> {
@@ -47,12 +59,13 @@ async function postExtract(
     throw new Error(`Fixture not found: ${pdfFilename}`)
   }
 
-  const pdfBuf = readFileSync(pdfPath)
-  const b64 = pdfBuf.toString('base64')
+  // Extract REAL PDF text — NOT a placeholder. Without real text,
+  // the LLM hallucinates all structured fields.
+  const pdfText = await extractTextFromPdf(pdfFilename)
+  expect(pdfText.length).toBeGreaterThan(100)
 
   const payload = JSON.stringify({
-    documentText: '[PDF]',
-    attachments: [{ data: b64, mimeType: 'application/pdf', filename: pdfFilename }],
+    documentText: pdfText,
   })
 
   const url = `${API_BASE}/api/ai/extract`

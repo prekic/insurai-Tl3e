@@ -304,7 +304,7 @@ describe('Validation Middleware', () => {
     describe('openAIExtractionSchema', () => {
       it('should validate valid input', () => {
         const result = openAIExtractionSchema.safeParse({
-          documentText: 'This is a valid document text.',
+          documentText: 'This is a valid document text for insurance policy extraction from Turkish kasko policies.',
         })
         expect(result.success).toBe(true)
       })
@@ -323,7 +323,7 @@ describe('Validation Middleware', () => {
 
       it('should accept optional fields', () => {
         const result = openAIExtractionSchema.safeParse({
-          documentText: 'Valid document',
+          documentText: 'A valid insurance policy document text for extraction testing with enough characters.',
           systemPrompt: 'Extract data',
           model: 'gpt-4-turbo',
         })
@@ -332,7 +332,7 @@ describe('Validation Middleware', () => {
 
       it('should sanitize documentText', () => {
         const result = openAIExtractionSchema.safeParse({
-          documentText: 'Document\0with\x00nulls',
+          documentText: 'A valid insurance policy document PDF text extracted for testing\0with\x00nulls continuation here to reach length',
         })
         expect(result.success).toBe(true)
         if (result.success) {
@@ -344,7 +344,7 @@ describe('Validation Middleware', () => {
     describe('anthropicExtractionSchema', () => {
       it('should validate valid input', () => {
         const result = anthropicExtractionSchema.safeParse({
-          documentText: 'Valid insurance policy document',
+          documentText: 'A valid long enough insurance policy document text for AI extraction testing purposes here.',
         })
         expect(result.success).toBe(true)
       })
@@ -390,7 +390,7 @@ describe('Validation Middleware', () => {
       const middleware = validate(schema, 'body')
 
       const req = {
-        body: { documentText: 'Test document content here' },
+        body: { documentText: 'A valid test document content for insurance policy extraction validation middleware testing.' },
       } as Request
       const res = { status: vi.fn().mockReturnThis(), json: vi.fn() } as unknown as Response
       const next = vi.fn() as NextFunction
@@ -399,7 +399,7 @@ describe('Validation Middleware', () => {
 
       expect(next).toHaveBeenCalled()
       // Body should be validated (sanitizeDocumentText doesn't trim, just removes control chars)
-      expect(req.body.documentText).toBe('Test document content here')
+      expect(req.body.documentText).toContain('test document content for insurance')
     })
 
     it('should return validation errors', () => {
