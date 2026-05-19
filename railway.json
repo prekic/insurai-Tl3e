@@ -6,10 +6,15 @@
     "buildCommand": "npm run build && npm run build:server"
   },
   "deploy": {
-    "startCommand": "NODE_ENV=production node dist-server/server/index.js",
-    "healthcheckPath": "/api/health",
-    "healthcheckTimeout": 60,
-    "restartPolicyType": "ON_FAILURE",
-    "restartPolicyMaxRetries": 10
+    "variables": {
+      "RATE_LIMIT_AI_MAX": "100",
+      "RATE_LIMIT_WINDOW_MS": "900000",
+      "RATE_LIMIT_MAX": "100",
+      "RATE_LIMIT_AI_WINDOW_MS": "3600000",
+      "RATE_LIMIT_CHAT_WINDOW_MS": "3600000",
+      "RATE_LIMIT_CHAT_MAX": "60",
+      "RATE_LIMIT_OCR_WINDOW_MS": "3600000",
+      "RATE_LIMIT_OCR_MAX": "30"
+    }
   }
 }
