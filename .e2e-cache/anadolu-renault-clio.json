@@ -1,0 +1,1055 @@
+{
+  "data": {
+    "policyType": "kasko",
+    "policyNumber": "P2024000001",
+    "startDate": "2024-01-01",
+    "endDate": "2025-01-01",
+    "provider": "Anadolu Sigorta",
+    "insured": {
+      "name": "AHMET YILMAZ",
+      "address": "Atatürk Cad. No:123, Kadıköy/İstanbul",
+      "tckn": "12345678901",
+      "phone": null,
+      "email": null
+    },
+    "policyholder": {
+      "name": "AHMET YILMAZ",
+      "address": "Atatürk Cad. No:123, Kadıköy/İstanbul",
+      "tckn": "12345678901",
+      "phone": null,
+      "email": null
+    },
+    "vehicle": {
+      "make": "RENAULT",
+      "model": "MEGANE",
+      "year": 2020,
+      "plate": "34 ABC 123"
+    },
+    "premium": {
+      "amount": 5000,
+      "currency": "TRY",
+      "paymentFrequency": "annual",
+      "installments": null
+    },
+    "coverages": [
+      {
+        "name": "Üçüncü Şahıs Mali Mesuliyet",
+        "nameTr": "Üçüncü Şahıs Mali Mesuliyet",
+        "category": "liability",
+        "limit": 500000,
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "limitType": "per_event",
+        "description": "Üçüncü şahıs mali sorumluluk teminatı",
+        "deductible": null,
+        "deductibleType": null,
+        "carveOuts": [],
+        "normalizedName": "third party liability",
+        "canonicalName": "THIRD_PARTY_LIABILITY",
+        "parsedLimit": {
+          "type": "numeric",
+          "amount": 500000
+        },
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "Cam Kırılması",
+        "nameTr": "Cam Kırılması",
+        "category": "supplementary",
+        "limit": 2000,
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "limitType": "per_event",
+        "description": "Cam kırılması teminatı",
+        "deductible": 0,
+        "deductibleType": "muafiyetsiz",
+        "carveOuts": [],
+        "normalizedName": "glass breakage",
+        "canonicalName": "GLASS_DAMAGE_PROTECTION",
+        "parsedLimit": {
+          "type": "numeric",
+          "amount": 2000
+        },
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "Hırsızlık",
+        "nameTr": "Hırsızlık",
+        "category": "supplementary",
+        "limit": 150000,
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "limitType": "per_event",
+        "description": "Hırsızlık teminatı",
+        "deductible": 500,
+        "deductibleType": "muafiyet",
+        "carveOuts": [],
+        "normalizedName": "theft",
+        "canonicalName": "THEFT",
+        "parsedLimit": {
+          "type": "numeric",
+          "amount": 150000
+        },
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "Yol Yardım",
+        "nameTr": "Yol Yardım",
+        "category": "assistance",
+        "limit": null,
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "limitType": null,
+        "description": "Anadolu Hizmet Grup 2",
+        "deductible": null,
+        "deductibleType": null,
+        "carveOuts": [],
+        "normalizedName": "roadside assistance",
+        "canonicalName": "ROADSIDE_ASSISTANCE",
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "İkame Araç",
+        "nameTr": "İkame Araç",
+        "category": "assistance",
+        "limit": null,
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "limitType": null,
+        "description": "Anadolu Hizmet Grup 2",
+        "deductible": null,
+        "deductibleType": null,
+        "carveOuts": [],
+        "normalizedName": "replacement vehicle",
+        "canonicalName": "REPLACEMENT_VEHICLE",
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "Yanlış Yakıt",
+        "nameTr": "Yanlış Yakıt",
+        "category": "supplementary",
+        "limit": 50000,
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "limitType": "aggregate",
+        "description": "Hatalı akaryakıt kaynaklı hasarlar (yıllık toplam)",
+        "deductible": null,
+        "deductibleType": null,
+        "carveOuts": [],
+        "normalizedName": "wrong fuel",
+        "canonicalName": "WRONG_FUEL",
+        "parsedLimit": {
+          "type": "numeric",
+          "amount": 50000
+        },
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "Hasarsızlık İndirimi Koruma",
+        "nameTr": "Hasarsızlık İndirimi Koruma",
+        "category": "supplementary",
+        "limit": null,
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "limitType": null,
+        "description": "İlk hasarda hasarsızlık indiriminin korunması",
+        "deductible": null,
+        "deductibleType": null,
+        "carveOuts": [],
+        "normalizedName": "no-claim discount protection",
+        "canonicalName": "NCD_PROTECTION",
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "Evcil Hayvan Tedavisi",
+        "nameTr": "Evcil Hayvan Tedavisi",
+        "category": "supplementary",
+        "limit": null,
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "limitType": null,
+        "description": "Araç içinde evcil hayvan yaralanması tedavisi",
+        "deductible": null,
+        "deductibleType": null,
+        "carveOuts": [],
+        "normalizedName": "pet ınjury",
+        "canonicalName": "PET_INJURY",
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "Anahtar Ele Geçirme Yoluyla Hırsızlık",
+        "nameTr": "Anahtar Ele Geçirme Yoluyla Hırsızlık",
+        "category": "supplementary",
+        "limit": null,
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "limitType": null,
+        "description": "Anahtar ele geçirme yoluyla hırsızlık",
+        "deductible": null,
+        "deductibleType": null,
+        "carveOuts": [],
+        "normalizedName": "key theft",
+        "canonicalName": "KEY_ACQUISITION_THEFT",
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "Yenisiyle Değiştirme",
+        "nameTr": "Yenisiyle Değiştirme",
+        "category": "supplementary",
+        "limit": null,
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "limitType": null,
+        "description": "İlk tescil yılı içinde pert/çalıntıda yeni araç",
+        "deductible": null,
+        "deductibleType": null,
+        "carveOuts": [],
+        "normalizedName": "new for old",
+        "canonicalName": "NEW_FOR_OLD_REPLACEMENT",
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "Sigara ve Benzeri Madde Hasarı",
+        "nameTr": "Sigara ve Benzeri Madde Hasarı",
+        "category": "supplementary",
+        "limit": null,
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "limitType": null,
+        "description": "Sigara yanığı iç döşeme hasarı",
+        "deductible": null,
+        "deductibleType": null,
+        "carveOuts": [],
+        "normalizedName": "cigarette burn",
+        "canonicalName": "CIGARETTE_DAMAGE",
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "Eskime Payı İndirimi Muafiyeti",
+        "nameTr": "Eskime Payı İndirimi Muafiyeti",
+        "category": "supplementary",
+        "limit": null,
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "limitType": null,
+        "description": "Hasarda kıymet kazanma tenzili uygulanmaz",
+        "deductible": null,
+        "deductibleType": null,
+        "carveOuts": [],
+        "normalizedName": "no betterment deduction",
+        "canonicalName": "BETTERMENT_DEDUCTION_EXCEPTION",
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "Enflasyon Koruma",
+        "nameTr": "Enflasyon Koruma",
+        "category": "supplementary",
+        "limit": null,
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "limitType": null,
+        "description": "Sigorta bedeli enflasyona endeksli",
+        "deductible": null,
+        "deductibleType": null,
+        "carveOuts": [],
+        "normalizedName": "ınflation protection",
+        "canonicalName": "INFLATION_PROTECTION",
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "Ek Donanım / Aksesuar",
+        "nameTr": "Ek Donanım / Aksesuar",
+        "category": "supplementary",
+        "limit": null,
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "limitType": null,
+        "description": "Rayiç değerin %10'una kadar aksesuar teminatı",
+        "deductible": null,
+        "deductibleType": null,
+        "carveOuts": [],
+        "normalizedName": "additional equipment",
+        "canonicalName": "ADDITIONAL_EQUIPMENT",
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "Kasko Teminatı",
+        "nameTr": "Kasko Teminatı",
+        "category": "main",
+        "limit": null,
+        "isUnlimited": false,
+        "isMarketValue": true,
+        "limitType": null,
+        "description": "Aracın rayiç değeri üzerinden kasko teminatı",
+        "deductible": 500,
+        "deductibleType": "muafiyet",
+        "carveOuts": [],
+        "normalizedName": "kasko (rayiç değer)",
+        "canonicalName": "MAIN_KASKO_COVERAGE",
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "Artan Mali Sorumluluk",
+        "canonicalName": "EXCESS_LIABILITY",
+        "normalizedName": "artan mali sorumluluk",
+        "nameTr": "Artan Mali Sorumluluk",
+        "limit": 100000,
+        "parsedLimit": {
+          "type": "numeric",
+          "amount": 100000
+        },
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "isImplicit": false,
+        "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir.",
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "Deprem",
+        "canonicalName": "EARTHQUAKE",
+        "normalizedName": "deprem",
+        "nameTr": "Deprem",
+        "limit": null,
+        "parsedLimit": null,
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "isImplicit": false,
+        "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir.",
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "Grev, Lokavt, Terör",
+        "canonicalName": "STRIKE_LOCKOUT_TERROR",
+        "normalizedName": "grev, lokavt, terör",
+        "nameTr": "Grev, Lokavt, Terör",
+        "limit": null,
+        "parsedLimit": null,
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "isImplicit": false,
+        "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir.",
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "Sel ve Su Baskını",
+        "canonicalName": "FLOOD_WATER_DAMAGE",
+        "normalizedName": "sel ve su baskını",
+        "nameTr": "Sel ve Su Baskını",
+        "limit": null,
+        "parsedLimit": null,
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "isImplicit": false,
+        "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir.",
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "Mini Onarım",
+        "nameTr": "Mini Onarım",
+        "category": "supplementary",
+        "limit": null,
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "limitType": null,
+        "description": "Dönemde 1 kez ücretsiz mini onarım",
+        "deductible": null,
+        "deductibleType": null,
+        "carveOuts": [],
+        "normalizedName": "mini repair service",
+        "canonicalName": "MINI_REPAIR",
+        "parsedLimit": null,
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "Koltuk Ferdi Kaza - Vefat",
+        "canonicalName": "SEAT_PERSONAL_ACCIDENT_DEATH",
+        "normalizedName": "koltuk ferdi kaza - vefat",
+        "nameTr": "Koltuk Ferdi Kaza - Vefat",
+        "limit": 100000,
+        "parsedLimit": {
+          "type": "numeric",
+          "amount": 100000
+        },
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "isImplicit": false,
+        "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir.",
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "Koltuk Ferdi Kaza - Sürekli Sakatlık",
+        "canonicalName": "SEAT_PERSONAL_ACCIDENT_DISABILITY",
+        "normalizedName": "koltuk ferdi kaza - sürekli sakatlık",
+        "nameTr": "Koltuk Ferdi Kaza - Sürekli Sakatlık",
+        "limit": 100000,
+        "parsedLimit": {
+          "type": "numeric",
+          "amount": 100000
+        },
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "isImplicit": false,
+        "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir.",
+        "included": true,
+        "isOptional": false
+      },
+      {
+        "name": "Hukuksal Koruma",
+        "nameTr": "Hukuksal Koruma",
+        "category": "legal",
+        "limit": 40000,
+        "isUnlimited": false,
+        "isMarketValue": false,
+        "limitType": "per_event",
+        "description": "40,000 TL per claim / 80,000 TL annual aggregate / 4,000 TL bail / 4,000 TL legal advance",
+        "deductible": null,
+        "deductibleType": null,
+        "carveOuts": [],
+        "normalizedName": "legal protection",
+        "canonicalName": "LEGAL_PROTECTION",
+        "parsedLimit": {
+          "type": "numeric",
+          "amount": 40000
+        },
+        "included": true,
+        "isOptional": false
+      }
+    ],
+    "exclusions": [
+      {
+        "name": "Pandemic Exclusion",
+        "nameTr": "Salgın ve Bulaşıcı Hastalık İstisnası",
+        "description": "Salgın ve bulaşıcı hastalıklar ile kamu otoritesi tarafından alınan kapatma kararları sonucu oluşan zararlar teminat dışıdır."
+      },
+      {
+        "name": "Cyber Attack Exclusion",
+        "nameTr": "Siber Saldırı İstisna Klozu",
+        "description": "Siber saldırı, fidye yazılımı ve benzeri siber riskler teminat dışıdır."
+      },
+      {
+        "name": "Sanctions Exclusion",
+        "nameTr": "Yaptırım Klozu",
+        "description": "BMGK, ABD, AB ve İngiltere yaptırımları kapsamındaki riskler teminat dışıdır."
+      },
+      {
+        "name": "Nuclear, Biological, Chemical Exclusion",
+        "nameTr": "Nükleer, Biyolojik ve Kimyasal Rizikolar Klozu",
+        "description": "Nükleer, biyolojik ve kimyasal riskler teminat dışıdır. Çevresel hasar 500,000 TL ile sınırlıdır."
+      }
+    ],
+    "deductibles": [
+      {
+        "amount": 500,
+        "type": "muafiyet",
+        "description": "Kasko ve hırsızlık teminatları için geçerli muafiyet",
+        "coverageName": "Kasko (Rayiç Değer)",
+        "coverageNameTr": "Kasko (Rayiç Değer)"
+      },
+      {
+        "amount": 0,
+        "type": "muafiyetsiz",
+        "description": "Cam kırılması teminatı muafiyetsiz",
+        "coverageName": "Glass Breakage",
+        "coverageNameTr": "Cam Kırılması"
+      }
+    ],
+    "specialConditions": [
+      "Araç ikame hizmeti Anadolu Hizmet Grup 2 kapsamında sağlanır.",
+      "Hatalı akaryakıt teminatı yıllık 50.000 TL ile sınırlıdır.",
+      "Araç kiralama veya ticari amaçla kullanıldığında %80 muafiyet uygulanır."
+    ],
+    "isBundle": false,
+    "bundleProducts": null,
+    "previousInsurer": null,
+    "amendmentInfo": {
+      "isAmendment": false,
+      "amendmentNumber": null,
+      "amendmentDate": null,
+      "basePolicyNumber": null,
+      "amendmentReason": null,
+      "premiumDifference": null
+    },
+    "analysis": {
+      "summary": "Bu poliçe, Anadolu Sigorta tarafından düzenlenmiş, 01/01/2024-01/01/2025 tarihleri arasında geçerli, 2020 model Renault Megane (34 ABC 123) için kasko sigortasıdır. Rayiç değer üzerinden kasko teminatı, 500.000 TL mali sorumluluk, cam kırılması (2.000 TL limit, muafiyetsiz), hırsızlık (150.000 TL limit, 500 TL muafiyet), yol yardım (Grup 2), ikame araç, hukuksal koruma (40.000 TL/olay, 80.000 TL/yıl), hatalı akaryakıt (50.000 TL/yıl), hasarsızlık indirimi koruma, evcil hayvan, anahtar çalınma, mini onarım, yeni araç, sigara yanığı, kıymet kazanma tenzili istisnası, enflasyon koruma ve aksesuar teminatları içerir. Muafiyet: kasko ve hırsızlık için 500 TL, cam kırılması muafiyetsizdir. İstisnalar: salgın, siber saldırı, yaptırım ve NBC klozları mevcuttur. Yıllık prim 5.000 TL'dir. VERIFIED BY AI",
+      "confidence": 0.95,
+      "warnings": [
+        "Rayiç değer belirtilmemiş, piyasa değeri üzerinden teminat sağlanmaktadır.",
+        "Yol yardım hizmet grubu belirtilmiş ancak limit belirtilmemiştir."
+      ]
+    }
+  },
+  "raw": {
+    "success": true,
+    "data": {
+      "policyType": "kasko",
+      "policyNumber": "P2024000001",
+      "startDate": "2024-01-01",
+      "endDate": "2025-01-01",
+      "provider": "Anadolu Sigorta",
+      "insured": {
+        "name": "AHMET YILMAZ",
+        "address": "Atatürk Cad. No:123, Kadıköy/İstanbul",
+        "tckn": "12345678901",
+        "phone": null,
+        "email": null
+      },
+      "policyholder": {
+        "name": "AHMET YILMAZ",
+        "address": "Atatürk Cad. No:123, Kadıköy/İstanbul",
+        "tckn": "12345678901",
+        "phone": null,
+        "email": null
+      },
+      "vehicle": {
+        "make": "RENAULT",
+        "model": "MEGANE",
+        "year": 2020,
+        "plate": "34 ABC 123"
+      },
+      "premium": {
+        "amount": 5000,
+        "currency": "TRY",
+        "paymentFrequency": "annual",
+        "installments": null
+      },
+      "coverages": [
+        {
+          "name": "Üçüncü Şahıs Mali Mesuliyet",
+          "nameTr": "Üçüncü Şahıs Mali Mesuliyet",
+          "category": "liability",
+          "limit": 500000,
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "limitType": "per_event",
+          "description": "Üçüncü şahıs mali sorumluluk teminatı",
+          "deductible": null,
+          "deductibleType": null,
+          "carveOuts": [],
+          "normalizedName": "third party liability",
+          "canonicalName": "THIRD_PARTY_LIABILITY",
+          "parsedLimit": {
+            "type": "numeric",
+            "amount": 500000
+          },
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "Cam Kırılması",
+          "nameTr": "Cam Kırılması",
+          "category": "supplementary",
+          "limit": 2000,
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "limitType": "per_event",
+          "description": "Cam kırılması teminatı",
+          "deductible": 0,
+          "deductibleType": "muafiyetsiz",
+          "carveOuts": [],
+          "normalizedName": "glass breakage",
+          "canonicalName": "GLASS_DAMAGE_PROTECTION",
+          "parsedLimit": {
+            "type": "numeric",
+            "amount": 2000
+          },
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "Hırsızlık",
+          "nameTr": "Hırsızlık",
+          "category": "supplementary",
+          "limit": 150000,
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "limitType": "per_event",
+          "description": "Hırsızlık teminatı",
+          "deductible": 500,
+          "deductibleType": "muafiyet",
+          "carveOuts": [],
+          "normalizedName": "theft",
+          "canonicalName": "THEFT",
+          "parsedLimit": {
+            "type": "numeric",
+            "amount": 150000
+          },
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "Yol Yardım",
+          "nameTr": "Yol Yardım",
+          "category": "assistance",
+          "limit": null,
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "limitType": null,
+          "description": "Anadolu Hizmet Grup 2",
+          "deductible": null,
+          "deductibleType": null,
+          "carveOuts": [],
+          "normalizedName": "roadside assistance",
+          "canonicalName": "ROADSIDE_ASSISTANCE",
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "İkame Araç",
+          "nameTr": "İkame Araç",
+          "category": "assistance",
+          "limit": null,
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "limitType": null,
+          "description": "Anadolu Hizmet Grup 2",
+          "deductible": null,
+          "deductibleType": null,
+          "carveOuts": [],
+          "normalizedName": "replacement vehicle",
+          "canonicalName": "REPLACEMENT_VEHICLE",
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "Yanlış Yakıt",
+          "nameTr": "Yanlış Yakıt",
+          "category": "supplementary",
+          "limit": 50000,
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "limitType": "aggregate",
+          "description": "Hatalı akaryakıt kaynaklı hasarlar (yıllık toplam)",
+          "deductible": null,
+          "deductibleType": null,
+          "carveOuts": [],
+          "normalizedName": "wrong fuel",
+          "canonicalName": "WRONG_FUEL",
+          "parsedLimit": {
+            "type": "numeric",
+            "amount": 50000
+          },
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "Hasarsızlık İndirimi Koruma",
+          "nameTr": "Hasarsızlık İndirimi Koruma",
+          "category": "supplementary",
+          "limit": null,
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "limitType": null,
+          "description": "İlk hasarda hasarsızlık indiriminin korunması",
+          "deductible": null,
+          "deductibleType": null,
+          "carveOuts": [],
+          "normalizedName": "no-claim discount protection",
+          "canonicalName": "NCD_PROTECTION",
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "Evcil Hayvan Tedavisi",
+          "nameTr": "Evcil Hayvan Tedavisi",
+          "category": "supplementary",
+          "limit": null,
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "limitType": null,
+          "description": "Araç içinde evcil hayvan yaralanması tedavisi",
+          "deductible": null,
+          "deductibleType": null,
+          "carveOuts": [],
+          "normalizedName": "pet ınjury",
+          "canonicalName": "PET_INJURY",
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "Anahtar Ele Geçirme Yoluyla Hırsızlık",
+          "nameTr": "Anahtar Ele Geçirme Yoluyla Hırsızlık",
+          "category": "supplementary",
+          "limit": null,
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "limitType": null,
+          "description": "Anahtar ele geçirme yoluyla hırsızlık",
+          "deductible": null,
+          "deductibleType": null,
+          "carveOuts": [],
+          "normalizedName": "key theft",
+          "canonicalName": "KEY_ACQUISITION_THEFT",
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "Yenisiyle Değiştirme",
+          "nameTr": "Yenisiyle Değiştirme",
+          "category": "supplementary",
+          "limit": null,
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "limitType": null,
+          "description": "İlk tescil yılı içinde pert/çalıntıda yeni araç",
+          "deductible": null,
+          "deductibleType": null,
+          "carveOuts": [],
+          "normalizedName": "new for old",
+          "canonicalName": "NEW_FOR_OLD_REPLACEMENT",
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "Sigara ve Benzeri Madde Hasarı",
+          "nameTr": "Sigara ve Benzeri Madde Hasarı",
+          "category": "supplementary",
+          "limit": null,
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "limitType": null,
+          "description": "Sigara yanığı iç döşeme hasarı",
+          "deductible": null,
+          "deductibleType": null,
+          "carveOuts": [],
+          "normalizedName": "cigarette burn",
+          "canonicalName": "CIGARETTE_DAMAGE",
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "Eskime Payı İndirimi Muafiyeti",
+          "nameTr": "Eskime Payı İndirimi Muafiyeti",
+          "category": "supplementary",
+          "limit": null,
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "limitType": null,
+          "description": "Hasarda kıymet kazanma tenzili uygulanmaz",
+          "deductible": null,
+          "deductibleType": null,
+          "carveOuts": [],
+          "normalizedName": "no betterment deduction",
+          "canonicalName": "BETTERMENT_DEDUCTION_EXCEPTION",
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "Enflasyon Koruma",
+          "nameTr": "Enflasyon Koruma",
+          "category": "supplementary",
+          "limit": null,
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "limitType": null,
+          "description": "Sigorta bedeli enflasyona endeksli",
+          "deductible": null,
+          "deductibleType": null,
+          "carveOuts": [],
+          "normalizedName": "ınflation protection",
+          "canonicalName": "INFLATION_PROTECTION",
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "Ek Donanım / Aksesuar",
+          "nameTr": "Ek Donanım / Aksesuar",
+          "category": "supplementary",
+          "limit": null,
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "limitType": null,
+          "description": "Rayiç değerin %10'una kadar aksesuar teminatı",
+          "deductible": null,
+          "deductibleType": null,
+          "carveOuts": [],
+          "normalizedName": "additional equipment",
+          "canonicalName": "ADDITIONAL_EQUIPMENT",
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "Kasko Teminatı",
+          "nameTr": "Kasko Teminatı",
+          "category": "main",
+          "limit": null,
+          "isUnlimited": false,
+          "isMarketValue": true,
+          "limitType": null,
+          "description": "Aracın rayiç değeri üzerinden kasko teminatı",
+          "deductible": 500,
+          "deductibleType": "muafiyet",
+          "carveOuts": [],
+          "normalizedName": "kasko (rayiç değer)",
+          "canonicalName": "MAIN_KASKO_COVERAGE",
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "Artan Mali Sorumluluk",
+          "canonicalName": "EXCESS_LIABILITY",
+          "normalizedName": "artan mali sorumluluk",
+          "nameTr": "Artan Mali Sorumluluk",
+          "limit": 100000,
+          "parsedLimit": {
+            "type": "numeric",
+            "amount": 100000
+          },
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "isImplicit": false,
+          "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir.",
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "Deprem",
+          "canonicalName": "EARTHQUAKE",
+          "normalizedName": "deprem",
+          "nameTr": "Deprem",
+          "limit": null,
+          "parsedLimit": null,
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "isImplicit": false,
+          "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir.",
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "Grev, Lokavt, Terör",
+          "canonicalName": "STRIKE_LOCKOUT_TERROR",
+          "normalizedName": "grev, lokavt, terör",
+          "nameTr": "Grev, Lokavt, Terör",
+          "limit": null,
+          "parsedLimit": null,
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "isImplicit": false,
+          "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir.",
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "Sel ve Su Baskını",
+          "canonicalName": "FLOOD_WATER_DAMAGE",
+          "normalizedName": "sel ve su baskını",
+          "nameTr": "Sel ve Su Baskını",
+          "limit": null,
+          "parsedLimit": null,
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "isImplicit": false,
+          "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir.",
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "Mini Onarım",
+          "nameTr": "Mini Onarım",
+          "category": "supplementary",
+          "limit": null,
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "limitType": null,
+          "description": "Dönemde 1 kez ücretsiz mini onarım",
+          "deductible": null,
+          "deductibleType": null,
+          "carveOuts": [],
+          "normalizedName": "mini repair service",
+          "canonicalName": "MINI_REPAIR",
+          "parsedLimit": null,
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "Koltuk Ferdi Kaza - Vefat",
+          "canonicalName": "SEAT_PERSONAL_ACCIDENT_DEATH",
+          "normalizedName": "koltuk ferdi kaza - vefat",
+          "nameTr": "Koltuk Ferdi Kaza - Vefat",
+          "limit": 100000,
+          "parsedLimit": {
+            "type": "numeric",
+            "amount": 100000
+          },
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "isImplicit": false,
+          "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir.",
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "Koltuk Ferdi Kaza - Sürekli Sakatlık",
+          "canonicalName": "SEAT_PERSONAL_ACCIDENT_DISABILITY",
+          "normalizedName": "koltuk ferdi kaza - sürekli sakatlık",
+          "nameTr": "Koltuk Ferdi Kaza - Sürekli Sakatlık",
+          "limit": 100000,
+          "parsedLimit": {
+            "type": "numeric",
+            "amount": 100000
+          },
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "isImplicit": false,
+          "description": "Sistem tarafından zorunlu teminat olarak otomatik eklenmiştir.",
+          "included": true,
+          "isOptional": false
+        },
+        {
+          "name": "Hukuksal Koruma",
+          "nameTr": "Hukuksal Koruma",
+          "category": "legal",
+          "limit": 40000,
+          "isUnlimited": false,
+          "isMarketValue": false,
+          "limitType": "per_event",
+          "description": "40,000 TL per claim / 80,000 TL annual aggregate / 4,000 TL bail / 4,000 TL legal advance",
+          "deductible": null,
+          "deductibleType": null,
+          "carveOuts": [],
+          "normalizedName": "legal protection",
+          "canonicalName": "LEGAL_PROTECTION",
+          "parsedLimit": {
+            "type": "numeric",
+            "amount": 40000
+          },
+          "included": true,
+          "isOptional": false
+        }
+      ],
+      "exclusions": [
+        {
+          "name": "Pandemic Exclusion",
+          "nameTr": "Salgın ve Bulaşıcı Hastalık İstisnası",
+          "description": "Salgın ve bulaşıcı hastalıklar ile kamu otoritesi tarafından alınan kapatma kararları sonucu oluşan zararlar teminat dışıdır."
+        },
+        {
+          "name": "Cyber Attack Exclusion",
+          "nameTr": "Siber Saldırı İstisna Klozu",
+          "description": "Siber saldırı, fidye yazılımı ve benzeri siber riskler teminat dışıdır."
+        },
+        {
+          "name": "Sanctions Exclusion",
+          "nameTr": "Yaptırım Klozu",
+          "description": "BMGK, ABD, AB ve İngiltere yaptırımları kapsamındaki riskler teminat dışıdır."
+        },
+        {
+          "name": "Nuclear, Biological, Chemical Exclusion",
+          "nameTr": "Nükleer, Biyolojik ve Kimyasal Rizikolar Klozu",
+          "description": "Nükleer, biyolojik ve kimyasal riskler teminat dışıdır. Çevresel hasar 500,000 TL ile sınırlıdır."
+        }
+      ],
+      "deductibles": [
+        {
+          "amount": 500,
+          "type": "muafiyet",
+          "description": "Kasko ve hırsızlık teminatları için geçerli muafiyet",
+          "coverageName": "Kasko (Rayiç Değer)",
+          "coverageNameTr": "Kasko (Rayiç Değer)"
+        },
+        {
+          "amount": 0,
+          "type": "muafiyetsiz",
+          "description": "Cam kırılması teminatı muafiyetsiz",
+          "coverageName": "Glass Breakage",
+          "coverageNameTr": "Cam Kırılması"
+        }
+      ],
+      "specialConditions": [
+        "Araç ikame hizmeti Anadolu Hizmet Grup 2 kapsamında sağlanır.",
+        "Hatalı akaryakıt teminatı yıllık 50.000 TL ile sınırlıdır.",
+        "Araç kiralama veya ticari amaçla kullanıldığında %80 muafiyet uygulanır."
+      ],
+      "isBundle": false,
+      "bundleProducts": null,
+      "previousInsurer": null,
+      "amendmentInfo": {
+        "isAmendment": false,
+        "amendmentNumber": null,
+        "amendmentDate": null,
+        "basePolicyNumber": null,
+        "amendmentReason": null,
+        "premiumDifference": null
+      },
+      "analysis": {
+        "summary": "Bu poliçe, Anadolu Sigorta tarafından düzenlenmiş, 01/01/2024-01/01/2025 tarihleri arasında geçerli, 2020 model Renault Megane (34 ABC 123) için kasko sigortasıdır. Rayiç değer üzerinden kasko teminatı, 500.000 TL mali sorumluluk, cam kırılması (2.000 TL limit, muafiyetsiz), hırsızlık (150.000 TL limit, 500 TL muafiyet), yol yardım (Grup 2), ikame araç, hukuksal koruma (40.000 TL/olay, 80.000 TL/yıl), hatalı akaryakıt (50.000 TL/yıl), hasarsızlık indirimi koruma, evcil hayvan, anahtar çalınma, mini onarım, yeni araç, sigara yanığı, kıymet kazanma tenzili istisnası, enflasyon koruma ve aksesuar teminatları içerir. Muafiyet: kasko ve hırsızlık için 500 TL, cam kırılması muafiyetsizdir. İstisnalar: salgın, siber saldırı, yaptırım ve NBC klozları mevcuttur. Yıllık prim 5.000 TL'dir. VERIFIED BY AI",
+        "confidence": 0.95,
+        "warnings": [
+          "Rayiç değer belirtilmemiş, piyasa değeri üzerinden teminat sağlanmaktadır.",
+          "Yol yardım hizmet grubu belirtilmiş ancak limit belirtilmemiştir."
+        ]
+      }
+    },
+    "usage": {
+      "input_tokens": 48155,
+      "output_tokens": 0,
+      "total_cost": 0
+    },
+    "model": "debate",
+    "provider": "debate_pipeline",
+    "fallback": true,
+    "fallbackReason": "ANTHROPIC_BILLING_ERROR",
+    "cost": 0,
+    "requestId": "ext-1779130946035",
+    "route": "/api/ai/extract",
+    "elapsedMs": 57372,
+    "phaseTiming": {
+      "configLoad_ms": 0,
+      "promptLoad_ms": 0,
+      "anthropic_ms": 298
+    },
+    "debate": {
+      "roundCount": 3,
+      "totalCost": 0,
+      "totalTokens": 48155,
+      "disagreements": [
+        "policyNumber: A=KASKO2024001234 vs B=P2024000001",
+        "premium.amount: A=4500 vs B=5000",
+        "insured.address: A=Atatürk Mah. 123. Sok. No:5, Beşiktaş/İstanbul vs B=Atatürk Cad. No:123, Kadıköy/İstanbul",
+        "coverages: A=16 coverages including Replacement Vehicle, Pet Injury, Key Theft, Mini Repair Service, New for Old, Cigarette Burn, No Betterment Deduction, Inflation Protection, Additional Equipment vs B=8 coverages including Glass Breakage (with limit 2000), Theft (with limit 150000), but missing many from A",
+        "deductibles: A=Single deductible of 500 TRY for standard vs B=Two deductibles: 500 for Kasko and Theft, 0 for Glass Breakage",
+        "specialConditions: A=Araç kiralama veya ticari amaçla kullanıldığında %80 muafiyet uygulanır. vs B=Araç ikame hizmeti Anadolu Hizmet Grup 2 kapsamında sağlanır. Hatalı akaryakıt teminatı yıllık 50.000 TL ile sınırlıdır.",
+        "policyNumber: A=P2024000001 vs B=KASKO2024001234",
+        "premium.amount: A=5000 vs B=4500",
+        "insured.address: A=Atatürk Cad. No:123, Kadıköy/İstanbul vs B=Atatürk Mah. 123. Sok. No:5, Beşiktaş/İstanbul",
+        "coverages: A=8 coverages: Kasko, Third Party Liability, Glass Breakage, Theft, Roadside Assistance, Legal Protection, Wrong Fuel, No-Claim Discount Protection vs B=16 coverages: includes all of A's except Theft and Glass Breakage (replaced by Glass Damage), plus Replacement Vehicle, Pet Injury, Key Theft, Mini Repair Service, New for Old, Cigarette Burn, No Betterment Deduction, Inflation Protection, Additional Equipment",
+        "coverages[?].name: A=Glass Breakage with limit 2000 vs B=Glass Damage with limit null",
+        "coverages[?].name: A=Theft with limit 150000 vs B=Missing",
+        "coverages[?].name: A=Missing vs B=Replacement Vehicle, Pet Injury, Key Theft, Mini Repair Service, New for Old, Cigarette Burn, No Betterment Deduction, Inflation Protection, Additional Equipment",
+        "deductibles: A=Two deductibles: 500 TL for Kasko and Theft, 0 TL for Glass Breakage vs B=One deductible: 500 TL standard",
+        "specialConditions: A=Two conditions: vehicle replacement service and wrong fuel limit vs B=One condition: 80% deductible if used for rental/commercial"
+      ],
+      "roundTripValid": true
+    },
+    "fallbackChain": [
+      {
+        "provider": "anthropic",
+        "success": false,
+        "error_code": "ANTHROPIC_BILLING_ERROR"
+      }
+    ]
+  },
+  "cachedAt": "2026-05-18T19:03:23.490Z",
+  "pdfFile": "anadolu-renault-clio.pdf"
+}
