@@ -13,3 +13,4 @@
     "restartPolicyMaxRetries": 10
   }
 }
+# deployment-trigger: $(date -u +%s)
