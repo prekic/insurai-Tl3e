@@ -242,7 +242,7 @@ const DEFAULT_RATE_LIMITS_CONFIG: RateLimitsConfig = {
   generalWindowMs: 60000,
   generalMaxRequests: 100,
   aiExtractionWindowMs: 3600000,
-  aiExtractionMaxRequests: 20,
+  aiExtractionMaxRequests: 100, // Railway V2 ignores per-service env vars, use DB default
   ocrWindowMs: 3600000,
   ocrMaxRequests: 30,
   chatWindowMs: 3600000,
