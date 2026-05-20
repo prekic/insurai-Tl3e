@@ -157,32 +157,36 @@ export async function convertToAnalyzedPolicy(
     data.exclusions = []
   }
 
-  // Normalize exclusions: the live API may return objects ({description, clauseReference})
-  // instead of plain strings. Flatten them to strings to prevent downstream .toLowerCase() crash.
-  data.exclusions = data.exclusions.map((e: unknown): string => {
-    if (typeof e === 'string') return e
-    const obj = e as Record<string, unknown>
-    return (
-      (typeof obj.description === 'string' ? obj.description : undefined) ??
-      (typeof obj.text === 'string' ? obj.text : undefined) ??
-      (typeof obj.name === 'string' ? obj.name : undefined) ??
-      String(e)
-    )
-  })
+  // Filter out null/undefined entries first — AI may return [null] or [{}]
+  // which would crash the .map() below on obj.description access.
+  data.exclusions = data.exclusions
+    .filter((e: unknown) => e != null)
+    .map((e: unknown): string => {
+      if (typeof e === 'string') return e
+      const obj = e as Record<string, unknown>
+      return (
+        (typeof obj.description === 'string' ? obj.description : undefined) ??
+        (typeof obj.text === 'string' ? obj.text : undefined) ??
+        (typeof obj.name === 'string' ? obj.name : undefined) ??
+        String(e)
+      )
+    })
   if (!data.specialConditions || !Array.isArray(data.specialConditions)) {
     data.specialConditions = []
   }
 
-  // Normalize specialConditions the same way (objects → strings)
-  data.specialConditions = data.specialConditions.map((c: unknown): string => {
-    if (typeof c === 'string') return c
-    const obj = c as Record<string, unknown>
-    return (
-      (typeof obj.description === 'string' ? obj.description : undefined) ??
-      (typeof obj.text === 'string' ? obj.text : undefined) ??
-      String(c)
-    )
-  })
+  // Filter out null/undefined entries first
+  data.specialConditions = data.specialConditions
+    .filter((c: unknown) => c != null)
+    .map((c: unknown): string => {
+      if (typeof c === 'string') return c
+      const obj = c as Record<string, unknown>
+      return (
+        (typeof obj.description === 'string' ? obj.description : undefined) ??
+        (typeof obj.text === 'string' ? obj.text : undefined) ??
+        String(c)
+      )
+    })
 
   // Determine status based on dates
   // Handle both camelCase (endDate) and snake_case (end_date) from AI
@@ -230,43 +234,46 @@ export async function convertToAnalyzedPolicy(
   //   1. AI-provided nameTr (if different from name)
   //   2. Lookup in canonical coverage names map
   //   3. Fall back to English name
-  const coverages: Coverage[] = data.coverages.map((c) => {
-    const coverageName = c.name || c.description || 'Unnamed Coverage'
-    const aiNameTr = c.nameTr && c.nameTr !== coverageName ? c.nameTr : null
-    const mappedNameTr = lookupCoverageNameTr(coverageName)
-    const resolvedNameTr = aiNameTr ?? mappedNameTr ?? coverageName
-    // Sprint 3 PR-S3.1 — recover Hatalı Akaryakıt limit (50K) when the LLM
-    // extracted the description but missed setting limit.
-    const recoveredLimit = recoverWrongFuelLimit(
-      coverageName,
-      resolvedNameTr,
-      c.description,
-      c.clause,
-      c.quote,
-      c.limit ?? 0
-    )
-    // Sprint 3 PR-S3.4 — gloss for Anadolu Hizmet assistance package when
-    // the LLM didn't populate a substantive description.
-    const hizmetGloss = generateAnadoluHizmetGloss(coverageName, resolvedNameTr, c.description)
-    return {
-      name: coverageName,
-      nameTr: resolvedNameTr,
-      limit: recoveredLimit ?? c.limit ?? 0,
-      deductible: c.deductible ?? 0,
-      included: c.included ?? true,
-      description: hizmetGloss ?? c.description ?? undefined,
-      isUnlimited: c.isUnlimited ?? false,
-      isMarketValue: c.isMarketValue ?? false,
-      category: recategorizeIfGlassRepair(coverageName, resolvedNameTr, c.category ?? 'other'),
-      importance: determineCoverageImportance(c),
-      // Evidence pointers — propagate from ExtractedCoverage so the reviewer
-      // UI can surface "Page N / § clause / quote" provenance.
-      page: c.page ?? null,
-      clause: c.clause ?? null,
-      quote: c.quote ?? null,
-      carveOuts: c.carveOuts ?? null,
-    }
-  })
+  // Filter out null/undefined coverage entries — AI may return [null] entries
+  const coverages: Coverage[] = data.coverages
+    .filter((c: unknown) => c != null)
+    .map((c) => {
+      const coverageName = c.name || c.description || 'Unnamed Coverage'
+      const aiNameTr = c.nameTr && c.nameTr !== coverageName ? c.nameTr : null
+      const mappedNameTr = lookupCoverageNameTr(coverageName)
+      const resolvedNameTr = aiNameTr ?? mappedNameTr ?? coverageName
+      // Sprint 3 PR-S3.1 — recover Hatalı Akaryakıt limit (50K) when the LLM
+      // extracted the description but missed setting limit.
+      const recoveredLimit = recoverWrongFuelLimit(
+        coverageName,
+        resolvedNameTr,
+        c.description,
+        c.clause,
+        c.quote,
+        c.limit ?? 0
+      )
+      // Sprint 3 PR-S3.4 — gloss for Anadolu Hizmet assistance package when
+      // the LLM didn't populate a substantive description.
+      const hizmetGloss = generateAnadoluHizmetGloss(coverageName, resolvedNameTr, c.description)
+      return {
+        name: coverageName,
+        nameTr: resolvedNameTr,
+        limit: recoveredLimit ?? c.limit ?? 0,
+        deductible: c.deductible ?? 0,
+        included: c.included ?? true,
+        description: hizmetGloss ?? c.description ?? undefined,
+        isUnlimited: c.isUnlimited ?? false,
+        isMarketValue: c.isMarketValue ?? false,
+        category: recategorizeIfGlassRepair(coverageName, resolvedNameTr, c.category ?? 'other'),
+        importance: determineCoverageImportance(c),
+        // Evidence pointers — propagate from ExtractedCoverage so the reviewer
+        // UI can surface "Page N / § clause / quote" provenance.
+        page: c.page ?? null,
+        clause: c.clause ?? null,
+        quote: c.quote ?? null,
+        carveOuts: c.carveOuts ?? null,
+      }
+    })
 
   // Get policy type - handle both camelCase and snake_case
   const rawPolicyType = data.policyType ?? data.policy_type
