@@ -597,8 +597,9 @@ export function mergeCoveragesWithTableData(
 ): ExtractedCoverage[] {
   const merged = new Map<string, ExtractedCoverage>()
 
-  // Add AI coverages first
+  // Add AI coverages first (skip null entries)
   for (const coverage of aiCoverages) {
+    if (!coverage) continue
     merged.set(coverage.name.toLowerCase(), coverage)
   }
 

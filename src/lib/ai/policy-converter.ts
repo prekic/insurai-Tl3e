@@ -152,6 +152,10 @@ export async function convertToAnalyzedPolicy(
     data.coverages = []
   }
 
+  // Filter out null/undefined entries from coverages — AI may return [null]
+  // which would crash downstream .name or .limit access.
+  data.coverages = data.coverages.filter((c) => c != null)
+
   // Ensure exclusions and specialConditions are arrays
   if (!data.exclusions || !Array.isArray(data.exclusions)) {
     data.exclusions = []

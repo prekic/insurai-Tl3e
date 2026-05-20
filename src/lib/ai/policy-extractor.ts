@@ -907,7 +907,12 @@ export async function extractPolicyFromDocument(
     // DOCUMENT AI FORM FIELD ENHANCEMENT
     // Use high-confidence form fields from Document AI to enhance/override AI extraction
     // ========================================================================
-    let enhancedExtractedData = extractedData
+    let enhancedExtractedData = {
+      ...extractedData,
+      coverages: (extractedData.coverages ?? []).filter(
+        (c): c is NonNullable<typeof c> => c != null
+      ),
+    }
     let formFieldsUsed = 0
 
     // ========== FORM FIELD ENHANCEMENT STAGE ==========
