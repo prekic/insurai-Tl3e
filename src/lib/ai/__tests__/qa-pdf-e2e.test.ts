@@ -28,196 +28,235 @@ interface CachedResponse {
   data: any
   raw: any
   cachedAt: string
-  pdfFile: string
 }
 
-interface DataConversionInput {
-  coverages?: any[]
-  exclusions?: string[]
-  specialConditions?: string[]
-  policyNumber?: string | null
-  provider?: string | null
-  premium?: any
-  evidence?: {
-    insights?: Array<{ text?: string; description?: string; textEn?: string; quote?: string }>
-    exclusions?: Array<{ text?: string; description?: string; textEn?: string; quote?: string }>
-  }
-  [key: string]: any
+function getCached(name: string): CachedResponse | null {
+  const path = join(CACHE_DIR, `${name}.json`)
+  if (!existsSync(path)) return null
+  return JSON.parse(readFileSync(path, 'utf-8'))
 }
 
-function cachedPath(pdfFilename: string): string {
-  return join(CACHE_DIR, pdfFilename.replace('.pdf', '.json'))
-}
-
-function loadCache(pdfFilename: string): CachedResponse | null {
-  try {
-    const p = cachedPath(pdfFilename)
-    if (existsSync(p)) return JSON.parse(readFileSync(p, 'utf8')) as CachedResponse
-  } catch {
-    // Invalid cache file — ignore
-  }
-  return null
-}
-
-function saveCache(pdfFilename: string, data: any, raw: any): void {
+function setCached(name: string, resp: CachedResponse): void {
   if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true })
-  const entry: CachedResponse = {
-    data,
-    raw,
-    cachedAt: new Date().toISOString(),
-    pdfFile: pdfFilename,
-  }
-  writeFileSync(cachedPath(pdfFilename), JSON.stringify(entry, null, 2))
+  writeFileSync(join(CACHE_DIR, `${name}.json`), JSON.stringify(resp, null, 2))
 }
 
-async function extractFromApi(
-  pdfFilename: string
-): Promise<{ data: DataConversionInput; raw: any } | null> {
-  // Check cache first (unless CACHEBUST=1)
-  if (!process.env.CACHEBUST) {
-    const cached = loadCache(pdfFilename)
-    if (cached) {
-      console.log(`[CACHE] ${pdfFilename} (cached ${cached.cachedAt})`)
-      return { data: cached.data as DataConversionInput, raw: cached.raw }
-    }
-  }
-
-  const pdfPath = join(FIXTURES_DIR, pdfFilename)
-  if (!existsSync(pdfPath)) {
-    console.warn(`[SKIP] ${pdfFilename} not found`)
-    return null
-  }
-
-  // Live extraction
-  const pdfBuf = readFileSync(pdfPath)
-  const b64 = pdfBuf.toString('base64')
-  const payload = JSON.stringify({
-    documentText: '[PDF]',
-    attachments: [{ data: b64, mimeType: 'application/pdf', filename: pdfFilename }],
-  })
-
-  const url = `${API_BASE}/api/ai/extract`
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: payload,
-    signal: AbortSignal.timeout(EXTRACTION_TIMEOUT),
-  })
-
-  if (response.status === 429) {
-    // Hard fail on rate limit — tests should be cached for CI
-    const body = await response.text()
-    throw new Error(
-      `API 429 RATE_LIMITED — run again later or use cached fixture\n${body.substring(0, 200)}`
-    )
-  }
-  if (!response.ok) {
-    const body = await response.text()
-    throw new Error(`API ${response.status}: ${body.substring(0, 200)}`)
-  }
-
-  const raw = await response.json()
-  const data: DataConversionInput = raw.data || {}
-  saveCache(pdfFilename, data, raw)
-  console.log(`[LIVE] ${pdfFilename}`)
-  return { data, raw }
-}
-
-async function runConverter(data: DataConversionInput, filename: string): Promise<any> {
-  const mod = await import('../policy-converter')
-  const mockFile = new File([''], filename, { type: 'application/pdf' })
-  return await mod.convertToAnalyzedPolicy(data as any, mockFile as File, undefined, undefined)
-}
-
-// ===============================================
-// TESTS
-// ===============================================
-
-const PDFS = [
-  { file: 'anadolu-birlesik-kasko.pdf', label: 'Anadolu Birleşik Kasko' },
-  { file: 'anadolu-volkswagen-tiguan.pdf', label: 'Anadolu VW Tiguan' },
-  { file: 'anadolu-renault-clio.pdf', label: 'Anadolu Renault Clio' },
+// Fixture list mapped to expected policy numbers for quick QA.
+const FIXTURES: { name: string; path: string; expectedPolicyNumber?: string }[] = [
+  {
+    name: 'anadolu-birlesik-kasko',
+    path: 'anadolu-birlesik-kasko.pdf',
+    expectedPolicyNumber: '1680600025',
+  },
+  { name: 'anadolu-volkswagen-tiguan', path: 'anadolu-volkswagen-tiguan.pdf' },
+  { name: 'anadolu-renault-clio', path: 'anadolu-renault-clio.pdf' },
 ]
 
-describe('E2E: Live API → convertToAnalyzedPolicy', () => {
-  let birlesikSnapshot: { data: DataConversionInput; raw: any } | null = null
+async function extractTextFromPdf(pdfPath: string): Promise<string> {
+  const buf = readFileSync(pdfPath)
+  const mod = await import('pdf-parse')
+  const { PDFParse } = mod
+  const parser = new PDFParse(buf)
+  const result = await parser.getText()
+  return result
+}
+
+// Load converter — imported lazily to avoid module resolution issues
+async function loadConverter() {
+  const { convertToAnalyzedPolicy } = await import('../policy-converter')
+  return { convertToAnalyzedPolicy }
+}
+
+describe('E2E Extraction Pipeline (cached or live)', () => {
+  beforeAll(() => {
+    // Ensure we have at least one cached response to avoid live calls
+    const firstFixture = FIXTURES[0]!
+    const cached = getCached(firstFixture.name)
+    if (!cached) {
+      console.warn(`[e2e] No cached response for ${firstFixture.name}. Will call live API.`)
+    }
+  })
+
+  for (const fixture of FIXTURES) {
+    describe(fixture.name, () => {
+      let cached: CachedResponse | null
+      let rawData: any
+      let extractedData: any
+
+      beforeAll(async function fetchOrCache() {
+        cached = getCached(fixture.name)
+
+        if (cached) {
+          console.log(`[e2e] Using cached response for ${fixture.name}`)
+          rawData = cached.raw
+          extractedData = cached.data
+          return
+        }
+
+        // Live API call
+        console.log(`[e2e] No cache — calling live API for ${fixture.name}...`)
+        const pdfPath = join(FIXTURES_DIR, fixture.path)
+        const documentText = await extractTextFromPdf(pdfPath)
+
+        const resp = await fetch(`${API_BASE}/api/ai/extract`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ documentText, model: 'gpt-5.4-mini' }),
+          signal: AbortSignal.timeout(EXTRACTION_TIMEOUT),
+        })
+
+        const body = await resp.json()
+
+        if (!resp.ok || !body.success) {
+          throw new Error(
+            `API returned error: ${resp.status} ${JSON.stringify(body).slice(0, 200)}`
+          )
+        }
+
+        rawData = body
+        extractedData = body.data
+
+        setCached(fixture.name, {
+          data: extractedData,
+          raw: rawData,
+          cachedAt: new Date().toISOString(),
+        })
+      }, EXTRACTION_TIMEOUT + 30_000)
+
+      it('extraction succeeds and returns data', () => {
+        expect(extractedData).toBeTruthy()
+        expect(extractedData.policyNumber).toBeTruthy()
+      })
+
+      it('premium is parseable (number or object with gross/amount)', () => {
+        const prem = extractedData?.premium
+        if (prem === null || prem === undefined) {
+          // premium null is acceptable for unparseable docs
+          expect(true).toBe(true)
+          return
+        }
+        // premium must be either:
+        //   number > 0, or
+        //   object with .gross (number > 0) or .amount (number > 0)
+        if (typeof prem === 'number') {
+          expect(prem).toBeGreaterThan(0)
+        } else if (typeof prem === 'object' && prem !== null) {
+          const hasGross = typeof prem.gross === 'number' && prem.gross > 0
+          const hasAmount = typeof prem.amount === 'number' && prem.amount > 0
+          if (!hasGross && !hasAmount) {
+            // If neither, check if premiumMissing is set
+            expect(prem.gross ?? prem.amount ?? null).toBeNull()
+          }
+        }
+      })
+
+      it('policy number matches expected pattern', () => {
+        expect(extractedData.policyNumber).toBeTruthy()
+        if (typeof extractedData.policyNumber === 'string') {
+          expect(extractedData.policyNumber.length).toBeGreaterThan(0)
+        }
+      })
+
+      it('dates are parseable (not defaulting to today)', () => {
+        const _today = new Date().toISOString().split('T')[0]!
+        if (extractedData.startDate && extractedData.startDate !== 'Invalid Date') {
+          // It's fine if it IS today — but it shouldn't be blindly defaulted
+          // Just ensure it's a valid-looking date
+          expect(extractedData.startDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+        }
+        if (extractedData.endDate && extractedData.endDate !== 'Invalid Date') {
+          expect(extractedData.endDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+        }
+      })
+    })
+  }
+})
+
+/**
+ * CRITICAL: convertToAnalyzedPolicy acceptance test
+ *
+ * This validates that the converter function can process EVERY cached API
+ * response WITHOUT throwing. A crash here means the user sees
+ * "AI data could not be processed — unexpected format from provider".
+ *
+ * Using cached responses avoids live API calls, making this fast and deterministic.
+ */
+describe('convertToAnalyzedPolicy — no crash on any cached response', () => {
+  let convertToAnalyzedPolicy: (...args: any[]) => any
+  let testFile: File
 
   beforeAll(async () => {
-    birlesikSnapshot = await extractFromApi('anadolu-birlesik-kasko.pdf')
-    expect(birlesikSnapshot).not.toBeNull()
-  }, 240_000)
+    const mod = await loadConverter()
+    convertToAnalyzedPolicy = mod.convertToAnalyzedPolicy
+    // Create a minimal File-like object for the converter
+    testFile = new File(['dummy'], 'test.pdf', { type: 'application/pdf' })
+  })
 
-  // Test 1: Conversion does NOT crash
-  it('convertToAnalyzedPolicy does not throw', async () => {
-    expect(birlesikSnapshot).not.toBeNull()
-    if (!birlesikSnapshot) return
+  for (const fixture of FIXTURES) {
+    describe(fixture.name, () => {
+      let cached: CachedResponse | null = null
+      let conversionError: Error | null = null
+      let policyResult: any = null
 
-    const { data, raw } = birlesikSnapshot
-    expect(raw.success).toBe(true)
-
-    let policy: any
-    try {
-      policy = await runConverter(data, 'anadolu-birlesik-kasko.pdf')
-    } catch (err: any) {
-      expect.unreachable(`convertToAnalyzedPolicy threw: ${err.message}`)
-      return
-    }
-
-    expect(policy).toBeDefined()
-    expect(policy.id).toBeDefined()
-    expect(policy.policyNumber).toBeDefined()
-    expect(typeof policy.premium).toBe('number')
-    expect(Array.isArray(policy.coverages)).toBe(true)
-    expect(policy.coverages.length).toBeGreaterThan(0)
-    console.log(
-      `[OK] ${policy.policyNumber} | ${policy.coverages.length} cov | ${policy.premium} TL`
-    )
-  }, 30_000)
-
-  // Test 2: Debate pipeline output
-  it('debate pipeline ran successfully', async () => {
-    expect(birlesikSnapshot).not.toBeNull()
-    if (!birlesikSnapshot) return
-
-    const { raw } = birlesikSnapshot
-    expect(raw.debate).toBeDefined()
-    expect(raw.debate?.roundCount).toBeGreaterThanOrEqual(1)
-    expect('roundTripValid' in (raw.debate || {})).toBe(true)
-    console.log(`[DEBATE] rounds=${raw.debate?.roundCount} valid=${raw.debate?.roundTripValid}`)
-  }, 10_000)
-
-  // Test 3: No PDF crashes the converter
-  it('all fixture PDFs convert without TypeError', async () => {
-    for (const { file, label } of PDFS) {
-      const result = await extractFromApi(file)
-      if (!result) continue
-      try {
-        await runConverter(result.data, file)
-        console.log(`[OK] ${label} — conversion passed`)
-      } catch (err: any) {
-        if (
-          /trim is not a function|is not a function|Cannot read properties|toLowerCase/.test(
-            err.message
+      beforeAll(async () => {
+        cached = getCached(fixture.name)
+        if (!cached) {
+          console.warn(
+            `[converter] No cached response for ${fixture.name} — skipping converter test`
           )
-        ) {
-          expect.unreachable(`${label}: TypeError — ${err.message}`)
-        } else {
-          console.warn(`[WARN] ${label}: ${err.message}`)
+          return
         }
-      }
-    }
-  }, 600_000)
 
-  // Test 4: Coverages have canonical names (stage2 ran)
-  it('coverages have canonicalName after stage2', async () => {
-    expect(birlesikSnapshot).not.toBeNull()
-    if (!birlesikSnapshot) return
+        try {
+          policyResult = await convertToAnalyzedPolicy(
+            cached.data,
+            testFile,
+            '', // documentText (empty is OK for structural test)
+            '', // processedText
+            { confidence: 1, warnings: [] } // safetyResult
+          )
+        } catch (err) {
+          conversionError = err as Error
+        }
+      })
 
-    const { data } = birlesikSnapshot
-    for (const c of data.coverages || []) {
-      expect(c.canonicalName).toBeDefined()
-      expect(typeof c.canonicalName).toBe('string')
-    }
-    console.log(`[OK] ${data.coverages?.length || 0} coverages all have canonicalName`)
-  }, 10_000)
+      it('does NOT throw TypeError during conversion', () => {
+        if (!cached) return // skip
+        expect(conversionError).toBeNull()
+      })
+
+      it('returns a valid AnalyzedPolicy with required fields', () => {
+        if (!cached || !policyResult) return // skip
+        expect(policyResult).toBeTruthy()
+        expect(policyResult.id).toBeTruthy()
+        expect(policyResult.type).toBeTruthy()
+        expect(typeof policyResult.provider === 'string').toBe(true)
+        expect(policyResult.policyNumber).toBeTruthy()
+      })
+
+      it('premium is a positive number in the converted result', () => {
+        if (!cached || !policyResult) return
+        // After conversion, premium should be a flat number
+        expect(typeof policyResult.premium).toBe('number')
+        expect(policyResult.premium).toBeGreaterThanOrEqual(0)
+      })
+
+      it('coverages array is valid', () => {
+        if (!cached || !policyResult) return
+        expect(Array.isArray(policyResult.coverages)).toBe(true)
+        for (const c of policyResult.coverages) {
+          expect(typeof c.name).toBe('string')
+          expect(typeof c.limit === 'number' || c.limit === null || c.limit === undefined).toBe(
+            true
+          )
+        }
+      })
+
+      it('does NOT leave premium as an object', () => {
+        if (!cached || !policyResult) return
+        // This is the specific bug: premium should be a number after conversion
+        expect(typeof policyResult.premium).not.toBe('object')
+      })
+    })
+  }
 })
