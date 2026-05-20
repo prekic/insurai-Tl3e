@@ -260,3 +260,164 @@ describe('convertToAnalyzedPolicy — no crash on any cached response', () => {
     })
   }
 })
+
+/**
+ * REGRESSION: Premium shape handling — explicit test of all 3 known API formats.
+ *
+ * The debate pipeline returns premium as {net, gross, installments} (no amount).
+ * The quick pipeline returns {amount, currency}.
+ * Some providers return a flat number.
+ *
+ * All three must pass through convertToAnalyzedPolicy without crashing.
+ */
+describe('Premium shape regression — all known API formats convert without crashing', () => {
+  let convertToAnalyzedPolicy: (...args: any[]) => any
+  let testFile: File
+
+  beforeAll(async () => {
+    const mod = await loadConverter()
+    convertToAnalyzedPolicy = mod.convertToAnalyzedPolicy
+    testFile = new File(['dummy'], 'test.pdf', { type: 'application/pdf' })
+  })
+
+  // Shape 1: Flat number
+  it('flat number premium converts to positive number', async () => {
+    const input = {
+      policyNumber: 'TEST001',
+      provider: 'Test Sigorta',
+      insuredName: 'Test User',
+      policyType: 'kasko',
+      premium: 31140,
+      coverages: [{ name: 'Kasko', limit: null, deductible: null, included: true }],
+      exclusions: [],
+      specialConditions: [],
+    }
+    const result = await convertToAnalyzedPolicy(input, testFile, '', '', {
+      confidence: 1,
+      warnings: [],
+    })
+    expect(typeof result.premium).toBe('number')
+    expect(result.premium).toBe(31140)
+  })
+
+  // Shape 2: {amount, currency} — quick pipeline
+  it('{amount, currency} premium converts via amount', async () => {
+    const input = {
+      policyNumber: 'TEST002',
+      provider: 'Test Sigorta',
+      insuredName: 'Test User',
+      policyType: 'kasko',
+      premium: { amount: 31140, currency: 'TRY' },
+      coverages: [{ name: 'Kasko', limit: null, deductible: null, included: true }],
+      exclusions: [],
+      specialConditions: [],
+    }
+    const result = await convertToAnalyzedPolicy(input, testFile, '', '', {
+      confidence: 1,
+      warnings: [],
+    })
+    expect(typeof result.premium).toBe('number')
+    expect(result.premium).toBe(31140)
+  })
+
+  // Shape 3: {gross, net} — debate pipeline (no amount field!)
+  it('{gross, net} premium converts via gross fallback', async () => {
+    const input = {
+      policyNumber: 'TEST003',
+      provider: 'Test Sigorta',
+      insuredName: 'Test User',
+      policyType: 'kasko',
+      premium: { net: 29657.14, gross: 31140 },
+      coverages: [{ name: 'Kasko', limit: null, deductible: null, included: true }],
+      exclusions: [],
+      specialConditions: [],
+    }
+    const result = await convertToAnalyzedPolicy(input, testFile, '', '', {
+      confidence: 1,
+      warnings: [],
+    })
+    expect(typeof result.premium).toBe('number')
+    expect(result.premium).toBe(31140)
+  })
+
+  // Shape 3b: {gross, net, installments} — debate pipeline with installments
+  it('{net, gross, installments} premium converts via gross fallback', async () => {
+    const input = {
+      policyNumber: 'TEST004',
+      provider: 'Test Sigorta',
+      insuredName: 'Test User',
+      policyType: 'kasko',
+      premium: { net: 29657.14, gross: 31140, installments: 3 },
+      coverages: [{ name: 'Kasko', limit: null, deductible: null, included: true }],
+      exclusions: [],
+      specialConditions: [],
+    }
+    const result = await convertToAnalyzedPolicy(input, testFile, '', '', {
+      confidence: 1,
+      warnings: [],
+    })
+    expect(typeof result.premium).toBe('number')
+    expect(result.premium).toBe(31140)
+  })
+
+  // Shape 4: {net, gross, paymentPlan} — older debate format
+  it('{net, gross, paymentPlan, currency} premium converts via gross fallback', async () => {
+    const input = {
+      policyNumber: 'TEST005',
+      provider: 'Test Sigorta',
+      insuredName: 'Test User',
+      policyType: 'kasko',
+      premium: { net: 29657.14, gross: 31140, currency: 'TRY', paymentPlan: '3 Taksit' },
+      coverages: [{ name: 'Kasko', limit: null, deductible: null, included: true }],
+      exclusions: [],
+      specialConditions: [],
+    }
+    const result = await convertToAnalyzedPolicy(input, testFile, '', '', {
+      confidence: 1,
+      warnings: [],
+    })
+    expect(typeof result.premium).toBe('number')
+    expect(result.premium).toBe(31140)
+  })
+
+  // Shape 5: Should NOT crash on unknown shapes (proactive guard)
+  it('{net} only premium (no gross, no amount) does not crash and defaults to 0', async () => {
+    const input = {
+      policyNumber: 'TEST006',
+      provider: 'Test Sigorta',
+      insuredName: 'Test User',
+      policyType: 'kasko',
+      premium: { net: 29657.14 }, // no gross, no amount!
+      coverages: [{ name: 'Kasko', limit: null, deductible: null, included: true }],
+      exclusions: [],
+      specialConditions: [],
+    }
+    const result = await convertToAnalyzedPolicy(input, testFile, '', '', {
+      confidence: 1,
+      warnings: [],
+    })
+    // Should not crash. Premium will be 0 since neither gross nor amount is found.
+    expect(typeof result.premium).toBe('number')
+    expect(result.premium).toBe(0)
+  })
+
+  // Shape 6: null premium
+  it('null premium does not crash and defaults to 0', async () => {
+    const input = {
+      policyNumber: 'TEST007',
+      provider: 'Test Sigorta',
+      insuredName: 'Test User',
+      policyType: 'kasko',
+      premium: null,
+      coverages: [{ name: 'Kasko', limit: null, deductible: null, included: true }],
+      exclusions: [],
+      specialConditions: [],
+    }
+    const result = await convertToAnalyzedPolicy(input, testFile, '', '', {
+      confidence: 1,
+      warnings: [],
+    })
+    expect(typeof result.premium).toBe('number')
+    expect(result.premium).toBe(0)
+  })
+})

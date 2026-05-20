@@ -196,11 +196,13 @@ describe('Server E2E: /api/ai/extract endpoint', () => {
       const d = body.data
       expect(d.premium).toBeDefined()
 
-      // Premium can be number or object with total
+      // Premium can be number or object with gross or amount
+      // (debate pipeline returns {net, gross, installments})
       if (typeof d.premium === 'object') {
-        expect(d.premium.total || d.premium.amount).toBeDefined()
+        expect(d.premium.gross || d.premium.amount || d.premium.total).toBeDefined()
         if (d.premium.total) expect(typeof d.premium.total).toBe('number')
         if (d.premium.amount) expect(typeof d.premium.amount).toBe('number')
+        if (d.premium.gross) expect(typeof d.premium.gross).toBe('number')
       } else {
         expect(typeof d.premium).toBe('number')
       }
