@@ -356,6 +356,10 @@ function mergeCoverages(
 
   for (const coverages of coverageArrays) {
     for (const coverage of coverages) {
+      // Skip null/undefined coverage entries — AI may return [null]
+      if (!coverage || typeof coverage !== 'object') continue
+      // Skip entries with no name — AI may return objects with missing fields
+      if (typeof coverage.name !== 'string' || !coverage.name) continue
       const key = coverage.name.toLowerCase().replace(/\s+/g, ' ').trim()
       const existing = merged.get(key)
 
@@ -381,17 +385,49 @@ function mergeCoverages(
 
 /**
  * Merge string arrays, removing duplicates
+ * Handles both plain strings and objects with a description/text/name field.
+ * Silently skips null/undefined entries.
  */
-function mergeStringArrays(arrays: string[][]): string[] {
+function mergeStringArrays(
+  arrays: (string | Record<string, unknown> | null | undefined)[][]
+): string[] {
   const seen = new Set<string>()
   const result: string[] = []
 
   for (const array of arrays) {
     for (const item of array) {
-      const normalized = item.toLowerCase().trim()
+      // Skip nulls
+      if (item == null) continue
+
+      // Normalize to string for dedup key
+      let normalized: string
+      let displayValue: string
+
+      if (typeof item === 'string') {
+        normalized = item.toLowerCase().trim()
+        displayValue = item
+      } else if (typeof item === 'object') {
+        // Extract text from object — prefer description, then text, then name
+        const obj = item
+        const extracted =
+          (typeof obj.description === 'string' ? obj.description : undefined) ??
+          (typeof obj.text === 'string' ? obj.text : undefined) ??
+          (typeof obj.name === 'string' ? obj.name : undefined) ??
+          ''
+        normalized = extracted.toLowerCase().trim()
+        displayValue = extracted
+      } else {
+        // Number, boolean, etc. — convert to string
+        normalized = String(item).toLowerCase().trim()
+        displayValue = String(item)
+      }
+
+      // Skip empty strings
+      if (!normalized) continue
+
       if (!seen.has(normalized)) {
         seen.add(normalized)
-        result.push(item)
+        result.push(displayValue)
       }
     }
   }
