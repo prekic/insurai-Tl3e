@@ -365,13 +365,24 @@ export async function convertToAnalyzedPolicy(
   if (typeof data.premium === 'number' && data.premium > 0) {
     premiumValue = data.premium
     premiumMissing = false
-  } else if (data.premium && typeof data.premium === 'object' && 'amount' in data.premium) {
-    const amt = (data.premium as { amount: number }).amount
-    if (amt > 0) {
-      premiumValue = amt
+  } else if (data.premium && typeof data.premium === 'object') {
+    const pObj = data.premium as Record<string, unknown>
+    // Handle { amount } pattern
+    if (typeof pObj.amount === 'number' && pObj.amount > 0) {
+      premiumValue = pObj.amount
       premiumMissing = false
+      console.warn('[convertToAnalyzedPolicy] Extracted premium from object.amount:', premiumValue)
     }
-    console.warn('[convertToAnalyzedPolicy] Extracted premium from object:', premiumValue)
+    // Handle { gross, net } pattern from debate pipeline
+    if (
+      (premiumMissing || premiumValue === 0) &&
+      typeof pObj.gross === 'number' &&
+      pObj.gross > 0
+    ) {
+      premiumValue = pObj.gross
+      premiumMissing = false
+      console.warn('[convertToAnalyzedPolicy] Extracted premium from object.gross:', premiumValue)
+    }
   }
 
   // Turkish premium magnitude sanity check — fix 100× / 1000× errors caused by
