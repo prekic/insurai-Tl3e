@@ -537,6 +537,12 @@ export function TryAnalysis() {
             PAYLOAD_TOO_LARGE: 'File exceeds the maximum upload size',
             EXTRACTION_TIMEOUT: 'AI analysis timed out — the service may be busy',
             ALL_PROVIDERS_FAILED: 'All AI providers failed — server issue',
+            OCR_ERROR:
+              'Could not read the document — scanned PDFs and image-only files are not supported yet',
+            OCR_FAILED: 'Document text extraction failed — try uploading a text-based PDF',
+            AUTH_FAILED: 'Document scanning service configuration issue',
+            API_NOT_ENABLED: 'Document scanning service not enabled',
+            NO_OCR_CONFIG: 'Document scanning not configured',
           }
           userDiag = diagLabels[errorCode] || `Error code: ${errorCode}`
         }
@@ -569,7 +575,7 @@ export function TryAnalysis() {
         if (userDiag) {
           message = isTimeout
             ? `${t.tryAnalysis.analysisTimedOut} ${t.tryAnalysis.pleaseWait}`
-            : `${userDiag}. ${t.tryAnalysis.pleaseWait}`
+            : userDiag
         } else if (isTimeout) {
           message = `${t.tryAnalysis.analysisTimedOut} ${t.tryAnalysis.pleaseWait}`
         }

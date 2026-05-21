@@ -682,6 +682,16 @@ export function PolicyUpload() {
         troubleshootingTip = IS_PRODUCTION
           ? t.upload.errorContactSupport
           : 'Add OPENAI_API_KEY or ANTHROPIC_API_KEY to the server .env file and restart.'
+      } else if (
+        errorMessage.includes('OCR_ERROR') ||
+        errorMessage.includes('OCR_FAILED') ||
+        errorMessage.includes('could not read')
+      ) {
+        userTitle = 'Could not read the document'
+        userMessage = errorMessage.includes('not supported')
+          ? 'Scanned PDFs and image-only files are not supported yet.'
+          : 'Could not read the document'
+        troubleshootingTip = 'Try uploading a text-based PDF generated from a digital source.'
       } else if (errorMessage.includes('LOW_CONFIDENCE')) {
         userTitle = t.upload.errorLowConfidence
         userMessage = t.upload.errorLowConfidenceMsg
