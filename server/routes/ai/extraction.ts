@@ -1333,12 +1333,38 @@ router.post(
           ? openaiSystemPrompt
           : openaiSystemPrompt + '\n\nRespond with valid JSON only.'
 
+      // DeepSeek's json_object mode tends to use its own nested insurance schema.
+      // Append an explicit flat JSON structure example so DeepSeek matches our format.
+      const dsOutputSchema =
+        '\n\nYou MUST output EXACTLY this flat JSON structure (use null for missing values):\n' +
+        '{\n' +
+        '  "policyNumber": "P123456789 or null",\n' +
+        '  "insurer": "Company name or null",\n' +
+        '  "startDate": "2025-01-28 or null",\n' +
+        '  "endDate": "2026-01-28 or null",\n' +
+        '  "currency": "TRY or null",\n' +
+        '  "premium": 5000,\n' +
+        '  "premiumNet": null,\n' +
+        '  "premiumTax": null,\n' +
+        '  "vehicleMake": "VOLKSWAGEN or null",\n' +
+        '  "vehicleModel": "PASSAT or null",\n' +
+        '  "vehicleYear": 2022,\n' +
+        '  "vehiclePlate": "34ABC123 or null",\n' +
+        '  "insuredName": "AHMET YILMAZ or null",\n' +
+        '  "NCD": 50,\n' +
+        '  "NCDKademe": 3,\n' +
+        '  "policyType": "kasko",\n' +
+        '  "coverages": [{"name": "Kasko Teminati", "nameTr": "Kasko Teminati", "limit": 500000, "deductible": null, "isOptional": false, "included": true, "category": "main"}],\n' +
+        '  "exclusions": [{"type": "kloz_haric", "text": "..."}]\n' +
+        '}\n\n' +
+        'CRITICAL: FLAT structure ONLY. No nested insurer/policy/parties/premiums/vehicles objects.'
+
       const response = await dsClient.chat.completions.create(
         {
           model: model || 'deepseek-chat',
           messages: [
             { role: 'system', content: dsSystemPrompt },
-            { role: 'user', content: finalUserPrompt },
+            { role: 'user', content: finalUserPrompt + dsOutputSchema },
           ],
           response_format: { type: 'json_object' },
           max_tokens: aiConfig.maxTokens,
