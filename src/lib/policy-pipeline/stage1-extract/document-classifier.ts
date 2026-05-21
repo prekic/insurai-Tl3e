@@ -19,12 +19,15 @@ export function classifyDocumentType(text: string): DocumentType {
 
   const lowerText = text.toLocaleLowerCase('tr-TR').substring(0, 5000) // Look at first 5000 chars
 
-  // Kasko indicators
+  // Kasko indicators — MUST be checked BEFORE home indicators because Birleşik
+  // Kasko policies often contain "Konut Sigortası" as a bundle sub-product name.
+  // The word "konut" appears in birleşik documents but they are vehicle policies.
   if (
     lowerText.includes('kasko sigorta') ||
     lowerText.includes('kasko poliçe') ||
     lowerText.includes('genişletilmiş kasko') ||
     lowerText.includes('dar kasko') ||
+    lowerText.includes('birleşik kasko') ||
     (lowerText.includes('araç sigorta') && lowerText.includes('rayiç değer'))
   ) {
     return 'kasko'
@@ -45,7 +48,8 @@ export function classifyDocumentType(text: string): DocumentType {
     return 'dask'
   }
 
-  // Home
+  // Home — must come AFTER kasko check, because 'konut sigorta' as a bundle
+  // sub-product name in Birleşik Kasko policies would otherwise misclassify.
   if (
     lowerText.includes('konut sigorta') ||
     lowerText.includes('ev sigorta') ||
