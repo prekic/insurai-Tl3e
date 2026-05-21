@@ -1334,30 +1334,30 @@ router.post(
           : openaiSystemPrompt + '\n\nRespond with valid JSON only.'
 
       // DeepSeek's json_object mode tends to use its own nested insurance schema.
-      // Append an explicit flat JSON structure example so DeepSeek matches our format.
+      // Append an explicit flat JSON structure description so DeepSeek matches our format.
       const dsOutputSchema =
-        '\n\nYou MUST output EXACTLY this flat JSON structure (use null for missing values):\n' +
-        '{\n' +
-        '  "policyNumber": "P123456789 or null",\n' +
-        '  "insurer": "Company name or null",\n' +
-        '  "startDate": "2025-01-28 or null",\n' +
-        '  "endDate": "2026-01-28 or null",\n' +
-        '  "currency": "TRY or null",\n' +
-        '  "premium": 5000,\n' +
-        '  "premiumNet": null,\n' +
-        '  "premiumTax": null,\n' +
-        '  "vehicleMake": "VOLKSWAGEN or null",\n' +
-        '  "vehicleModel": "PASSAT or null",\n' +
-        '  "vehicleYear": 2022,\n' +
-        '  "vehiclePlate": "34ABC123 or null",\n' +
-        '  "insuredName": "AHMET YILMAZ or null",\n' +
-        '  "NCD": 50,\n' +
-        '  "NCDKademe": 3,\n' +
-        '  "policyType": "kasko",\n' +
-        '  "coverages": [{"name": "Kasko Teminati", "nameTr": "Kasko Teminati", "limit": 500000, "deductible": null, "isOptional": false, "included": true, "category": "main"}],\n' +
-        '  "exclusions": [{"type": "kloz_haric", "text": "..."}]\n' +
-        '}\n\n' +
-        'CRITICAL: FLAT structure ONLY. No nested insurer/policy/parties/premiums/vehicles objects.'
+        '\n\nYou MUST output EXACTLY this flat JSON structure. Use null for missing values. Extract ALL coverages you find, not just one.' +
+        ' Follow this exact key/type layout:\n' +
+        '- policyNumber: string or null\n' +
+        '- insurer: string or null (company name only, NOT an object)\n' +
+        '- startDate: string or null (YYYY-MM-DD)\n' +
+        '- endDate: string or null (YYYY-MM-DD)\n' +
+        '- currency: string or null (3-letter code)\n' +
+        '- premium: number or null (total premium)\n' +
+        '- premiumNet: number or null\n' +
+        '- premiumTax: number or null\n' +
+        '- vehicleMake: string or null\n' +
+        '- vehicleModel: string or null\n' +
+        '- vehicleYear: number or null\n' +
+        '- vehiclePlate: string or null\n' +
+        '- insuredName: string or null\n' +
+        '- NCD: number or null\n' +
+        '- NCDKademe: number or null\n' +
+        '- policyType: string ("kasko", "traffic", "home", etc.)\n' +
+        '- coverages: array of objects with: name (string), nameTr (string), limit (number or null), ' +
+        'deductible (string or null), isOptional (bool), included (bool), category (string: "main" / "liability" / "supplementary" / "assistance" / "legal" / "other")\n' +
+        '- exclusions: array of objects with: type (string), text (string)\n\n' +
+        'CRITICAL: FLAT structure only. No nested insurer/policy/parties/premiums/vehicles objects.'
 
       const response = await dsClient.chat.completions.create(
         {
