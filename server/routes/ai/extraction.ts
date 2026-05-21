@@ -1845,6 +1845,13 @@ router.post(
 
         const finalParsed = debateResult.final.parsed as Record<string, unknown>
 
+        // ── Inject policyType if DeepSeek dropped it ──────────────────
+        // DeepSeek's json_object mode routinely omits policyType (~80% of requests).
+        // Without it the frontend defaults to 'home' → shows 'Konut Sigortası'.
+        if (!finalParsed.policyType && !finalParsed.policy_type) {
+          finalParsed.policyType = classification.type
+        }
+
         // ── Post-debate metadata completeness fix ────────────────────
         // The debate pipeline always uses DeepSeek with json_object (no strict schema),
         // which routinely drops non-revenue metadata fields (insurer, insuredName,
