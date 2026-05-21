@@ -296,7 +296,6 @@ export async function runExtractionPipeline(
 ): Promise<PipelineResult> {
   const {
     requestId,
-    policyType,
     promptVersion,
     alerters = defaultAlerters,
     classification: classificationOverride,
@@ -360,7 +359,7 @@ export async function runExtractionPipeline(
 
       // 3. Validate output deterministically
       const parsedRecord = parsedData as Record<string, unknown>
-      const validation: ValidationResult = validateOutput(parsedRecord, documentText, policyType, {
+      const validation: ValidationResult = validateOutput(parsedRecord, documentText, {
         minCoverages,
       })
 

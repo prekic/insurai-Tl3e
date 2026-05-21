@@ -39,13 +39,12 @@ interface ValidationCheck {
  *
  * @param extractedData - The parsed extraction result
  * @param documentText  - Original OCR text (for document type classification)
- * @param policyType    - Optional policy type hint from request body
+
  * @param options       - Tuning knobs for testability
  */
 export function validateOutput(
   extractedData: Record<string, unknown>,
   documentText: string,
-  policyType?: string,
   options: {
     /** Whether to reject extraction with 0 coverages (default: true) */
     rejectEmptyCoverages?: boolean
@@ -85,10 +84,18 @@ export function validateOutput(
 
   // If the text CLEARLY says kasko but extracted says konut/home — bad
   let typeMismatch = false
-  if (classifiedType === 'kasko' && extractedType.includes('home') && !extractedType.includes('kasko')) {
+  if (
+    classifiedType === 'kasko' &&
+    extractedType.includes('home') &&
+    !extractedType.includes('kasko')
+  ) {
     typeMismatch = true
   }
-  if (classifiedType === 'home' && extractedType.includes('kasko') && !extractedType.includes('home')) {
+  if (
+    classifiedType === 'home' &&
+    extractedType.includes('kasko') &&
+    !extractedType.includes('home')
+  ) {
     typeMismatch = true
   }
 
@@ -106,9 +113,7 @@ export function validateOutput(
   checks.push({
     name: 'provider',
     pass: providerOk,
-    message: providerOk
-      ? `Provider: ${provider || '(unset)'}`
-      : 'Provider is empty or "unknown"',
+    message: providerOk ? `Provider: ${provider || '(unset)'}` : 'Provider is empty or "unknown"',
   })
 
   // ── Check 4: Dates present ────────────────────────────────────────────
@@ -118,9 +123,7 @@ export function validateOutput(
   checks.push({
     name: 'dates',
     pass: datesOk,
-    message: datesOk
-      ? `Dates: ${startDate} → ${endDate}`
-      : 'Missing start or end date',
+    message: datesOk ? `Dates: ${startDate} → ${endDate}` : 'Missing start or end date',
   })
 
   // ── Check 5: Premium reasonable ───────────────────────────────────────
@@ -130,15 +133,15 @@ export function validateOutput(
   checks.push({
     name: 'premium',
     pass: premiumOk,
-    message: premiumOk
-      ? `Premium: ${rawPremium || '(unset)'}`
-      : `Premium is zero: "${rawPremium}"`,
+    message: premiumOk ? `Premium: ${rawPremium || '(unset)'}` : `Premium is zero: "${rawPremium}"`,
   })
 
   // ── Final verdict ─────────────────────────────────────────────────────
   const failures = checks.filter((c) => !c.pass)
   const pass = failures.length === 0
-  const summary = pass ? 'All checks passed' : `${failures.length} check(s) failed: ${failures.map((c) => c.name).join(', ')}`
+  const summary = pass
+    ? 'All checks passed'
+    : `${failures.length} check(s) failed: ${failures.map((c) => c.name).join(', ')}`
 
   if (!pass) {
     log.warn('Output validation failed', { summary, checks: checks.filter((c) => !c.pass) })
