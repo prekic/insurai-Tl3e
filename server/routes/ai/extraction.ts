@@ -1366,6 +1366,50 @@ router.post(
         throw new Error('AI returned invalid JSON — response could not be parsed')
       }
 
+      // ── Normalize DeepSeek output format ───────────────────────────
+      // DeepSeek sometimes uses a nested schema (insurer: {name, address},
+      // policy: {policyNumber, startDate}, parties: {insured: {name, idNumber}},
+      // premiums: {grossPremium, totalPayable}, vehicles: [...])
+      // instead of the flat schema the prompt requests. Detect and flatten.
+      if (rawParsed.policy && typeof rawParsed.policy === 'object' && !rawParsed.policyNumber) {
+        const p = rawParsed.policy as Record<string, unknown>
+        if (p.policyNumber) rawParsed.policyNumber = p.policyNumber
+        if (p.startDate) rawParsed.startDate = p.startDate
+        if (p.endDate) rawParsed.endDate = p.endDate
+      }
+      if (rawParsed.parties && typeof rawParsed.parties === 'object') {
+        const pa = rawParsed.parties as Record<string, unknown>
+        const insured = pa.insured as Record<string, unknown> | undefined
+        if (insured?.name && !rawParsed.insuredName) rawParsed.insuredName = insured.name
+        if (insured?.idNumber && !rawParsed.insuredId) rawParsed.insuredId = insured.idNumber
+      }
+      if (
+        typeof rawParsed.insurer === 'object' &&
+        rawParsed.insurer !== null &&
+        !Array.isArray(rawParsed.insurer)
+      ) {
+        const ins = rawParsed.insurer as Record<string, unknown>
+        if (ins.name) rawParsed.insurer = ins.name
+      }
+      if (rawParsed.premiums && typeof rawParsed.premiums === 'object') {
+        const pr = rawParsed.premiums as Record<string, unknown>
+        if (pr.totalPayable && !rawParsed.premium) rawParsed.premium = pr.totalPayable
+        if (pr.grossPremium && !rawParsed.premium) rawParsed.premium = pr.grossPremium
+        if (pr.currency && !rawParsed.currency) rawParsed.currency = pr.currency
+      }
+      if (
+        rawParsed.vehicles &&
+        Array.isArray(rawParsed.vehicles) &&
+        rawParsed.vehicles.length > 0
+      ) {
+        const v = rawParsed.vehicles[0] as Record<string, unknown>
+        if (v.plate && !rawParsed.vehiclePlate) rawParsed.vehiclePlate = v.plate
+        if (v.make && !rawParsed.vehicleMake) rawParsed.vehicleMake = v.make
+        if (v.model && !rawParsed.vehicleModel) rawParsed.vehicleModel = v.model
+        if (v.year && !rawParsed.vehicleYear) rawParsed.vehicleYear = v.year
+        if (v.vin && !rawParsed.vin) rawParsed.vin = v.vin
+      }
+
       // ── Inject policyType if DeepSeek dropped it ──────────────────
       if (!rawParsed.policyType && !rawParsed.policy_type) {
         rawParsed.policyType = classification.type
