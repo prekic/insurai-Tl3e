@@ -51,6 +51,12 @@ import logger from './lib/logger.js'
 import { apiMetrics } from './middleware/api-metrics.js'
 import { initializeDefaultAlertRules } from './middleware/monitoring.js'
 import { probeAdminNotifications } from './services/admin-notification-service.js'
+import {
+  bootProviderCheck,
+  startPeriodicHealthCheck,
+  setDiagnosticsImports,
+  setStatusSink,
+} from './services/provider-health-monitor.js'
 
 const log = logger.child('Server')
 
@@ -475,6 +481,55 @@ initializeDefaultAlertRules()
 probeAdminNotifications().catch(() => {
   // probeAdminNotifications already logs internally; nothing more to do here.
 })
+
+// ── Provider Health Monitoring ──────────────────────────────────────────────
+// Run boot-time provider health check (non-blocking) and start periodic checks.
+// Uses dynamic import to avoid circular deps (extraction.ts imports from alert-service).
+// Wire diagnostics status sink AND set up client imports BEFORE boot check
+import('../server/routes/ai/extraction.js')
+  .then((extraction) => {
+    setDiagnosticsImports({
+      getOpenAIClient: extraction.getOpenAIClient,
+      getAnthropicClient: extraction.getAnthropicClient,
+      getDeepSeekClient: extraction.getDeepSeekClient,
+      getGeminiClient: extraction.getGeminiClient,
+      getGCPCredentialsPath: extraction.getGCPCredentialsPath,
+      getDocumentAIAccessToken: extraction.getDocumentAIAccessToken,
+    })
+
+    // Wire the diagnostics endpoint's status update function
+    import('../server/routes/ai/diagnostics.js')
+      .then((diag) => {
+        setStatusSink(diag.updateProviderStatus)
+      })
+      .catch((err: unknown) => {
+        console.error(
+          '[index] Failed to wire diagnostics status sink:',
+          err instanceof Error ? err.message : String(err)
+        )
+        log.warn('Provider health status sink not wired', {
+          error: err instanceof Error ? err.message : String(err),
+        })
+      })
+
+    // Run boot check after a brief delay to let the server stabilise
+    setTimeout(() => {
+      bootProviderCheck()
+    }, 5_000)
+
+    // Start periodic checks every 15 minutes
+    startPeriodicHealthCheck(15 * 60 * 1000)
+  })
+  .catch((err: unknown) => {
+    // import failure — log via a synchronous logger (the standard one is already imported)
+    console.error(
+      '[index] Failed to wire provider health monitor:',
+      err instanceof Error ? err.message : String(err)
+    )
+    log.warn('Provider health monitor not wired — dynamic import failed', {
+      error: err instanceof Error ? err.message : String(err),
+    })
+  })
 
 // Start server
 // eslint-disable-next-line prefer-const -- server declared above for graceful shutdown handling

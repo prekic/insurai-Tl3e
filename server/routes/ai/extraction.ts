@@ -33,7 +33,7 @@ import {
 } from '../../middleware/validation.js'
 import * as adminNotificationService from '../../services/admin-notification-service.js'
 import { getAIConfig } from '../../services/config-service.js'
-import { alertBilling, alertProviderFallback } from '../../lib/alert-service.js'
+import { alertBilling, alertProviderFallback, dispatchAlert } from '../../lib/alert-service.js'
 import { loadPrompts, getPromptVersionTag } from '../../lib/prompt-loader.js'
 import { classifyDocument } from '../../lib/classifier-gate.js'
 import {
@@ -110,7 +110,7 @@ let openaiClient: OpenAI | null = null
 let anthropicClient: Anthropic | null = null
 let deepseekClient: OpenAI | null = null
 
-function getOpenAIClient(): OpenAI | null {
+export function getOpenAIClient(): OpenAI | null {
   if (!process.env.OPENAI_API_KEY) return null
   if (!openaiClient) {
     openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -118,7 +118,7 @@ function getOpenAIClient(): OpenAI | null {
   return openaiClient
 }
 
-function getAnthropicClient(): Anthropic | null {
+export function getAnthropicClient(): Anthropic | null {
   if (!process.env.ANTHROPIC_API_KEY) return null
   if (!anthropicClient) {
     anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -130,7 +130,7 @@ function getAnthropicClient(): Anthropic | null {
  * Get or create an OpenAI-compatible client for DeepSeek API.
  * DeepSeek is ~10x cheaper than gpt-5.4 and serves as fallback for quota/rate-limit errors.
  */
-function getDeepSeekClient(): OpenAI | null {
+export function getDeepSeekClient(): OpenAI | null {
   const apiKey = process.env.DEEPSEEK_API_KEY
   if (!apiKey) return null
   if (!deepseekClient) {
@@ -155,7 +155,7 @@ function getDeepSeekClient(): OpenAI | null {
 
 let geminiClient: GoogleGenAI | null = null
 
-function getGeminiClient(): GoogleGenAI | null {
+export function getGeminiClient(): GoogleGenAI | null {
   if (!process.env.GEMINI_API_KEY) return null
   if (!geminiClient) {
     geminiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
@@ -206,7 +206,7 @@ process.on('SIGTERM', () => {
 // Cache for credentials file path (written once from env var)
 let _cachedCredentialsPath: string | null = null
 
-function getGCPCredentialsPath(): string | null {
+export function getGCPCredentialsPath(): string | null {
   // Return cached path if already resolved
   if (_cachedCredentialsPath) {
     return _cachedCredentialsPath
@@ -269,7 +269,7 @@ function isDocumentAIConfigured(): boolean {
 /**
  * Get access token for Document AI
  */
-async function getDocumentAIAccessToken(): Promise<string | null> {
+export async function getDocumentAIAccessToken(): Promise<string | null> {
   log.debug('getDocumentAIAccessToken called')
   const credentialsPath = getGCPCredentialsPath()
   log.debug('Credentials path resolved', { credentialsPath })
@@ -2480,6 +2480,18 @@ router.post('/ocr', validateJSON, ocrLimiter, validateOCR, async (req: Request, 
         : 'Google Cloud rate limit exceeded'
     }
 
+    // Fire alert for non-transient OCR errors so operators know immediately
+    if (code === 'INVALID_API_KEY' || code === 'API_NOT_ENABLED' || code === 'BILLING_ERROR') {
+      dispatchAlert({
+        severity: 'error',
+        category: 'api_error',
+        title: 'Google Cloud Vision OCR Failed — ' + code,
+        message: `Cloud Vision OCR rejected with ${code}: ${message.slice(0, 300)}`,
+        provider: 'google_vision',
+        dedupKey: 'ocr:vision:' + code,
+      }).catch(() => {})
+    }
+
     res.status(500).json({
       error: userMessage,
       code,
@@ -2887,6 +2899,18 @@ router.post(
           : 'Invalid document format for Document AI'
       }
 
+      // Fire alert for non-transient Document AI errors
+      if (code === 'PERMISSION_DENIED' || code === 'PROCESSOR_NOT_FOUND') {
+        dispatchAlert({
+          severity: 'error',
+          category: 'api_error',
+          title: 'Document AI Failed — ' + code,
+          message: `Document AI OCR rejected with ${code}: ${message.slice(0, 300)}`,
+          provider: 'google_document_ai',
+          dedupKey: 'ocr:document-ai:' + code,
+        }).catch(() => {})
+      }
+
       res.status(500).json({
         error: userMessage,
         code,
@@ -3087,6 +3111,18 @@ router.post(
         userMessage = IS_PRODUCTION
           ? 'Document processing service unavailable'
           : 'Gemini API key invalid — check GEMINI_API_KEY'
+      }
+
+      // Fire alert for non-transient Gemini OCR failures
+      if (code === 'AUTH_FAILED') {
+        dispatchAlert({
+          severity: 'error',
+          category: 'api_error',
+          title: 'Gemini OCR Failed — ' + code,
+          message: `Gemini OCR rejected with ${code}: ${message.slice(0, 300)}`,
+          provider: 'gemini',
+          dedupKey: 'ocr:gemini:' + code,
+        }).catch(() => {})
       }
 
       res.status(500).json({

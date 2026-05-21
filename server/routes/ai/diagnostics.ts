@@ -16,6 +16,21 @@ import * as path from 'path'
 import { fileURLToPath } from 'url'
 import logger from '../../lib/logger.js'
 import { generalLimiter } from '../../middleware/rate-limit.js'
+
+// Exported mutation hook for the provider health monitor module
+// The boot checker calls this to push results into the diagnostics endpoint.
+const providerStatus: Record<string, string> = {}
+
+/**
+ * Update the in-memory provider status (called by provider-health-monitor).
+ */
+export function updateProviderStatus(name: string, status: string): void {
+  providerStatus[name] = status
+}
+
+export function getAllProviderStatuses(): Record<string, string> {
+  return { ...providerStatus }
+}
 import { validateJSON } from '../../middleware/validation.js'
 import { getClientWithError } from '../../services/admin-db.js'
 import { getAIConfig } from '../../services/config-service.js'
@@ -947,4 +962,57 @@ router.get('/processing-log/:documentId', generalLimiter, async (req: Request, r
   }
 })
 
+// ── Provider Health Summary (monitoring-friendly) ─────────────────────────
+
+/**
+ * GET /api/ai/provider-health
+ * Returns condensed provider health status suitable for monitoring dashboards.
+ * Lightweight — reads env + cached state, does NOT make API calls.
+ */
+router.get('/provider-health', generalLimiter, async (_req: Request, res: Response) => {
+  const providers = {
+    openai: {
+      configured: !!process.env.OPENAI_API_KEY,
+      status: getProviderStatus('openai'),
+    },
+    anthropic: {
+      configured: !!process.env.ANTHROPIC_API_KEY,
+      status: getProviderStatus('anthropic'),
+    },
+    deepseek: {
+      configured: !!process.env.DEEPSEEK_API_KEY,
+      status: getProviderStatus('deepseek'),
+    },
+    gemini: {
+      configured: !!process.env.GEMINI_API_KEY,
+      status: getProviderStatus('gemini'),
+    },
+    google_vision: {
+      configured: !!(
+        process.env.GOOGLE_CLOUD_API_KEY || process.env.GOOGLE_APPLICATION_CREDENTIALS
+      ),
+      status: getProviderStatus('google_vision'),
+    },
+    google_document_ai: {
+      configured: !!(
+        (process.env.GOOGLE_CLOUD_API_KEY || process.env.GOOGLE_APPLICATION_CREDENTIALS) &&
+        process.env.DOCUMENT_AI_PROCESSOR_ID
+      ),
+      status: getProviderStatus('google_document_ai'),
+    },
+  }
+
+  res.json({
+    healthy: Object.values(providers).every((p) => !p.configured || p.status === 'healthy'),
+    providers,
+    timestamp: new Date().toISOString(),
+  })
+})
+
 export default router
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function getProviderStatus(name: string): string {
+  return providerStatus[name] || 'unknown'
+}
