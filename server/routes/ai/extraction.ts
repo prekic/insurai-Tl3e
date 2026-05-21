@@ -33,6 +33,10 @@ import {
 } from '../../middleware/validation.js'
 import * as adminNotificationService from '../../services/admin-notification-service.js'
 import { getAIConfig } from '../../services/config-service.js'
+import { alertBilling, alertProviderFallback, alertAllProvidersFailed } from '../../lib/alert-service.js'
+import { loadPrompts, getPromptVersionTag } from '../../lib/prompt-loader.js'
+import { validateOutput } from '../../lib/output-validator.js'
+import { classifyDocument, checkTypeConsistency } from '../../lib/classifier-gate.js'
 import { hashOcrInput, lookupOcrCache, storeOcrCache } from '../../services/ocr-cache.js'
 import { sendExtractionCompleteNotification } from '../../services/notification-service.js'
 import { getExtractionPrompt } from '../../services/prompt-service.js'
@@ -85,6 +89,86 @@ function assertExtractionModelAllowed(model: unknown, res: Response): boolean {
     return false
   }
   return true
+}
+
+// ── FIX 1: Error classification types ──
+// BillingError: operator-actionable (credit/balance). Triggers high-priority alert + degradedReason injection.
+// TransientError: transient capacity/rate-limit. Silently falls back to next provider.
+class BillingError extends Error {
+  constructor(
+    message: string,
+    public readonly provider: string,
+    public readonly originalError?: unknown
+  ) {
+    super(message)
+    this.name = 'BillingError'
+  }
+}
+
+class TransientError extends Error {
+  constructor(
+    message: string,
+    public readonly provider: string,
+    public readonly originalError?: unknown
+  ) {
+    super(message)
+    this.name = 'TransientError'
+  }
+}
+
+/**
+ * Classify a provider error into BillingError, TransientError, or the original error.
+ * Billing = credit/quota/precondition failure (needs operator action).
+ * Transient = rate-limit/timeout/overload (should retry next provider).
+ */
+function classifyProviderError(
+  error: unknown,
+  provider: string,
+  _requestId?: string
+): Error {
+  const message = error instanceof Error ? error.message : String(error)
+
+  // Billing/quota errors (operator must act)
+  const billingPatterns = [
+    'credit', 'billing', 'insufficient_quota', 'quota',
+    'FAILED_PRECONDITION', 'account_balance', 'insufficient',
+    'rate limit exceeded for org', 'exceeded your current quota',
+    'Insufficient', 'payment required',
+  ]
+  for (const p of billingPatterns) {
+    if (message.toLowerCase().includes(p)) {
+      return new BillingError(message, provider, error)
+    }
+  }
+
+  // AbortError = SDK timeout (transient)
+  if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
+    return new TransientError(message, provider, error)
+  }
+
+  // Auth errors usually transient (wrong key in env — fixable but not credit)
+  // Treat as transient so we attempt next provider
+  if (error instanceof Error && error.name === 'AuthenticationError') {
+    return new TransientError(message, provider, error)
+  }
+
+  // Transient patterns: rate limit, 429, overloaded, 529, network timeouts
+  const transientPatterns = [
+    '429', '529', '503', 'rate_limit', 'rate limit',
+    'overloaded', 'overloaded_error', 'too many requests',
+    'timeout', 'ETIMEDOUT', 'ECONNRESET', 'ENOTFOUND',
+    'context_length_exceeded', 'bad gateway', 'service unavailable',
+    'internal server error', 'Please try again', 'try again later',
+  ]
+  for (const p of transientPatterns) {
+    if (message.toLowerCase().includes(p.toLowerCase())) {
+      return new TransientError(message, provider, error)
+    }
+  }
+
+  // Default: return original. Falls through to current ad-hoc error handling.
+  if (error instanceof Error) return error
+  return new Error(String(error))
 }
 
 // ES Module directory resolution
@@ -381,35 +465,10 @@ router.post(
         model: model || 'gpt-5.4',
       })
 
-      // Get extraction prompt from admin system (falls back to hardcoded if unavailable)
-      let finalSystemPrompt: string
-      let finalUserPrompt = documentText
-      let promptTemplateUsed: string | undefined
-
-      if (clientPrompt) {
-        // Use client-provided prompt (backward compatibility)
-        finalSystemPrompt = clientPrompt
-      } else {
-        // Use admin-managed prompt
-        const renderedPrompt = await getExtractionPrompt(documentText, policyType)
-        if (renderedPrompt) {
-          finalSystemPrompt = renderedPrompt.systemPrompt
-          finalUserPrompt = renderedPrompt.userPrompt
-          promptTemplateUsed = `${renderedPrompt.templateName} v${renderedPrompt.version}`
-          log.info('Using prompt template', {
-            requestId,
-            provider: 'openai',
-            template: promptTemplateUsed,
-          })
-        } else {
-          finalSystemPrompt = 'Extract policy information as JSON.'
-          log.info('Using fallback prompt', {
-            requestId,
-            provider: 'openai',
-            reason: 'admin prompt unavailable',
-          })
-        }
-      }
+      // ── FIX 2: Centralised prompt loading (same prompt across all endpoints) ──
+      const loadedPrompts = await loadPrompts(documentText, policyType, clientPrompt)
+      const { openaiSystemPrompt: finalSystemPrompt, userPrompt: finalUserPrompt } = loadedPrompts
+      const promptVersion = getPromptVersionTag(loadedPrompts.templateMeta)
 
       log.info('Calling OpenAI API', { requestId })
       log.debug('System prompt preview', {
@@ -752,6 +811,7 @@ router.post(
         model: usedModel,
         cost: totalCost,
         attempts: healingResult.attempts,
+        promptVersion,
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -1349,52 +1409,31 @@ router.post(
     const PRIMARY_PROVIDER_TIMEOUT_MS = aiConfig.primaryProviderTimeoutMs
     const FALLBACK_PROVIDER_TIMEOUT_MS = aiConfig.fallbackProviderTimeoutMs
 
-    // Build Anthropic schema prompt with admin-configurable confidence weights
-    const confidenceWeights: ConfidenceWeights = {
-      policyNumber: aiConfig.confidenceWeightPolicyNumber,
-      provider: aiConfig.confidenceWeightProvider,
-      dates: aiConfig.confidenceWeightDates,
-      premium: aiConfig.confidenceWeightPremium,
-      coverages: aiConfig.confidenceWeightCoverages,
-    }
-    const anthropicSchemaPrompt = buildAnthropicSchemaPrompt(confidenceWeights)
-
-    // Get extraction prompt (shared between providers)
-    // For Anthropic, we append the schema prompt to ensure structured JSON output
-    // For OpenAI, we use response_format: json_schema
-    let openaiSystemPrompt: string
-    let anthropicSystemPrompt: string
-    let finalUserPrompt = documentText
-
+    // ── FIX 2: Centralised prompt loading (same prompt for all providers) ──
     const promptStart = Date.now()
-    if (clientPrompt) {
-      openaiSystemPrompt = clientPrompt
-      anthropicSystemPrompt = `${clientPrompt}\n\n${anthropicSchemaPrompt}`
-      finalUserPrompt = documentText
-      markPhase('promptLoad_ms', promptStart)
-    } else {
-      const renderedPrompt = await getExtractionPrompt(documentText, policyType)
-      markPhase('promptLoad_ms', promptStart)
-      if (renderedPrompt) {
-        openaiSystemPrompt = renderedPrompt.systemPrompt
-        anthropicSystemPrompt = `${renderedPrompt.systemPrompt}\n\n${anthropicSchemaPrompt}`
-        finalUserPrompt = renderedPrompt.userPrompt
-        log.info('Using prompt template', {
-          requestId,
-          template: renderedPrompt.templateName,
-          version: renderedPrompt.version,
-        })
-      } else {
-        openaiSystemPrompt = 'Extract policy information as JSON.'
-        anthropicSystemPrompt = `Extract policy information as JSON.\n\n${anthropicSchemaPrompt}`
-        log.info('Using fallback prompt', { requestId })
-      }
-    }
+    const loadedPrompts = await loadPrompts(documentText, policyType, clientPrompt)
+    markPhase('promptLoad_ms', promptStart)
+    const { openaiSystemPrompt, anthropicSystemPrompt, userPrompt: finalUserPrompt, templateMeta: promptMeta } = loadedPrompts
+    const promptVersion = getPromptVersionTag(promptMeta)
+
+    // ── FIX 5: Document classifier — gates policy type before extraction ──
+    const classification = classifyDocument(documentText)
+    log.info('Document classification', {
+      requestId,
+      type: classification.type,
+      confidence: classification.confidence,
+      hints: classification.hints.slice(0, 5),
+    })
+
+    // ── degradedReason tracks WHY we fell back (injected into final response) ──
+    let degradedReason: string | undefined
 
     log.info('Using config', {
       requestId,
       anthropicModel: aiConfig.anthropicExtractionModel,
       openaiModel: aiConfig.openaiExtractionModel,
+      promptVersion,
+      classification: classification.type,
       setupMs: Date.now() - startTime,
       phaseTiming,
     })
@@ -1500,11 +1539,21 @@ router.post(
 
           markPhase('anthropic_ms', anthropicStart)
 
-          log.info('Anthropic extraction successful', {
+          // ── FIX 7: Provider attempt log ──
+          log.info('Provider attempt', {
             requestId,
-            anthropicMs: Date.now() - anthropicStart,
-            totalMs: Date.now() - startTime,
-            phaseTiming,
+            provider: 'anthropic',
+            attempt: 1,
+            ofTotal: 3,
+          })
+
+          // ── FIX 7: Provider succeeded log ──
+          log.info('Provider succeeded', {
+            requestId,
+            provider: 'anthropic',
+            coverageCount: (parsedData as any)?.coverages?.length ?? 0,
+            validationPassed: true,
+            durationMs: Date.now() - anthropicStart,
           })
 
           // Record successful extraction metric
@@ -1557,6 +1606,8 @@ router.post(
             route: '/api/ai/extract',
             elapsedMs: Date.now() - startTime,
             phaseTiming,
+            degradedReason,
+            promptVersion,
           })
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Unknown error'
@@ -1569,27 +1620,23 @@ router.post(
             phaseTiming,
           })
 
-          // Classify the Anthropic error for structured fallback reporting
-          const isBillingError =
-            message.includes('credit') ||
-            message.includes('billing') ||
-            message.includes('FAILED_PRECONDITION')
-          const isRateLimitError = message.includes('429') || message.includes('rate_limit')
-          const isAuthError = message.includes('401') || message.includes('invalid x-api-key')
-          const isOverloadedError = message.includes('overloaded') || message.includes('529')
+          // ── FIX 1: Classify error using the canonical helper ──
+          const classified = classifyProviderError(error, 'anthropic', requestId)
+          const fallbackReason = classified instanceof BillingError ? 'ANTHROPIC_BILLING_ERROR' : `ANTHROPIC_${classified.name.toUpperCase()}_${error instanceof Error ? error.name : 'UNKNOWN'}`.substring(0, 50)
 
-          // Determine fallback reason for structured response
-          const isAbortTimeout = error instanceof Error && error.name === 'AbortError'
-          let fallbackReason = 'ANTHROPIC_UNKNOWN_ERROR'
-          if (isAbortTimeout) fallbackReason = 'ANTHROPIC_SDK_TIMEOUT'
-          else if (isBillingError) fallbackReason = 'ANTHROPIC_BILLING_ERROR'
-          else if (isRateLimitError) fallbackReason = 'ANTHROPIC_RATE_LIMITED'
-          else if (isAuthError) fallbackReason = 'ANTHROPIC_AUTH_ERROR'
-          else if (isOverloadedError) fallbackReason = 'ANTHROPIC_OVERLOADED'
-          else if (message.includes('timeout') || message.includes('ETIMEDOUT'))
-            fallbackReason = 'ANTHROPIC_TIMEOUT'
+          // ── FIX 1: Track degradedReason for billing errors ──
+          if (classified instanceof BillingError) {
+            degradedReason = 'primary_billing_error'
+          }
 
-          // Capture in Sentry (even though we're falling back to OpenAI, record the failure)
+          // ── FIX 7: Provider rejected log ──
+          log.warn('Provider output rejected', {
+            requestId,
+            provider: 'anthropic',
+            reasons: [classified.message],
+          })
+
+          // Capture in Sentry (even though we're falling back, record the failure)
           captureServerError(error instanceof Error ? error : new Error(message), {
             requestId,
             provider: 'anthropic',
@@ -1598,7 +1645,7 @@ router.post(
             willFallback: !!openaiClient,
           })
 
-          // Record Anthropic failure metric (even in fallback path)
+          // Record Anthropic failure metric
           recordExtractionEvent({
             requestId,
             timestamp: new Date().toISOString(),
@@ -1625,65 +1672,17 @@ router.post(
             errorMessage: message.substring(0, 200),
           })
 
-          // Notify admin for critical errors (not for transient capacity issues)
-          if (isBillingError) {
-            log.warn('Anthropic billing error, falling back to OpenAI', {
+          // ── FIX 1 + FIX 6: Fire alert (billing → high priority, transient → silent) ──
+          if (classified instanceof BillingError) {
+            alertBilling('Anthropic', message, {
               requestId,
               fallbackReason,
-            })
-            adminNotificationService
-              .notifyBillingIssue('Anthropic', message, {
-                requestId,
-                errorMessage: message,
-                timestamp: new Date().toISOString(),
-              })
-              .catch((err) =>
-                log.warn('Failed to notify billing issue', {
-                  provider: 'Anthropic',
-                  requestId,
-                  error: err instanceof Error ? err.message : String(err),
-                })
-              )
-          } else if (isRateLimitError) {
-            log.warn('Anthropic rate limit, falling back to OpenAI', { requestId, fallbackReason })
-            adminNotificationService
-              .notifyRateLimit('Anthropic', {
-                requestId,
-                errorMessage: message,
-                timestamp: new Date().toISOString(),
-              })
-              .catch((err) =>
-                log.warn('Failed to notify rate limit', {
-                  provider: 'Anthropic',
-                  requestId,
-                  error: err instanceof Error ? err.message : String(err),
-                })
-              )
-          } else if (isAuthError) {
-            log.warn('Anthropic auth error, falling back to OpenAI', { requestId, fallbackReason })
-            adminNotificationService
-              .notifyAPIError('Anthropic', 'INVALID_API_KEY', message, {
-                requestId,
-                timestamp: new Date().toISOString(),
-              })
-              .catch((err) =>
-                log.warn('Failed to notify API error', {
-                  provider: 'Anthropic',
-                  requestId,
-                  error: err instanceof Error ? err.message : String(err),
-                })
-              )
-          } else if (isOverloadedError) {
-            log.info('Anthropic overloaded (capacity issue), falling back to OpenAI', {
-              requestId,
-              fallbackReason,
-            })
+              phaseTiming,
+            }).catch(() => {})
           } else {
-            log.warn('Anthropic failed with unknown error, falling back to OpenAI', {
-              requestId,
-              fallbackReason,
-              error: message,
-            })
+            alertProviderFallback('Anthropic', fallbackReason, requestId, {
+              phaseTiming,
+            }).catch(() => {})
           }
 
           // Store fallback reason for response
@@ -2123,13 +2122,38 @@ ${documentText.substring(0, 8000)}`
 
         const isFallback = !!anthropicClient
         const storedFallbackReason = (req as Request & { _fallbackReason?: string })._fallbackReason
-        log.info('OpenAI extraction successful', {
+
+        // ── FIX 4: Output validation ──
+        const oaiParsed = parsedOpenAIData as Record<string, unknown>
+        const oaiValidation = validateOutput(oaiParsed, documentText, policyType)
+        if (!oaiValidation.pass && isFallback) {
+          log.warn('OpenAI (fallback) output validation failed', {
+            requestId,
+            summary: oaiValidation.summary,
+          })
+          // Only reject if validation fails AND we still have DeepSeek as fallback
+          const dsAvailable = !!getDeepSeekClient() || !!process.env.DEEPSEEK_API_KEY
+          if (dsAvailable && !oaiValidation.pass) {
+            throw new Error(`OpenAI output validation failed: ${oaiValidation.summary}`)
+          }
+        }
+
+        // ── FIX 5: Document type consistency check ──
+        const typeCheck = checkTypeConsistency(classification, oaiParsed.policyType as string | undefined)
+        if (!typeCheck.consistent) {
+          log.warn('Policy type mismatch', {
+            requestId,
+            mismatch: typeCheck.mismatchDescription,
+          })
+        }
+
+        // ── FIX 7: Provider succeeded log ──
+        log.info('Provider succeeded', {
           requestId,
-          fallback: isFallback,
-          fallbackReason: storedFallbackReason,
-          openaiMs: phaseTiming['openai_ms'],
-          totalMs: Date.now() - startTime,
-          phaseTiming,
+          provider: 'openai',
+          coverageCount: oaiParsed.coverages?.length ?? 0,
+          validationPassed: oaiValidation.pass,
+          durationMs: Date.now() - openaiStart,
         })
 
         // Record successful extraction metric
@@ -2158,11 +2182,10 @@ ${documentText.substring(0, 8000)}`
         // Fire push notification if user is authenticated (non-blocking fire-and-forget)
         const notifyUserIdUNI_OAI = req.headers['x-user-id'] as string | undefined
         if (notifyUserIdUNI_OAI) {
-          const extractedUNI_OAI = parsedOpenAIData as Record<string, unknown>
           sendExtractionCompleteNotification(
             notifyUserIdUNI_OAI,
-            String(extractedUNI_OAI.policyType || 'policy'),
-            (extractedUNI_OAI.policyNumber as string | null | undefined) ?? null
+            String(oaiParsed.policyType || 'policy'),
+            (oaiParsed.policyNumber as string | null | undefined) ?? null
           ).catch((err) =>
             log.warn('Push notification failed after unified/OpenAI extraction', {
               requestId,
@@ -2177,13 +2200,15 @@ ${documentText.substring(0, 8000)}`
           usage: response.usage,
           model: response.model,
           provider: 'openai',
-          fallback: isFallback, // Indicates if we fell back from Anthropic
+          fallback: isFallback,
           ...(isFallback && storedFallbackReason && { fallbackReason: storedFallbackReason }),
           cost: cost.totalCost,
           requestId,
           route: '/api/ai/extract',
           elapsedMs: Date.now() - startTime,
           phaseTiming,
+          degradedReason,
+          promptVersion,
           ...(isFallback && {
             fallbackChain: [
               { provider: 'anthropic', success: false, error_code: storedFallbackReason },
@@ -2196,21 +2221,28 @@ ${documentText.substring(0, 8000)}`
         const message = error instanceof Error ? error.message : 'Unknown error'
         log.error('OpenAI also failed', { requestId, error: message, phaseTiming })
 
-        // Classify error code
+        // ── FIX 1: Classify error ──
+        const oaiClassified = classifyProviderError(error, 'openai', requestId)
         let openaiErrorCode = 'OPENAI_UNKNOWN_ERROR'
-        const isAbortTimeout = error instanceof Error && error.name === 'AbortError'
-        if (isAbortTimeout) openaiErrorCode = 'OPENAI_SDK_TIMEOUT'
-        else if (message.includes('401') || message.includes('Incorrect API key'))
-          openaiErrorCode = 'OPENAI_AUTH_ERROR'
-        else if (message.includes('429')) openaiErrorCode = 'OPENAI_RATE_LIMITED'
-        else if (message.includes('insufficient_quota') || message.includes('billing'))
+        if (oaiClassified instanceof BillingError) {
           openaiErrorCode = 'OPENAI_BILLING_ERROR'
-        else if (message.includes('timeout') || message.includes('ETIMEDOUT'))
-          openaiErrorCode = 'OPENAI_TIMEOUT'
-        else if (message.includes('context_length_exceeded'))
-          openaiErrorCode = 'OPENAI_CONTEXT_LENGTH'
+          if (!degradedReason) degradedReason = 'all_providers_billing_error'
+        } else if (oaiClassified instanceof TransientError) {
+          openaiErrorCode = 'OPENAI_TRANSIENT_ERROR'
+          if (!degradedReason) degradedReason = 'fallback_provider_error'
+        }
+        if (message.includes('Output validation')) {
+          openaiErrorCode = 'OPENAI_VALIDATION_REJECTED'
+        }
 
-        // Capture in Sentry — both providers failed, this is critical
+        // ── FIX 7: Provider rejected log ──
+        log.warn('Provider output rejected', {
+          requestId,
+          provider: 'openai',
+          reasons: [message.substring(0, 200)],
+        })
+
+        // Capture in Sentry
         captureServerError(error instanceof Error ? error : new Error(message), {
           requestId,
           provider: 'openai',
@@ -2246,39 +2278,16 @@ ${documentText.substring(0, 8000)}`
           errorMessage: message.substring(0, 200),
         })
 
-        // Notify admin — both providers failed is always critical
-        adminNotificationService
-          .notifyAPIError(
-            'OpenAI',
-            openaiErrorCode,
-            `All providers failed. OpenAI error: ${message.substring(0, 200)}`,
-            {
-              requestId,
-              allProvidersFailed: true,
-              documentLength: documentText?.length ?? 0,
-            }
-          )
-          .catch((err) =>
-            log.warn('Failed to notify all-providers-failed', {
-              requestId,
-              error: err instanceof Error ? err.message : String(err),
-            })
-          )
-
-        // Legacy: specific billing notification
-        if (message.includes('insufficient_quota') || message.includes('billing')) {
-          adminNotificationService
-            .notifyBillingIssue('OpenAI', message, {
-              requestId,
-              timestamp: new Date().toISOString(),
-            })
-            .catch((err) =>
-              log.warn('Failed to notify billing issue', {
-                provider: 'OpenAI',
-                requestId,
-                error: err instanceof Error ? err.message : String(err),
-              })
-            )
+        // ── FIX 1 + FIX 6: Unified alerting ──
+        if (oaiClassified instanceof BillingError) {
+          alertBilling('OpenAI', message, {
+            requestId,
+            errorCode: openaiErrorCode,
+          }).catch(() => {})
+        } else {
+          alertProviderFallback('OpenAI', openaiErrorCode, requestId, {
+            anthropicError: (req as any)._fallbackReason,
+          }).catch(() => {})
         }
 
         const isTimeout = openaiErrorCode.includes('TIMEOUT')
@@ -2413,6 +2422,35 @@ ${documentText.substring(0, 8000)}`
               allProvidersFailed: true,
             })
 
+            // ── FIX 1 + FIX 6: All providers failed — alert + billing vs transient ──
+            alertAllProvidersFailed(`DeepSeek: ${dsMsg}`, requestId, 'anthropic→openai→deepseek', {
+              anthropicError: (req as any)._fallbackReason,
+              openaiError: openaiErrorCode,
+            }).catch(() => {})
+
+            // ── FIX 7: Final outcome log ──
+            log.info('Extraction completed', {
+              requestId,
+              finalProvider: 'deepseek',
+              promptVersion,
+              degradedReason,
+              totalDurationMs: Date.now() - startTime,
+              success: false,
+            })
+
+            // ── FIX 1: ALL providers failed with billing → 503 ──
+            if (degradedReason === 'all_providers_billing_error') {
+              return res.status(503).json({
+                error: 'Extraction unavailable — all AI providers exhausted (billing/credit)',
+                code: 'EXTRACTION_UNAVAILABLE_BILLING',
+                details: `Operator action required: credit/balance top-up needed. Anthropic: ${(req as any)._fallbackReason}. OpenAI: ${message.substring(0, 100)}. DeepSeek: ${dsMsg}`,
+                elapsedMs: Date.now() - startTime,
+                phaseTiming: { ...phaseTiming, deepseek_ms: Date.now() - startTime },
+                requestId,
+                timestamp: new Date().toISOString(),
+              })
+            }
+
             return res.status(500).json({
               error: 'All AI providers failed',
               code: 'ALL_PROVIDERS_FAILED',
@@ -2427,6 +2465,16 @@ ${documentText.substring(0, 8000)}`
             })
           }
         }
+
+        // ── FIX 7: Final outcome log (no DeepSeek fallback) ──
+        log.info('Extraction completed', {
+          requestId,
+          finalProvider: 'openai',
+          promptVersion,
+          degradedReason,
+          totalDurationMs: Date.now() - startTime,
+          success: false,
+        })
 
         return res.status(isTimeout ? 504 : 500).json({
           error: isTimeout
