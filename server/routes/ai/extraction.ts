@@ -1335,9 +1335,22 @@ router.post(
     const PRIMARY_PROVIDER_TIMEOUT_MS = aiConfig.primaryProviderTimeoutMs
     const FALLBACK_PROVIDER_TIMEOUT_MS = aiConfig.fallbackProviderTimeoutMs
 
+    // ── FIX 5: Document classifier — gates policy type before extraction ──
+    // Run classification FIRST so we can select the correct type-specific prompt.
+    const classification = classifyDocument(documentText)
+    log.info('Document classification', {
+      requestId,
+      type: classification.type,
+      confidence: classification.confidence,
+      hints: classification.hints.slice(0, 5),
+    })
+
+    // Use classification result as prompt type if client didn't provide one
+    const effectivePolicyType = policyType || classification.type
+
     // ── FIX 2: Centralised prompt loading (same prompt for all providers) ──
     const promptStart = Date.now()
-    const loadedPrompts = await loadPrompts(documentText, policyType, clientPrompt)
+    const loadedPrompts = await loadPrompts(documentText, effectivePolicyType, clientPrompt)
     markPhase('promptLoad_ms', promptStart)
     const {
       openaiSystemPrompt,
@@ -1346,15 +1359,6 @@ router.post(
       templateMeta: promptMeta,
     } = loadedPrompts
     const promptVersion = getPromptVersionTag(promptMeta)
-
-    // ── FIX 5: Document classifier — gates policy type before extraction ──
-    const classification = classifyDocument(documentText)
-    log.info('Document classification', {
-      requestId,
-      type: classification.type,
-      confidence: classification.confidence,
-      hints: classification.hints.slice(0, 5),
-    })
 
     // ── degradedReason tracks WHY we fell back (injected into final response) ──
     let degradedReason: string | undefined
