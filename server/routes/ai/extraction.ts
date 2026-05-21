@@ -35,7 +35,7 @@ import * as adminNotificationService from '../../services/admin-notification-ser
 import { getAIConfig } from '../../services/config-service.js'
 import { alertBilling, alertProviderFallback, dispatchAlert } from '../../lib/alert-service.js'
 import { loadPrompts, getPromptVersionTag } from '../../lib/prompt-loader.js'
-import { classifyDocument } from '../../lib/classifier-gate.js'
+import { classifyDocument, checkTypeConsistency } from '../../lib/classifier-gate.js'
 import {
   runExtractionPipeline,
   BillingError,
@@ -1530,6 +1530,33 @@ router.post(
             )
           }
 
+          // ── Type consistency check (Anthropic path) ────────────────
+          const extractedANT = parsedData as Record<string, unknown>
+          const antConsistency = checkTypeConsistency(
+            classification,
+            extractedANT.policyType as string | null | undefined
+          )
+          if (!antConsistency.consistent) {
+            log.warn('Type mismatch in Anthropic response: ' + antConsistency.mismatchDescription, {
+              requestId,
+            })
+            degradedReason = degradedReason
+              ? degradedReason + '; Type mismatch: ' + antConsistency.mismatchDescription
+              : 'Type mismatch: ' + antConsistency.mismatchDescription
+            dispatchAlert({
+              severity: 'warning',
+              category: 'api_error',
+              title: 'Policy Type Mismatch (Anthropic)',
+              message: antConsistency.mismatchDescription || 'Unknown mismatch',
+              provider: 'anthropic',
+              dedupKey:
+                'type_mismatch:' +
+                classification.type +
+                '->' +
+                String(extractedANT.policyType || '?'),
+            }).catch(() => {})
+          }
+
           return res.json({
             success: true,
             data: parsedData,
@@ -2135,6 +2162,31 @@ ${documentText.substring(0, 8000)}`
 
       markPhase(`${providerName}_ms`, startTime)
       markPhase('pipeline_ms', startTime)
+
+      // ── Type consistency check ──────────────────────────────────────
+      // If the heuristic classifier and the LLM disagree on document type,
+      // flag it as degraded so the frontend/operator knows the result may
+      // use the wrong coverage schema.
+      const consistency = checkTypeConsistency(
+        classification,
+        parsedData.policyType as string | null | undefined
+      )
+      if (!consistency.consistent) {
+        log.warn('Type mismatch in response: ' + consistency.mismatchDescription, { requestId })
+        const mismatchNote = 'Type mismatch: ' + consistency.mismatchDescription
+        ;(result as any).degradedReason = result.degradedReason
+          ? result.degradedReason + '; ' + mismatchNote
+          : mismatchNote
+        dispatchAlert({
+          severity: 'warning',
+          category: 'api_error',
+          title: 'Policy Type Mismatch Detected',
+          message: consistency.mismatchDescription || 'Unknown mismatch',
+          provider: providerName,
+          dedupKey:
+            'type_mismatch:' + classification.type + '->' + String(parsedData.policyType || '?'),
+        }).catch(() => {})
+      }
 
       log.info('Provider succeeded', {
         requestId,
