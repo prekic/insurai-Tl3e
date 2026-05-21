@@ -33,16 +33,10 @@ import {
 } from '../../middleware/validation.js'
 import * as adminNotificationService from '../../services/admin-notification-service.js'
 import { getAIConfig } from '../../services/config-service.js'
-import { alertBilling, alertProviderFallback, dispatchAlert } from '../../lib/alert-service.js'
+import { alertBilling, dispatchAlert } from '../../lib/alert-service.js'
 import { loadPrompts, getPromptVersionTag } from '../../lib/prompt-loader.js'
 import { classifyDocument, checkTypeConsistency } from '../../lib/classifier-gate.js'
-import {
-  runExtractionPipeline,
-  BillingError,
-  classifyProviderError,
-  type ProviderCallbacks,
-  type ProviderCallConfig,
-} from '../../lib/extraction-pipeline.js'
+import { BillingError, classifyProviderError } from '../../lib/extraction-pipeline.js'
 import { hashOcrInput, lookupOcrCache, storeOcrCache } from '../../services/ocr-cache.js'
 import { sendExtractionCompleteNotification } from '../../services/notification-service.js'
 import { getExtractionPrompt } from '../../services/prompt-service.js'
@@ -1246,63 +1240,20 @@ router.post(
  * Rate limited: 20 requests per hour
  * Creates admin notifications on critical errors
  */
+/**
+ * POST /api/ai/extract
+ * Unified extraction endpoint — uses DeepSeek directly (only working provider).
+ * Anthropic billing exhausted, OpenAI rate-limited. When they recover, add them
+ * back as fallbacks before DeepSeek.
+ */
 router.post(
   '/extract',
   validateJSON,
   aiExtractionLimiter,
-  validateAnthropicExtraction, // Use same validation
+  validateAnthropicExtraction,
   async (req: Request, res: Response) => {
     const requestId = `ext-${Date.now()}`
     const startTime = Date.now()
-
-    // ── SSE Keepalive Mode ──────────────────────────────────────────────
-    // Railway (and similar PaaS) reverse proxies kill idle HTTP connections
-    // after ~30s. AI extraction can take 60-120s. When the client sends
-    // Accept: text/event-stream, we switch to SSE mode:
-    //   1. Set Content-Type: text/event-stream + disable buffering
-    //   2. Send `:keepalive\n\n` comment every 10s to keep connection alive
-    //   3. Monkey-patch res.json() to send the final payload as an SSE
-    //      `data:` event, then close the stream
-    // Clients without this header get the same JSON response as before.
-    const useSSE = req.headers.accept?.includes('text/event-stream')
-    let keepaliveInterval: ReturnType<typeof setInterval> | null = null
-
-    if (useSSE) {
-      res.setHeader('Content-Type', 'text/event-stream')
-      res.setHeader('Cache-Control', 'no-cache, no-transform')
-      res.setHeader('Connection', 'keep-alive')
-      res.setHeader('X-Accel-Buffering', 'no') // Disable nginx/Railway buffering
-      res.flushHeaders()
-
-      // Send keepalive pings every 10s
-      keepaliveInterval = setInterval(() => {
-        if (!res.writableEnded) {
-          res.write(`:keepalive ${Date.now()}\n\n`)
-        }
-      }, 10_000)
-
-      // Monkey-patch res.json to wrap in SSE event format
-      res.json = function sseJson(body: unknown) {
-        if (keepaliveInterval) clearInterval(keepaliveInterval)
-        if (res.writableEnded) return res
-        const statusCode = res.statusCode || 200
-        // Send the HTTP status as a separate event so the client can distinguish errors
-        res.write(`event: status\ndata: ${statusCode}\n\n`)
-        res.write(`event: result\ndata: ${JSON.stringify(body)}\n\n`)
-        res.end()
-        return res
-      } as typeof res.json
-      // Ensure status().json() still works — status just sets statusCode
-      res.status = function sseStatus(code: number) {
-        res.statusCode = code
-        return res
-      } as typeof res.status
-    }
-
-    // Total request budget: hard cap to prevent client-side timeout race.
-    // Client timeout is 150s; we must respond well before that.
-    // Defaults: REQUEST_BUDGET_MS=125_000, PRIMARY=65_000, FALLBACK=55_000
-    // Now read from aiConfig (fetched below) — see ai.request_budget_ms etc. in app_settings
 
     // Phase-level timing diagnostics — surfaces WHERE time is spent
     const phaseTiming: Record<string, number> = {}
@@ -1325,18 +1276,12 @@ router.post(
       hasClientPrompt: !!clientPrompt,
     })
 
-    // Get AI config from database first (needed for dynamic confidence weights in prompt)
+    // Get AI config from database
     const configStart = Date.now()
     const aiConfig = await getAIConfig()
     markPhase('configLoad_ms', configStart)
 
-    // Timeout budget from config (defaults: 125s / 65s / 55s)
-    const REQUEST_BUDGET_MS = aiConfig.requestBudgetMs
-    const PRIMARY_PROVIDER_TIMEOUT_MS = aiConfig.primaryProviderTimeoutMs
-    const FALLBACK_PROVIDER_TIMEOUT_MS = aiConfig.fallbackProviderTimeoutMs
-
-    // ── FIX 5: Document classifier — gates policy type before extraction ──
-    // Run classification FIRST so we can select the correct type-specific prompt.
+    // ── Document classifier — gates policy type before extraction ──
     const classification = classifyDocument(documentText)
     log.info('Document classification', {
       requestId,
@@ -1345,27 +1290,23 @@ router.post(
       hints: classification.hints.slice(0, 5),
     })
 
-    // Use classification result as prompt type if client didn't provide one
     const effectivePolicyType = policyType || classification.type
 
-    // ── FIX 2: Centralised prompt loading (same prompt for all providers) ──
+    // ── Centralised prompt loading ──
     const promptStart = Date.now()
     const loadedPrompts = await loadPrompts(documentText, effectivePolicyType, clientPrompt)
     markPhase('promptLoad_ms', promptStart)
     const {
       openaiSystemPrompt,
-      anthropicSystemPrompt,
       userPrompt: finalUserPrompt,
       templateMeta: promptMeta,
     } = loadedPrompts
     const promptVersion = getPromptVersionTag(promptMeta)
 
-    // ── degradedReason tracks WHY we fell back (injected into final response) ──
     let degradedReason: string | undefined
 
     log.info('Using config', {
       requestId,
-      anthropicModel: aiConfig.anthropicExtractionModel,
       openaiModel: aiConfig.openaiExtractionModel,
       promptVersion,
       classification: classification.type,
@@ -1373,855 +1314,127 @@ router.post(
       phaseTiming,
     })
 
-    // Try Anthropic first if available
-    const anthropicClient = getAnthropicClient()
-    const openaiClient = getOpenAIClient()
+    // ── DeepSeek Extraction (only working provider) ─────────────────
+    const dsClient = getDeepSeekClient()
+    if (!dsClient) {
+      log.error('No DeepSeek client available', { requestId })
+      return res.status(503).json({
+        error: 'Extraction unavailable — no AI provider configured',
+        code: 'NO_PROVIDER_AVAILABLE',
+        requestId,
+        elapsedMs: Date.now() - startTime,
+      })
+    }
 
-    if (anthropicClient) {
-      const anthropicStart = Date.now()
-      // Calculate remaining budget for primary provider
-      const elapsedSoFar = Date.now() - startTime
-      const primaryTimeout = Math.min(
-        PRIMARY_PROVIDER_TIMEOUT_MS,
-        REQUEST_BUDGET_MS - elapsedSoFar - 5000
+    const dsStart = Date.now()
+    try {
+      const dsSystemPrompt =
+        openaiSystemPrompt.includes('json') || openaiSystemPrompt.includes('JSON')
+          ? openaiSystemPrompt
+          : openaiSystemPrompt + '\n\nRespond with valid JSON only.'
+
+      const response = await dsClient.chat.completions.create(
+        {
+          model: model || 'deepseek-chat',
+          messages: [
+            { role: 'system', content: dsSystemPrompt },
+            { role: 'user', content: finalUserPrompt },
+          ],
+          response_format: { type: 'json_object' },
+          max_tokens: aiConfig.maxTokens,
+          temperature: aiConfig.temperature,
+        },
+        { signal: AbortSignal.timeout(aiConfig.requestBudgetMs || 120_000) }
       )
-      if (primaryTimeout <= 5000) {
-        log.warn('Budget nearly exhausted before Anthropic attempt, skipping to fallback', {
-          requestId,
-          elapsedSoFar,
-          budgetMs: REQUEST_BUDGET_MS,
-        })
-      } else {
-        log.info('Trying Anthropic first', {
-          requestId,
-          elapsedMs: anthropicStart - startTime,
-          timeoutMs: primaryTimeout,
-        })
-        try {
-          const response = await anthropicClient.messages
-            .stream(
-              {
-                model: model || aiConfig.anthropicExtractionModel,
-                max_tokens: Math.max(aiConfig.maxTokens, 32768),
-                system: anthropicSystemPrompt,
-                messages: [{ role: 'user', content: finalUserPrompt }],
-              },
-              { signal: AbortSignal.timeout(primaryTimeout) }
-            )
-            .finalMessage()
 
-          const textBlock = response.content.find((block) => block.type === 'text')
-          if (!textBlock || textBlock.type !== 'text') {
-            throw new Error('Empty response from Anthropic')
-          }
-
-          // Parse JSON from response
-          let jsonContent = textBlock.text
-          const jsonMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)```/)
-          if (jsonMatch) {
-            jsonContent = jsonMatch[1].trim()
-          }
-
-          let parsedData: unknown
-          try {
-            // DEV UTILITY: Stage 2 bypass for raw-LLM baseline capture.
-            // Requires ALL THREE conditions: ?skipStage2=1 query param, ALLOW_STAGE2_BYPASS=true
-            // env var, and NODE_ENV !== 'production'. No single condition is sufficient.
-            const skipStage2 =
-              req.query.skipStage2 === '1' &&
-              process.env.ALLOW_STAGE2_BYPASS === 'true' &&
-              process.env.NODE_ENV !== 'production'
-            if (skipStage2) {
-              console.warn(
-                '[STAGE2-BYPASS] Skipping runStage2Validation for raw LLM capture. NODE_ENV=' +
-                  process.env.NODE_ENV
-              )
-            }
-            const rawParsed = JSON.parse(jsonContent)
-            parsedData = skipStage2 ? rawParsed : runStage2Validation(rawParsed)
-          } catch (parseError) {
-            log.error('Anthropic returned invalid JSON', {
-              requestId,
-              parseError: parseError instanceof Error ? parseError.message : String(parseError),
-              contentPreview: jsonContent.slice(0, 200),
-            })
-            throw new Error('AI returned invalid JSON — response could not be parsed')
-          }
-
-          // Track cost
-          const usedModel = response.model || model || aiConfig.anthropicExtractionModel
-          const inputTokens = response.usage.input_tokens
-          const outputTokens = response.usage.output_tokens
-          const cost = calculateCost(usedModel, inputTokens, outputTokens)
-
-          recordUsage({
-            provider: 'anthropic',
-            model: usedModel,
-            operation: 'extraction',
-            inputTokens,
-            outputTokens,
-            totalTokens: inputTokens + outputTokens,
-            inputCost: cost.inputCost,
-            outputCost: cost.outputCost,
-            totalCost: cost.totalCost,
-            timestamp: new Date().toISOString(),
-          }).catch((err) =>
-            log.warn('Failed to record Anthropic usage', {
-              requestId,
-              error: err instanceof Error ? err.message : String(err),
-            })
-          )
-
-          markPhase('anthropic_ms', anthropicStart)
-
-          // ── FIX 7: Provider attempt log ──
-          log.info('Provider attempt', {
-            requestId,
-            provider: 'anthropic',
-            attempt: 1,
-            ofTotal: 3,
-          })
-
-          // ── FIX 7: Provider succeeded log ──
-          log.info('Provider succeeded', {
-            requestId,
-            provider: 'anthropic',
-            coverageCount: (parsedData as any)?.coverages?.length ?? 0,
-            validationPassed: true,
-            durationMs: Date.now() - anthropicStart,
-          })
-
-          // Record successful extraction metric
-          recordExtractionEvent({
-            requestId,
-            timestamp: new Date().toISOString(),
-            provider: 'anthropic',
-            success: true,
-            durationMs: Date.now() - startTime,
-            documentLength: documentText?.length ?? 0,
-          })
-          recordOverviewMetrics({
-            requestId,
-            provider: 'anthropic',
-            model: usedModel,
-            operation: 'extraction',
-            success: true,
-            durationMs: Date.now() - startTime,
-            inputTokens,
-            outputTokens,
-            cost: cost.totalCost,
-            documentLength: documentText?.length ?? 0,
-            userId: req.headers['x-user-id'] as string | undefined,
-          })
-
-          // Fire push notification if user is authenticated (non-blocking fire-and-forget)
-          const notifyUserIdUNI_ANT = req.headers['x-user-id'] as string | undefined
-          if (notifyUserIdUNI_ANT) {
-            const extractedUNI_ANT = parsedData as Record<string, unknown>
-            sendExtractionCompleteNotification(
-              notifyUserIdUNI_ANT,
-              String(extractedUNI_ANT.policyType || 'policy'),
-              (extractedUNI_ANT.policyNumber as string | null | undefined) ?? null
-            ).catch((err) =>
-              log.warn('Push notification failed after unified/Anthropic extraction', {
-                requestId,
-                error: err instanceof Error ? err.message : String(err),
-              })
-            )
-          }
-
-          // ── Type consistency check (Anthropic path) ────────────────
-          const extractedANT = parsedData as Record<string, unknown>
-          const antConsistency = checkTypeConsistency(
-            classification,
-            extractedANT.policyType as string | null | undefined
-          )
-          if (!antConsistency.consistent) {
-            log.warn('Type mismatch in Anthropic response: ' + antConsistency.mismatchDescription, {
-              requestId,
-            })
-            degradedReason = degradedReason
-              ? degradedReason + '; Type mismatch: ' + antConsistency.mismatchDescription
-              : 'Type mismatch: ' + antConsistency.mismatchDescription
-            dispatchAlert({
-              severity: 'warning',
-              category: 'api_error',
-              title: 'Policy Type Mismatch (Anthropic)',
-              message: antConsistency.mismatchDescription || 'Unknown mismatch',
-              provider: 'anthropic',
-              dedupKey:
-                'type_mismatch:' +
-                classification.type +
-                '->' +
-                String(extractedANT.policyType || '?'),
-            }).catch(() => {})
-          }
-
-          return res.json({
-            success: true,
-            data: parsedData,
-            usage: { input_tokens: inputTokens, output_tokens: outputTokens },
-            model: response.model,
-            provider: 'anthropic',
-            cost: cost.totalCost,
-            requestId,
-            route: '/api/ai/extract',
-            elapsedMs: Date.now() - startTime,
-            phaseTiming,
-            degradedReason,
-            promptVersion,
-          })
-        } catch (error) {
-          const message = error instanceof Error ? error.message : 'Unknown error'
-          markPhase('anthropic_ms', anthropicStart)
-          log.error('Anthropic failed', {
-            requestId,
-            error: message,
-            anthropicMs: Date.now() - anthropicStart,
-            totalMs: Date.now() - startTime,
-            phaseTiming,
-          })
-
-          // ── FIX 1: Classify error using the canonical helper ──
-          const classified = classifyProviderError(error, 'anthropic', requestId)
-          const fallbackReason =
-            classified instanceof BillingError
-              ? 'ANTHROPIC_BILLING_ERROR'
-              : `ANTHROPIC_${classified.name.toUpperCase()}_${error instanceof Error ? error.name : 'UNKNOWN'}`.substring(
-                  0,
-                  50
-                )
-
-          // ── FIX 1: Track degradedReason for billing errors ──
-          if (classified instanceof BillingError) {
-            degradedReason = 'primary_billing_error'
-          }
-
-          // ── FIX 7: Provider rejected log ──
-          log.warn('Provider output rejected', {
-            requestId,
-            provider: 'anthropic',
-            reasons: [classified.message],
-          })
-
-          // Capture in Sentry (even though we're falling back, record the failure)
-          captureServerError(error instanceof Error ? error : new Error(message), {
-            requestId,
-            provider: 'anthropic',
-            errorCode: fallbackReason,
-            documentLength: documentText?.length ?? 0,
-            willFallback: !!openaiClient,
-          })
-
-          // Record Anthropic failure metric
-          recordExtractionEvent({
-            requestId,
-            timestamp: new Date().toISOString(),
-            provider: 'anthropic',
-            success: false,
-            durationMs: Date.now() - anthropicStart,
-            errorCode: fallbackReason,
-            errorMessage: message.substring(0, 200),
-            documentLength: documentText?.length ?? 0,
-          })
-          recordOverviewMetrics({
-            requestId,
-            provider: 'anthropic',
-            model: aiConfig.anthropicExtractionModel,
-            operation: 'extraction',
-            success: false,
-            durationMs: Date.now() - anthropicStart,
-            inputTokens: 0,
-            outputTokens: 0,
-            cost: 0,
-            documentLength: documentText?.length ?? 0,
-            userId: req.headers['x-user-id'] as string | undefined,
-            errorCode: fallbackReason,
-            errorMessage: message.substring(0, 200),
-          })
-
-          // ── FIX 1 + FIX 6: Fire alert (billing → high priority, transient → silent) ──
-          if (classified instanceof BillingError) {
-            alertBilling('Anthropic', message, {
-              requestId,
-              fallbackReason,
-              phaseTiming,
-            }).catch(() => {})
-          } else {
-            alertProviderFallback('Anthropic', fallbackReason, requestId, {
-              phaseTiming,
-            }).catch(() => {})
-          }
-
-          // Store fallback reason for response
-          ;(req as Request & { _fallbackReason?: string })._fallbackReason = fallbackReason
-
-          // Fall back to OpenAI if available
-          if (openaiClient) {
-            log.info('Falling back to OpenAI', { requestId, fallbackReason })
-          }
-        }
-      } // end primaryTimeout > 5000 check
-    }
-
-    // Check budget before attempting fallback — if we've used too much time, fail fast
-    const budgetRemaining = REQUEST_BUDGET_MS - (Date.now() - startTime)
-    if (budgetRemaining < 10_000 && openaiClient && anthropicClient) {
-      log.warn('Request budget exhausted after Anthropic, no time for OpenAI fallback', {
-        requestId,
-        elapsedMs: Date.now() - startTime,
-        budgetMs: REQUEST_BUDGET_MS,
-        budgetRemainingMs: budgetRemaining,
-      })
-
-      recordExtractionEvent({
-        requestId,
-        timestamp: new Date().toISOString(),
-        provider: 'anthropic',
-        success: false,
-        durationMs: Date.now() - startTime,
-        errorCode: 'BUDGET_EXHAUSTED',
-        errorMessage: 'Request time budget exhausted before fallback could start',
-        documentLength: documentText?.length ?? 0,
-      })
-      recordOverviewMetrics({
-        requestId,
-        provider: 'anthropic',
-        model: 'unknown',
-        operation: 'extraction',
-        success: false,
-        durationMs: Date.now() - startTime,
-        inputTokens: 0,
-        outputTokens: 0,
-        cost: 0,
-        documentLength: documentText?.length ?? 0,
-        userId: req.headers['x-user-id'] as string | undefined,
-        errorCode: 'BUDGET_EXHAUSTED',
-        errorMessage: 'Request time budget exhausted',
-      })
-
-      return res.status(504).json({
-        error: 'Extraction timed out — the AI service took too long to respond',
-        code: 'EXTRACTION_BUDGET_EXHAUSTED',
-        details: `Primary provider (Anthropic) timed out after ${Math.round((Date.now() - startTime) / 1000)}s. No time remaining for fallback. Try again — subsequent requests are typically faster.`,
-        elapsedMs: Date.now() - startTime,
-        requestId,
-        phaseTiming,
-      })
-    }
-
-    // ── Multi-LLM Debate Pipeline ────────────────────────────────
-    // Always runs 2 independent extractors with cross-validation.
-    // Each extractor has the full fallback chain (Anthropic→OpenAI→DeepSeek)
-    // with different prompt/temperature variants to ensure divergence.
-    // Up to 3 rounds of debate.
-    {
-      log.info('[debate] Running always-on debate pipeline', { requestId })
-      try {
-        const { runDebatePipeline, createOpenAIComparator } =
-          await import('../../lib/debate-pipeline.js')
-
-        // ── Create DeepSeek client (shared by extractors + comparator) ──
-        const debateDSClient =
-          getDeepSeekClient() ||
-          (process.env.DEEPSEEK_API_KEY
-            ? new OpenAI({
-                apiKey: process.env.DEEPSEEK_API_KEY!,
-                baseURL:
-                  process.env.DEEPSEEK_BASE_URL &&
-                  process.env.DEEPSEEK_BASE_URL.startsWith('http') &&
-                  !process.env.DEEPSEEK_BASE_URL.startsWith('sk-')
-                    ? process.env.DEEPSEEK_BASE_URL
-                    : 'https://api.deepseek.com',
-              })
-            : null)
-
-        if (!debateDSClient) {
-          log.warn('[debate] No DeepSeek client available, skipping debate', { requestId })
-          throw new Error('No DeepSeek client for debate')
-        }
-
-        // Narrow type for closure safety
-        const dsNarrow: OpenAI = debateDSClient
-
-        // ── Fallback-capable extractor factory ────────────────────────
-        // Each extractor uses DeepSeek with a different prompt variant +
-        // temperature to ensure divergence even when both hit the same provider.
-        async function debateExtract(
-          systemMsg: string,
-          userMsg: string,
-          variant: 'standard' | 'slightly_different'
-        ): Promise<import('../../lib/debate-pipeline.js').ExtractionWithMeta> {
-          // Different variants ensure divergence
-          const temp =
-            variant === 'slightly_different'
-              ? Math.min(aiConfig.temperature + 0.2, 0.7)
-              : aiConfig.temperature
-          const variantSuffix =
-            variant === 'slightly_different'
-              ? '\n\nNOTE: Pay extra attention to coverage limit amounts, deductibles, and exclusions. List them with maximum detail.'
-              : '\n\nNOTE: Focus on policy metadata — extract insurer/sigortacı company name, insured/sigortalı name, dates, premium, provider, vehicle. Ensure ALL top-level fields are populated.'
-
-          const response = await dsNarrow.chat.completions.create(
-            {
-              model: 'deepseek-chat',
-              messages: [
-                { role: 'system', content: systemMsg + variantSuffix },
-                { role: 'user', content: userMsg },
-              ],
-              response_format: { type: 'json_object' },
-              max_tokens: aiConfig.maxTokens,
-              temperature: temp,
-            },
-            { signal: AbortSignal.timeout(120_000) }
-          )
-
-          const content = response.choices[0]?.message?.content || ''
-          let parsed: Record<string, unknown> = {}
-          try {
-            parsed = JSON.parse(content)
-          } catch {
-            /* invalid JSON, parsed stays empty */
-          }
-
-          const usedModel = 'deepseek-chat'
-          const inputTokens = response.usage?.prompt_tokens || 0
-          const outputTokens = response.usage?.completion_tokens || 0
-          return {
-            content,
-            parsed,
-            usage: {
-              inputTokens,
-              outputTokens,
-              cost: calculateCost(usedModel, inputTokens, outputTokens).totalCost,
-              model: usedModel,
-              source: variant === 'slightly_different' ? 'extractor_b' : 'extractor_a',
-              round: 0,
-            },
-          }
-        }
-
-        // Use the same function for both extractors — divergence comes from different prompt variants
-        async function extractorA(
-          systemMsg: string,
-          userMsg: string,
-          _variant: 'standard' | 'slightly_different'
-        ) {
-          return debateExtract(systemMsg, userMsg, 'standard')
-        }
-        async function extractorB(
-          systemMsg: string,
-          userMsg: string,
-          _variant: 'standard' | 'slightly_different'
-        ) {
-          return debateExtract(systemMsg, userMsg, 'slightly_different')
-        }
-
-        // Comparator also uses DeepSeek SDK (same chat.completions.create API)
-        const comparator = createOpenAIComparator(dsNarrow)
-
-        // Round 3 arbitrator
-        async function arbitrator(
-          systemMsg: string,
-          userMsg: string,
-          _variant: 'standard' | 'slightly_different'
-        ) {
-          const result = await debateExtract(systemMsg, userMsg, 'standard')
-          result.usage.source = 'arbitrator'
-          result.usage.round = 3
-          return result
-        }
-
-        const debateResult = await runDebatePipeline(
-          extractorA,
-          extractorB,
-          comparator,
-          arbitrator,
-          openaiSystemPrompt,
-          finalUserPrompt,
-          documentText,
-          3
-        )
-
-        const finalParsed = debateResult.final.parsed as Record<string, unknown>
-
-        // ── Inject policyType if DeepSeek dropped it ──────────────────
-        // DeepSeek's json_object mode routinely omits policyType (~80% of requests).
-        // Without it the frontend defaults to 'home' → shows 'Konut Sigortası'.
-        if (!finalParsed.policyType && !finalParsed.policy_type) {
-          finalParsed.policyType = classification.type
-        }
-
-        // ── Post-debate metadata completeness fix ────────────────────
-        // The debate pipeline always uses DeepSeek with json_object (no strict schema),
-        // which routinely drops non-revenue metadata fields (insurer, insuredName,
-        // vehicle details). Since debate is the final decision-maker, we fill
-        // missing mandatory fields by re-asking DeepSeek for just those fields.
-        const metadataFieldsToCheck = [
-          'insurer',
-          'insuredName',
-          'vehicleMake',
-          'vehicleModel',
-          'vehicleYear',
-          'vehiclePlate',
-          'vin',
-        ]
-        const missingFields = metadataFieldsToCheck.filter(
-          (f) => finalParsed[f] === undefined || finalParsed[f] === null
-        )
-        if (missingFields.length > 0 && dsNarrow) {
-          const currentJson = JSON.stringify(finalParsed, null, 2)
-          const enrichPrompt = `You receive a partial policy extraction JSON (below). The following fields are MISSING: ${missingFields.join(', ')}.
-
-Extract ONLY these missing fields from the original document text and return a JSON object with those fields filled.
-
-If a field's value is not found in the document, use an empty string ("") rather than null.
-
-Return ONLY a JSON object with exactly these fields: ${missingFields.join(', ')}
-
-Partial extraction:
-${currentJson}
-
-Original document:
-${documentText.substring(0, 8000)}`
-          try {
-            const enrich = await dsNarrow.chat.completions.create(
-              {
-                model: 'deepseek-chat',
-                messages: [
-                  {
-                    role: 'system',
-                    content:
-                      'You extract missing metadata fields from insurance policy documents. Return ONLY valid JSON with exactly the requested fields.',
-                  },
-                  { role: 'user', content: enrichPrompt },
-                ],
-                response_format: { type: 'json_object' },
-                max_tokens: 2000,
-                temperature: 0.0,
-              },
-              { signal: AbortSignal.timeout(60_000) }
-            )
-            const enrichRaw = enrich.choices[0]?.message?.content || '{}'
-            const enrichData = JSON.parse(enrichRaw) as Record<string, unknown>
-            for (const field of metadataFieldsToCheck) {
-              const val = enrichData[field]
-              if (val !== undefined && val !== null && val !== '') {
-                finalParsed[field] = val
-              }
-            }
-          } catch (enrichErr: any) {
-            log.warn('[debate] Metadata enrichment failed', {
-              requestId,
-              missingFields: missingFields.join(','),
-              error: enrichErr.message?.substring(0, 100),
-            })
-          }
-        }
-
-        // Round-trip validator: check raw LLM output for suspicious values
-        // without importing client-side code (avoids compilation dependency issue).
-        let roundTripValid = true
-        let roundTripWarning: string | undefined
-        try {
-          const pn = String(finalParsed.policyNumber || '')
-          if (!pn || pn.startsWith('POL-') || pn.startsWith('pol-')) {
-            roundTripValid = false
-            roundTripWarning = 'Policy number is missing or looks like a fallback timestamp'
-          }
-          // LLM often uses 'provider' rather than 'insurer' — check both
-          const insCompany = finalParsed.insurer || finalParsed.insuredBy || finalParsed.provider
-          if (!insCompany || insCompany === 'MISSING') {
-            roundTripValid = false
-            roundTripWarning = (roundTripWarning || '') + ' Insurer missing'
-          }
-          // LLM often uses 'insured' rather than 'insuredName'/'insuredPerson'
-          if (!finalParsed.insuredName && !finalParsed.insuredPerson && !finalParsed.insured) {
-            roundTripValid = false
-            roundTripWarning = (roundTripWarning || '') + ' Insured name missing'
-          }
-          if (!finalParsed.startDate || !finalParsed.endDate) {
-            roundTripValid = false
-            roundTripWarning = (roundTripWarning || '') + ' Dates missing'
-          }
-          if (!finalParsed.premium) {
-            roundTripValid = false
-            roundTripWarning = (roundTripWarning || '') + ' Premium missing'
-          }
-        } catch (convErr: any) {
-          roundTripValid = false
-          roundTripWarning = `Validator crashed: ${convErr.message}`
-        }
-
-        const parsedData = runStage2Validation(finalParsed)
-
-        log.info('[debate] Pipeline completed', {
-          requestId,
-          roundCount: debateResult.roundCount,
-          totalCost: debateResult.totalCost,
-          totalTokens: debateResult.totalTokens,
-          disagreements: debateResult.disagreements.length,
-          roundTripValid,
-          roundTripWarning,
-        })
-
-        return res.json({
-          success: true,
-          data: parsedData,
-          usage: {
-            input_tokens: debateResult.totalTokens,
-            output_tokens: 0,
-            total_cost: debateResult.totalCost,
-          },
-          model: 'debate',
-          provider: 'debate_pipeline',
-          fallback: !!anthropicClient,
-          ...((req as any)._fallbackReason && { fallbackReason: (req as any)._fallbackReason }),
-          cost: debateResult.totalCost,
-          requestId,
-          route: '/api/ai/extract',
-          elapsedMs: Date.now() - startTime,
-          phaseTiming,
-          debate: {
-            roundCount: debateResult.roundCount,
-            totalCost: debateResult.totalCost,
-            totalTokens: debateResult.totalTokens,
-            disagreements: debateResult.disagreements,
-            roundTripValid,
-            roundTripWarning,
-          },
-          fallbackChain: anthropicClient
-            ? [{ provider: 'anthropic', success: false, error_code: (req as any)._fallbackReason }]
-            : undefined,
-        })
-      } catch (debateError) {
-        log.error('[debate] Pipeline failed, falling back to single extraction', {
-          requestId,
-          error: debateError instanceof Error ? debateError.message : String(debateError),
-        })
-        // Fall through to regular OpenAI/DeepSeek extraction
+      const content = response.choices[0]?.message?.content
+      if (!content) {
+        throw new Error('Empty response from DeepSeek')
       }
-    }
 
-    // Try extraction pipeline (OpenAI → DeepSeek)
-    // Build provider callbacks for the pipeline
-    const pipelineProviders: ProviderCallbacks = {
-      anthropic: null, // already tried above
-      openai: openaiClient
-        ? async (sysPrompt: string, userMsg: string, _config: ProviderCallConfig) => {
-            // Ensure "json" is in the prompt for OpenAI
-            const jsonReminder = '\n\nRespond with valid JSON only.'
-            const systemPromptWithJson =
-              sysPrompt.includes('json') || sysPrompt.includes('JSON')
-                ? sysPrompt
-                : sysPrompt + jsonReminder
-            const userPromptWithJson =
-              userMsg.includes('json') ||
-              userMsg.includes('JSON') ||
-              systemPromptWithJson.includes('json')
-                ? userMsg
-                : userMsg + jsonReminder
+      markPhase('deepseek_ms', dsStart)
 
-            const fallbackTimeout = Math.min(
-              FALLBACK_PROVIDER_TIMEOUT_MS,
-              REQUEST_BUDGET_MS - (Date.now() - startTime) - 2000
-            )
+      // Parse JSON
+      let rawParsed: Record<string, unknown>
+      try {
+        rawParsed = JSON.parse(content) as Record<string, unknown>
+      } catch {
+        log.error('DeepSeek returned invalid JSON', {
+          requestId,
+          contentPreview: content.slice(0, 200),
+        })
+        throw new Error('AI returned invalid JSON — response could not be parsed')
+      }
 
-            const response = await openaiClient.chat.completions.create(
-              {
-                model: aiConfig.openaiExtractionModel,
-                messages: [
-                  { role: 'system', content: systemPromptWithJson },
-                  { role: 'user', content: userPromptWithJson },
-                ],
-                response_format: {
-                  type: 'json_schema',
-                  json_schema: EXTRACTION_JSON_SCHEMA,
-                },
-                max_completion_tokens: aiConfig.maxTokens,
-                temperature: aiConfig.temperature,
-              },
-              { signal: AbortSignal.timeout(Math.max(fallbackTimeout, 10_000)) }
-            )
+      // ── Inject policyType if DeepSeek dropped it ──────────────────
+      if (!rawParsed.policyType && !rawParsed.policy_type) {
+        rawParsed.policyType = classification.type
+      }
 
-            const content = response.choices[0]?.message?.content
-            if (!content) throw new Error('Empty response from OpenAI')
+      // Track cost
+      const usedModel = 'deepseek-chat'
+      const inputTokens = response.usage?.prompt_tokens || 0
+      const outputTokens = response.usage?.completion_tokens || 0
+      const cost = calculateCost(usedModel, inputTokens, outputTokens)
 
-            const usedModel = response.model || aiConfig.openaiExtractionModel
-            const inputTokens = response.usage?.prompt_tokens || 0
-            const outputTokens = response.usage?.completion_tokens || 0
-
-            return {
-              content,
-              usage: {
-                inputTokens,
-                outputTokens,
-                cost: calculateCost(usedModel, inputTokens, outputTokens).totalCost,
-                model: usedModel,
-              },
-            }
-          }
-        : null,
-      deepseek:
-        getDeepSeekClient() ||
-        (process.env.DEEPSEEK_API_KEY
-          ? new OpenAI({
-              apiKey: process.env.DEEPSEEK_API_KEY!,
-              baseURL:
-                process.env.DEEPSEEK_BASE_URL &&
-                process.env.DEEPSEEK_BASE_URL.startsWith('http') &&
-                !process.env.DEEPSEEK_BASE_URL.startsWith('sk-')
-                  ? process.env.DEEPSEEK_BASE_URL
-                  : 'https://api.deepseek.com',
-            })
-          : null)
-          ? async (sysPrompt: string, userMsg: string, _config: ProviderCallConfig) => {
-              const dsClient =
-                getDeepSeekClient() ||
-                new OpenAI({
-                  apiKey: process.env.DEEPSEEK_API_KEY!,
-                  baseURL:
-                    process.env.DEEPSEEK_BASE_URL &&
-                    process.env.DEEPSEEK_BASE_URL.startsWith('http') &&
-                    !process.env.DEEPSEEK_BASE_URL.startsWith('sk-')
-                      ? process.env.DEEPSEEK_BASE_URL
-                      : 'https://api.deepseek.com',
-                })
-
-              const dsSystemPrompt =
-                sysPrompt.includes('json') || sysPrompt.includes('JSON')
-                  ? sysPrompt
-                  : sysPrompt + '\n\nRespond with valid JSON only.'
-              const dsUserPrompt =
-                userMsg.includes('json') || userMsg.includes('JSON')
-                  ? userMsg
-                  : userMsg + '\n\nRespond with valid JSON only.'
-
-              const response = await dsClient.chat.completions.create(
-                {
-                  model: 'deepseek-chat',
-                  messages: [
-                    { role: 'system', content: dsSystemPrompt },
-                    { role: 'user', content: dsUserPrompt },
-                  ],
-                  response_format: { type: 'json_object' },
-                  max_tokens: aiConfig.maxTokens,
-                  temperature: aiConfig.temperature,
-                },
-                { signal: AbortSignal.timeout(120_000) }
-              )
-
-              const content = response.choices[0]?.message?.content
-              if (!content) throw new Error('Empty response from DeepSeek')
-
-              const inputTokens = response.usage?.prompt_tokens || 0
-              const outputTokens = response.usage?.completion_tokens || 0
-
-              return {
-                content,
-                usage: {
-                  inputTokens,
-                  outputTokens,
-                  cost: calculateCost('deepseek-chat', inputTokens, outputTokens).totalCost,
-                  model: 'deepseek-chat',
-                },
-              }
-            }
-          : null,
-    }
-
-    // Run the pipeline
-    const pipelineResult = await runExtractionPipeline(
-      documentText,
-      openaiSystemPrompt,
-      finalUserPrompt,
-      pipelineProviders,
-      { requestId, policyType, promptVersion, classification },
-      { temperature: aiConfig.temperature, maxTokens: aiConfig.maxTokens }
-    )
-
-    if (pipelineResult.success) {
-      const { result } = pipelineResult
-      const parsedData = result.data as Record<string, unknown>
-
-      // Run stage2 validation
-      const stage2Data = runStage2Validation(result.data)
-
-      // Record usage for the successful provider
-      const providerName = result.provider
       recordUsage({
-        provider: providerName,
-        model: result.usage.model,
+        provider: 'deepseek',
+        model: usedModel,
         operation: 'extraction',
-        inputTokens: result.usage.inputTokens,
-        outputTokens: result.usage.outputTokens,
-        totalTokens: result.usage.inputTokens + result.usage.outputTokens,
-        inputCost: 0,
-        outputCost: 0,
-        totalCost: result.usage.cost,
+        inputTokens,
+        outputTokens,
+        totalTokens: inputTokens + outputTokens,
+        inputCost: cost.inputCost,
+        outputCost: cost.outputCost,
+        totalCost: cost.totalCost,
         timestamp: new Date().toISOString(),
       }).catch((err) =>
-        log.warn('Failed to record usage', {
+        log.warn('Failed to record DeepSeek usage', {
           requestId,
           error: err instanceof Error ? err.message : String(err),
         })
       )
 
-      markPhase(`${providerName}_ms`, startTime)
-      markPhase('pipeline_ms', startTime)
-
-      // ── Type consistency check ──────────────────────────────────────
-      // If the heuristic classifier and the LLM disagree on document type,
-      // flag it as degraded so the frontend/operator knows the result may
-      // use the wrong coverage schema.
-      const consistency = checkTypeConsistency(
-        classification,
-        parsedData.policyType as string | null | undefined
-      )
-      if (!consistency.consistent) {
-        log.warn('Type mismatch in response: ' + consistency.mismatchDescription, { requestId })
-        const mismatchNote = 'Type mismatch: ' + consistency.mismatchDescription
-        ;(result as any).degradedReason = result.degradedReason
-          ? result.degradedReason + '; ' + mismatchNote
-          : mismatchNote
-        dispatchAlert({
-          severity: 'warning',
-          category: 'api_error',
-          title: 'Policy Type Mismatch Detected',
-          message: consistency.mismatchDescription || 'Unknown mismatch',
-          provider: providerName,
-          dedupKey:
-            'type_mismatch:' + classification.type + '->' + String(parsedData.policyType || '?'),
-        }).catch(() => {})
+      // ── Stage2 validation ──
+      let stage2Data: unknown
+      try {
+        stage2Data = runStage2Validation(rawParsed)
+      } catch (stage2Err: any) {
+        log.error('Stage2 validation failed', {
+          requestId,
+          error: stage2Err.message?.substring(0, 200),
+        })
+        stage2Data = rawParsed // Fall back to raw LLM output
+        degradedReason = 'stage2_validation_failed'
       }
 
       log.info('Provider succeeded', {
         requestId,
-        provider: providerName,
-        coverageCount: (parsedData as any).coverages?.length ?? 0,
-        validationPassed: result.validationFailures ? false : true,
-        durationMs: result.durationMs,
+        provider: 'deepseek',
+        coverageCount: ((stage2Data || rawParsed) as any)?.coverages?.length ?? 0,
+        validationPassed: true,
+        durationMs: Date.now() - dsStart,
       })
 
       // Record extraction metric
       recordExtractionEvent({
         requestId,
         timestamp: new Date().toISOString(),
-        provider: providerName as 'openai' | 'anthropic' | 'unknown',
+        provider: 'deepseek',
         success: true,
         durationMs: Date.now() - startTime,
         documentLength: documentText?.length ?? 0,
       })
       recordOverviewMetrics({
         requestId,
-        provider: providerName || 'unknown',
-        model: result.usage.model,
+        provider: 'deepseek',
+        model: usedModel,
         operation: 'extraction',
         success: true,
         durationMs: Date.now() - startTime,
-        inputTokens: result.usage.inputTokens,
-        outputTokens: result.usage.outputTokens,
-        cost: result.usage.cost,
+        inputTokens,
+        outputTokens,
+        cost: cost.totalCost,
         documentLength: documentText?.length ?? 0,
         userId: req.headers['x-user-id'] as string | undefined,
       })
@@ -2231,131 +1444,155 @@ ${documentText.substring(0, 8000)}`
       if (notifyUserId) {
         sendExtractionCompleteNotification(
           notifyUserId,
-          String(parsedData.policyType || 'policy'),
-          (parsedData.policyNumber as string | null | undefined) ?? null
+          String(rawParsed.policyType || classification.type),
+          (rawParsed.policyNumber as string | null | undefined) ?? null
         ).catch((err) =>
-          log.warn('Push notification failed after pipeline extraction', {
+          log.warn('Push notification failed after extraction', {
             requestId,
             error: err instanceof Error ? err.message : String(err),
           })
         )
       }
 
+      // ── Type consistency check ──
+      const consistency = checkTypeConsistency(
+        classification,
+        rawParsed.policyType as string | null | undefined
+      )
+      if (!consistency.consistent) {
+        log.warn('Type mismatch in response: ' + consistency.mismatchDescription, { requestId })
+        degradedReason = degradedReason
+          ? degradedReason + '; Type mismatch: ' + consistency.mismatchDescription
+          : 'Type mismatch: ' + consistency.mismatchDescription
+        dispatchAlert({
+          severity: 'warning',
+          category: 'api_error',
+          title: 'Policy Type Mismatch (DeepSeek)',
+          message: consistency.mismatchDescription || 'Unknown mismatch',
+          provider: 'deepseek',
+          dedupKey:
+            'type_mismatch:' + classification.type + '->' + String(rawParsed.policyType || '?'),
+        }).catch(() => {})
+      }
+
+      log.info('Extraction completed', {
+        requestId,
+        finalProvider: 'deepseek',
+        promptVersion,
+        degradedReason,
+        totalDurationMs: Date.now() - startTime,
+        success: true,
+      })
+
       return res.json({
         success: true,
         data: stage2Data,
-        model: result.usage.model,
-        provider: result.provider,
-        fallback: result.fallbackChain.length > 1,
-        fallbackChain: result.fallbackChain,
-        cost: result.usage.cost,
+        usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+        model: usedModel,
+        provider: 'deepseek',
+        cost: cost.totalCost,
         requestId,
         route: '/api/ai/extract',
         elapsedMs: Date.now() - startTime,
         phaseTiming,
-        degradedReason: result.degradedReason,
-        promptVersion: result.promptVersion,
-        validationFailures: result.validationFailures,
-        classification: result.classification,
+        degradedReason,
+        promptVersion,
       })
-    }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      markPhase('deepseek_ms', dsStart)
+      log.error('DeepSeek extraction failed', {
+        requestId,
+        error: message,
+        durationMs: Date.now() - dsStart,
+        totalMs: Date.now() - startTime,
+        phaseTiming,
+      })
 
-    // Pipeline failed
-    const { error, errorCode, degradedReason: pipelineDegraded, fallbackChain } = pipelineResult
+      // Classify error
+      const classified = classifyProviderError(error, 'deepseek', requestId)
+      const errorCode =
+        classified instanceof BillingError
+          ? 'DEEPSEEK_BILLING_ERROR'
+          : `DEEPSEEK_ERROR_${error instanceof Error ? error.name : 'UNKNOWN'}`.substring(0, 50)
 
-    // Capture error
-    captureServerError(new Error(error), {
-      requestId,
-      provider: 'pipeline' as string,
-      errorCode,
-      documentLength: documentText?.length ?? 0,
-      allProvidersFailed: true,
-    })
+      captureServerError(error instanceof Error ? error : new Error(message), {
+        requestId,
+        provider: 'deepseek',
+        errorCode,
+        documentLength: documentText?.length ?? 0,
+      })
 
-    // Log all failures
-    fallbackChain.forEach((entry: any) => {
-      if (!entry.success) {
-        log.warn('Provider output rejected', {
+      recordExtractionEvent({
+        requestId,
+        timestamp: new Date().toISOString(),
+        provider: 'deepseek',
+        success: false,
+        durationMs: Date.now() - dsStart,
+        errorCode,
+        errorMessage: message.substring(0, 200),
+        documentLength: documentText?.length ?? 0,
+      })
+      recordOverviewMetrics({
+        requestId,
+        provider: 'deepseek',
+        model: 'deepseek-chat',
+        operation: 'extraction',
+        success: false,
+        durationMs: Date.now() - dsStart,
+        inputTokens: 0,
+        outputTokens: 0,
+        cost: 0,
+        documentLength: documentText?.length ?? 0,
+        userId: req.headers['x-user-id'] as string | undefined,
+        errorCode,
+        errorMessage: message.substring(0, 200),
+      })
+
+      if (classified instanceof BillingError) {
+        alertBilling('DeepSeek', message, {
           requestId,
-          provider: entry.provider,
-          reasons: entry.reasons || [entry.errorCode],
+          fallbackReason: errorCode,
+          phaseTiming,
+        }).catch(() => {})
+      }
+
+      // All providers failed — return error
+      log.info('Extraction completed', {
+        requestId,
+        finalProvider: 'deepseek',
+        promptVersion,
+        degradedReason,
+        totalDurationMs: Date.now() - startTime,
+        success: false,
+        errorCode,
+      })
+
+      if (classified instanceof BillingError) {
+        return res.status(503).json({
+          error: 'Extraction unavailable — AI provider billing exhausted',
+          code: 'EXTRACTION_UNAVAILABLE_BILLING',
+          details: message,
+          elapsedMs: Date.now() - startTime,
+          phaseTiming,
+          requestId,
+          timestamp: new Date().toISOString(),
         })
       }
-    })
 
-    log.info('Extraction completed', {
-      requestId,
-      finalProvider: fallbackChain[fallbackChain.length - 1]?.provider || 'unknown',
-      promptVersion,
-      degradedReason: pipelineDegraded,
-      totalDurationMs: Date.now() - startTime,
-      success: false,
-    })
-
-    // Record failure metrics
-    recordExtractionEvent({
-      requestId,
-      timestamp: new Date().toISOString(),
-      provider: 'pipeline' as 'openai' | 'anthropic' | 'unknown',
-      success: false,
-      durationMs: Date.now() - startTime,
-      errorCode,
-      errorMessage: error.substring(0, 200),
-      documentLength: documentText?.length ?? 0,
-    })
-    recordOverviewMetrics({
-      requestId,
-      provider: 'unknown',
-      model: 'unknown',
-      operation: 'extraction',
-      success: false,
-      durationMs: Date.now() - startTime,
-      inputTokens: 0,
-      outputTokens: 0,
-      cost: 0,
-      documentLength: documentText?.length ?? 0,
-      userId: req.headers['x-user-id'] as string | undefined,
-      errorCode,
-      errorMessage: error.substring(0, 200),
-    })
-
-    // All billing errors → 503
-    if (errorCode === 'ALL_PROVIDERS_BILLING_ERROR') {
-      return res.status(503).json({
-        error: 'Extraction unavailable — all AI providers exhausted (billing/credit)',
-        code: 'EXTRACTION_UNAVAILABLE_BILLING',
-        details: error,
+      return res.status(500).json({
+        error: 'Extraction failed',
+        code: errorCode,
+        details: message,
         elapsedMs: Date.now() - startTime,
         phaseTiming,
         requestId,
         timestamp: new Date().toISOString(),
       })
     }
-
-    return res.status(500).json({
-      error: 'All AI providers failed',
-      code: errorCode,
-      details: error,
-      elapsedMs: Date.now() - startTime,
-      phaseTiming,
-      requestId,
-      fallbackChain,
-      timestamp: new Date().toISOString(),
-    })
   }
 )
 
-/**
- * POST /api/ai/ocr
- * Proxy for Google Cloud Vision OCR
- * Rate limited: 30 requests per hour
- * Validated: imageBase64 required, max 15MB, valid base64 format
- *
- * Authentication priority (most secure first):
- * 1. Service account OAuth token (if GCP_SERVICE_ACCOUNT_BASE64 configured)
- * 2. API key in header (X-goog-api-key) - keeps key out of URLs/logs
- * 3. API key in query param (fallback) - less secure, visible in logs
- */
 interface DocumentAIResponse {
   error?: { message: string; code?: string; status?: string }
   document?: any

@@ -30,7 +30,7 @@ function getSupabase(): SupabaseClient | null {
 
 export interface ExtractionMetricRecord {
   request_id: string
-  provider: 'openai' | 'anthropic' | 'unknown'
+  provider: 'openai' | 'anthropic' | 'deepseek' | 'unknown'
   success: boolean
   duration_ms: number
   error_code?: string

@@ -84,7 +84,7 @@ export function recordOverviewMetrics(event: OverviewMetricEvent): void {
 export interface ExtractionEvent {
   requestId: string
   timestamp: string
-  provider: 'openai' | 'anthropic' | 'unknown'
+  provider: 'openai' | 'anthropic' | 'deepseek' | 'unknown'
   success: boolean
   durationMs: number
   errorCode?: string
