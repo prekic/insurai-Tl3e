@@ -138,6 +138,18 @@ export interface Coverage {
    * these as a caveat badge on the relevant scenario card.
    */
   carveOuts?: string[] | null
+  /**
+   * Coverage applicability status:
+   * - 'applicable' (default): Coverage is active
+   * - 'conditional': Coverage applies only under certain conditions
+   * - 'not_applicable': Coverage does not apply to this policy (e.g., vehicle too old for New For Old)
+   */
+  status?: 'applicable' | 'conditional' | 'not_applicable'
+  /**
+   * Conditions under which the coverage applies (for 'conditional' status)
+   * or reasons why it doesn't apply (for 'not_applicable' status)
+   */
+  conditions?: string[]
 }
 
 /** Exclusion with severity information */
@@ -181,7 +193,7 @@ export interface Policy {
   premiumNet?: number
   /** Tax amount, usually BSMV */
   premiumTax?: number
-  monthlyPremium: number
+  monthlyPremium?: number
   deductible: number
   startDate: string
   expiryDate: string

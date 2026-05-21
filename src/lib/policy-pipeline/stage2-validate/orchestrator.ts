@@ -25,7 +25,7 @@ export function runStage2Validation(data: any): any {
   // 2. Canonicalize Coverages
   if (Array.isArray(result.coverages)) {
     const uniqueCoverages = new Map<string, any>()
-    const deferredUnknowns: Array<{canonicalized: any; rawName: string; nameLow: string}> = []
+    const deferredUnknowns: Array<{ canonicalized: any; rawName: string; nameLow: string }> = []
 
     result.coverages.forEach((cov: any) => {
       if (!cov) return
@@ -73,7 +73,7 @@ export function runStage2Validation(data: any): any {
         deferredUnknowns.push({
           canonicalized,
           rawName: cov.name || '',
-          nameLow: (cov.name || '').toLowerCase().trim()
+          nameLow: (cov.name || '').toLowerCase().trim(),
         })
       }
     })
@@ -260,11 +260,43 @@ export function runStage2Validation(data: any): any {
           ? !!cov.included
           : true
       const isOptional = cov.isOptional === true ? true : false
-      return { ...cov, included, isOptional }
+      const status = cov.status ?? 'applicable'
+      const conditions = Array.isArray(cov.conditions) ? cov.conditions : []
+      return { ...cov, included, isOptional, status, conditions }
     })
   }
 
-  // 3d. Propagate Hukuksal Koruma sub-limits from main entry description
+  // 3d. Yenisiyle Değiştirme (New For Old Replacement) applicability check
+  // The clause applies ONLY to first-registered zero-km vehicles within their
+  // first kasko year. If the vehicle is >1 year old, mark as not_applicable.
+  if (Array.isArray(result.coverages)) {
+    const yeniEski = result.coverages.find(
+      (c: any) => c.canonicalName === 'NEW_FOR_OLD_REPLACEMENT'
+    )
+    if (yeniEski) {
+      // Determine vehicle age from model year or first registration
+      const vehicleYear: number | null = result.vehicleYear ?? result.vehicle_year ?? null
+      const currentYear = new Date().getFullYear()
+      // Check tescilTarihi for additional age info
+      const tescilYear = result.tescilTarihi ? new Date(result.tescilTarihi).getFullYear() : null
+      const effectiveYear = tescilYear || vehicleYear
+
+      if (effectiveYear && currentYear - effectiveYear >= 1) {
+        yeniEski.status = 'not_applicable'
+        if (!yeniEski.conditions) yeniEski.conditions = []
+        yeniEski.conditions.push(
+          'Clause applies only to first-registered zero-km vehicles within their first kasko year.'
+        )
+        yeniEski.description =
+          'Bu teminat sadece sıfır km araçların ilk kasko yılında geçerlidir. Araç ' +
+          `${currentYear - effectiveYear} yaşında olduğu için uygulanamaz.`
+        // Also mark as not included since it's not applicable
+        yeniEski.included = false
+      }
+    }
+  }
+
+  // 3e. Propagate Hukuksal Koruma sub-limits from main entry description
   // The main HK entry has limits in its description field (e.g. "5,000 TL per claim
   // / 11,000 TL annual aggregate / 750 TL bail / 750 TL advance"). The sub-items
   // (Avans, Kefalet, Olay Basi, Yillik Toplam) are auto-added by the adapter with

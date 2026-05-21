@@ -529,7 +529,39 @@ export async function convertToAnalyzedPolicy(
       typeof data.premiumNet === 'number' && data.premiumNet > 0 ? data.premiumNet : undefined,
     premiumTax:
       typeof data.premiumTax === 'number' && data.premiumTax > 0 ? data.premiumTax : undefined,
-    monthlyPremium: premiumValue / 12,
+    monthlyPremium: (() => {
+      const pf = (data.paymentFrequency ?? '').toLowerCase()
+      // If annual / lump sum / peşin, do NOT synthesize a monthly premium
+      if (
+        pf === 'annual' ||
+        pf === 'single' ||
+        pf === 'peşin' ||
+        pf === 'pesin' ||
+        pf.includes('peşin') ||
+        pf.includes('pesin') ||
+        pf.includes('annual') ||
+        pf.includes('single') ||
+        pf.includes('lump')
+      ) {
+        return undefined
+      }
+      // For valid installment terms (monthly, quarterly, semi-annual), divide
+      if (premiumValue > 0 && pf === 'monthly') {
+        return premiumValue
+      }
+      if (premiumValue > 0 && pf === 'quarterly') {
+        return premiumValue / 3
+      }
+      if (premiumValue > 0 && pf === 'semi-annual') {
+        return premiumValue / 6
+      }
+      // Fallback: only divide if we have a valid premium and no paymentFrequency indicator
+      if (premiumValue > 0 && !data.paymentFrequency) {
+        return premiumValue / 12
+      }
+      // If paymentFrequency is set to something we don't understand, be safe
+      return undefined
+    })(),
     deductible: coverages.length > 0 ? Math.max(0, ...coverages.map((c) => c.deductible ?? 0)) : 0,
     startDate: (() => {
       const rawStartDate = data.startDate ?? data.start_date

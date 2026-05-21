@@ -219,18 +219,23 @@ function generateMetrics(policies: ComparisonPolicy[]): ComparisonMetric[] {
   })
 
   // Monthly premium
+  const monthlyValues = policies.map((p) => ({
+    policyId: p.policy.id,
+    value: p.policy.monthlyPremium ?? 0,
+    isBest: false,
+    isWorst: false,
+  }))
+  const bestMonthly = Math.min(...monthlyValues.map((v) => v.value))
+  const worstMonthly = Math.max(...monthlyValues.map((v) => v.value))
+  for (const v of monthlyValues) {
+    v.isBest = v.value === bestMonthly
+    v.isWorst = v.value === worstMonthly
+  }
   metrics.push({
     name: 'Monthly Premium',
     nameTR: 'Aylık Prim',
     unit: 'TRY',
-    values: policies.map((p) => ({
-      policyId: p.policy.id,
-      value: p.policy.monthlyPremium,
-      isBest:
-        p.policy.monthlyPremium === Math.min(...policies.map((pp) => pp.policy.monthlyPremium)),
-      isWorst:
-        p.policy.monthlyPremium === Math.max(...policies.map((pp) => pp.policy.monthlyPremium)),
-    })),
+    values: monthlyValues,
     higherIsBetter: false,
   })
 

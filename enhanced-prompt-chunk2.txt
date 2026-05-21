@@ -1,0 +1,84 @@
+
+7. **Location detail**: "Poliçe İstanbul, Ataşehir, Atatürk Mah., Mustafa Kemal Cad. No: 25/1A adresindeki riski kapsamaktadır."
+
+Use prefixes: ⚠ for warnings, 💡 for information, ✓ for confirmations.
+
+## --- VEHICLE & IDENTITY DETAIL ---
+
+Extract ALL of these fields from the SI (sigorta ettiren/sigortalı) section and vehicle info section:
+
+- **vehicleMake**: Make only (e.g., "VOLKSWAGEN", "RENAULT")
+- **vehicleModel**: Full model name including trim, engine (e.g., "GOLF 1.6 COMFORT", "CLIO HB TOUCH 1.5 DCI EDC 90", "Tiguan 1.4 TSI ACT BMT 150 DSG Highline")
+- **vehicleYear**: Model year as integer (e.g., 2016)
+- **vehiclePlate**: License plate (e.g., "34 RZ9511"). Look for "plaka" or "plaka no" field.
+- **vin**: Şasi / VIN number (e.g., "WVGZZZ5NZHW862628"). Look for "şasi no" field.
+- **motorNo**: Motor number (e.g., "CZE307964"). Look for "motor no" field.
+- **tescilTarihi**: Registration / tescil date (e.g., "01/01/2017"). Look for "tescil tarihi" field. Always convert to YYYY-MM-DD.
+- **vehicleUsage**: 'private' (hususi) or 'commercial' (ticari). Check "Kullanim Sekli" field (e.g., "Hususi Otomobil" → 'private')
+- **insuredEntityType**: 'individual' (bireysel/gercek kisi) or 'corporate' (tuzel kisi/kurumsal)
+- **insurer**: Full company name of the insurer (Sigorta Sirketi Unvani, e.g. "ANADOLU ANONIM TURK SIGORTA SIRKETI")
+- **insuredName**: Full name/company of the insured (Sigortali Adi/Unvani)
+- **insuredAddress**: Full address of the insured including street, neighborhood, city, district
+- **location**: Full location including province/city and district (e.g., "İstanbul, Ataşehir, Atatürk Mah., Mustafa Kemal Cad. No: 25/1A")
+- **NCD**: Current hasarsizlik indirimi as a % number (e.g. 50 for 50%)
+- **NCDKademe**: Current hasarsizlik kademesi/step number (e.g. 3)
+- **oncekiSigortaci**: Önceki sigortacı adı (previous insurer, e.g. "Sompo Japan Sigorta A.Ş.")
+- **tramerBelgeNo**: TRAMER belge numarası
+- **teminatDisiKazaSayisi**: Teminat dışı kaza sayısı
+- **SBMNumber**: SBM Police No (9-digit number found near SBM BIM Ref No)
+- **BIMHash**: BIM referans hash/değeri
+- **paymentMethod**: How premium was paid ("Sanal POS", "Kredi Karti", "Nakit", "Banka Havalesi")
+- **acenteAdi**: Acente adı (agency name)
+- **acenteNo**: Acente numarası
+- **yetkiliAdi**: Yetkili adı (authorized person)
+- **ruhsatNo**: Ruhsat no (license number)
+
+### Anadolu Hizmet 30/48 Detail
+
+For Anadolu Sigorta policies with "Yol Yardım" and "İkame Araç" services, capture:
+- **Grup sınıfı**: e.g., Grup 2 (vehicle class group)
+- **Kapsam**: e.g., "Hususi 30/48 Otomobil" — 30 days partial coverage, 48 days total loss coverage
+- **Yılda max kullanım**: e.g., "yılda max 2 kez" (maximum 2 uses per year)
+- **Pert dahil**: Whether total loss (pert) is included in the coverage
+
+## --- OUTPUT STRUCTURE ---
+
+Return ALL fields listed below. Use camelCase for all keys. Use null for any field not explicitly found.
+
+Top-level fields:
+- policyNumber, provider, insurer (Sigortaci), policyType, isBundle, bundleProducts
+- startDate, endDate (YYYY-MM-DD format, NEVER MM/DD/YYYY)
+- currency (3-letter ISO code, e.g. TRY, USD, EUR)
+- premium (total premium as number)
+- premiumNet (net premium before tax / Vergi Oncesi Prim — number)
+- premiumTax (tax amount / BSMV — number)
+- paymentFrequency ('annual', 'monthly', 'quarterly', 'single')
+- paymentMethod (payment method e.g. 'Sanal POS', 'Kredi Karti', 'Nakit', 'Banka Havalesi')
+- vehicleMake, vehicleModel, vehicleYear, vehiclePlate, vin, motorNo, tescilTarihi
+- vehicleUsage ('private' or 'commercial' / 'hususi' or 'ticari')
+- insuredEntityType ('individual' or 'corporate' / 'bireysel' or 'tuzel kisi')
+- insuredName: Full name/company name of the insured (Sigortali / Sigorta Ettiren)
+- insuredAddress: Full address of the insured
+- location: Full location (city/district/address)
+- NCD (hasarsizlik indirimi): Current NCD percentage as a number (e.g. 50 for 50%)
+- NCDKademe (hasarsizlik kademesi): Current NCD tier/step (e.g. 3)
+- oncekiSigortaci: Previous insurer name (e.g. "Sompo Japan Sigorta A.Ş.")
+- tramerBelgeNo: TRAMER document number
+- teminatDisiKazaSayisi: Number of claims outside coverage
+- SBMNumber (SBM Police No): 9-digit SBM reference number
+- BIMHash: BIM reference hash
+- acenteAdi, acenteNo, yetkiliAdi, ruhsatNo: Agency info
+
+Coverage items (array):
+  For each: name, nameTr, limit (number), deductible, isOptional (bool), included (bool),
+  category ('main','liability','supplementary','assistance','legal','other'),
+  isUnlimited (bool), isMarketValue (bool), description, quote, clause, carveOuts (array),
+  status ('applicable', 'conditional', 'not_applicable'), conditions (string array)
+
+discounts object: ncdDiscount, groupDiscount, otherDiscountPct, evidence
+exclusions array: each with type, text, textEn, quote, evidence
+conditionalDeductibles array: each with trigger, rate, evidence
+amendmentInfo object: isAmendment, amendmentNumber, amendmentDate, basePolicyNumber, amendmentReason, premiumDifference
+evidence object: insights array with text, textEn, quote
+
+Be thorough but accurate. It's better to return null than to guess incorrectly.
