@@ -1081,7 +1081,32 @@ export async function getExtractionPrompt(
   }
 
   // Fall back to master extraction prompt
-  return getRenderedPrompt('Policy Extraction - Master', { document_text: documentText })
+  const masterPrompt = await getRenderedPrompt('Policy Extraction - Master', {
+    document_text: documentText,
+  })
+  if (masterPrompt) {
+    // If we have a non-kasko policy type but no type-specific template exists,
+    // inject the document type into the user prompt so the LLM knows what
+    // kind of policy it's examining. Without this, the kasko-optimised master
+    // prompt produces konut coverages that don't match any schema and become NaN.
+    if (policyType && policyType !== 'kasko') {
+      const displayNames: Record<string, string> = {
+        traffic: 'Traffic (ZMMS)',
+        home: 'Home (Konut)',
+        health: 'Health',
+        life: 'Life',
+        dask: 'DASK (Earthquake)',
+        business: 'Business',
+        nakliyat: 'Transport (Nakliyat)',
+      }
+      const typeName = displayNames[policyType] || policyType
+      masterPrompt.userPrompt = `[Document type: ${typeName}]
+\n\n${masterPrompt.userPrompt}`
+    }
+    return masterPrompt
+  }
+
+  return null
 }
 
 /**
