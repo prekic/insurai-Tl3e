@@ -174,11 +174,11 @@ const DEFAULT_AI_CONFIG: AIConfig = {
   confidenceWeightDates: 0.2,
   confidenceWeightPremium: 0.2,
   confidenceWeightCoverages: 0.25,
-  requestBudgetMs: 175000,
-  primaryProviderTimeoutMs: 90000,
-  fallbackProviderTimeoutMs: 75000,
-  clientFetchTimeoutMs: 185000,
-  trialExtractionTimeoutMs: 200000,
+  requestBudgetMs: 275000,
+  primaryProviderTimeoutMs: 150000,
+  fallbackProviderTimeoutMs: 120000,
+  clientFetchTimeoutMs: 290000,
+  trialExtractionTimeoutMs: 300000,
   ocrFetchTimeoutMs: 90000,
 }
 

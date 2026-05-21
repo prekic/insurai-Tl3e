@@ -296,11 +296,11 @@ export function TryAnalysis() {
 
         trackTrialAnalysisStarted()
 
-        // Client timeout: 150s to give the server's 105s budget room to respond.
+        // Client timeout: 300s to give the debate pipeline room to finish (long docs ~4.5min).
         // The server enforces its own budget and returns structured timeout errors,
         // so this fires only as a last resort safety net.
-        // Default 150_000 — configurable via app_settings ai.trial_extraction_timeout_ms
-        let EXTRACTION_TIMEOUT_MS = 150_000
+        // Default 300_000 — configurable via app_settings ai.trial_extraction_timeout_ms
+        let EXTRACTION_TIMEOUT_MS = 300_000
         try {
           const { getAIConfig } = await import('@/lib/config')
           const aiCfg = await getAIConfig()
