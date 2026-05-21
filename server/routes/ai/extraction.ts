@@ -33,10 +33,16 @@ import {
 } from '../../middleware/validation.js'
 import * as adminNotificationService from '../../services/admin-notification-service.js'
 import { getAIConfig } from '../../services/config-service.js'
-import { alertBilling, alertProviderFallback, alertAllProvidersFailed } from '../../lib/alert-service.js'
+import { alertBilling, alertProviderFallback } from '../../lib/alert-service.js'
 import { loadPrompts, getPromptVersionTag } from '../../lib/prompt-loader.js'
-import { validateOutput } from '../../lib/output-validator.js'
-import { classifyDocument, checkTypeConsistency } from '../../lib/classifier-gate.js'
+import { classifyDocument } from '../../lib/classifier-gate.js'
+import {
+  runExtractionPipeline,
+  BillingError,
+  classifyProviderError,
+  type ProviderCallbacks,
+  type ProviderCallConfig,
+} from '../../lib/extraction-pipeline.js'
 import { hashOcrInput, lookupOcrCache, storeOcrCache } from '../../services/ocr-cache.js'
 import { sendExtractionCompleteNotification } from '../../services/notification-service.js'
 import { getExtractionPrompt } from '../../services/prompt-service.js'
@@ -89,86 +95,6 @@ function assertExtractionModelAllowed(model: unknown, res: Response): boolean {
     return false
   }
   return true
-}
-
-// ── FIX 1: Error classification types ──
-// BillingError: operator-actionable (credit/balance). Triggers high-priority alert + degradedReason injection.
-// TransientError: transient capacity/rate-limit. Silently falls back to next provider.
-class BillingError extends Error {
-  constructor(
-    message: string,
-    public readonly provider: string,
-    public readonly originalError?: unknown
-  ) {
-    super(message)
-    this.name = 'BillingError'
-  }
-}
-
-class TransientError extends Error {
-  constructor(
-    message: string,
-    public readonly provider: string,
-    public readonly originalError?: unknown
-  ) {
-    super(message)
-    this.name = 'TransientError'
-  }
-}
-
-/**
- * Classify a provider error into BillingError, TransientError, or the original error.
- * Billing = credit/quota/precondition failure (needs operator action).
- * Transient = rate-limit/timeout/overload (should retry next provider).
- */
-function classifyProviderError(
-  error: unknown,
-  provider: string,
-  _requestId?: string
-): Error {
-  const message = error instanceof Error ? error.message : String(error)
-
-  // Billing/quota errors (operator must act)
-  const billingPatterns = [
-    'credit', 'billing', 'insufficient_quota', 'quota',
-    'FAILED_PRECONDITION', 'account_balance', 'insufficient',
-    'rate limit exceeded for org', 'exceeded your current quota',
-    'Insufficient', 'payment required',
-  ]
-  for (const p of billingPatterns) {
-    if (message.toLowerCase().includes(p)) {
-      return new BillingError(message, provider, error)
-    }
-  }
-
-  // AbortError = SDK timeout (transient)
-  if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
-    return new TransientError(message, provider, error)
-  }
-
-  // Auth errors usually transient (wrong key in env — fixable but not credit)
-  // Treat as transient so we attempt next provider
-  if (error instanceof Error && error.name === 'AuthenticationError') {
-    return new TransientError(message, provider, error)
-  }
-
-  // Transient patterns: rate limit, 429, overloaded, 529, network timeouts
-  const transientPatterns = [
-    '429', '529', '503', 'rate_limit', 'rate limit',
-    'overloaded', 'overloaded_error', 'too many requests',
-    'timeout', 'ETIMEDOUT', 'ECONNRESET', 'ENOTFOUND',
-    'context_length_exceeded', 'bad gateway', 'service unavailable',
-    'internal server error', 'Please try again', 'try again later',
-  ]
-  for (const p of transientPatterns) {
-    if (message.toLowerCase().includes(p.toLowerCase())) {
-      return new TransientError(message, provider, error)
-    }
-  }
-
-  // Default: return original. Falls through to current ad-hoc error handling.
-  if (error instanceof Error) return error
-  return new Error(String(error))
 }
 
 // ES Module directory resolution
@@ -1413,7 +1339,12 @@ router.post(
     const promptStart = Date.now()
     const loadedPrompts = await loadPrompts(documentText, policyType, clientPrompt)
     markPhase('promptLoad_ms', promptStart)
-    const { openaiSystemPrompt, anthropicSystemPrompt, userPrompt: finalUserPrompt, templateMeta: promptMeta } = loadedPrompts
+    const {
+      openaiSystemPrompt,
+      anthropicSystemPrompt,
+      userPrompt: finalUserPrompt,
+      templateMeta: promptMeta,
+    } = loadedPrompts
     const promptVersion = getPromptVersionTag(promptMeta)
 
     // ── FIX 5: Document classifier — gates policy type before extraction ──
@@ -1622,7 +1553,13 @@ router.post(
 
           // ── FIX 1: Classify error using the canonical helper ──
           const classified = classifyProviderError(error, 'anthropic', requestId)
-          const fallbackReason = classified instanceof BillingError ? 'ANTHROPIC_BILLING_ERROR' : `ANTHROPIC_${classified.name.toUpperCase()}_${error instanceof Error ? error.name : 'UNKNOWN'}`.substring(0, 50)
+          const fallbackReason =
+            classified instanceof BillingError
+              ? 'ANTHROPIC_BILLING_ERROR'
+              : `ANTHROPIC_${classified.name.toUpperCase()}_${error instanceof Error ? error.name : 'UNKNOWN'}`.substring(
+                  0,
+                  50
+                )
 
           // ── FIX 1: Track degradedReason for billing errors ──
           if (classified instanceof BillingError) {
@@ -2028,279 +1965,69 @@ ${documentText.substring(0, 8000)}`
       }
     }
 
-    // Try OpenAI (either as fallback or primary)
-    if (openaiClient) {
-      const openaiStart = Date.now()
-      // Calculate remaining budget for fallback provider
-      const fallbackTimeout = Math.min(
-        FALLBACK_PROVIDER_TIMEOUT_MS,
-        REQUEST_BUDGET_MS - (Date.now() - startTime) - 2000
-      )
-      log.info('Trying OpenAI', {
-        requestId,
-        elapsedMs: openaiStart - startTime,
-        timeoutMs: fallbackTimeout,
-        isFallback: !!anthropicClient,
-      })
-      try {
-        // Ensure "json" is in the prompt for OpenAI
-        const jsonReminder = '\n\nRespond with valid JSON only.'
-        const systemPromptWithJson =
-          openaiSystemPrompt.includes('json') || openaiSystemPrompt.includes('JSON')
-            ? openaiSystemPrompt
-            : openaiSystemPrompt + jsonReminder
-        const userPromptWithJson =
-          finalUserPrompt.includes('json') ||
-          finalUserPrompt.includes('JSON') ||
-          systemPromptWithJson.includes('json')
-            ? finalUserPrompt
-            : finalUserPrompt + jsonReminder
+    // Try extraction pipeline (OpenAI → DeepSeek)
+    // Build provider callbacks for the pipeline
+    const pipelineProviders: ProviderCallbacks = {
+      anthropic: null, // already tried above
+      openai: openaiClient
+        ? async (sysPrompt: string, userMsg: string, _config: ProviderCallConfig) => {
+            // Ensure "json" is in the prompt for OpenAI
+            const jsonReminder = '\n\nRespond with valid JSON only.'
+            const systemPromptWithJson =
+              sysPrompt.includes('json') || sysPrompt.includes('JSON')
+                ? sysPrompt
+                : sysPrompt + jsonReminder
+            const userPromptWithJson =
+              userMsg.includes('json') ||
+              userMsg.includes('JSON') ||
+              systemPromptWithJson.includes('json')
+                ? userMsg
+                : userMsg + jsonReminder
 
-        const response = await openaiClient.chat.completions.create(
-          {
-            model: aiConfig.openaiExtractionModel,
-            messages: [
-              { role: 'system', content: systemPromptWithJson },
-              { role: 'user', content: userPromptWithJson },
-            ],
-            response_format: {
-              type: 'json_schema',
-              json_schema: EXTRACTION_JSON_SCHEMA,
-            },
-            max_completion_tokens: aiConfig.maxTokens,
-            temperature: aiConfig.temperature,
-          },
-          { signal: AbortSignal.timeout(Math.max(fallbackTimeout, 10_000)) }
-        )
+            const fallbackTimeout = Math.min(
+              FALLBACK_PROVIDER_TIMEOUT_MS,
+              REQUEST_BUDGET_MS - (Date.now() - startTime) - 2000
+            )
 
-        const content = response.choices[0]?.message?.content
-        if (!content) {
-          throw new Error('Empty response from OpenAI')
-        }
+            const response = await openaiClient.chat.completions.create(
+              {
+                model: aiConfig.openaiExtractionModel,
+                messages: [
+                  { role: 'system', content: systemPromptWithJson },
+                  { role: 'user', content: userPromptWithJson },
+                ],
+                response_format: {
+                  type: 'json_schema',
+                  json_schema: EXTRACTION_JSON_SCHEMA,
+                },
+                max_completion_tokens: aiConfig.maxTokens,
+                temperature: aiConfig.temperature,
+              },
+              { signal: AbortSignal.timeout(Math.max(fallbackTimeout, 10_000)) }
+            )
 
-        // Track cost
-        const usedModel = response.model || aiConfig.openaiExtractionModel
-        const inputTokens = response.usage?.prompt_tokens || 0
-        const outputTokens = response.usage?.completion_tokens || 0
-        const cost = calculateCost(usedModel, inputTokens, outputTokens)
+            const content = response.choices[0]?.message?.content
+            if (!content) throw new Error('Empty response from OpenAI')
 
-        recordUsage({
-          provider: 'openai',
-          model: usedModel,
-          operation: 'extraction',
-          inputTokens,
-          outputTokens,
-          totalTokens: inputTokens + outputTokens,
-          inputCost: cost.inputCost,
-          outputCost: cost.outputCost,
-          totalCost: cost.totalCost,
-          timestamp: new Date().toISOString(),
-        }).catch((err) =>
-          log.warn('Failed to record OpenAI usage', {
-            requestId,
-            error: err instanceof Error ? err.message : String(err),
-          })
-        )
+            const usedModel = response.model || aiConfig.openaiExtractionModel
+            const inputTokens = response.usage?.prompt_tokens || 0
+            const outputTokens = response.usage?.completion_tokens || 0
 
-        let parsedOpenAIData: unknown
-        try {
-          const rawParsed = JSON.parse(content)
-          // Run stage2 validation even on the fallback path (same as Anthropic primary path).
-          // FIX: Previously this path returned raw LLM output without runStage2Validation,
-          // meaning the /extract OpenAI fallback bypassed canonicalization entirely.
-          parsedOpenAIData = runStage2Validation(rawParsed)
-        } catch (parseError) {
-          log.error('OpenAI returned invalid JSON', {
-            requestId,
-            parseError: parseError instanceof Error ? parseError.message : String(parseError),
-            contentPreview: content.slice(0, 200),
-          })
-          throw new Error('AI returned invalid JSON — response could not be parsed')
-        }
-
-        markPhase('openai_ms', openaiStart)
-
-        const isFallback = !!anthropicClient
-        const storedFallbackReason = (req as Request & { _fallbackReason?: string })._fallbackReason
-
-        // ── FIX 4: Output validation ──
-        const oaiParsed = parsedOpenAIData as Record<string, unknown>
-        const oaiValidation = validateOutput(oaiParsed, documentText, policyType)
-        if (!oaiValidation.pass && isFallback) {
-          log.warn('OpenAI (fallback) output validation failed', {
-            requestId,
-            summary: oaiValidation.summary,
-          })
-          // Only reject if validation fails AND we still have DeepSeek as fallback
-          const dsAvailable = !!getDeepSeekClient() || !!process.env.DEEPSEEK_API_KEY
-          if (dsAvailable && !oaiValidation.pass) {
-            throw new Error(`OpenAI output validation failed: ${oaiValidation.summary}`)
+            return {
+              content,
+              usage: {
+                inputTokens,
+                outputTokens,
+                cost: calculateCost(usedModel, inputTokens, outputTokens).totalCost,
+                model: usedModel,
+              },
+            }
           }
-        }
-
-        // ── FIX 5: Document type consistency check ──
-        const typeCheck = checkTypeConsistency(classification, oaiParsed.policyType as string | undefined)
-        if (!typeCheck.consistent) {
-          log.warn('Policy type mismatch', {
-            requestId,
-            mismatch: typeCheck.mismatchDescription,
-          })
-        }
-
-        // ── FIX 7: Provider succeeded log ──
-        log.info('Provider succeeded', {
-          requestId,
-          provider: 'openai',
-          coverageCount: oaiParsed.coverages?.length ?? 0,
-          validationPassed: oaiValidation.pass,
-          durationMs: Date.now() - openaiStart,
-        })
-
-        // Record successful extraction metric
-        recordExtractionEvent({
-          requestId,
-          timestamp: new Date().toISOString(),
-          provider: 'openai',
-          success: true,
-          durationMs: Date.now() - startTime,
-          documentLength: documentText?.length ?? 0,
-        })
-        recordOverviewMetrics({
-          requestId,
-          provider: 'openai',
-          model: usedModel,
-          operation: 'extraction',
-          success: true,
-          durationMs: Date.now() - startTime,
-          inputTokens,
-          outputTokens,
-          cost: cost.totalCost,
-          documentLength: documentText?.length ?? 0,
-          userId: req.headers['x-user-id'] as string | undefined,
-        })
-
-        // Fire push notification if user is authenticated (non-blocking fire-and-forget)
-        const notifyUserIdUNI_OAI = req.headers['x-user-id'] as string | undefined
-        if (notifyUserIdUNI_OAI) {
-          sendExtractionCompleteNotification(
-            notifyUserIdUNI_OAI,
-            String(oaiParsed.policyType || 'policy'),
-            (oaiParsed.policyNumber as string | null | undefined) ?? null
-          ).catch((err) =>
-            log.warn('Push notification failed after unified/OpenAI extraction', {
-              requestId,
-              error: err instanceof Error ? err.message : String(err),
-            })
-          )
-        }
-
-        return res.json({
-          success: true,
-          data: parsedOpenAIData,
-          usage: response.usage,
-          model: response.model,
-          provider: 'openai',
-          fallback: isFallback,
-          ...(isFallback && storedFallbackReason && { fallbackReason: storedFallbackReason }),
-          cost: cost.totalCost,
-          requestId,
-          route: '/api/ai/extract',
-          elapsedMs: Date.now() - startTime,
-          phaseTiming,
-          degradedReason,
-          promptVersion,
-          ...(isFallback && {
-            fallbackChain: [
-              { provider: 'anthropic', success: false, error_code: storedFallbackReason },
-              { provider: 'openai', success: true, duration_ms: phaseTiming['openai_ms'] },
-            ],
-          }),
-        })
-      } catch (error) {
-        markPhase('openai_ms', openaiStart)
-        const message = error instanceof Error ? error.message : 'Unknown error'
-        log.error('OpenAI also failed', { requestId, error: message, phaseTiming })
-
-        // ── FIX 1: Classify error ──
-        const oaiClassified = classifyProviderError(error, 'openai', requestId)
-        let openaiErrorCode = 'OPENAI_UNKNOWN_ERROR'
-        if (oaiClassified instanceof BillingError) {
-          openaiErrorCode = 'OPENAI_BILLING_ERROR'
-          if (!degradedReason) degradedReason = 'all_providers_billing_error'
-        } else if (oaiClassified instanceof TransientError) {
-          openaiErrorCode = 'OPENAI_TRANSIENT_ERROR'
-          if (!degradedReason) degradedReason = 'fallback_provider_error'
-        }
-        if (message.includes('Output validation')) {
-          openaiErrorCode = 'OPENAI_VALIDATION_REJECTED'
-        }
-
-        // ── FIX 7: Provider rejected log ──
-        log.warn('Provider output rejected', {
-          requestId,
-          provider: 'openai',
-          reasons: [message.substring(0, 200)],
-        })
-
-        // Capture in Sentry
-        captureServerError(error instanceof Error ? error : new Error(message), {
-          requestId,
-          provider: 'openai',
-          errorCode: openaiErrorCode,
-          documentLength: documentText?.length ?? 0,
-          allProvidersFailed: true,
-        })
-
-        // Record OpenAI failure metric
-        recordExtractionEvent({
-          requestId,
-          timestamp: new Date().toISOString(),
-          provider: 'openai',
-          success: false,
-          durationMs: Date.now() - openaiStart,
-          errorCode: openaiErrorCode,
-          errorMessage: message.substring(0, 200),
-          documentLength: documentText?.length ?? 0,
-        })
-        recordOverviewMetrics({
-          requestId,
-          provider: 'openai',
-          model: 'gpt-5.4',
-          operation: 'extraction',
-          success: false,
-          durationMs: Date.now() - openaiStart,
-          inputTokens: 0,
-          outputTokens: 0,
-          cost: 0,
-          documentLength: documentText?.length ?? 0,
-          userId: req.headers['x-user-id'] as string | undefined,
-          errorCode: openaiErrorCode,
-          errorMessage: message.substring(0, 200),
-        })
-
-        // ── FIX 1 + FIX 6: Unified alerting ──
-        if (oaiClassified instanceof BillingError) {
-          alertBilling('OpenAI', message, {
-            requestId,
-            errorCode: openaiErrorCode,
-          }).catch(() => {})
-        } else {
-          alertProviderFallback('OpenAI', openaiErrorCode, requestId, {
-            anthropicError: (req as any)._fallbackReason,
-          }).catch(() => {})
-        }
-
-        const isTimeout = openaiErrorCode.includes('TIMEOUT')
-
-        // ── DeepSeek Fallback ──
-        // If both Anthropic and OpenAI failed, and DeepSeek is configured, try it
-        // before giving up. DeepSeek uses json_object (not json_schema like OpenAI).
-        const deepseekClient = getDeepSeekClient()
-        const hasDeepSeekKey = !!process.env.DEEPSEEK_API_KEY
-        if (deepseekClient || hasDeepSeekKey) {
-          const dsClient =
-            deepseekClient ||
-            new OpenAI({
+        : null,
+      deepseek:
+        getDeepSeekClient() ||
+        (process.env.DEEPSEEK_API_KEY
+          ? new OpenAI({
               apiKey: process.env.DEEPSEEK_API_KEY!,
               baseURL:
                 process.env.DEEPSEEK_BASE_URL &&
@@ -2309,197 +2036,248 @@ ${documentText.substring(0, 8000)}`
                   ? process.env.DEEPSEEK_BASE_URL
                   : 'https://api.deepseek.com',
             })
+          : null)
+          ? async (sysPrompt: string, userMsg: string, _config: ProviderCallConfig) => {
+              const dsClient =
+                getDeepSeekClient() ||
+                new OpenAI({
+                  apiKey: process.env.DEEPSEEK_API_KEY!,
+                  baseURL:
+                    process.env.DEEPSEEK_BASE_URL &&
+                    process.env.DEEPSEEK_BASE_URL.startsWith('http') &&
+                    !process.env.DEEPSEEK_BASE_URL.startsWith('sk-')
+                      ? process.env.DEEPSEEK_BASE_URL
+                      : 'https://api.deepseek.com',
+                })
 
-          try {
-            log.warn('[fallback] Anthropic+OpenAI failed, retrying with DeepSeek', {
-              requestId,
-              anthropicError: (req as any)._fallbackReason,
-              openaiError: openaiErrorCode,
-            })
+              const dsSystemPrompt =
+                sysPrompt.includes('json') || sysPrompt.includes('JSON')
+                  ? sysPrompt
+                  : sysPrompt + '\n\nRespond with valid JSON only.'
+              const dsUserPrompt =
+                userMsg.includes('json') || userMsg.includes('JSON')
+                  ? userMsg
+                  : userMsg + '\n\nRespond with valid JSON only.'
 
-            const deepseekStart = Date.now()
-            // Ensure prompts ask for JSON (DeepSeek needs json_object response_format)
-            const dsSystemPrompt =
-              openaiSystemPrompt.includes('json') || openaiSystemPrompt.includes('JSON')
-                ? openaiSystemPrompt
-                : openaiSystemPrompt + '\n\nRespond with valid JSON only.'
-            const dsUserPrompt =
-              finalUserPrompt.includes('json') || finalUserPrompt.includes('JSON')
-                ? finalUserPrompt
-                : finalUserPrompt + '\n\nRespond with valid JSON only.'
-
-            const dsResponse = await dsClient.chat.completions.create(
-              {
-                model: 'deepseek-chat',
-                messages: [
-                  { role: 'system', content: dsSystemPrompt },
-                  { role: 'user', content: dsUserPrompt },
-                ],
-                response_format: { type: 'json_object' },
-                max_tokens: aiConfig.maxTokens,
-                temperature: aiConfig.temperature,
-              },
-              { signal: AbortSignal.timeout(120_000) }
-            )
-
-            const dsContent = dsResponse.choices[0]?.message?.content
-            if (!dsContent) throw new Error('Empty response from DeepSeek')
-
-            const dsInputTokens = dsResponse.usage?.prompt_tokens || 0
-            const dsOutputTokens = dsResponse.usage?.completion_tokens || 0
-            const dsCost = calculateCost('deepseek-chat', dsInputTokens, dsOutputTokens)
-
-            recordUsage({
-              provider: 'deepseek',
-              model: 'deepseek-chat',
-              operation: 'extraction',
-              inputTokens: dsInputTokens,
-              outputTokens: dsOutputTokens,
-              totalTokens: dsInputTokens + dsOutputTokens,
-              inputCost: dsCost.inputCost,
-              outputCost: dsCost.outputCost,
-              totalCost: dsCost.totalCost,
-              timestamp: new Date().toISOString(),
-            }).catch((err: any) =>
-              log.warn('Failed to record DeepSeek usage', {
-                requestId,
-                error: err instanceof Error ? err.message : String(err),
-              })
-            )
-
-            let parsedDSData: unknown
-            try {
-              const rawParsed = JSON.parse(dsContent)
-              // Run stage2 validation (same as primary path)
-              parsedDSData = runStage2Validation(rawParsed)
-            } catch (_parseError) {
-              throw new Error('DeepSeek returned invalid JSON')
-            }
-
-            markPhase('deepseek_ms', deepseekStart)
-            log.info('[fallback] DeepSeek fallback succeeded', {
-              requestId,
-              deepseekMs: Date.now() - deepseekStart,
-              phaseTiming,
-            })
-
-            return res.json({
-              success: true,
-              data: parsedDSData,
-              model: 'deepseek-chat',
-              provider: 'deepseek',
-              fallback: true,
-              fallbackChain: [
+              const response = await dsClient.chat.completions.create(
                 {
-                  provider: 'anthropic',
-                  success: false,
-                  error_code: (req as any)._fallbackReason,
+                  model: 'deepseek-chat',
+                  messages: [
+                    { role: 'system', content: dsSystemPrompt },
+                    { role: 'user', content: dsUserPrompt },
+                  ],
+                  response_format: { type: 'json_object' },
+                  max_tokens: aiConfig.maxTokens,
+                  temperature: aiConfig.temperature,
                 },
-                { provider: 'openai', success: false, error_code: openaiErrorCode },
-                { provider: 'deepseek', success: true },
-              ],
-              cost: dsCost.totalCost,
-              requestId,
-              route: '/api/ai/extract',
-              elapsedMs: Date.now() - startTime,
-              phaseTiming,
-            })
-          } catch (deepseekError) {
-            const dsMsg =
-              deepseekError instanceof Error ? deepseekError.message : 'Unknown DeepSeek error'
-            log.error('[fallback] DeepSeek also failed', {
-              requestId,
-              error: dsMsg,
-              phaseTiming,
-            })
+                { signal: AbortSignal.timeout(120_000) }
+              )
 
-            // Capture all-providers-failed including DeepSeek
-            captureServerError(deepseekError instanceof Error ? deepseekError : new Error(dsMsg), {
-              requestId,
-              provider: 'deepseek',
-              errorCode: 'DEEPSEEK_ERROR',
-              documentLength: documentText?.length ?? 0,
-              allProvidersFailed: true,
-            })
+              const content = response.choices[0]?.message?.content
+              if (!content) throw new Error('Empty response from DeepSeek')
 
-            // ── FIX 1 + FIX 6: All providers failed — alert + billing vs transient ──
-            alertAllProvidersFailed(`DeepSeek: ${dsMsg}`, requestId, 'anthropic→openai→deepseek', {
-              anthropicError: (req as any)._fallbackReason,
-              openaiError: openaiErrorCode,
-            }).catch(() => {})
+              const inputTokens = response.usage?.prompt_tokens || 0
+              const outputTokens = response.usage?.completion_tokens || 0
 
-            // ── FIX 7: Final outcome log ──
-            log.info('Extraction completed', {
-              requestId,
-              finalProvider: 'deepseek',
-              promptVersion,
-              degradedReason,
-              totalDurationMs: Date.now() - startTime,
-              success: false,
-            })
-
-            // ── FIX 1: ALL providers failed with billing → 503 ──
-            if (degradedReason === 'all_providers_billing_error') {
-              return res.status(503).json({
-                error: 'Extraction unavailable — all AI providers exhausted (billing/credit)',
-                code: 'EXTRACTION_UNAVAILABLE_BILLING',
-                details: `Operator action required: credit/balance top-up needed. Anthropic: ${(req as any)._fallbackReason}. OpenAI: ${message.substring(0, 100)}. DeepSeek: ${dsMsg}`,
-                elapsedMs: Date.now() - startTime,
-                phaseTiming: { ...phaseTiming, deepseek_ms: Date.now() - startTime },
-                requestId,
-                timestamp: new Date().toISOString(),
-              })
+              return {
+                content,
+                usage: {
+                  inputTokens,
+                  outputTokens,
+                  cost: calculateCost('deepseek-chat', inputTokens, outputTokens).totalCost,
+                  model: 'deepseek-chat',
+                },
+              }
             }
-
-            return res.status(500).json({
-              error: 'All AI providers failed',
-              code: 'ALL_PROVIDERS_FAILED',
-              details:
-                `Anthropic: ${(req as any)._fallbackReason}. ` +
-                `OpenAI: ${message.substring(0, 100)}. ` +
-                `DeepSeek: ${dsMsg}`,
-              elapsedMs: Date.now() - startTime,
-              phaseTiming: { ...phaseTiming, deepseek_ms: Date.now() - startTime },
-              requestId,
-              timestamp: new Date().toISOString(),
-            })
-          }
-        }
-
-        // ── FIX 7: Final outcome log (no DeepSeek fallback) ──
-        log.info('Extraction completed', {
-          requestId,
-          finalProvider: 'openai',
-          promptVersion,
-          degradedReason,
-          totalDurationMs: Date.now() - startTime,
-          success: false,
-        })
-
-        return res.status(isTimeout ? 504 : 500).json({
-          error: isTimeout
-            ? 'Extraction timed out — the AI service took too long to respond. Please try again.'
-            : 'All AI providers failed',
-          code: isTimeout ? 'EXTRACTION_TIMEOUT' : 'ALL_PROVIDERS_FAILED',
-          details: message,
-          elapsedMs: Date.now() - startTime,
-          phaseTiming,
-          requestId,
-          timestamp: new Date().toISOString(),
-        })
-      }
+          : null,
     }
 
-    // No providers available
-    log.error('No AI providers configured', {
+    // Run the pipeline
+    const pipelineResult = await runExtractionPipeline(
+      documentText,
+      openaiSystemPrompt,
+      finalUserPrompt,
+      pipelineProviders,
+      { requestId, policyType, promptVersion, classification },
+      { temperature: aiConfig.temperature, maxTokens: aiConfig.maxTokens }
+    )
+
+    if (pipelineResult.success) {
+      const { result } = pipelineResult
+      const parsedData = result.data as Record<string, unknown>
+
+      // Run stage2 validation
+      const stage2Data = runStage2Validation(result.data)
+
+      // Record usage for the successful provider
+      const providerName = result.provider
+      recordUsage({
+        provider: providerName,
+        model: result.usage.model,
+        operation: 'extraction',
+        inputTokens: result.usage.inputTokens,
+        outputTokens: result.usage.outputTokens,
+        totalTokens: result.usage.inputTokens + result.usage.outputTokens,
+        inputCost: 0,
+        outputCost: 0,
+        totalCost: result.usage.cost,
+        timestamp: new Date().toISOString(),
+      }).catch((err) =>
+        log.warn('Failed to record usage', {
+          requestId,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      )
+
+      markPhase(`${providerName}_ms`, startTime)
+      markPhase('pipeline_ms', startTime)
+
+      log.info('Provider succeeded', {
+        requestId,
+        provider: providerName,
+        coverageCount: (parsedData as any).coverages?.length ?? 0,
+        validationPassed: result.validationFailures ? false : true,
+        durationMs: result.durationMs,
+      })
+
+      // Record extraction metric
+      recordExtractionEvent({
+        requestId,
+        timestamp: new Date().toISOString(),
+        provider: providerName as 'openai' | 'anthropic' | 'unknown',
+        success: true,
+        durationMs: Date.now() - startTime,
+        documentLength: documentText?.length ?? 0,
+      })
+      recordOverviewMetrics({
+        requestId,
+        provider: providerName || 'unknown',
+        model: result.usage.model,
+        operation: 'extraction',
+        success: true,
+        durationMs: Date.now() - startTime,
+        inputTokens: result.usage.inputTokens,
+        outputTokens: result.usage.outputTokens,
+        cost: result.usage.cost,
+        documentLength: documentText?.length ?? 0,
+        userId: req.headers['x-user-id'] as string | undefined,
+      })
+
+      // Fire push notification if user is authenticated
+      const notifyUserId = req.headers['x-user-id'] as string | undefined
+      if (notifyUserId) {
+        sendExtractionCompleteNotification(
+          notifyUserId,
+          String(parsedData.policyType || 'policy'),
+          (parsedData.policyNumber as string | null | undefined) ?? null
+        ).catch((err) =>
+          log.warn('Push notification failed after pipeline extraction', {
+            requestId,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        )
+      }
+
+      return res.json({
+        success: true,
+        data: stage2Data,
+        model: result.usage.model,
+        provider: result.provider,
+        fallback: result.fallbackChain.length > 1,
+        fallbackChain: result.fallbackChain,
+        cost: result.usage.cost,
+        requestId,
+        route: '/api/ai/extract',
+        elapsedMs: Date.now() - startTime,
+        phaseTiming,
+        degradedReason: result.degradedReason,
+        promptVersion: result.promptVersion,
+        validationFailures: result.validationFailures,
+        classification: result.classification,
+      })
+    }
+
+    // Pipeline failed
+    const { error, errorCode, degradedReason: pipelineDegraded, fallbackChain } = pipelineResult
+
+    // Capture error
+    captureServerError(new Error(error), {
       requestId,
-      hasAnthropicKey: !!process.env.ANTHROPIC_API_KEY,
-      hasOpenaiKey: !!process.env.OPENAI_API_KEY,
+      provider: 'pipeline' as string,
+      errorCode,
+      documentLength: documentText?.length ?? 0,
+      allProvidersFailed: true,
     })
-    return res.status(503).json({
-      error:
-        'No AI providers configured. Check OPENAI_API_KEY and ANTHROPIC_API_KEY environment variables.',
-      code: 'NO_PROVIDERS_CONFIGURED',
+
+    // Log all failures
+    fallbackChain.forEach((entry: any) => {
+      if (!entry.success) {
+        log.warn('Provider output rejected', {
+          requestId,
+          provider: entry.provider,
+          reasons: entry.reasons || [entry.errorCode],
+        })
+      }
+    })
+
+    log.info('Extraction completed', {
+      requestId,
+      finalProvider: fallbackChain[fallbackChain.length - 1]?.provider || 'unknown',
+      promptVersion,
+      degradedReason: pipelineDegraded,
+      totalDurationMs: Date.now() - startTime,
+      success: false,
+    })
+
+    // Record failure metrics
+    recordExtractionEvent({
+      requestId,
+      timestamp: new Date().toISOString(),
+      provider: 'pipeline' as 'openai' | 'anthropic' | 'unknown',
+      success: false,
+      durationMs: Date.now() - startTime,
+      errorCode,
+      errorMessage: error.substring(0, 200),
+      documentLength: documentText?.length ?? 0,
+    })
+    recordOverviewMetrics({
+      requestId,
+      provider: 'unknown',
+      model: 'unknown',
+      operation: 'extraction',
+      success: false,
+      durationMs: Date.now() - startTime,
+      inputTokens: 0,
+      outputTokens: 0,
+      cost: 0,
+      documentLength: documentText?.length ?? 0,
+      userId: req.headers['x-user-id'] as string | undefined,
+      errorCode,
+      errorMessage: error.substring(0, 200),
+    })
+
+    // All billing errors → 503
+    if (errorCode === 'ALL_PROVIDERS_BILLING_ERROR') {
+      return res.status(503).json({
+        error: 'Extraction unavailable — all AI providers exhausted (billing/credit)',
+        code: 'EXTRACTION_UNAVAILABLE_BILLING',
+        details: error,
+        elapsedMs: Date.now() - startTime,
+        phaseTiming,
+        requestId,
+        timestamp: new Date().toISOString(),
+      })
+    }
+
+    return res.status(500).json({
+      error: 'All AI providers failed',
+      code: errorCode,
+      details: error,
+      elapsedMs: Date.now() - startTime,
+      phaseTiming,
+      requestId,
+      fallbackChain,
+      timestamp: new Date().toISOString(),
     })
   }
 )
