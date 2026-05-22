@@ -1335,10 +1335,10 @@ router.post(
 
       // DeepSeek's json_object mode fluctuates between nested and flat schemas.
       // Append a concrete flat JSON example so it matches our expected format.
-      // IMPORTANT: Show MULTIPLE coverage items so it doesn't limit to one.
       const dsOutputSchema =
-        '\n\nYour response MUST match this flat JSON structure exactly. Replace with data from the document, ' +
-        'and include as many coverages as found in the document. Use null for missing values.\n' +
+        '\n\nIMPORTANT: You MUST output EXACTLY this flat JSON structure. Replace with data from the document. ' +
+        'Include ALL coverages mentioned in the document (add more items to the coverages array). ' +
+        'Each coverage limit must be a NUMBER or null, NOT an object. Use null for missing values.\n' +
         '{\n' +
         '  "policyNumber": "1680600025",\n' +
         '  "insurer": "Anadolu Sigorta",\n' +
@@ -1346,6 +1346,7 @@ router.post(
         '  "endDate": "2026-12-28",\n' +
         '  "currency": "TRY",\n' +
         '  "premium": 31140.00,\n' +
+        '  "premiumNet": 29657.14,\n' +
         '  "vehicleMake": "VOLKSWAGEN",\n' +
         '  "vehicleModel": "TIGUAN",\n' +
         '  "vehicleYear": "2016",\n' +
@@ -1357,15 +1358,22 @@ router.post(
         '  "coverages": [\n' +
         '    { "name": "Kasko Teminatı", "limit": 500000 },\n' +
         '    { "name": "İhtiyari Mali Sorumluluk", "limit": 500000 },\n' +
+        '    { "name": "İhtiyari Mali Sorumluluk Kaza Başına", "limit": 1000000 },\n' +
         '    { "name": "Hukuksal Koruma", "limit": 25000 },\n' +
-        '    { "name": "Koltuk Ferdi Kaza", "limit": 50000 },\n' +
-        '    { "name": "Yol Yardım", "limit": null }\n' +
+        '    { "name": "Koltuk Ferdi Kaza Vefat", "limit": 50000 },\n' +
+        '    { "name": "Koltuk Ferdi Kaza Sakatlık", "limit": 50000 },\n' +
+        '    { "name": "Motorlu Araca Bağlı Ferdi Kaza", "limit": 50000 },\n' +
+        '    { "name": "Sürücüye Bağlı Ferdi Kaza", "limit": 50000 },\n' +
+        '    { "name": "Yol Yardım", "limit": null },\n' +
+        '    { "name": "İkame Araç", "limit": null },\n' +
+        '    { "name": "Sel ve Su Baskını", "limit": null },\n' +
+        '    { "name": "Cam Kırılması", "limit": null }\n' +
         '  ],\n' +
         '  "exclusions": [\n' +
         '    { "type": "kloz_haric", "text": "Çatı camı ve sunroof teminat dışı" }\n' +
         '  ]\n' +
         '}\n\n' +
-        'Also include these fields if present: premiumNet, premiumTax, vehicleYear, NCDKademe, insuredId, vehicleVin.'
+        'ADD more coverages to the array if the document has more. limit field MUST be a simple number (e.g. 500000) or null — never an object.'
 
       const response = await dsClient.chat.completions.create(
         {
@@ -1481,6 +1489,21 @@ router.post(
       // ── Case 3: Clean up DeepSeek extra arrays that confuse stage2 ──
       for (const extraKey of ['clauses', 'taxes', 'installments', 'errors', 'endorsements']) {
         delete rawParsed[extraKey]
+      }
+
+      // ── Case 4: Normalize coverage limit format ───────────────────
+      // DeepSeek sometimes outputs limit as {"amount": 500000, "currency": "TRY"}
+      // instead of a simple number. Normalize to plain number for stage2.
+      const coverageList = rawParsed.coverages as Array<Record<string, unknown>> | undefined
+      if (coverageList) {
+        for (const c of coverageList) {
+          const lim = c.limit
+          if (lim !== null && typeof lim === 'object' && !Array.isArray(lim)) {
+            // Extract amount from {amount: number, currency: string}
+            const limObj = lim as Record<string, unknown>
+            c.limit = (typeof limObj.amount === 'number' ? limObj.amount : null) as number | null
+          }
+        }
       }
 
       // ── Inject policyType if DeepSeek dropped it ──────────────────
