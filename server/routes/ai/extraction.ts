@@ -1342,13 +1342,29 @@ router.post(
       // Without one, DeepSeek uses its nested schema and returns null values.
       // DeepSeek json_object mode: ALL-null structure to force reading from document,
       // with enough coverage name hints to show the flat schema pattern.
+      // Concrete flat JSON example with null entity values and specific coverage names
+      // to force DeepSeek into flat format while avoiding training data fill-in.
       const dsOutputSchema =
-        '\n\nExtract ALL policy data from the document above as flat JSON:' +
-        ' policyNumber, insurer, insuredName, startDate, endDate, premium, ' +
-        'vehicleMake, vehicleModel, vehicleYear, vehiclePlate, NCD, policyType.\n' +
-        'coverages: array of {name, limit}.\n' +
-        'exclusions: array of {type, text}.\n' +
-        'ALL values come from the document only. null if not found. Flat structure, no nested objects.'
+        '\n\nOutput flat JSON following this structure (read values from document above):\n' +
+        '{\n' +
+        '  "policyNumber": null,\n' +
+        '  "insurer": null,\n' +
+        '  "insuredName": null,\n' +
+        '  "startDate": null,\n' +
+        '  "endDate": null,\n' +
+        '  "premium": null,\n' +
+        '  "vehicleMake": null,\n' +
+        '  "vehicleModel": null,\n' +
+        '  "vehicleYear": null,\n' +
+        '  "vehiclePlate": null,\n' +
+        '  "NCD": null,\n' +
+        '  "policyType": null,\n' +
+        '  "coverages": [\n' +
+        '    { "name": "Kasko Teminatı", "limit": null },\n' +
+        '    { "name": "İhtiyari Mali Sorumluluk", "limit": null }\n' +
+        '  ]\n' +
+        '}\n' +
+        'Replace null with actual data from document. Add more coverages. No nested objects.'
 
       const response = await dsClient.chat.completions.create(
         {
