@@ -783,11 +783,15 @@ router.post(
       hints: classification.hints.slice(0, 5),
     })
 
-    const effectivePolicyType = policyType || classification.type
+    // NOTE: We ALWAYS use the master prompt (no policyType hint) to avoid loading
+    // type-specific prompts from Supabase (e.g. "Kasko Extraction v3") which are
+    // outdated and cause Birleşik Kasko 0-coverage issues. The master prompt
+    // (Policy Extraction - Master v4) is the authoritative extraction prompt.
 
     // ── Centralised prompt loading ──
     const promptStart = Date.now()
-    const loadedPrompts = await loadPrompts(documentText, effectivePolicyType, clientPrompt)
+    // Load without policyType to always get the latest master prompt, not type-specific
+    const loadedPrompts = await loadPrompts(documentText, undefined, clientPrompt)
     markPhase('promptLoad_ms', promptStart)
     const {
       openaiSystemPrompt,
