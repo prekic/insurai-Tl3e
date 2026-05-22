@@ -1333,12 +1333,15 @@ router.post(
           ? openaiSystemPrompt
           : openaiSystemPrompt + '\n\nRespond with valid JSON only.'
 
-      // DeepSeek's json_object mode tends to use its own nested insurance schema.
-      // Add a minimal hint to prefer flat format so DeepSeek avoids nested objects.
+      // DeepSeek's json_object mode tends to use a different schema. Add a brief hint
+      // but keep it short enough that the document text remains the primary signal.
       const dsOutputSchema =
-        '\n\nCRITICAL: Output a FLAT JSON object. Do NOT nest fields inside objects like policy: {...}, ' +
-        'insurer: {name, address}, parties: {insured: {...}}, premiums: {...}, or vehicles: [...]. ' +
-        'Extract ALL coverages and ALL exclusions mentioned in the document text above.'
+        '\n\nOUTPUT REQUIREMENTS:\n' +
+        '1. Flat JSON only. Do NOT nest fields inside policy/insurer/parties/premiums/vehicles objects.\n' +
+        '2. Insurer is a string (company name), not an object.\n' +
+        '3. Premium/total premium is at top level, not inside a premiums object.\n' +
+        '4. Vehicle info (plate, make, model) is at top level, not inside a vehicles array.\n' +
+        '5. Extract ALL coverages listed in the document — do not skip any.'
 
       const response = await dsClient.chat.completions.create(
         {
@@ -1374,10 +1377,14 @@ router.post(
       }
 
       // ── Normalize DeepSeek output format ───────────────────────────
-      // DeepSeek sometimes uses a nested schema (insurer: {name, address},
-      // policy: {policyNumber, startDate}, parties: {insured: {name, idNumber}},
-      // premiums: {grossPremium, totalPayable}, vehicles: [...])
-      // instead of the flat schema the prompt requests. Detect and flatten.
+      // DeepSeek's json_object mode can use a COMPLETELY DIFFERENT schema
+      // (insurerName, policyholderName, grossPremium, vehicles[], errors[], etc.)
+      // instead of our flat expected schema. Handle three cases:
+      //   1) Nested objects (policy: {...}, parties: {...}, premiums: {...})
+      //   2) Alternative top-level field names (insurerName → insurer, etc.)
+      //   3) Extra arrays (errors[], taxes[], installments[]) to clean up
+
+      // ── Case 1: Flatten nested object patterns ──────────────────────
       if (rawParsed.policy && typeof rawParsed.policy === 'object' && !rawParsed.policyNumber) {
         const p = rawParsed.policy as Record<string, unknown>
         if (p.policyNumber) rawParsed.policyNumber = p.policyNumber
@@ -1389,6 +1396,9 @@ router.post(
         const insured = pa.insured as Record<string, unknown> | undefined
         if (insured?.name && !rawParsed.insuredName) rawParsed.insuredName = insured.name
         if (insured?.idNumber && !rawParsed.insuredId) rawParsed.insuredId = insured.idNumber
+        // Also check policyholder (alternative DeepSeek naming)
+        const polholder = pa.policyholder as Record<string, unknown> | undefined
+        if (polholder?.name && !rawParsed.insuredName) rawParsed.insuredName = polholder.name
       }
       if (
         typeof rawParsed.insurer === 'object' &&
@@ -1415,6 +1425,38 @@ router.post(
         if (v.model && !rawParsed.vehicleModel) rawParsed.vehicleModel = v.model
         if (v.year && !rawParsed.vehicleYear) rawParsed.vehicleYear = v.year
         if (v.vin && !rawParsed.vin) rawParsed.vin = v.vin
+      }
+
+      // ── Case 2: Map alternative field names DeepSeek uses ──────────
+      // DeepSeek sometimes uses a completely different schema at the top level
+      // (insurerName, grossPremium, policyholderName, etc.) instead of ours.
+      const altFieldMap: Record<string, string> = {
+        insurerName: 'insurer',
+        policyholderName: 'insuredName',
+        policyholderIdNumber: 'insuredId',
+        policyholderAddress: 'insuredAddress',
+        policyholderTaxNumber: 'insuredTaxNumber',
+        grossPremium: 'premium',
+        netPremium: 'premiumNet',
+        totalPayable: 'premium',
+        premiumsCurrency: 'currency',
+        issueDateTime: 'startDate',
+        durationDays: 'durationDays',
+      }
+      for (const [altKey, targetKey] of Object.entries(altFieldMap)) {
+        const val = rawParsed[altKey]
+        if (val !== undefined && val !== null) {
+          // Only set target if it's not already populated
+          if (rawParsed[targetKey] === undefined || rawParsed[targetKey] === null) {
+            rawParsed[targetKey] = val
+          }
+          delete rawParsed[altKey]
+        }
+      }
+
+      // ── Case 3: Clean up DeepSeek extra arrays that confuse stage2 ──
+      for (const extraKey of ['clauses', 'taxes', 'installments', 'errors', 'endorsements']) {
+        delete rawParsed[extraKey]
       }
 
       // ── Inject policyType if DeepSeek dropped it ──────────────────
