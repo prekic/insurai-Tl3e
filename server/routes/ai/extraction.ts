@@ -1333,22 +1333,22 @@ router.post(
           ? openaiSystemPrompt
           : openaiSystemPrompt + '\n\nRespond with valid JSON only.'
 
-      // DeepSeek's json_object mode needs a flat structure hint.
-      // Put it in the system prompt (before document text) so DeepSeek has the structure
-      // in mind while reading.
+      // DeepSeek's json_object mode fluctuates between nested and flat schemas.
+      // The flat format hint MUST be appended AFTER the document text, not in the
+      // system prompt. DeepSeek hallucinates more when structure hint precedes the doc.
       const dsOutputSchema =
-        '\n\nIMPORTANT: Return flat JSON only. ' +
-        'No nested policy/insurer/parties/premiums/vehicles objects. ' +
-        'Insurer is a plain string. ' +
-        'Coverage limits are plain numbers or null. ' +
-        'Extract ALL coverages from the user-provided document.'
+        '\n\nFLAT JSON FORMAT:\n' +
+        '- ALL fields are top-level (insurer as string, premium as number, etc.)\n' +
+        '- NO nested objects: policy/insurer/parties/premiums\n' +
+        '- Coverages: [{name: string, limit: number|null}]\n' +
+        '- Extract ALL coverages from the document text above.'
 
       const response = await dsClient.chat.completions.create(
         {
           model: model || 'deepseek-chat',
           messages: [
-            { role: 'system', content: dsSystemPrompt + dsOutputSchema },
-            { role: 'user', content: finalUserPrompt },
+            { role: 'system', content: dsSystemPrompt },
+            { role: 'user', content: finalUserPrompt + dsOutputSchema },
           ],
           response_format: { type: 'json_object' },
           max_tokens: aiConfig.maxTokens,
