@@ -7,6 +7,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenAI } from '@google/genai'
 import { Request, Response, Router } from 'express'
 import OpenAI from 'openai'
 import logger from '../../lib/logger.js'
@@ -30,6 +31,7 @@ import { recordOverviewMetrics } from './shared.js'
 // Initialize clients (lazy - only when keys are available)
 let openaiClient: OpenAI | null = null
 let anthropicClient: Anthropic | null = null
+let geminiClient: GoogleGenAI | null = null
 
 function getOpenAIClient(): OpenAI | null {
   if (!process.env.OPENAI_API_KEY) return null
@@ -45,6 +47,14 @@ function getAnthropicClient(): Anthropic | null {
     anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   }
   return anthropicClient
+}
+
+function getGeminiClient(): GoogleGenAI | null {
+  if (!process.env.GEMINI_API_KEY) return null
+  if (!geminiClient) {
+    geminiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+  }
+  return geminiClient
 }
 
 const CHAT_SYSTEM_PROMPT_FALLBACK = `You are an expert insurance policy assistant for the Turkish insurance market. You help users understand their insurance policies, answer questions about coverage, compare policies, and identify potential gaps or issues.
@@ -108,185 +118,184 @@ router.post(
       // Get AI config for chat settings
       const aiConfig = await getAIConfig()
 
-      if (useProvider === 'openai') {
+      // ── Fallback chain: try requested provider, then fallbacks, then Gemini ──
+      let lastError: unknown
+      const successProvider: 'openai' | 'anthropic' | 'gemini' | '' = ''
+
+      // Helper to attempt a provider
+      async function tryChatProvider(
+        providerName: string,
+        caller: () => Promise<boolean>
+      ): Promise<boolean> {
+        try {
+          return await caller()
+        } catch (err) {
+          lastError = err
+          log.warn(providerName + ' chat failed, attempting fallback', {
+            error: err instanceof Error ? err.message : String(err),
+          })
+          return false
+        }
+      }
+
+      // Helper to respond with success
+      function respondChat(
+        responseText: string,
+        providerName: string,
+        model: string,
+        inputTokens: number,
+        outputTokens: number,
+        cost: { totalCost: number; inputCost: number; outputCost: number }
+      ) {
+        recordUsage({
+          provider: providerName,
+          model,
+          operation: 'chat',
+          inputTokens,
+          outputTokens,
+          totalTokens: inputTokens + outputTokens,
+          inputCost: cost.inputCost,
+          outputCost: cost.outputCost,
+          totalCost: cost.totalCost,
+          timestamp: new Date().toISOString(),
+        }).catch(() => {})
+
+        recordOverviewMetrics({
+          requestId: `chat-${Date.now()}`,
+          provider: providerName,
+          model,
+          operation: 'chat',
+          success: true,
+          durationMs: Date.now() - chatStart,
+          inputTokens,
+          outputTokens,
+          cost: cost.totalCost,
+          userId: req.headers['x-user-id'] as string | undefined,
+        })
+
+        res.json({
+          success: true,
+          response: responseText,
+          provider: providerName,
+          usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+          cost: cost.totalCost,
+        })
+      }
+
+      // Build messages for OpenAI-style API
+      const openaiMessages = [
+        { role: 'system' as const, content: systemPrompt },
+        ...conversationHistory.map((msg: ChatMessage) => ({
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+        })),
+        { role: 'user' as const, content: message },
+      ]
+
+      // Build messages for Anthropic-style API
+      const anthropicMessages = conversationHistory.map((msg: ChatMessage) => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+      }))
+      anthropicMessages.push({ role: 'user' as const, content: message })
+
+      // ── TRY 1: OpenAI ──
+      if (!successProvider && useProvider === 'openai') {
         const client = getOpenAIClient()
-        if (!client) {
-          return res.status(503).json({
-            error: IS_PRODUCTION ? 'Chat service unavailable' : 'OpenAI not configured',
-            code: 'PROVIDER_NOT_CONFIGURED',
-          })
-        }
-
-        // Build messages array with history
-        const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-          { role: 'system', content: systemPrompt },
-          ...conversationHistory.map((msg: ChatMessage) => ({
-            role: msg.role as 'user' | 'assistant',
-            content: msg.content,
-          })),
-          { role: 'user', content: message },
-        ]
-
-        const response = await client.chat.completions.create({
-          model: aiConfig.openaiBackupModel, // Use backup/fast model for chat
-          messages,
-          max_tokens: 1024,
-          temperature: aiConfig.chatTemperature,
-        })
-
-        const content = response.choices[0]?.message?.content
-        if (!content) {
-          return res.status(500).json({
-            error: IS_PRODUCTION ? 'Unable to generate response' : 'Empty response from OpenAI',
-            code: 'EMPTY_RESPONSE',
-          })
-        }
-
-        // Track cost usage for chat
-        const chatModel = response.model || aiConfig.openaiBackupModel
-        const inputTokens = response.usage?.prompt_tokens || 0
-        const outputTokens = response.usage?.completion_tokens || 0
-        const cost = calculateCost(chatModel, inputTokens, outputTokens)
-
-        // Record usage asynchronously
-        recordUsage({
-          provider: 'openai',
-          model: chatModel,
-          operation: 'chat',
-          inputTokens,
-          outputTokens,
-          totalTokens: inputTokens + outputTokens,
-          inputCost: cost.inputCost,
-          outputCost: cost.outputCost,
-          totalCost: cost.totalCost,
-          timestamp: new Date().toISOString(),
-        }).catch((err) => {
-          if (!IS_PRODUCTION)
-            log.debug('Cost tracking failed', {
-              error: err instanceof Error ? err.message : String(err),
+        if (client) {
+          const succeeded = await tryChatProvider('openai', async () => {
+            const response = await client.chat.completions.create({
+              model: aiConfig.openaiBackupModel,
+              messages: openaiMessages,
+              max_tokens: 1024,
+              temperature: aiConfig.chatTemperature,
             })
-        })
+            const content = response.choices[0]?.message?.content
+            if (!content) return false
+            const chatModel = response.model || aiConfig.openaiBackupModel
+            const inputTokens = response.usage?.prompt_tokens || 0
+            const outputTokens = response.usage?.completion_tokens || 0
+            const cost = calculateCost(chatModel, inputTokens, outputTokens)
+            respondChat(content, 'openai', chatModel, inputTokens, outputTokens, cost)
+            return true
+          })
+          if (succeeded) {
+            log.info('OpenAI chat succeeded', { requestId: `chat-${Date.now()}` })
+            return
+          }
+        }
+      }
 
-        recordOverviewMetrics({
-          requestId: `chat-${Date.now()}`,
-          provider: 'openai',
-          model: chatModel,
-          operation: 'chat',
-          success: true,
-          durationMs: Date.now() - chatStart,
-          inputTokens,
-          outputTokens,
-          cost: cost.totalCost,
-          userId: req.headers['x-user-id'] as string | undefined,
-        })
-
-        return res.json({
-          success: true,
-          response: content,
-          provider: 'openai',
-          usage: response.usage,
-          cost: cost.totalCost,
-        })
-      } else {
-        // Anthropic
+      // ── TRY 2: Anthropic ──
+      if (!successProvider && useProvider === 'anthropic') {
         const client = getAnthropicClient()
-        if (!client) {
-          return res.status(503).json({
-            error: IS_PRODUCTION ? 'Chat service unavailable' : 'Anthropic not configured',
-            code: 'PROVIDER_NOT_CONFIGURED',
-          })
-        }
-
-        // Build messages array with history
-        const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
-          ...conversationHistory.map((msg: ChatMessage) => ({
-            role: msg.role as 'user' | 'assistant',
-            content: msg.content,
-          })),
-          { role: 'user', content: message },
-        ]
-
-        const response = await client.messages.create({
-          model: aiConfig.anthropicBackupModel, // Use backup/fast model for chat
-          max_tokens: 1024,
-          system: systemPrompt,
-          messages,
-        })
-
-        const textBlock = response.content.find((block) => block.type === 'text')
-        if (!textBlock || textBlock.type !== 'text') {
-          return res.status(500).json({
-            error: IS_PRODUCTION ? 'Unable to generate response' : 'Empty response from Anthropic',
-            code: 'EMPTY_RESPONSE',
-          })
-        }
-
-        // Track cost usage for chat
-        const chatModel = response.model || aiConfig.anthropicBackupModel
-        const inputTokens = response.usage.input_tokens
-        const outputTokens = response.usage.output_tokens
-        const cost = calculateCost(chatModel, inputTokens, outputTokens)
-
-        // Record usage asynchronously
-        recordUsage({
-          provider: 'anthropic',
-          model: chatModel,
-          operation: 'chat',
-          inputTokens,
-          outputTokens,
-          totalTokens: inputTokens + outputTokens,
-          inputCost: cost.inputCost,
-          outputCost: cost.outputCost,
-          totalCost: cost.totalCost,
-          timestamp: new Date().toISOString(),
-        }).catch((err) => {
-          if (!IS_PRODUCTION)
-            log.debug('Cost tracking failed', {
-              error: err instanceof Error ? err.message : String(err),
+        if (client) {
+          const succeeded = await tryChatProvider('anthropic', async () => {
+            const response = await client.messages.create({
+              model: aiConfig.anthropicBackupModel,
+              max_tokens: 1024,
+              system: systemPrompt,
+              messages: anthropicMessages,
             })
-        })
-
-        recordOverviewMetrics({
-          requestId: `chat-${Date.now()}`,
-          provider: 'anthropic',
-          model: chatModel,
-          operation: 'chat',
-          success: true,
-          durationMs: Date.now() - chatStart,
-          inputTokens,
-          outputTokens,
-          cost: cost.totalCost,
-          userId: req.headers['x-user-id'] as string | undefined,
-        })
-
-        return res.json({
-          success: true,
-          response: textBlock.text,
-          provider: 'anthropic',
-          usage: {
-            input_tokens: response.usage.input_tokens,
-            output_tokens: response.usage.output_tokens,
-          },
-          cost: cost.totalCost,
-        })
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      const errorDetails = {
-        timestamp: new Date().toISOString(),
-        provider: (req.body as ChatInput).provider || 'unknown',
-        errorType: error instanceof Error ? error.constructor.name : 'Unknown',
-        message: errorMessage,
+            const textBlock = response.content.find((block) => block.type === 'text')
+            if (!textBlock || textBlock.type !== 'text') return false
+            const chatModel = response.model || aiConfig.anthropicBackupModel
+            const inputTokens = response.usage.input_tokens
+            const outputTokens = response.usage.output_tokens
+            const cost = calculateCost(chatModel, inputTokens, outputTokens)
+            respondChat(textBlock.text, 'anthropic', chatModel, inputTokens, outputTokens, cost)
+            return true
+          })
+          if (succeeded) {
+            log.info('Anthropic chat succeeded', { requestId: `chat-${Date.now()}` })
+            return
+          }
+        }
       }
 
-      if (!IS_PRODUCTION) {
-        log.debug('Chat failed', errorDetails)
+      // ── TRY 3: Gemini fallback (always try if previous providers failed) ──
+      if (!successProvider) {
+        const client = getGeminiClient()
+        if (client) {
+          const succeeded = await tryChatProvider('gemini', async () => {
+            const geminiSystemMsg =
+              systemPrompt +
+              (conversationHistory.length > 0
+                ? '\n\nConversation history:\n' +
+                  conversationHistory.map((m) => m.role + ': ' + m.content).join('\n')
+                : '') +
+              '\n\nUser: ' +
+              message
+
+            const response = await client.models.generateContent({
+              model: 'gemini-3-flash',
+              contents: [{ role: 'user', parts: [{ text: geminiSystemMsg }] }],
+              config: {
+                temperature: aiConfig.chatTemperature,
+                maxOutputTokens: 1024,
+              },
+            })
+
+            const content = response.text
+            if (!content) return false
+
+            const inputTokens = response.usageMetadata?.promptTokenCount || 0
+            const outputTokens = response.usageMetadata?.candidatesTokenCount || 0
+            const cost = calculateCost('gemini-3-flash', inputTokens, outputTokens)
+            respondChat(content, 'gemini', 'gemini-3-flash', inputTokens, outputTokens, cost)
+            return true
+          })
+          if (succeeded) {
+            log.info('Gemini chat succeeded', { requestId: `chat-${Date.now()}` })
+            return
+          }
+        }
       }
 
-      // Determine specific error code
+      // ── ALL PROVIDERS FAILED ──
+      const errorMessage = lastError instanceof Error ? lastError.message : 'All providers failed'
       let code = 'CHAT_FAILED'
       let userMessage = IS_PRODUCTION ? 'Unable to process your message' : 'Chat request failed'
-
       if (errorMessage.includes('401') || errorMessage.includes('API key')) {
         code = 'INVALID_API_KEY'
         userMessage = IS_PRODUCTION ? 'Chat service temporarily unavailable' : 'API key is invalid'
@@ -302,7 +311,28 @@ router.post(
         error: userMessage,
         code,
         ...(!IS_PRODUCTION && { details: errorMessage }),
-        timestamp: errorDetails.timestamp,
+        timestamp: new Date().toISOString(),
+      })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      let code = 'CHAT_FAILED'
+      let userMessage = IS_PRODUCTION ? 'Unable to process your message' : 'Chat request failed'
+      if (errorMessage.includes('401') || errorMessage.includes('API key')) {
+        code = 'INVALID_API_KEY'
+        userMessage = IS_PRODUCTION ? 'Chat service temporarily unavailable' : 'API key is invalid'
+      } else if (errorMessage.includes('429') || errorMessage.includes('rate_limit')) {
+        code = 'RATE_LIMIT_EXCEEDED'
+        userMessage = IS_PRODUCTION ? 'Service busy, please try again later' : 'Rate limit exceeded'
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
+        code = 'TIMEOUT'
+        userMessage = IS_PRODUCTION ? 'Request timed out, please try again' : 'Request timed out'
+      }
+
+      res.status(500).json({
+        error: userMessage,
+        code,
+        ...(!IS_PRODUCTION && { details: errorMessage }),
+        timestamp: new Date().toISOString(),
       })
     }
   }

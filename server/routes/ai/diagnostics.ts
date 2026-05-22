@@ -495,6 +495,7 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
   const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 
   const diagnostics: {
+    deepseek: ProviderDiagnostic
     openai: ProviderDiagnostic
     anthropic: ProviderDiagnostic
     google: ProviderDiagnostic
@@ -502,6 +503,7 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
     timestamp: string
     environment?: string // Only included in non-production
   } = {
+    deepseek: { configured: false, valid: false },
     openai: { configured: false, valid: false },
     anthropic: { configured: false, valid: false },
     google: { configured: false, valid: false },
@@ -509,6 +511,50 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
     timestamp: new Date().toISOString(),
     // Only expose environment in non-production
     ...(IS_PRODUCTION ? {} : { environment: process.env.NODE_ENV || 'development' }),
+  }
+
+  // Test DeepSeek
+  if (process.env.DEEPSEEK_API_KEY) {
+    diagnostics.deepseek.configured = true
+    const startTime = Date.now()
+    try {
+      const rawBase = process.env.DEEPSEEK_BASE_URL
+      const validUrl =
+        rawBase && rawBase.startsWith('http') && !rawBase.startsWith('sk-')
+          ? rawBase
+          : 'https://api.deepseek.com'
+      const dsClient = new OpenAI({
+        apiKey: process.env.DEEPSEEK_API_KEY,
+        baseURL: validUrl,
+      })
+      const response = await dsClient.chat.completions.create({
+        model: 'deepseek-v4-pro',
+        messages: [{ role: 'user', content: 'Say "OK"' }],
+        max_tokens: 5,
+      })
+      diagnostics.deepseek.valid = true
+      diagnostics.deepseek.latencyMs = Date.now() - startTime
+      if (!IS_PRODUCTION) {
+        diagnostics.deepseek.model = response.model
+      }
+    } catch (error) {
+      diagnostics.deepseek.valid = false
+      diagnostics.deepseek.latencyMs = Date.now() - startTime
+      let errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      if (errorMsg.includes('401') || errorMsg.includes('Incorrect API key')) {
+        errorMsg = 'Invalid API key - check DEEPSEEK_API_KEY in .env'
+      } else if (errorMsg.includes('429')) {
+        errorMsg = 'Rate limit exceeded'
+      } else if (errorMsg.includes('insufficient_quota')) {
+        errorMsg = 'API quota exhausted'
+      }
+      diagnostics.deepseek.errorCode = classifyDiagnosticError(errorMsg)
+      diagnostics.deepseek.error = sanitizeDiagnosticError(errorMsg, IS_PRODUCTION)
+      log.warn('DeepSeek diagnostic failed', {
+        errorCode: diagnostics.deepseek.errorCode,
+        error: errorMsg,
+      })
+    }
   }
 
   // Test OpenAI
