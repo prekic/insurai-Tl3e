@@ -1359,23 +1359,11 @@ router.post(
       // Parse JSON from text response (may have markdown fences or extra text)
       let rawParsed: Record<string, unknown>
       try {
-        // Remove markdown fences first
-        let cleaned = content.replace(/```json\n?|```\n?/gi, '').trim()
-        // Then find the outermost { ... } block with balanced braces
-        const firstBrace = cleaned.indexOf('{')
-        if (firstBrace >= 0) {
-          let depth = 0
-          let end = firstBrace
-          for (let i = firstBrace; i < cleaned.length; i++) {
-            if (cleaned[i] === '{') depth++
-            else if (cleaned[i] === '}') depth--
-            if (depth === 0) {
-              end = i + 1
-              break
-            }
-          }
-          cleaned = cleaned.slice(firstBrace, end)
-        }
+        // Try parsing content directly
+        const jsonMatch = content.match(/\{[\s\S]*?\}/)
+        const jsonStr = jsonMatch ? jsonMatch[0] : content
+        // Remove any markdown code block markers
+        const cleaned = jsonStr.replace(/```json\n?|```\n?/gi, '').trim()
         rawParsed = JSON.parse(cleaned) as Record<string, unknown>
       } catch {
         log.error('DeepSeek returned invalid JSON', {
