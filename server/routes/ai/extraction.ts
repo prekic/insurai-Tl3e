@@ -1337,11 +1337,14 @@ router.post(
       // The flat format hint MUST be appended AFTER the document text, not in the
       // system prompt. DeepSeek hallucinates more when structure hint precedes the doc.
       const dsOutputSchema =
-        '\n\nFLAT JSON FORMAT:\n' +
-        '- ALL fields are top-level (insurer as string, premium as number, etc.)\n' +
-        '- NO nested objects: policy/insurer/parties/premiums\n' +
-        '- Coverages: [{name: string, limit: number|null}]\n' +
-        '- Extract ALL coverages from the document text above.'
+        '\n\nIMPORTANT: You MUST extract all fields ONLY from the document text above. ' +
+        'Do NOT use your general knowledge or training data. If a field value is not explicitly ' +
+        'mentioned in the document text, set it to null. For example, if the document does not ' +
+        'mention a vehicle plate number, set "vehiclePlate": null.\n\n' +
+        'Return flat JSON only. No nested policy/insurer/parties/premiums/vehicles objects. ' +
+        'Insurer is a plain string, not an object. ' +
+        'Coverage limits are numbers or null. ' +
+        'Extract ALL coverages from the document.'
 
       const response = await dsClient.chat.completions.create(
         {
