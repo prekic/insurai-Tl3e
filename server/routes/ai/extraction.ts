@@ -1334,30 +1334,11 @@ router.post(
           : openaiSystemPrompt + '\n\nRespond with valid JSON only.'
 
       // DeepSeek's json_object mode tends to use its own nested insurance schema.
-      // Append an explicit flat JSON structure description so DeepSeek matches our format.
+      // Add a minimal hint to prefer flat format so DeepSeek avoids nested objects.
       const dsOutputSchema =
-        '\n\nYou MUST output EXACTLY this flat JSON structure. Use null for missing values. Extract ALL coverages you find, not just one.' +
-        ' Follow this exact key/type layout:\n' +
-        '- policyNumber: string or null\n' +
-        '- insurer: string or null (company name only, NOT an object)\n' +
-        '- startDate: string or null (YYYY-MM-DD)\n' +
-        '- endDate: string or null (YYYY-MM-DD)\n' +
-        '- currency: string or null (3-letter code)\n' +
-        '- premium: number or null (total premium)\n' +
-        '- premiumNet: number or null\n' +
-        '- premiumTax: number or null\n' +
-        '- vehicleMake: string or null\n' +
-        '- vehicleModel: string or null\n' +
-        '- vehicleYear: number or null\n' +
-        '- vehiclePlate: string or null\n' +
-        '- insuredName: string or null\n' +
-        '- NCD: number or null\n' +
-        '- NCDKademe: number or null\n' +
-        '- policyType: string ("kasko", "traffic", "home", etc.)\n' +
-        '- coverages: array of objects with: name (string), nameTr (string), limit (number or null), ' +
-        'deductible (string or null), isOptional (bool), included (bool), category (string: "main" / "liability" / "supplementary" / "assistance" / "legal" / "other")\n' +
-        '- exclusions: array of objects with: type (string), text (string)\n\n' +
-        'CRITICAL: FLAT structure only. No nested insurer/policy/parties/premiums/vehicles objects.'
+        '\n\nCRITICAL: Output a FLAT JSON object. Do NOT nest fields inside objects like policy: {...}, ' +
+        'insurer: {name, address}, parties: {insured: {...}}, premiums: {...}, or vehicles: [...]. ' +
+        'Extract ALL coverages and ALL exclusions mentioned in the document text above.'
 
       const response = await dsClient.chat.completions.create(
         {
