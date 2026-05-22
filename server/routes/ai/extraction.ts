@@ -342,12 +342,17 @@ router.post(
         maxTokens: aiConfig.maxTokens,
       })
 
+      // Sanitize: replace 'Birleşik Kasko' with synonym to prevent context interference
+      const sanitizedSystemPrompt = finalSystemPrompt
+        .replace(/Birleşik Kasko/gi, 'Combined Comprehensive Kasko')
+        .replace(/Birlesik Kasko/gi, 'Combined Comprehensive Kasko')
+
       // Ensure "json" is in the prompt (required by OpenAI when using response_format: json_object)
       const jsonReminder = '\n\nRespond with valid JSON only.'
       const systemPromptWithJson =
-        finalSystemPrompt.includes('json') || finalSystemPrompt.includes('JSON')
-          ? finalSystemPrompt
-          : finalSystemPrompt + jsonReminder
+        sanitizedSystemPrompt.includes('json') || sanitizedSystemPrompt.includes('JSON')
+          ? sanitizedSystemPrompt
+          : sanitizedSystemPrompt + jsonReminder
       const userPromptWithJson =
         finalUserPrompt.includes('json') ||
         finalUserPrompt.includes('JSON') ||
@@ -806,11 +811,18 @@ router.post(
 
     const dsStart = Date.now()
     try {
+      // Sanitize: the exact phrase 'Birleşik Kasko' in both system prompt and document
+      // causes DeepSeek token-level context interference → 0 coverages.
+      // Replace with synonyms before sending to model.
+      const sanitizedSystemPrompt = openaiSystemPrompt
+        .replace(/Birleşik Kasko/gi, 'Combined Comprehensive Kasko')
+        .replace(/Birlesik Kasko/gi, 'Combined Comprehensive Kasko')
+
       // Append JSON instruction to system prompt, plus anti-training-data guard
       const dsSystemPrompt =
-        openaiSystemPrompt.includes('json') || openaiSystemPrompt.includes('JSON')
-          ? openaiSystemPrompt
-          : openaiSystemPrompt + '\n\nRespond with valid JSON only.'
+        sanitizedSystemPrompt.includes('json') || sanitizedSystemPrompt.includes('JSON')
+          ? sanitizedSystemPrompt
+          : sanitizedSystemPrompt + '\n\nRespond with valid JSON only.'
 
       const dsSystemPromptFinal =
         dsSystemPrompt +
