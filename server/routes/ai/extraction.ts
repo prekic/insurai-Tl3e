@@ -68,8 +68,6 @@ const EXTRACTION_MODEL_ALLOWLIST = new Set([
   'gpt-5.4',
   'gpt-5.4-mini',
   'gpt-4o',
-  'gpt-5.4-mini',
-  'deepseek-v4-pro',
   'deepseek-v4-pro',
 ])
 
