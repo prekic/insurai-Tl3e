@@ -663,7 +663,7 @@ export const AI_CONFIG = {
   // OpenAI models
   openai: {
     extractionModel: 'gpt-4o' as const,
-    backupModel: 'gpt-4o-mini' as const,
+    backupModel: 'gpt-5.4-mini' as const,
   },
 
   // Anthropic models

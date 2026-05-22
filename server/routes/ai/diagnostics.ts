@@ -520,7 +520,7 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
       if (client) {
         // Make a minimal API call to verify the key works
         const response = await client.chat.completions.create({
-          model: 'gpt-4o-mini',
+          model: 'gpt-5.4-mini',
           messages: [{ role: 'user', content: 'Say "OK"' }],
           max_tokens: 5,
         })
@@ -739,14 +739,14 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
       if (client) {
         // Minimal health check — just verify the API key works
         await client.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3-flash',
           contents: 'Say "OK"',
           config: { maxOutputTokens: 5 },
         })
         diagnostics.gemini.valid = true
         diagnostics.gemini.latencyMs = Date.now() - startTime
         if (!IS_PRODUCTION) {
-          diagnostics.gemini.model = 'gemini-2.5-flash'
+          diagnostics.gemini.model = 'gemini-3-flash'
         }
       }
     } catch (error) {

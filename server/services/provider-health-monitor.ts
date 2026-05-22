@@ -111,7 +111,7 @@ async function checkOpenAI(results: Record<string, string>): Promise<void> {
     }
 
     await client.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5.4-mini',
       messages: [{ role: 'user', content: 'OK' }],
       max_tokens: 5,
     })
@@ -221,7 +221,7 @@ async function checkDeepSeek(results: Record<string, string>): Promise<void> {
     }
 
     await client.chat.completions.create({
-      model: 'deepseek-chat',
+      model: 'deepseek-v4-pro',
       messages: [{ role: 'user', content: 'OK' }],
       max_tokens: 5,
     })
@@ -270,7 +270,7 @@ async function checkGemini(results: Record<string, string>): Promise<void> {
 
     // Test with a simple content generation
     await client.models.generateContent({
-      model: 'gemini-2.0-flash-lite',
+      model: 'gemini-3-flash',
       contents: [{ role: 'user', parts: [{ text: 'OK' }] }],
     })
   } catch (err: any) {

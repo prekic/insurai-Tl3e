@@ -68,7 +68,7 @@ export interface AICleanerOptions {
 const DEFAULT_TIMEOUT = 30000 // 30 seconds
 
 const DEFAULT_MODELS: Record<AIProviderName, string> = {
-  openai: 'gpt-4o-mini',
+  openai: 'gpt-5.4-mini',
   anthropic: 'claude-3-haiku-20240307',
   gemini: 'gemini-1.5-flash',
 }
@@ -135,14 +135,14 @@ CORRECTED TEXT:`
  */
 function extractCriticalData(text: string): string[] {
   const patterns = [
-    /\d{10,}/g,                      // Long numbers (policy numbers)
-    /\d{2}\/\d{2}\/\d{4}/g,          // Dates (DD/MM/YYYY)
-    /\d{2}-\d{2}-\d{4}/g,            // Dates (DD-MM-YYYY)
-    /\d{4}-\d{2}-\d{2}/g,            // Dates (YYYY-MM-DD)
-    /\d{1,3}(?:\.\d{3})*,\d{2}/g,    // Turkish formatted amounts (31.140,00)
-    /\d{2}\s*[A-Z]{1,3}\s*\d{4,}/g,  // Plate numbers (34 ABC 1234)
-    /[A-Z0-9]{10,}/g,                // Reference codes
-    /T\.?C\.?\s*\d{11}/gi,           // TC Kimlik numbers
+    /\d{10,}/g, // Long numbers (policy numbers)
+    /\d{2}\/\d{2}\/\d{4}/g, // Dates (DD/MM/YYYY)
+    /\d{2}-\d{2}-\d{4}/g, // Dates (DD-MM-YYYY)
+    /\d{4}-\d{2}-\d{2}/g, // Dates (YYYY-MM-DD)
+    /\d{1,3}(?:\.\d{3})*,\d{2}/g, // Turkish formatted amounts (31.140,00)
+    /\d{2}\s*[A-Z]{1,3}\s*\d{4,}/g, // Plate numbers (34 ABC 1234)
+    /[A-Z0-9]{10,}/g, // Reference codes
+    /T\.?C\.?\s*\d{11}/gi, // TC Kimlik numbers
   ]
 
   const critical: string[] = []
@@ -199,7 +199,7 @@ async function callOpenAIDirect(
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -255,7 +255,9 @@ async function callAnthropicDirect(
 
     if (!response.ok) {
       const errorText = await response.text()
-      throw new Error(`Anthropic API error: ${response.status} ${response.statusText} - ${errorText}`)
+      throw new Error(
+        `Anthropic API error: ${response.status} ${response.statusText} - ${errorText}`
+      )
     }
 
     const data = await response.json()
@@ -415,10 +417,10 @@ export function cleanTurkishOCROffline(text: string): string {
     result = result.replace(
       new RegExp(
         `(?<=[^${TURKISH_UPPER}]|^)` + // Not preceded by uppercase
-        `([${TURKISH_UPPER}])` +        // Single uppercase letter
-        `[ \\t]+` +                     // Horizontal whitespace
-        `([${TURKISH_UPPER}])` +        // Single uppercase letter
-        `(?=[ \\t]+[${TURKISH_UPPER}](?:[ \\t]+[${TURKISH_UPPER}]|[^${TURKISH_LOWER}]|$))`, // Must have more single letters following
+          `([${TURKISH_UPPER}])` + // Single uppercase letter
+          `[ \\t]+` + // Horizontal whitespace
+          `([${TURKISH_UPPER}])` + // Single uppercase letter
+          `(?=[ \\t]+[${TURKISH_UPPER}](?:[ \\t]+[${TURKISH_UPPER}]|[^${TURKISH_LOWER}]|$))`, // Must have more single letters following
         'gu'
       ),
       '$1$2'
@@ -429,10 +431,10 @@ export function cleanTurkishOCROffline(text: string): string {
   // Handle final pair in a sequence
   result = result.replace(
     new RegExp(
-      `([${TURKISH_UPPER}]{2,})` +  // Already collapsed letters
-      `[ \\t]+` +                   // Space
-      `([${TURKISH_UPPER}])` +      // Single letter
-      `(?=[^${TURKISH_UPPER}${TURKISH_LOWER}]|$)`, // Followed by non-letter or end
+      `([${TURKISH_UPPER}]{2,})` + // Already collapsed letters
+        `[ \\t]+` + // Space
+        `([${TURKISH_UPPER}])` + // Single letter
+        `(?=[^${TURKISH_UPPER}${TURKISH_LOWER}]|$)`, // Followed by non-letter or end
       'gu'
     ),
     '$1$2'
@@ -444,17 +446,17 @@ export function cleanTurkishOCROffline(text: string): string {
   const commonConjunctions = ['VE', 'İLE', 'VEYA']
   for (const conj of commonConjunctions) {
     // Match: Turkish letter (including İ) followed by conjunction
-    const pattern = new RegExp(`([${TURKISH_UPPER}${TURKISH_LOWER}İı])(${conj})(?=[${TURKISH_UPPER}]|\\s|$)`, 'g')
+    const pattern = new RegExp(
+      `([${TURKISH_UPPER}${TURKISH_LOWER}İı])(${conj})(?=[${TURKISH_UPPER}]|\\s|$)`,
+      'g'
+    )
     result = result.replace(pattern, '$1 $2')
   }
 
   // Split at clear lowercase-uppercase boundaries that look like glued words
   // e.g., "HUSUSİOTOMOBİL" → "HUSUSİ OTOMOBİL"
   // Look for: ...İ followed by uppercase (common Turkish suffix ending)
-  result = result.replace(
-    /([İıiI])([A-ZÇĞÖŞÜİ][a-zçğıöşüi]{2,})/g,
-    '$1 $2'
-  )
+  result = result.replace(/([İıiI])([A-ZÇĞÖŞÜİ][a-zçğıöşüi]{2,})/g, '$1 $2')
 
   // Normalize whitespace
   result = result.replace(/[ \t]{2,}/g, ' ')
@@ -600,7 +602,7 @@ export async function cleanTurkishOCRMultiProvider(
       result,
       validation: validateOutput(text, result),
     }))
-    .filter(r => r.validation.valid)
+    .filter((r) => r.validation.valid)
 
   let bestResult = text
   if (validResults.length > 0) {
@@ -609,7 +611,7 @@ export async function cleanTurkishOCRMultiProvider(
     bestResult = validResults[0].result
   } else if (Object.values(results).length > 0) {
     // No valid results, pick the longest one
-    bestResult = Object.values(results).reduce((a, b) => a.length > b.length ? a : b, text)
+    bestResult = Object.values(results).reduce((a, b) => (a.length > b.length ? a : b), text)
   }
 
   const validation = validateOutput(text, bestResult)

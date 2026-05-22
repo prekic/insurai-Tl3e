@@ -67,7 +67,7 @@ const COST_OPTIMIZED: SettingsTemplate = {
   tags: ['budget', 'savings', 'development'],
   overrides: [
     // AI: Use backup (cheaper) models, reduce token usage
-    { category: 'ai', key: 'openai_extraction_model', value: 'gpt-4o-mini' },
+    { category: 'ai', key: 'openai_extraction_model', value: 'gpt-5.4-mini' },
     { category: 'ai', key: 'anthropic_extraction_model', value: 'claude-3-5-haiku-latest' },
     { category: 'ai', key: 'max_tokens', value: 2048 },
     { category: 'ai', key: 'temperature', value: 0.1 },
@@ -100,7 +100,7 @@ const BALANCED: SettingsTemplate = {
   overrides: [
     // AI defaults
     { category: 'ai', key: 'openai_extraction_model', value: 'gpt-4o' },
-    { category: 'ai', key: 'openai_backup_model', value: 'gpt-4o-mini' },
+    { category: 'ai', key: 'openai_backup_model', value: 'gpt-5.4-mini' },
     { category: 'ai', key: 'anthropic_extraction_model', value: 'claude-sonnet-4-20250514' },
     { category: 'ai', key: 'anthropic_backup_model', value: 'claude-3-5-haiku-latest' },
     { category: 'ai', key: 'max_tokens', value: 4096 },
@@ -196,7 +196,7 @@ const QUICK_DEMO: SettingsTemplate = {
   tags: ['demo', 'presentation', 'fast'],
   overrides: [
     // AI: Faster but lower quality
-    { category: 'ai', key: 'openai_extraction_model', value: 'gpt-4o-mini' },
+    { category: 'ai', key: 'openai_extraction_model', value: 'gpt-5.4-mini' },
     { category: 'ai', key: 'max_tokens', value: 2048 },
     { category: 'ai', key: 'extraction_timeout_ms', value: 45000 },
     { category: 'ai', key: 'enable_fallback', value: false },

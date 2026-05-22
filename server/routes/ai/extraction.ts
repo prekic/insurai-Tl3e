@@ -68,9 +68,9 @@ const EXTRACTION_MODEL_ALLOWLIST = new Set([
   'gpt-5.4',
   'gpt-5.4-mini',
   'gpt-4o',
-  'gpt-4o-mini',
-  'deepseek-chat',
-  'deepseek-reasoner',
+  'gpt-5.4-mini',
+  'deepseek-v4-pro',
+  'deepseek-v4-pro',
 ])
 
 /**
@@ -314,7 +314,7 @@ router.get('/test-deepseek', async (_req: Request, res: Response) => {
       baseURL: baseUrlResolved,
     })
     const response = await dsClient.chat.completions.create({
-      model: 'deepseek-chat',
+      model: 'deepseek-v4-pro',
       messages: [{ role: 'user', content: 'Say hello in JSON like {"hello":true}' }],
       response_format: { type: 'json_object' },
       max_tokens: 20,
@@ -539,7 +539,7 @@ router.post(
         const deepSeekWorker = async (userPrompt: string, temperature: number) => {
           const response = await dsClient.chat.completions.create(
             {
-              model: 'deepseek-chat',
+              model: 'deepseek-v4-pro',
               messages: [
                 { role: 'system', content: systemPromptWithJson },
                 { role: 'user', content: userPrompt },
@@ -557,8 +557,8 @@ router.post(
             usage: {
               inputTokens,
               outputTokens,
-              cost: calculateCost('deepseek-chat', inputTokens, outputTokens).totalCost,
-              model: 'deepseek-chat',
+              cost: calculateCost('deepseek-v4-pro', inputTokens, outputTokens).totalCost,
+              model: 'deepseek-v4-pro',
             },
           }
         }
@@ -566,7 +566,7 @@ router.post(
           const judgePrompt = `Original Document:\n\n${finalUserPrompt}\n\nExtraction Result:\n\n${workerContent}`
           const response = await dsClient.chat.completions.create(
             {
-              model: 'deepseek-chat',
+              model: 'deepseek-v4-pro',
               messages: [
                 { role: 'system', content: JUDGE_SYSTEM_PROMPT },
                 { role: 'user', content: judgePrompt },
@@ -583,8 +583,8 @@ router.post(
             usage: {
               inputTokens,
               outputTokens,
-              cost: calculateCost('deepseek-chat', inputTokens, outputTokens).totalCost,
-              model: 'deepseek-chat',
+              cost: calculateCost('deepseek-v4-pro', inputTokens, outputTokens).totalCost,
+              model: 'deepseek-v4-pro',
             },
           }
         }
@@ -600,7 +600,7 @@ router.post(
           // Use fallback result instead
           healingResult.success = true
           healingResult.data = fallbackResult.data
-          healingResult.finalModel = 'deepseek-chat (fallback)'
+          healingResult.finalModel = 'deepseek-v4-pro (fallback)'
           healingResult.totalCost = fallbackResult.totalCost
           healingResult.totalInputTokens = fallbackResult.totalInputTokens
           healingResult.totalOutputTokens = fallbackResult.totalOutputTokens
@@ -1368,7 +1368,7 @@ router.post(
 
       const response = await dsClient.chat.completions.create(
         {
-          model: model || 'deepseek-chat',
+          model: model || 'deepseek-v4-pro',
           messages: [
             { role: 'system', content: dsSystemPromptFinal },
             { role: 'user', content: finalUserPrompt + dsOutputSchema },
@@ -1503,7 +1503,7 @@ router.post(
       }
 
       // Track cost
-      const usedModel = 'deepseek-chat'
+      const usedModel = 'deepseek-v4-pro'
       const inputTokens = response.usage?.prompt_tokens || 0
       const outputTokens = response.usage?.completion_tokens || 0
       const cost = calculateCost(usedModel, inputTokens, outputTokens)
@@ -1667,7 +1667,7 @@ router.post(
       recordOverviewMetrics({
         requestId,
         provider: 'deepseek',
-        model: 'deepseek-chat',
+        model: 'deepseek-v4-pro',
         operation: 'extraction',
         success: false,
         durationMs: Date.now() - dsStart,
@@ -2380,7 +2380,7 @@ router.post(
 
       const { imageBase64 } = req.body as { imageBase64: string }
       const aiConfig = await getAIConfig()
-      const model = aiConfig.geminiModel || 'gemini-2.5-flash'
+      const model = aiConfig.geminiModel || 'gemini-3-flash'
 
       // Detect MIME type from base64 header (fallback to image/png)
       let mimeType = 'image/png'

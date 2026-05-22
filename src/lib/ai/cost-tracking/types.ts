@@ -25,7 +25,7 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     outputPer1K: 0.01, // $10 per 1M output tokens
     contextLimit: 128000,
   },
-  'gpt-4o-mini': {
+  'gpt-5.4-mini': {
     inputPer1K: 0.00015, // $0.15 per 1M input tokens
     outputPer1K: 0.0006, // $0.60 per 1M output tokens
     contextLimit: 128000,

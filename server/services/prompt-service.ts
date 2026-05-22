@@ -747,7 +747,7 @@ Return the extracted data following the schema provided.`,
     isActive: true,
     variables: ['policy_context', 'user_message'],
     defaultProvider: 'openai',
-    defaultModel: 'gpt-4o-mini',
+    defaultModel: 'gpt-5.4-mini',
     parameters: { temperature: 0.5, maxTokens: 2048 },
     systemPrompt: `You are an expert insurance policy assistant for the Turkish insurance market. You help users understand their insurance policies, answer questions about coverage, compare policies, and identify potential gaps or issues.
 
@@ -776,7 +776,7 @@ Key guidelines:
     isActive: true,
     variables: ['raw_text'],
     defaultProvider: 'openai',
-    defaultModel: 'gpt-4o-mini',
+    defaultModel: 'gpt-5.4-mini',
     parameters: { temperature: 0.2, maxTokens: 8192 },
     systemPrompt: `You are a document text normalizer for Turkish insurance documents. Fix OCR errors while preserving the original meaning exactly.
 
@@ -810,7 +810,7 @@ Return the corrected text only.`,
     isActive: true,
     variables: ['document_text'],
     defaultProvider: 'openai',
-    defaultModel: 'gpt-4o-mini',
+    defaultModel: 'gpt-5.4-mini',
     parameters: { temperature: 0, maxTokens: 50 },
     systemPrompt: `Analyze this insurance document and determine the policy type.
 

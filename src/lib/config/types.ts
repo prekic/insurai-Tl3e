@@ -118,7 +118,7 @@ export interface AIConfig {
 
 export const DEFAULT_AI_CONFIG: AIConfig = {
   openaiExtractionModel: 'gpt-4o',
-  openaiBackupModel: 'gpt-4o-mini',
+  openaiBackupModel: 'gpt-5.4-mini',
   anthropicExtractionModel: 'claude-sonnet-4-6',
   anthropicBackupModel: 'claude-3-5-haiku-latest',
   maxTokens: 4096,
@@ -598,7 +598,7 @@ export interface CostConfig {
 export const DEFAULT_COST_CONFIG: CostConfig = {
   tokenPricing: {
     'gpt-4o': { input: 0.0025, output: 0.01 },
-    'gpt-4o-mini': { input: 0.00015, output: 0.0006 },
+    'gpt-5.4-mini': { input: 0.00075, output: 0.0045 },
     'gpt-4-turbo': { input: 0.01, output: 0.03 },
     'gpt-4': { input: 0.03, output: 0.06 },
     'gpt-3.5-turbo': { input: 0.0005, output: 0.0015 },

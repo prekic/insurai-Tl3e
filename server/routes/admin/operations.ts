@@ -599,7 +599,11 @@ appConfigs.set('ai.default_provider', {
   type: 'string',
   description: 'Default AI provider',
 })
-appConfigs.set('ai.chat_model', { value: 'gpt-4o-mini', type: 'string', description: 'Chat model' })
+appConfigs.set('ai.chat_model', {
+  value: 'gpt-5.4-mini',
+  type: 'string',
+  description: 'Chat model',
+})
 appConfigs.set('ai.extraction_model', {
   value: 'gpt-5.4',
   type: 'string',
