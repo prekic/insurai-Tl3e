@@ -1340,38 +1340,15 @@ router.post(
 
       // DeepSeek's json_object mode needs a concrete flat JSON example to match our format.
       // Without one, DeepSeek uses its nested schema and returns null values.
+      // DeepSeek json_object mode: ALL-null structure to force reading from document,
+      // with enough coverage name hints to show the flat schema pattern.
       const dsOutputSchema =
-        '\n\nReturn flat JSON following this structure (replace values from document, add more coverages):\n' +
-        '{\n' +
-        '  "policyNumber": "string_from_doc",\n' +
-        '  "insurer": "string_from_doc",\n' +
-        '  "insuredName": "string_from_doc",\n' +
-        '  "startDate": "YYYY-MM-DD",\n' +
-        '  "endDate": "YYYY-MM-DD",\n' +
-        '  "premium": 12345,\n' +
-        '  "vehicleMake": "string_from_doc",\n' +
-        '  "vehicleModel": "string_from_doc",\n' +
-        '  "vehicleYear": "YYYY",\n' +
-        '  "vehiclePlate": "string_from_doc",\n' +
-        '  "NCD": 50,\n' +
-        '  "policyType": "kasko",\n' +
-        '  "coverages": [\n' +
-        '    { "name": "Kasko Teminatı", "limit": 500000 },\n' +
-        '    { "name": "İhtiyari Mali Sorumluluk", "limit": 500000 },\n' +
-        '    { "name": "Hukuksal Koruma", "limit": 25000 },\n' +
-        '    { "name": "Koltuk Ferdi Kaza Vefat", "limit": 50000 },\n' +
-        '    { "name": "Koltuk Ferdi Kaza Sakatlık", "limit": 50000 },\n' +
-        '    { "name": "Motorlu Araca Bağlı Ferdi Kaza", "limit": 50000 },\n' +
-        '    { "name": "Sürücüye Bağlı Ferdi Kaza", "limit": 50000 },\n' +
-        '    { "name": "Yol Yardım", "limit": null },\n' +
-        '    { "name": "İkame Araç", "limit": null },\n' +
-        '    { "name": "Cam Kırılması", "limit": null },\n' +
-        '    { "name": "Ek Donanım", "limit": 50000 }\n' +
-        '  ]\n' +
-        '}\n' +
-        'CRITICAL: You MUST read values from the DOCUMENT TEXT above, NOT from this example. ' +
-        'Replace all placeholder values with data from the actual document. ' +
-        'Read every line of the document. Do NOT use training data defaults.'
+        '\n\nExtract ALL policy data from the document above as flat JSON:' +
+        ' policyNumber, insurer, insuredName, startDate, endDate, premium, ' +
+        'vehicleMake, vehicleModel, vehicleYear, vehiclePlate, NCD, policyType.\n' +
+        'coverages: array of {name, limit}.\n' +
+        'exclusions: array of {type, text}.\n' +
+        'ALL values come from the document only. null if not found. Flat structure, no nested objects.'
 
       const response = await dsClient.chat.completions.create(
         {
