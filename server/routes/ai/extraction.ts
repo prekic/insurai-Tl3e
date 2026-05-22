@@ -1333,54 +1333,22 @@ router.post(
           ? openaiSystemPrompt
           : openaiSystemPrompt + '\n\nRespond with valid JSON only.'
 
-      // DeepSeek's json_object mode fluctuates between nested and flat schemas.
-      // Append a concrete flat JSON example so it matches our expected format.
+      // DeepSeek's json_object mode needs a flat structure hint.
+      // Put it in the system prompt (before document text) so DeepSeek has the structure
+      // in mind while reading.
       const dsOutputSchema =
-        '\n\nIMPORTANT: You MUST output EXACTLY this flat JSON structure. Replace with data from the document. ' +
-        'Include ALL coverages mentioned in the document (add more items to the coverages array). ' +
-        'Each coverage limit must be a NUMBER or null, NOT an object. Use null for missing values.\n' +
-        '{\n' +
-        '  "policyNumber": "1680600025",\n' +
-        '  "insurer": "Anadolu Sigorta",\n' +
-        '  "startDate": "2025-12-28",\n' +
-        '  "endDate": "2026-12-28",\n' +
-        '  "currency": "TRY",\n' +
-        '  "premium": 31140.00,\n' +
-        '  "premiumNet": 29657.14,\n' +
-        '  "vehicleMake": "VOLKSWAGEN",\n' +
-        '  "vehicleModel": "TIGUAN",\n' +
-        '  "vehicleYear": "2016",\n' +
-        '  "vehiclePlate": "34RZ9511",\n' +
-        '  "insuredName": "ERİŞ AMBALAJ SAN. TİC. LTD. ŞTİ.",\n' +
-        '  "NCD": 50,\n' +
-        '  "NCDKademe": 3,\n' +
-        '  "policyType": "kasko",\n' +
-        '  "coverages": [\n' +
-        '    { "name": "Kasko Teminatı", "limit": 500000 },\n' +
-        '    { "name": "İhtiyari Mali Sorumluluk", "limit": 500000 },\n' +
-        '    { "name": "İhtiyari Mali Sorumluluk Kaza Başına", "limit": 1000000 },\n' +
-        '    { "name": "Hukuksal Koruma", "limit": 25000 },\n' +
-        '    { "name": "Koltuk Ferdi Kaza Vefat", "limit": 50000 },\n' +
-        '    { "name": "Koltuk Ferdi Kaza Sakatlık", "limit": 50000 },\n' +
-        '    { "name": "Motorlu Araca Bağlı Ferdi Kaza", "limit": 50000 },\n' +
-        '    { "name": "Sürücüye Bağlı Ferdi Kaza", "limit": 50000 },\n' +
-        '    { "name": "Yol Yardım", "limit": null },\n' +
-        '    { "name": "İkame Araç", "limit": null },\n' +
-        '    { "name": "Sel ve Su Baskını", "limit": null },\n' +
-        '    { "name": "Cam Kırılması", "limit": null }\n' +
-        '  ],\n' +
-        '  "exclusions": [\n' +
-        '    { "type": "kloz_haric", "text": "Çatı camı ve sunroof teminat dışı" }\n' +
-        '  ]\n' +
-        '}\n\n' +
-        'ADD more coverages to the array if the document has more. limit field MUST be a simple number (e.g. 500000) or null — never an object.'
+        '\n\nIMPORTANT: Return flat JSON only. ' +
+        'No nested policy/insurer/parties/premiums/vehicles objects. ' +
+        'Insurer is a plain string. ' +
+        'Coverage limits are plain numbers or null. ' +
+        'Extract ALL coverages from the user-provided document.'
 
       const response = await dsClient.chat.completions.create(
         {
           model: model || 'deepseek-chat',
           messages: [
-            { role: 'system', content: dsSystemPrompt },
-            { role: 'user', content: finalUserPrompt + dsOutputSchema },
+            { role: 'system', content: dsSystemPrompt + dsOutputSchema },
+            { role: 'user', content: finalUserPrompt },
           ],
           response_format: { type: 'json_object' },
           max_tokens: aiConfig.maxTokens,
