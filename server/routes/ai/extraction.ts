@@ -143,7 +143,6 @@ export function getGeminiClient(): GoogleGenAI | null {
   return geminiClient
 }
 
-
 /**
  * Cleanup temp GCP credentials file on process exit.
  * The file is written from base64 env var and should not persist on disk.
@@ -1468,7 +1467,7 @@ router.post('/ocr', validateJSON, ocrLimiter, validateOCR, async (req: Request, 
     }
 
     // Resolve OCR timeout from config (DB-overridable). Same key drives
-    // Document AI and Vision OCR — both have similar cold-start profiles.
+    // Google Vision OCR has a cold-start profile, so use a generous timeout.
     const aiCfgVision = await getAIConfig()
     const ocrFetchTimeoutMs = aiCfgVision.ocrFetchTimeoutMs
 
@@ -1497,7 +1496,7 @@ router.post('/ocr', validateJSON, ocrLimiter, validateOCR, async (req: Request, 
       }
     }
 
-    // ONE retry on AbortError (timeout) — see comment on the Document AI path
+    // ONE retry on AbortError (timeout)
     // for rationale.
     let response: globalThis.Response
     try {

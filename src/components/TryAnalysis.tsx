@@ -162,7 +162,7 @@ export function TryAnalysis() {
 
       // Hard wall-time budget — if extraction hasn't resolved by this point,
       // force the error UI. Prevents users from sitting on a frozen
-      // "PDF Extraction…" card for >2 minutes when both primary (Document AI)
+      // "PDF Extraction…" card for >2 minutes when both primary (Vision OCR)
       // and fallback (pdf.js client-side) paths are stuck retrying. The
       // background extraction may still complete and persist via
       // saveTrialResult(); on next visit the effect at the top of this file

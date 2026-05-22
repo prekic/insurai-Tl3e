@@ -10,7 +10,7 @@ import type {
 // Console Noise Suppression
 // =============================================================================
 // Silence diagnostic console.warn/error output from the extraction pipeline
-// during tests. This removes ~1000+ lines of [PolicyExtractor], [Document AI],
+// during tests. This removes ~1000+ lines of [PolicyExtractor],
 // etc. noise while preserving:
 //   - [ClauseResolver] — intentional safety-guard output
 //   - Vitest spy-intercepted calls (tests using vi.spyOn still see output)

@@ -1,11 +1,11 @@
 /**
- * Document AI OCR result cache.
+ * OCR CR result cache.
  *
- * Document AI is deterministic on identical input — the same base64 PDF chunk
+ * OCR s deterministic on identical input — the same base64 PDF chunk
  * produces the same OCR text every call. Caching by SHA256 of the chunk
- * eliminates redundant Document AI billing for repeated CI runs (smoke,
+ * eliminates redundant OCR illing for repeated CI runs (smoke,
  * stability) on the same fixtures and shields against per-day quotas on
- * Google's Document AI free tier.
+ * Google's OCR ree tier.
  *
  * Storage: `ocr_cache` table (migration 061), service-role-only RLS.
  * Key: SHA256 hex of the base64 documentBase64 string.
@@ -51,7 +51,7 @@ export interface CachedOcrResult {
 /**
  * Look up a cached OCR result. Returns null on miss, on database error, or
  * when Supabase is not configured. The caller falls through to the live
- * Document AI call in any of those cases — cache lookup must never block
+ * OCR all in any of those cases — cache lookup must never block
  * the OCR pipeline.
  *
  * Side effect on hit: increments hit_count and bumps last_hit_at. The update

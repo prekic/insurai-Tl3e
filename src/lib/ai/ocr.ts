@@ -88,7 +88,7 @@ export function isLikelyScannedPDF(extractedText: string, pageCount: number): bo
 
 /**
  * Perform OCR using Google Cloud Vision API
- * Simpler fallback when Document AI is not available
+ * Simpler fallback when Google Vision API is not available
  */
 async function performVisionAPIOCR(
   file: File
@@ -145,30 +145,39 @@ async function performVisionAPIOCR(
       }
     }
 
-    const response = await fetch(
-      `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requests: [
-            {
-              image: { content: base64Content },
-              features: [{ type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }],
-              imageContext: { languageHints: ['tr', 'en'] },
-            },
-          ],
-        }),
-      }
-    )
+    const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requests: [
+          {
+            image: { content: base64Content },
+            features: [{ type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }],
+            imageContext: { languageHints: ['tr', 'en'] },
+          },
+        ],
+      }),
+    })
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
-      throw new Error((errorData as { error?: { message?: string } }).error?.message || `API error: ${response.status}`)
+      throw new Error(
+        (errorData as { error?: { message?: string } }).error?.message ||
+          `API error: ${response.status}`
+      )
     }
 
     const result = await response.json()
-    const annotation = (result as { responses?: Array<{ fullTextAnnotation?: { text?: string; pages?: Array<{ blocks?: Array<{ confidence?: number }> }> } }> }).responses?.[0]?.fullTextAnnotation
+    const annotation = (
+      result as {
+        responses?: Array<{
+          fullTextAnnotation?: {
+            text?: string
+            pages?: Array<{ blocks?: Array<{ confidence?: number }> }>
+          }
+        }>
+      }
+    ).responses?.[0]?.fullTextAnnotation
 
     // Calculate average confidence
     const pages = annotation?.pages || []
@@ -225,17 +234,15 @@ export interface OCROptions {
  * Perform OCR on a scanned document
  *
  * Automatically selects the best backend:
- * 1. Document AI (if configured) - Better accuracy, form fields, tables
+ * 1. Google Vision API (primary) - Text detection from images
  * 2. Vision API (fallback) - Simpler text extraction
  *
  * Implements caching to avoid repeated OCR on same documents
  */
 export async function performOCR(
   file: File,
-  options: OCROptions = {}
+  { skipCache = false }: OCROptions = {}
 ): Promise<{ success: true; data: OCRResult } | { success: false; error: OCRError }> {
-  const { backend = 'auto', skipCache = false } = options
-
   // Initialize cache
   await aiCache.initialize()
 
@@ -275,9 +282,8 @@ export async function performOCR(
  */
 export async function performMultiPageOCR(
   pages: Blob[],
-  options: OCROptions = {}
+  _options: OCROptions = {}
 ): Promise<{ success: true; data: OCRResult } | { success: false; error: OCRError }> {
-
   const proxyUrl = getProxyUrl()
 
   // Check configuration
@@ -349,7 +355,16 @@ export async function performMultiPageOCR(
         }
 
         const result = await response.json()
-        const annotation = (result as { responses?: Array<{ fullTextAnnotation?: { text?: string; pages?: Array<{ blocks?: Array<{ confidence?: number }> }> } }> }).responses?.[0]?.fullTextAnnotation
+        const annotation = (
+          result as {
+            responses?: Array<{
+              fullTextAnnotation?: {
+                text?: string
+                pages?: Array<{ blocks?: Array<{ confidence?: number }> }>
+              }
+            }>
+          }
+        ).responses?.[0]?.fullTextAnnotation
 
         return {
           text: annotation?.text || '',
@@ -360,8 +375,7 @@ export async function performMultiPageOCR(
 
     // Combine results
     const combinedText = pageResults.map((r) => r.text).join('\n\n')
-    const avgConfidence =
-      pageResults.reduce((sum, r) => sum + r.confidence, 0) / pageResults.length
+    const avgConfidence = pageResults.reduce((sum, r) => sum + r.confidence, 0) / pageResults.length
     const processingTimeMs = Date.now() - startTime
 
     return {

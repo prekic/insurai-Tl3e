@@ -348,7 +348,6 @@ const OCR_KEY_MAP: Record<string, keyof OCRConfig> = {
   weight_encoding_check: 'weightEncodingCheck',
   weight_field_extraction: 'weightFieldExtraction',
   google_vision_confidence: 'googleVisionConfidence',
-  document_ai_confidence: 'documentAiConfidence',
   tesseract_confidence: 'tesseractConfidence',
   language_min_confidence: 'languageMinConfidence',
   language_sample_size: 'languageSampleSize',

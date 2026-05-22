@@ -134,7 +134,7 @@ const STAGE_LABELS: Record<ProcessingStage, { en: string; tr: string; descriptio
   form_field_enhancement: {
     en: 'Form Fields',
     tr: 'Form Alanları',
-    description: 'Enhancement using Document AI form field detection',
+    description: 'Enhancement using OCR form field detection',
   },
   table_parsing: {
     en: 'Table Parsing',

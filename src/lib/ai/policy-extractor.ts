@@ -28,19 +28,13 @@ import {
   extractViaProxy,
   type AIProvider,
 } from './config'
-import {
-  
-  type FormField,
-  type PageText,
-  type Table,
-} from './document-ocr'
+import { type FormField, type PageText, type Table } from './document-ocr'
 import { ExtractedCoverage, ExtractedPolicyData } from './extraction-schema'
 import { extractTextFromPDFWithRetry, isPDFFile } from './pdf-parser'
 import { extractWithClaude } from './providers/claude'
 import { extractWithConsensus, type ConsensusResult } from './providers/consensus'
 import { extractWithOpenAI } from './providers/openai'
 import { resolveClauseRelationships } from './relationship-resolver'
-import { mergeCoveragesWithTableData, parseTablesForCoverages } from './table-parser'
 import {
   applyBasicOCRCorrections,
   processTextEnhanced,
@@ -536,7 +530,7 @@ export async function extractPolicyFromDocument(
   }
 
   // ========== TEXT PREPROCESSING STAGE ==========
-  markClientPhase('textExtraction_total_ms', pdfjsStart) // Total time for OCR/pdf.js phase
+  markClientPhase('textExtraction_total_ms', Date.now()) // Total time for OCR/pdf.js phase
   const preprocessStart = performance.now()
   logger?.startStage('text_preprocessing', {
     text_length: documentText.length,
@@ -788,7 +782,7 @@ export async function extractPolicyFromDocument(
       )
     }
 
-        let enhancedExtractedData = {
+    let enhancedExtractedData = {
       ...extractedData,
       coverages: (extractedData.coverages ?? []).filter(
         (c): c is NonNullable<typeof c> => c != null
@@ -885,7 +879,6 @@ export async function extractPolicyFromDocument(
     // TABLE-BASED COVERAGE ENHANCEMENT
     // Parse tables to extract structured coverage information
     // ========================================================================
-    const tableCoveragesUsed = 0
 
     // ========== VALIDATION STAGE ==========
     logger?.startStage('validation', {
@@ -1169,7 +1162,7 @@ export async function extractPolicyFromDocument(
         fieldsUsed: 0,
         tableCoveragesUsed: 0,
         processingTimeMs: 0,
-        warnings: ['Extracted without Google Document AI'],
+        warnings: ['Fallback extraction without cloud OCR'],
       },
     }
   } catch (error) {

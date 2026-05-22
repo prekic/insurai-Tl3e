@@ -1,7 +1,7 @@
 /**
- * Document AI Table Parser
+ * Table Parser
  *
- * Extracts structured coverage information from Document AI tables.
+ * Extracts structured coverage information from OCR table data.
  * Parses Turkish insurance document tables for coverage limits,
  * deductibles, and policy details.
  */
@@ -109,7 +109,7 @@ const INCLUDED_PATTERNS = [/dah[iİ]l/i, /dahi̇l/i, /\bvar\b/i, /evet/i, /✓/,
 // ============================================================================
 
 /**
- * Parse Document AI tables and extract coverage information
+ * Parse OCR tables and extract coverage information
  */
 export function parseTablesForCoverages(tables: Table[]): ParsedTableData {
   const allCoverages: InternalCoverage[] = []

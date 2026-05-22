@@ -4,7 +4,7 @@
  * Client for the OCR orchestrator microservice that provides
  * ensemble OCR across multiple engines (ABBYY, GCP, Azure, Tesseract).
  *
- * Falls back to direct Document AI when orchestrator is unavailable.
+ * Falls back to direct Vision API when orchestrator is unavailable.
  */
 
 import { getProxyUrl } from './config'
@@ -60,13 +60,16 @@ export interface OrchestratorOCRResponse {
   pageCount: number
   formFields?: FormField[]
   tables?: Table[]
-  engineResults: Record<OCREngine, {
-    success: boolean
-    text?: string
-    confidence?: number
-    latencyMs: number
-    error?: string
-  }>
+  engineResults: Record<
+    OCREngine,
+    {
+      success: boolean
+      text?: string
+      confidence?: number
+      latencyMs: number
+      error?: string
+    }
+  >
   bestEngine: OCREngine
   processingTimeMs: number
 }
@@ -149,10 +152,7 @@ export class OCROrchestratorClient {
    */
   async getHealth(): Promise<OrchestratorHealthResponse> {
     // Check cache
-    if (
-      this.healthCache.data &&
-      Date.now() - this.healthCache.timestamp < this.HEALTH_CACHE_TTL
-    ) {
+    if (this.healthCache.data && Date.now() - this.healthCache.timestamp < this.HEALTH_CACHE_TTL) {
       return this.healthCache.data
     }
 
@@ -166,7 +166,7 @@ export class OCROrchestratorClient {
       throw new Error(`Orchestrator health check failed: ${response.status}`)
     }
 
-    const health = await response.json() as OrchestratorHealthResponse
+    const health = (await response.json()) as OrchestratorHealthResponse
 
     // Update cache
     this.healthCache = { data: health, timestamp: Date.now() }
@@ -221,7 +221,7 @@ export class OCROrchestratorClient {
       )
     }
 
-    return await response.json() as OrchestratorOCRResponse
+    return (await response.json()) as OrchestratorOCRResponse
   }
 
   /**
@@ -250,7 +250,7 @@ export class OCROrchestratorClient {
       throw new Error(`Classification failed: ${response.status}`)
     }
 
-    return await response.json() as ClassifyResponse
+    return (await response.json()) as ClassifyResponse
   }
 }
 
@@ -261,8 +261,7 @@ export class OCROrchestratorClient {
 /**
  * Perform OCR using the best available method:
  * 1. OCR Orchestrator (if available) - Multi-engine ensemble
- * 2. Direct Document AI via proxy - Single engine
- * 3. Direct Vision API - Fallback
+ * 2. Direct Vision API via proxy - Fallback
  */
 export async function performUnifiedOCR(
   file: File,
@@ -271,15 +270,18 @@ export async function performUnifiedOCR(
     engines?: OCREngine[]
     languageHints?: string[]
   } = {}
-): Promise<{
-  success: true
-  data: OCRResult
-  method: 'orchestrator' | 'document-ai' | 'vision-api'
-  engineDetails?: OrchestratorOCRResponse['engineResults']
-} | {
-  success: false
-  error: { code: string; message: string }
-}> {
+): Promise<
+  | {
+      success: true
+      data: OCRResult
+      method: 'orchestrator' | 'vision-api'
+      engineDetails?: OrchestratorOCRResponse['engineResults']
+    }
+  | {
+      success: false
+      error: { code: string; message: string }
+    }
+> {
   const { preferOrchestrator = true, engines, languageHints = ['tr', 'en'] } = options
 
   // Convert file to base64
@@ -316,7 +318,7 @@ export async function performUnifiedOCR(
             isScanned: true,
             formFields: result.formFields,
             tables: result.tables,
-            backend: 'document-ai', // Best engine used
+            backend: 'vision-api', // Best engine used
             processingTimeMs: result.processingTimeMs,
           },
           method: 'orchestrator',
@@ -328,45 +330,9 @@ export async function performUnifiedOCR(
     }
   }
 
-  // Fall back to direct Document AI via proxy
+  // Fall back to Vision API via proxy
   const proxyUrl = getProxyUrl()
   if (proxyUrl) {
-    try {
-      const response = await fetch(`${proxyUrl}/api/ai/ocr/document-ai`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          documentBase64: base64Content,
-          mimeType,
-          languageHints,
-        }),
-      })
-
-      if (response.ok) {
-        const result = await response.json()
-
-        if (result.success) {
-          return {
-            success: true,
-            data: {
-              text: result.data.text || '',
-              confidence: result.data.confidence || 0,
-              pageCount: result.data.pageCount || 1,
-              isScanned: true,
-              formFields: result.data.formFields,
-              tables: result.data.tables,
-              backend: 'document-ai',
-              processingTimeMs: result.data.processingTimeMs,
-            },
-            method: 'document-ai',
-          }
-        }
-      }
-    } catch (error) {
-      console.warn('[OCR] Document AI failed, falling back to Vision API:', error)
-    }
-
-    // Fall back to Vision API
     try {
       const response = await fetch(`${proxyUrl}/api/ai/ocr`, {
         method: 'POST',

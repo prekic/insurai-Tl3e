@@ -54,7 +54,7 @@ export function isAIConfigured(): boolean {
  * Check if OCR is configured (via proxy)
  */
 export function isOCRConfigured(): boolean {
-  // OCR is only available through proxy (Document AI requires server-side credentials)
+  // OCR is only available through proxy (requires server-side credentials)
   return isProxyConfigured()
 }
 

@@ -110,7 +110,7 @@ export interface AIConfig {
   fallbackProviderTimeoutMs: number
   clientFetchTimeoutMs: number
   trialExtractionTimeoutMs: number
-  // Per-fetch timeout for the server-side OCR call to Document AI / Vision.
+  // Per-fetch timeout for the server-side OCR call to Vision.
   // See migration 044 and gotcha-table entry on the 60-second hardcoded
   // ceiling that broke Allianz extraction in production.
   ocrFetchTimeoutMs: number
@@ -262,7 +262,6 @@ export interface OCRConfig {
   weightFieldExtraction: number
   // Provider Thresholds
   googleVisionConfidence: number
-  documentAiConfidence: number
   tesseractConfidence: number
   // Language Detection
   languageMinConfidence: number
@@ -296,7 +295,6 @@ export const DEFAULT_OCR_CONFIG: OCRConfig = {
   weightEncodingCheck: 0.15,
   weightFieldExtraction: 0.15,
   googleVisionConfidence: 0.8,
-  documentAiConfidence: 0.85,
   tesseractConfidence: 0.7,
   languageMinConfidence: 0.4,
   languageSampleSize: 2000,

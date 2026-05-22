@@ -12,11 +12,11 @@ export type ProcessingStage =
   | 'pdf_extraction' // Text extraction via pdf.js
   | 'ocr_decision' // OCR Decision Engine analysis (language, policy type, quality)
   | 'ocr_check' // Legacy: Density check to determine if OCR needed
-  | 'ocr_processing' // OCR via Document AI/Vision/Tesseract
-  | 'gemini_ocr' // Gemini multimodal OCR fallback (when Document AI + pdf.js both fail)
+  | 'ocr_processing' // OCR via Vision/Tesseract
+  | 'gemini_ocr' // Gemini multimodal OCR fallback (when Vision + pdf.js both fail)
   | 'text_preprocessing' // Text normalization, OCR cleanup
   | 'ai_extraction' // GPT-4o/Claude structured extraction
-  | 'form_field_enhancement' // Document AI form fields applied
+  | 'form_field_enhancement' // Form field enhancement applied
   | 'table_parsing' // Coverage table parsing
   | 'validation' // Data validation (Zod, business rules)
   | 'cloud_vision_ocr' // Google Cloud Vision API OCR fallback
@@ -283,8 +283,8 @@ export const STAGE_CONFIGS: Record<ProcessingStage, StageConfig> = {
     name: 'form_field_enhancement',
     label: 'Form Fields',
     labelTr: 'Form Alanları',
-    description: 'Enhancement using Document AI form field detection',
-    descriptionTr: 'Document AI form alanı tespiti ile zenginleştirme',
+    description: 'Enhancement using OCR form field detection',
+    descriptionTr: 'OCR form alanı tespiti ile zenginleştirme',
     icon: 'FormInput',
     color: 'rose',
   },

@@ -57,7 +57,7 @@ const SETTING_GROUPS = {
   processing: {
     title: 'Processing Options',
     description: 'Control how documents are processed',
-    keys: ['max_pages_per_request', 'enable_page_splitting', 'prefer_document_ai'],
+    keys: ['max_pages_per_request', 'enable_page_splitting'],
   },
   pipeline: {
     title: 'OCR Pipeline Timeouts',

@@ -49,7 +49,7 @@ export interface AIConfig {
   fallbackProviderTimeoutMs: number
   clientFetchTimeoutMs: number
   trialExtractionTimeoutMs: number
-  // Per-fetch timeout for the server-side OCR call to Document AI / Vision.
+  // Per-fetch timeout for the server-side OCR call to Vision.
   // Distinct from primaryProviderTimeoutMs (chat extraction) — OCR has its
   // own latency profile (cold-start in particular) and should be tunable
   // independently. Default 90 s gives Doc AI cold-start headroom; we observed

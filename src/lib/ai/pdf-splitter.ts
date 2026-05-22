@@ -1,13 +1,13 @@
 /**
  * PDF Splitter Utility
  *
- * Splits large PDFs into smaller chunks for processing by Document AI
+ * Splits large PDFs into smaller chunks for processing
  * which has a 15-page limit per request.
  */
 
 import { PDFDocument } from 'pdf-lib'
 
-/** Maximum pages per chunk for Document AI (reduced to 10 to avoid 20MB payload 403s on dense PDFs) */
+/** Maximum pages per chunk  (reduced to 10 to avoid 20MB payload 403s on dense PDFs) */
 export const DOCUMENT_AI_PAGE_LIMIT = 10
 
 /**
@@ -37,7 +37,7 @@ export async function getPdfPageCount(file: File): Promise<number> {
  * Split a PDF file into chunks of maximum `maxPagesPerChunk` pages
  *
  * @param file - The PDF file to split
- * @param maxPagesPerChunk - Maximum pages per chunk (default: 15 for Document AI)
+ * @param maxPagesPerChunk - Maximum pages per chunk (default: 10)
  * @returns Split result with chunks and metadata
  */
 export async function splitPdf(

@@ -137,7 +137,7 @@ export function isAIConfigured(): boolean {
 }
 
 /**
- * Check if OCR is available (Google Document AI)
+ * Check if OCR is available (Google Cloud Vision)
  * Returns true if proxy is configured (server handles OCR) or direct key is available
  */
 export function isOCRConfigured(): boolean {
@@ -222,7 +222,7 @@ export async function getAnthropicClient(): Promise<Anthropic | null> {
 }
 
 /**
- * Get Google Cloud API key for Document AI (for direct API access in development)
+ * Get Google Cloud API key (for direct API access in development)
  * In production, use ocrViaProxy() instead
  */
 export function getGoogleCloudApiKey(): string | null {

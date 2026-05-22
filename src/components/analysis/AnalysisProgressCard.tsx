@@ -190,7 +190,7 @@ export function AnalysisProgressCard({
   const runningStage = visibleStages.find((s) => stageStatusMap.get(s)?.status === 'running')
 
   // Fallback signal: when there's no running stage but the last stage transition
-  // was a failure, the orchestrator is likely between attempts (e.g. Document AI
+  // was a failure, the orchestrator is likely between attempts (e.g. Vision OCR
   // failed → pdf.js fallback retry queued, or pdf.js worker error → next CDN
   // probe). Without this branch the banner falls through to the static
   // "Preparing to analyze…" label, which is misleading and makes the card look

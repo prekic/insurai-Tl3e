@@ -212,7 +212,6 @@ export const settingValidationRules: Record<string, ValidationRule> = {
 
   // OCR Settings - Provider Confidence
   google_vision_confidence: validators.ratio(),
-  document_ai_confidence: validators.ratio(),
   tesseract_confidence: validators.ratio(),
   language_min_confidence: validators.ratio(),
   policy_type_min_confidence: validators.ratio(),
