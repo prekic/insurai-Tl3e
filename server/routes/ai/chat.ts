@@ -268,7 +268,7 @@ router.post(
               message
 
             const response = await client.models.generateContent({
-              model: 'gemini-3-flash',
+              model: 'gemini-2.5-flash',
               contents: [{ role: 'user', parts: [{ text: geminiSystemMsg }] }],
               config: {
                 temperature: aiConfig.chatTemperature,
@@ -281,8 +281,8 @@ router.post(
 
             const inputTokens = response.usageMetadata?.promptTokenCount || 0
             const outputTokens = response.usageMetadata?.candidatesTokenCount || 0
-            const cost = calculateCost('gemini-3-flash', inputTokens, outputTokens)
-            respondChat(content, 'gemini', 'gemini-3-flash', inputTokens, outputTokens, cost)
+            const cost = calculateCost('gemini-2.5-flash', inputTokens, outputTokens)
+            respondChat(content, 'gemini', 'gemini-2.5-flash', inputTokens, outputTokens, cost)
             return true
           })
           if (succeeded) {

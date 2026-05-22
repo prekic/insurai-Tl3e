@@ -168,9 +168,6 @@ function getGeminiClient(): GoogleGenAI | null {
   return geminiClient
 }
 
-
-
-
 /**
  * Get the path to GCP service account credentials
  */
@@ -228,8 +225,6 @@ function getGCPCredentialsPath(): string | null {
 
   return null
 }
-
-
 
 /**
  * POST /api/ai/sense-check
@@ -494,7 +489,7 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
         const response = await client.chat.completions.create({
           model: 'gpt-5.4-mini',
           messages: [{ role: 'user', content: 'Say "OK"' }],
-          max_tokens: 5,
+          max_completion_tokens: 5,
         })
         diagnostics.openai.valid = true
         diagnostics.openai.latencyMs = Date.now() - startTime
@@ -572,17 +567,17 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
     diagnostics.google.configured = true
     const startTime = Date.now()
     try {
-      let url = `https://vision.googleapis.com/v1/images:annotate?key=${googleApiKey}`
+      const url = `https://vision.googleapis.com/v1/images:annotate?key=${googleApiKey}`
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       }
 
-      let authMethod = 'api_key'
+      const authMethod = 'api_key'
 
       // Make a minimal API call to verify credentials work
-      // Using a tiny 1x1 white PNG to minimize cost
+      // Using a tiny 1x1 white PNG to minimize cost — base64 is a valid PNG
       const testImage =
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR2mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4//8/AAX+Av4N70a4AAAAAElFTkSuQmCC'
       const response = await fetch(url, {
         method: 'POST',
         headers,
@@ -600,7 +595,11 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
         diagnostics.google.valid = true
         diagnostics.google.latencyMs = Date.now() - startTime
       } else {
-        const errorBody = (await response.json().catch(() => ({ error: { message: 'Unknown error' } }))) as { error?: { message?: string } }
+        const errorBody = (await response
+          .json()
+          .catch(() => ({ error: { message: 'Unknown error' } }))) as {
+          error?: { message?: string }
+        }
         const errorMsg = errorBody.error?.message || `HTTP ${response.status}`
         diagnostics.google.valid = false
         diagnostics.google.latencyMs = Date.now() - startTime
@@ -634,14 +633,14 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
       if (client) {
         // Minimal health check — just verify the API key works
         await client.models.generateContent({
-          model: 'gemini-3-flash',
+          model: 'gemini-2.5-flash',
           contents: 'Say "OK"',
           config: { maxOutputTokens: 5 },
         })
         diagnostics.gemini.valid = true
         diagnostics.gemini.latencyMs = Date.now() - startTime
         if (!IS_PRODUCTION) {
-          diagnostics.gemini.model = 'gemini-3-flash'
+          diagnostics.gemini.model = 'gemini-2.5-flash'
         }
       }
     } catch (error) {

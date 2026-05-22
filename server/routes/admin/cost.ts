@@ -381,7 +381,7 @@ router.get('/cost/pricing', authenticateAdmin, (_req: AuthenticatedRequest, res:
     'gpt-5.4',
     'claude-sonnet-4-6',
     'claude-haiku-4-5',
-    'gemini-3-flash',
+    'gemini-2.5-flash',
     // Legacy models
     'gpt-4o',
     'gpt-5.4-mini',

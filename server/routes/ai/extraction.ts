@@ -448,7 +448,7 @@ router.post(
         }
       }
 
-      // ── TRY 3: Gemini (gemini-3-flash) ──
+      // ── TRY 3: Gemini (gemini-2.5-flash) ──
       async function tryGeminiExtraction(): Promise<boolean> {
         const gm = getGeminiClient()
         if (!gm) return false
@@ -461,7 +461,7 @@ router.post(
             '\n\nRespond with valid JSON only. Use null for missing values.'
 
           const response = await gm.models.generateContent({
-            model: 'gemini-3-flash',
+            model: 'gemini-2.5-flash',
             contents: [{ role: 'user', parts: [{ text: geminiPrompt }] }],
             config: {
               temperature: aiConfig.temperature,
@@ -478,11 +478,11 @@ router.post(
             inputTokens: response.usageMetadata?.promptTokenCount || 0,
             outputTokens: response.usageMetadata?.candidatesTokenCount || 0,
             cost: calculateCost(
-              'gemini-3-flash',
+              'gemini-2.5-flash',
               response.usageMetadata?.promptTokenCount || 0,
               response.usageMetadata?.candidatesTokenCount || 0
             ).totalCost,
-            model: 'gemini-3-flash',
+            model: 'gemini-2.5-flash',
           }
           successProvider = 'gemini'
           return true
@@ -1321,10 +1321,10 @@ router.post(
         log.warn('OpenAI client not available for fallback', { requestId })
       }
 
-      // ── FALLBACK 2: Gemini (gemini-3-flash) ──
+      // ── FALLBACK 2: Gemini (gemini-2.5-flash) ──
       const geminiClient = getGeminiClient()
       if (geminiClient) {
-        const succeeded = await tryProvider('gemini', 'gemini-3-flash', async () => {
+        const succeeded = await tryProvider('gemini', 'gemini-2.5-flash', async () => {
           const geminiPrompt =
             'Extract policy information from this insurance document into JSON.\n\n' +
             openaiSystemPrompt +
@@ -1333,7 +1333,7 @@ router.post(
             '\n\nRespond with valid JSON only. Use null for missing values.'
 
           const response = await geminiClient.models.generateContent({
-            model: 'gemini-3-flash',
+            model: 'gemini-2.5-flash',
             contents: [{ role: 'user', parts: [{ text: geminiPrompt }] }],
             config: {
               temperature: aiConfig.temperature,
@@ -1349,11 +1349,11 @@ router.post(
               inputTokens: response.usageMetadata?.promptTokenCount || 0,
               outputTokens: response.usageMetadata?.candidatesTokenCount || 0,
               cost: calculateCost(
-                'gemini-3-flash',
+                'gemini-2.5-flash',
                 response.usageMetadata?.promptTokenCount || 0,
                 response.usageMetadata?.candidatesTokenCount || 0
               ).totalCost,
-              model: 'gemini-3-flash',
+              model: 'gemini-2.5-flash',
             },
           }
         })
@@ -1661,7 +1661,7 @@ router.post(
 
       const { imageBase64 } = req.body as { imageBase64: string }
       const aiConfig = await getAIConfig()
-      const model = aiConfig.geminiModel || 'gemini-3-flash'
+      const model = aiConfig.geminiModel || 'gemini-2.5-flash'
 
       // Detect MIME type from base64 header (fallback to image/png)
       let mimeType = 'image/png'

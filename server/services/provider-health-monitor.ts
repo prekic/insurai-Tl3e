@@ -267,7 +267,7 @@ async function checkGemini(results: Record<string, string>): Promise<void> {
 
     // Test with a simple content generation
     await client.models.generateContent({
-      model: 'gemini-3-flash',
+      model: 'gemini-2.5-flash',
       contents: [{ role: 'user', parts: [{ text: 'OK' }] }],
     })
   } catch (err: any) {
@@ -336,8 +336,7 @@ async function checkGoogleVision(results: Record<string, string>): Promise<void>
         severity: 'error',
         category: 'api_error',
         title: 'Google Cloud Vision Auth Failed',
-        message:
-          'No Google Cloud API key configured. OCR via Vision API will fail.',
+        message: 'No Google Cloud API key configured. OCR via Vision API will fail.',
         provider: 'google_vision',
         dedupKey: 'health:google_vision:auth_failed',
       })
@@ -346,7 +345,7 @@ async function checkGoogleVision(results: Record<string, string>): Promise<void>
 
     // Test with a tiny 1x1 white PNG
     const testImage =
-      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4//8/AAX+Av4N70a4AAAAAElFTkSuQmCC'
     const response = await fetch(url, {
       method: 'POST',
       headers,
