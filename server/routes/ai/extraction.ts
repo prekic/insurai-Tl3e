@@ -1333,15 +1333,39 @@ router.post(
           ? openaiSystemPrompt
           : openaiSystemPrompt + '\n\nRespond with valid JSON only.'
 
-      // DeepSeek's json_object mode tends to use a different schema. Add a brief hint
-      // but keep it short enough that the document text remains the primary signal.
+      // DeepSeek's json_object mode fluctuates between nested and flat schemas.
+      // Append a concrete flat JSON example so it matches our expected format.
+      // IMPORTANT: Show MULTIPLE coverage items so it doesn't limit to one.
       const dsOutputSchema =
-        '\n\nOUTPUT REQUIREMENTS:\n' +
-        '1. Flat JSON only. Do NOT nest fields inside policy/insurer/parties/premiums/vehicles objects.\n' +
-        '2. Insurer is a string (company name), not an object.\n' +
-        '3. Premium/total premium is at top level, not inside a premiums object.\n' +
-        '4. Vehicle info (plate, make, model) is at top level, not inside a vehicles array.\n' +
-        '5. Extract ALL coverages listed in the document — do not skip any.'
+        '\n\nYour response MUST match this flat JSON structure exactly. Replace with data from the document, ' +
+        'and include as many coverages as found in the document. Use null for missing values.\n' +
+        '{\n' +
+        '  "policyNumber": "1680600025",\n' +
+        '  "insurer": "Anadolu Sigorta",\n' +
+        '  "startDate": "2025-12-28",\n' +
+        '  "endDate": "2026-12-28",\n' +
+        '  "currency": "TRY",\n' +
+        '  "premium": 31140.00,\n' +
+        '  "vehicleMake": "VOLKSWAGEN",\n' +
+        '  "vehicleModel": "TIGUAN",\n' +
+        '  "vehicleYear": "2016",\n' +
+        '  "vehiclePlate": "34RZ9511",\n' +
+        '  "insuredName": "ERİŞ AMBALAJ SAN. TİC. LTD. ŞTİ.",\n' +
+        '  "NCD": 50,\n' +
+        '  "NCDKademe": 3,\n' +
+        '  "policyType": "kasko",\n' +
+        '  "coverages": [\n' +
+        '    { "name": "Kasko Teminatı", "limit": 500000 },\n' +
+        '    { "name": "İhtiyari Mali Sorumluluk", "limit": 500000 },\n' +
+        '    { "name": "Hukuksal Koruma", "limit": 25000 },\n' +
+        '    { "name": "Koltuk Ferdi Kaza", "limit": 50000 },\n' +
+        '    { "name": "Yol Yardım", "limit": null }\n' +
+        '  ],\n' +
+        '  "exclusions": [\n' +
+        '    { "type": "kloz_haric", "text": "Çatı camı ve sunroof teminat dışı" }\n' +
+        '  ]\n' +
+        '}\n\n' +
+        'Also include these fields if present: premiumNet, premiumTax, vehicleYear, NCDKademe, insuredId, vehicleVin.'
 
       const response = await dsClient.chat.completions.create(
         {
