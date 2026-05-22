@@ -816,33 +816,33 @@ router.post(
         dsSystemPrompt +
         '\n\nNEVER use training data defaults. Every value comes from the document text in the user message.'
 
-      // DeepSeek's json_object mode needs a concrete flat JSON example to match our format.
-      // Without one, DeepSeek uses its nested schema and returns null values.
-      // DeepSeek json_object mode: ALL-null structure to force reading from document,
-      // with enough coverage name hints to show the flat schema pattern.
-      // Concrete flat JSON example with null entity values and specific coverage names
-      // to force DeepSeek into flat format while avoiding training data fill-in.
+      // DeepSeek json_object mode: type-hint template to enforce flat output format.
+      // 'null' placeholders cause DeepSeek to output null — use type hints instead ("string", "number").
+      // Turkish coverage field labels help DeepSeek map Turkish document text correctly.
       const dsOutputSchema =
-        '\n\nOutput flat JSON following this structure (read values from document above):\n' +
+        '\n\nOutput flat JSON ONLY — use EXACTLY this flat structure with values from document. NO nested objects.\n' +
         '{\n' +
-        '  "policyNumber": null,\n' +
-        '  "insurer": null,\n' +
-        '  "insuredName": null,\n' +
-        '  "startDate": null,\n' +
-        '  "endDate": null,\n' +
-        '  "premium": null,\n' +
-        '  "vehicleMake": null,\n' +
-        '  "vehicleModel": null,\n' +
-        '  "vehicleYear": null,\n' +
-        '  "vehiclePlate": null,\n' +
-        '  "NCD": null,\n' +
-        '  "policyType": null,\n' +
+        '  "policyNumber": "string or null",\n' +
+        '  "insurer": "string or null",\n' +
+        '  "insuredName": "string or null",\n' +
+        '  "startDate": "YYYY-MM-DD or null",\n' +
+        '  "endDate": "YYYY-MM-DD or null",\n' +
+        '  "premium": 0 as number or null,\n' +
+        '  "vehicleMake": "string or null",\n' +
+        '  "vehicleModel": "string or null",\n' +
+        '  "vehicleYear": "string or null",\n' +
+        '  "vehiclePlate": "string or null",\n' +
+        '  "NCD": "number or null",\n' +
+        '  "policyType": "string or null",\n' +
         '  "coverages": [\n' +
-        '    { "name": "Kasko Teminatı", "limit": null },\n' +
-        '    { "name": "İhtiyari Mali Sorumluluk", "limit": null }\n' +
+        '    { "name": "Teminat adı", "limit": sayi, "currency": "TRY" },\n' +
+        '    { "name": "Teminat adı", "limit": sayi, "currency": "TRY" }\n' +
+        '  ],\n' +
+        '  "exclusions": [\n' +
+        '    { "type": "exclusion or sublimit", "text": "açıklama" }\n' +
         '  ]\n' +
         '}\n' +
-        'Replace null with actual data from document. Add more coverages. No nested objects.'
+        'CRITICAL: Read ALL values from the document above. Do NOT use training defaults. Extract every coverage listed in the document. Add all coverages found.'
 
       const response = await dsClient.chat.completions.create(
         {
