@@ -1334,17 +1334,19 @@ router.post(
           : openaiSystemPrompt + '\n\nRespond with valid JSON only.'
 
       // DeepSeek's json_object mode fluctuates between nested and flat schemas.
-      // The flat format hint MUST be appended AFTER the document text, not in the
-      // system prompt. DeepSeek hallucinates more when structure hint precedes the doc.
+      // Use a descriptive schema with field-level notes (not concrete example values).
       const dsOutputSchema =
-        '\n\nIMPORTANT: You MUST extract all fields ONLY from the document text above. ' +
-        'Do NOT use your general knowledge or training data. If a field value is not explicitly ' +
-        'mentioned in the document text, set it to null. For example, if the document does not ' +
-        'mention a vehicle plate number, set "vehiclePlate": null.\n\n' +
-        'Return flat JSON only. No nested policy/insurer/parties/premiums/vehicles objects. ' +
-        'Insurer is a plain string, not an object. ' +
-        'Coverage limits are numbers or null. ' +
-        'Extract ALL coverages from the document.'
+        '\n\nFields (set null if not in document): ' +
+        'policyNumber (string), insurer (string), insuredName (string), ' +
+        'startDate (YYYY-MM-DD), endDate (YYYY-MM-DD), ' +
+        'premium (number), currency (string), ' +
+        'vehiclePlate (string), vehicleMake (string), vehicleModel (string), vehicleYear (string), ' +
+        'NCD (number), NCDKademe (number), ' +
+        'policyType (string).\n' +
+        'coverages: [{name: string, limit: number|null}] — all from doc.\n' +
+        'exclusions: [{type: string, text: string}].\n' +
+        'CRITICAL: Extract from document text ONLY. Use null for missing. ' +
+        'Insurer is a string, not object. Limits are plain numbers.'
 
       const response = await dsClient.chat.completions.create(
         {
