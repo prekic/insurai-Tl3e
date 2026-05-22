@@ -1333,30 +1333,16 @@ router.post(
           ? openaiSystemPrompt
           : openaiSystemPrompt + '\n\nRespond with valid JSON only.'
 
-      // DeepSeek's json_object mode needs concrete format guidance to avoid nested schema.
-      // Embed the structure hint in the system prompt (before doc) instead of user prompt.
-      const dsSystemWithSchema =
-        dsSystemPrompt +
-        '\n\nOUTPUT FORMAT: Flat JSON, no nested objects. Key fields (all at top level):\n' +
-        'policyNumber (string), insurer (string), insuredName (string),\n' +
-        'startDate, endDate (string YYYY-MM-DD),\n' +
-        'premium (number), premiumNet (number), currency (string),\n' +
-        'vehiclePlate, vehicleMake, vehicleModel, vehicleYear (string),\n' +
-        'NCD (number 0-100), NCDKademe (number), vehicleVin (string),\n' +
-        'policyType (string), documentType (string).\n' +
-        'coverages: [{name: string, limit: number|null}]. ' +
-        'exclusions: [{type: string, text: string}].\n' +
-        'INSIST: You MUST extract ALL values from the document text in the user message. ' +
-        'Do NOT use training data defaults. If not in the document, use null.'
-
+      // DeepSeek's json_object mode triggers internal insurance schema which ignores
+      // document content. Remove json_object mode to let DeepSeek read the document
+      // naturally. We'll parse JSON from the text response.
       const response = await dsClient.chat.completions.create(
         {
           model: model || 'deepseek-chat',
           messages: [
-            { role: 'system', content: dsSystemWithSchema },
-            { role: 'user', content: finalUserPrompt },
+            { role: 'system', content: dsSystemPrompt },
+            { role: 'user', content: finalUserPrompt + '\n\nExtract all fields as flat JSON.' },
           ],
-          response_format: { type: 'json_object' },
           max_tokens: aiConfig.maxTokens,
           temperature: aiConfig.temperature,
         },
@@ -1370,14 +1356,19 @@ router.post(
 
       markPhase('deepseek_ms', dsStart)
 
-      // Parse JSON
+      // Parse JSON from text response (may have markdown fences or extra text)
       let rawParsed: Record<string, unknown>
       try {
-        rawParsed = JSON.parse(content) as Record<string, unknown>
+        // Try parsing content directly
+        const jsonMatch = content.match(/\{[\s\S]*?\}/)
+        const jsonStr = jsonMatch ? jsonMatch[0] : content
+        // Remove any markdown code block markers
+        const cleaned = jsonStr.replace(/```json\n?|```\n?/gi, '').trim()
+        rawParsed = JSON.parse(cleaned) as Record<string, unknown>
       } catch {
         log.error('DeepSeek returned invalid JSON', {
           requestId,
-          contentPreview: content.slice(0, 200),
+          contentPreview: content.slice(0, 300),
         })
         throw new Error('AI returned invalid JSON — response could not be parsed')
       }
