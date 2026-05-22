@@ -183,7 +183,7 @@ Your task is to extract structured information from insurance policy documents.
 ## Policy Types
 
 kasko, traffic, home, health, life, dask, business, nakliyat
-For Birleşik Kasko policies, set policyType to "kasko" and isBundle to true with the bundle product names. The display type string "Birleşik Kasko – Genişletilmiş Kasko" is derived from isBundle + bundleProducts, so you do NOT need to set policyType to this long string.
+For combined/comprehensive policies (e.g., bundle products that include Kasko + Koltuk Ferdi Kaza + Artan Mali Sorumluluk + Hukuksal Koruma under one policy), set policyType to "kasko" and isBundle to true with the bundle product names.
 
 ## Date Format
 
@@ -264,12 +264,12 @@ Extract ALL coverage/teminat items found throughout the document. This includes:
 
 ### CRITICAL: Do NOT conflate similar-named coverages
 
-Turkish Birleşik Kasko policies commonly include these three DISTINCT personal accident coverages with DIFFERENT meanings:
+Turkish combined/comprehensive Kasko policies commonly include these three DISTINCT personal accident coverages with DIFFERENT meanings:
 - **Koltuk Ferdi Kaza** / **Koltuk FK**: Covers PASSENGERS/OCCUPANTS in the insured vehicle (seat-based PA)
 - **Motorlu Araca Bağlı Ferdi Kaza**: Covers NON-OCCUPANTS injured by the vehicle (pedestrians, cyclists, etc.)
 - **Sürücüye Bağlı Ferdi Kaza**: Covers the DRIVER specifically
 
-ALL THREE appear together in many Birleşik Kasko policies, often in the same coverage table with the same limit amount (e.g., all at 50,000 TL). Extract ALL THREE as separate coverage items. Do NOT merge them or drop one. If you see "Motorlu Araca Bağlı" in the table, also check if "Sürücüye Bağlı" appears in the same table.
+ALL THREE appear together in many combined/comprehensive Kasko policies, often in the same coverage table with the same limit amount (e.g., all at 50,000 TL). Extract ALL THREE as separate coverage items. Do NOT merge them or drop one. If you see "Motorlu Araca Bağlı" in the table, also check if "Sürücüye Bağlı" appears in the same table.
 
 This is a known systematic failure point: extractors often extract Motorlu Araca Bağlı but drop Sürücüye Bağlı when they share the same limit value. Both must appear in the output.
 
@@ -283,7 +283,7 @@ This is a known systematic failure point: extractors often extract Motorlu Araca
 
 ### Manevi Tazminat (Moral Damages) — CRITICAL LABELING RULE
 
-"Manevi Tazminat" in Birleşik Kasko policies is a SUB-LIMIT of "Artan Mali Sorumluluk" (Extended Liability), NOT a standalone coverage. 
+"Manevi Tazminat" in combined/comprehensive Kasko policies is a SUB-LIMIT of "Artan Mali Sorumluluk" (Extended Liability), NOT a standalone coverage. 
 - Correct: name="Artan Mali Sorumluluk Manevi Tazminat", category should match AMS (liability)
 - Wrong: name="Manevi Tazminat" as standalone coverage with a separate category
 - The limit for Manevi Tazminat (e.g., 2,500,000 TL) is the per-person moral damages sub-limit under AMS
@@ -300,7 +300,7 @@ When Koltuk Ferdi Kaza has a per-person limit (e.g., 10,000 TL) AND a seat count
 
 ### AXA Sigorta Coverage Names
 
-AXA Birleşik Kasko policies (corporate/fleet) use different naming from Anadolu Sigorta. Common AXA-specific coverages:
+AXA combined/comprehensive Kasko policies (corporate/fleet) use different naming from Anadolu Sigorta. Common AXA-specific coverages:
   - Araç Bilgi Hattı → Vehicle Information Hotline
   - Yol Kenarında Onarım → Roadside Repair
   - Lastik Değişimi → Tire Change
@@ -361,10 +361,10 @@ Also check these locations for numeric limits:
 1. The "Sigorta Kapsami / Teminat Limiti" compact summary block
 2. Individual kloz sections that state "olay basina azami ... TL"
 3. Per-person limits (can apply to multiple coverages)
-4. "Birlesik" policy tables that show each sub-product's sub-limits
+4. "Combined/Karma" policy tables that show each sub-product's sub-limits
 5. Hukuksal Koruma tables (often have 3-4 sub-limits: avans, kefalet, olay basina, yillik)
 
-**Birlesik Kasko Hukuksal Koruma sub-limits — CRITICAL:** Hukuksal Koruma in Birlesik Kasko policies typically has 4 sub-limits:
+**Combined Kasko Hukuksal Koruma sub-limits — CRITICAL:** Hukuksal Koruma in combined/comprehensive Kasko policies typically has 4 sub-limits:
 - Avans (Advance): e.g. 750 TL
 - Kefalet (Bail): e.g. 750 TL
 - Olay Basi (Per Event/Base): e.g. 3,750 TL (sometimes listed as 4,000 TL in Anadolu)
@@ -373,13 +373,13 @@ Search the full document for these numbers — they are often stated in a kloz o
 
 **Hukuksal Koruma Deduplication:** If the structured per-line breakdown (avans/kefalet/olay başı/yıllık toplam) is present with specific limits, extract the sub-items AND remove the aggregate coverage entry (e.g., the 40,000 TL total row) to avoid duplicates.
 
-**Birlesik Kasko Koltuk Ferdi Kaza sub-limits — CRITICAL:**
+**Combined Kasko Koltuk Ferdi Kaza sub-limits — CRITICAL:**
 - Vefat (Death): typically 5,000 TL (NOT 100,000)
 - Surekli Sakatlik (Permanent Disability): typically 5,000 TL (NOT 100,000)
 - Tedavi (Medical Treatment): typically 500 TL
 Do NOT confuse these with the Artan Mali Sorumluluk limit (which can be 100,000 TL).
 
-**Birlesik Kasko coverage table — AXA corporate policies typically show:**
+**Combined Kasko coverage table — AXA corporate policies typically show:**
   KOLTUK FERDI KAZA
   Ölüm/Sakatlık Hali Kişi Adet  "500.000,00"
   Tedavi "50.000,00"
@@ -388,7 +388,7 @@ Do NOT confuse these with the Artan Mali Sorumluluk limit (which can be 100,000 
   
   SÜRÜCÜYE BAĞLI FERDİ KAZA (Kaza Başına) "50.000,00"
 Note: The dots (".") are THOUSANDS separators, not decimals. 500.000,00 = five hundred thousand.
-ALL THREE coverages (Koltuk FK, Motorlu Araca Bağlı, Sürücüye Bağlı) appear together in AXA Birleşik Kasko policies as DISTINCT items with their OWN limits. Extract all three.
+ALL THREE coverages (Koltuk FK, Motorlu Araca Bağlı, Sürücüye Bağlı) appear together in AXA combined/comprehensive Kasko policies as DISTINCT items with their OWN limits. Extract all three.
 
 ### Special Coverage Values
 - **"Sinirsiz" (Unlimited)**: Set isUnlimited=true and limit=null
@@ -487,7 +487,7 @@ If two coverage entries have the same limit and reference the same clause, merge
 
 ## --- BUNDLE DETECTION ---
 
-For "Birlesik" (Combined) Kasko policies:
+For combined/comprehensive Kasko policies (bundle policies):
 - The coverages table contains items from multiple products: Kasko, Koltuk Ferdi Kaza, Artan Mali Sorumluluk, Hukuksal Koruma
 - Set isBundle: true
 - Populate bundleProducts with the product names: ["Kasko", "Koltuk Ferdi Kaza", "Artan Mali Sorumluluk", "Hukuksal Koruma"]
