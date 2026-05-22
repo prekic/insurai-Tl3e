@@ -29,14 +29,12 @@ import {
   type AIProvider,
 } from './config'
 import {
-  extractWithDocumentAI,
-  isDocumentOCRAvailable,
+  
   type FormField,
   type PageText,
   type Table,
 } from './document-ocr'
 import { ExtractedCoverage, ExtractedPolicyData } from './extraction-schema'
-import { extractFormFieldMap, findFormField, TURKISH_FORM_FIELD_PATTERNS } from './ocr'
 import { extractTextFromPDFWithRetry, isPDFFile } from './pdf-parser'
 import { extractWithClaude } from './providers/claude'
 import { extractWithConsensus, type ConsensusResult } from './providers/consensus'
@@ -75,7 +73,7 @@ export interface ExtractionResult {
     warnings: string[]
     enhanced: string[]
   }
-  // Document AI OCR data (always present with OCR-first approach)
+  // Document OCR data (always present with OCR-first approach)
   documentOCR?: {
     /** SHA-256 hash of original PDF */
     pdfHash: string
@@ -281,142 +279,29 @@ export async function extractPolicyFromDocument(
   }
 
   // ========== TEXT EXTRACTION STAGE ==========
-  // Try Document AI OCR first, fall back to pdf.js if unavailable
+  // Try pdf.js extraction first
   logger?.startStage('ocr_processing', {
     filename: file.name,
     file_size: file.size,
-    strategy: 'document-ai-first-with-pdfjs-fallback',
-    backend: 'document-ai',
+    strategy: 'pdfjs-first',
+    backend: 'vision-api',
   })
 
-  // Variables to hold extraction results (from either Document AI or pdf.js)
+  // Variables to hold extraction results
   let documentText: string = ''
-  let ocrFormFields: FormField[] = []
-  let ocrTables: Table[] = []
   let usedOCR = false
-  let extractionMethod: 'document-ai' | 'pdf.js' | 'cloud-vision' | 'gemini-ocr' | 'none' = 'none'
+  let extractionMethod: 'pdf.js' | 'cloud-vision' | 'gemini-ocr' | 'none' = 'none'
   let pageCount = 0
-  // Store full Document AI data for result object (when available)
-  let documentAIOcrData: {
-    pdfHash: string
-    pages: PageText[]
-    confidence: number
-    metadata: { processingTimeMs: number; warnings: string[] }
-  } | null = null
 
-  // Try Document AI OCR first (if available)
-  const documentAIAvailable = isDocumentOCRAvailable()
-
-  const ocrPhaseStart = performance.now()
-  if (documentAIAvailable) {
-    console.warn('[PolicyExtractor] Attempting Document AI extraction...')
-    const ocrResult = await extractWithDocumentAI(file)
-    markClientPhase('documentAI_ms', ocrPhaseStart)
-    console.warn(
-      '[PolicyExtractor] Document AI result success:',
-      ocrResult.success,
-      `(${clientPhaseTiming['documentAI_ms']}ms)`
-    )
-
-    if (ocrResult.success) {
-      // Document AI succeeded - use its results
-      const ocrData = ocrResult.data
-      documentText = ocrData.text
-      ocrFormFields = ocrData.formFields
-      ocrTables = ocrData.tables
-      usedOCR = true
-      extractionMethod = 'document-ai'
-      pageCount = ocrData.pageCount
-      // Store full data for result object
-      documentAIOcrData = {
-        pdfHash: ocrData.pdfHash,
-        pages: ocrData.pages,
-        confidence: ocrData.confidence,
-        metadata: ocrData.metadata,
-      }
-
-      // Log Document AI success
-      logger?.setOCRUsed('document-ai')
-      logger?.setPageCount(ocrData.pageCount)
-      logger?.completeStage({
-        output: {
-          text_length: documentText.length,
-          text_preview: documentText.substring(0, 500) + '...',
-          page_count: ocrData.pageCount,
-          confidence: ocrData.confidence,
-          pdf_hash: ocrData.pdfHash,
-          form_fields_count: ocrFormFields.length,
-          tables_count: ocrTables.length,
-          processing_time_ms: ocrData.metadata.processingTimeMs,
-          warnings: ocrData.metadata.warnings,
-        },
-        metadata: {
-          pages: ocrData.pages.map((p) => ({
-            page: p.pageNumber,
-            chars: p.text.length,
-            confidence: p.confidence,
-            warnings: p.warnings,
-          })),
-          form_fields: ocrFormFields.slice(0, 10),
-          tables_structure: ocrTables.map((t) => ({
-            page: t.pageNumber,
-            rows: t.rows?.length || 0,
-            cols: t.rows?.[0]?.cells?.length || 0,
-          })),
-        },
-        full_output_text: documentText,
-      })
-
-      if (import.meta.env.DEV) {
-        console.warn(
-          `[Document AI OCR] ${ocrData.pageCount} pages, ` +
-            `${(ocrData.confidence * 100).toFixed(1)}% confidence, ` +
-            `${ocrFormFields.length} form fields, ` +
-            `${ocrTables.length} tables, ` +
-            `${ocrData.metadata.processingTimeMs}ms`
-        )
-      }
-    } else {
-      // Document AI failed - properly close the stage and log error details
-      console.warn('[PolicyExtractor] Document AI FAILED:', ocrResult.error.message)
-      console.warn('[PolicyExtractor] Document AI error code:', ocrResult.error.code)
-      console.warn('[PolicyExtractor] Document AI error details:', ocrResult.error.details)
-      console.warn('[PolicyExtractor] Will try pdf.js fallback...')
-
-      // IMPORTANT: Fail the ocr_processing stage BEFORE starting pdf_extraction
-      // This prevents "Stage interrupted by new stage" error
-      logger?.failStage(`Document AI OCR failed: ${ocrResult.error.message}`, {
-        error_code: ocrResult.error.code,
-        error_details: ocrResult.error.details,
-        will_try_fallback: true,
-        fallback_method: 'pdf.js',
-      })
-    }
-  } else {
-    // Document AI not available - fail the already-started ocr_processing stage
-    console.warn('[PolicyExtractor] Document AI not available, will try pdf.js fallback')
-
-    // IMPORTANT: Fail the ocr_processing stage BEFORE starting pdf_extraction
-    // The stage was already started at line 268, so we must fail it (not skip)
-    // This prevents "Stage interrupted by new stage" error
-    logger?.failStage('Document AI not configured', {
-      reason: 'not_configured',
-      proxy_url_set: !!import.meta.env.VITE_API_PROXY_URL,
-      will_try_fallback: true,
-      fallback_method: 'pdf.js',
-      note: 'Configure GCP_SERVICE_ACCOUNT_BASE64 environment variable for Document AI',
-    })
-  }
-
-  // If Document AI didn't work (not available or failed), try pdf.js
-  console.warn('[PolicyExtractor] extractionMethod after Document AI attempt:', extractionMethod)
+  // Extract text via pdf.js
+  console.warn('[PolicyExtractor] extractionMethod:', extractionMethod)
   if (extractionMethod === 'none') {
     const pdfjsStart = performance.now()
     console.warn('[PolicyExtractor] Starting pdf.js fallback extraction...')
     logger?.startStage('pdf_extraction', {
       filename: file.name,
       file_size: file.size,
-      fallback_reason: documentAIAvailable ? 'document-ai-failed' : 'document-ai-not-configured',
+      fallback_reason: 'starting-pdfjs-extraction',
     })
 
     const pdfResult = await extractTextFromPDFWithRetry(file)
@@ -651,7 +536,7 @@ export async function extractPolicyFromDocument(
   }
 
   // ========== TEXT PREPROCESSING STAGE ==========
-  markClientPhase('textExtraction_total_ms', ocrPhaseStart) // Total time for OCR/pdf.js phase
+  markClientPhase('textExtraction_total_ms', pdfjsStart) // Total time for OCR/pdf.js phase
   const preprocessStart = performance.now()
   logger?.startStage('text_preprocessing', {
     text_length: documentText.length,
@@ -903,169 +788,11 @@ export async function extractPolicyFromDocument(
       )
     }
 
-    // ========================================================================
-    // DOCUMENT AI FORM FIELD ENHANCEMENT
-    // Use high-confidence form fields from Document AI to enhance/override AI extraction
-    // ========================================================================
-    let enhancedExtractedData = {
+        let enhancedExtractedData = {
       ...extractedData,
       coverages: (extractedData.coverages ?? []).filter(
         (c): c is NonNullable<typeof c> => c != null
       ),
-    }
-    let formFieldsUsed = 0
-
-    // ========== FORM FIELD ENHANCEMENT STAGE ==========
-    if (ocrFormFields && ocrFormFields.length > 0) {
-      logger?.startStage('form_field_enhancement', {
-        form_fields_available: ocrFormFields.length,
-        backend: 'document-ai',
-      })
-      const formFieldMap = extractFormFieldMap(ocrFormFields)
-      const narrowedFormFields = ocrFormFields
-
-      if (import.meta.env.DEV) {
-        console.warn('[Document AI] Form field map:', formFieldMap)
-      }
-
-      // Helper to find and use high-confidence form field value
-      const getFormFieldValue = (
-        patterns: readonly (string | RegExp)[],
-        currentValue: string | number | null | undefined,
-        minConfidence = 0.7
-      ): string | undefined => {
-        const field = findFormField(narrowedFormFields, patterns)
-        if (field && field.confidence >= minConfidence && field.value) {
-          formFieldsUsed++
-          return field.value
-        }
-        return currentValue?.toString()
-      }
-
-      // Use form fields for policy number (high priority - very reliable from Document AI)
-      const formPolicyNumber = getFormFieldValue(
-        TURKISH_FORM_FIELD_PATTERNS.policyNumber,
-        extractedData.policyNumber,
-        0.6
-      )
-      if (formPolicyNumber && formPolicyNumber !== extractedData.policyNumber) {
-        enhancedExtractedData = { ...enhancedExtractedData, policyNumber: formPolicyNumber }
-        if (import.meta.env.DEV) {
-          console.warn(
-            `[Document AI] Policy number enhanced: "${extractedData.policyNumber}" → "${formPolicyNumber}"`
-          )
-        }
-      }
-
-      // Use form fields for insured name
-      const formInsuredName = getFormFieldValue(
-        TURKISH_FORM_FIELD_PATTERNS.insuredName,
-        extractedData.insuredName
-      )
-      if (formInsuredName && formInsuredName !== extractedData.insuredName) {
-        enhancedExtractedData = { ...enhancedExtractedData, insuredName: formInsuredName }
-        if (import.meta.env.DEV) {
-          console.warn(
-            `[Document AI] Insured name enhanced: "${extractedData.insuredName}" → "${formInsuredName}"`
-          )
-        }
-      }
-
-      // Use form fields for dates
-      const formStartDate = getFormFieldValue(
-        TURKISH_FORM_FIELD_PATTERNS.startDate,
-        extractedData.startDate
-      )
-      if (formStartDate && formStartDate !== extractedData.startDate) {
-        // Normalize date format if needed (DD.MM.YYYY → YYYY-MM-DD)
-        const normalizedDate = formStartDate.includes('.')
-          ? formStartDate.split('.').reverse().join('-')
-          : formStartDate
-        enhancedExtractedData = { ...enhancedExtractedData, startDate: normalizedDate }
-      }
-
-      const formEndDate = getFormFieldValue(
-        TURKISH_FORM_FIELD_PATTERNS.endDate,
-        extractedData.endDate
-      )
-      if (formEndDate && formEndDate !== extractedData.endDate) {
-        const normalizedDate = formEndDate.includes('.')
-          ? formEndDate.split('.').reverse().join('-')
-          : formEndDate
-        enhancedExtractedData = { ...enhancedExtractedData, endDate: normalizedDate }
-      }
-
-      // Use form fields for premium (parse Turkish number format)
-      const formPremium = getFormFieldValue(
-        TURKISH_FORM_FIELD_PATTERNS.premium,
-        extractedData.premium?.toString()
-      )
-      if (formPremium) {
-        // Parse Turkish currency format: "₺5.000,50" or "5.000,50 TL"
-        const cleanPremium = formPremium
-          .replace(/[₺TL\s]/g, '')
-          .replace(/\./g, '')
-          .replace(',', '.')
-        const parsedPremium = parseFloat(cleanPremium)
-        if (!isNaN(parsedPremium) && parsedPremium !== extractedData.premium) {
-          // Magnitude sanity check: Prevent extracting vehicle market value as premium
-          // Kasko premiums are rarely over 500,000 TL, but vehicle values are usually 1M+ TL
-          const isSuspiciousVehicleValue =
-            parsedPremium > 500000 && (!extractedData.premium || extractedData.premium < 500000)
-
-          if (isSuspiciousVehicleValue) {
-            console.warn(
-              `[Document AI] Rejected suspicious premium OCR enhancement. OCR value ${parsedPremium} resembles vehicle value. Keeping AI value: ${extractedData.premium}`
-            )
-          } else {
-            enhancedExtractedData = { ...enhancedExtractedData, premium: parsedPremium }
-            if (import.meta.env.DEV) {
-              console.warn(
-                `[Document AI] Premium enhanced: ${extractedData.premium} → ${parsedPremium}`
-              )
-            }
-          }
-        }
-      }
-
-      if (import.meta.env.DEV && formFieldsUsed > 0) {
-        console.warn(`[Document AI] Enhanced extraction with ${formFieldsUsed} form fields`)
-      }
-
-      // Log form field enhancement completion
-      logger?.completeStage({
-        output: {
-          fields_used: formFieldsUsed,
-          enhanced_policy_number: enhancedExtractedData.policyNumber !== extractedData.policyNumber,
-          enhanced_insured_name: enhancedExtractedData.insuredName !== extractedData.insuredName,
-          enhanced_premium: enhancedExtractedData.premium !== extractedData.premium,
-        },
-      })
-    } else {
-      // Provide detailed decision context for why form field enhancement was skipped
-      logger?.skipStage('form_field_enhancement', {
-        reason: 'No form fields available',
-        decision_context: {
-          assessment_performed: 'Check for Document AI form fields from OCR stage',
-          actual_values: {
-            form_fields_count: ocrFormFields?.length || 0,
-            ocr_used: usedOCR,
-            ocr_backend: 'document-ai',
-            has_form_fields: !!(ocrFormFields && ocrFormFields.length > 0),
-          },
-          decision_logic:
-            'OCR was performed with Document AI backend, but no form fields were detected. Document may not have structured form fields.',
-          alternatives: usedOCR
-            ? [
-                'Use Google Document AI which has better form field detection',
-                'Document may need cleaner scan quality for form field detection',
-              ]
-            : [
-                'Form fields are only available when using Document AI OCR',
-                'For native text PDFs, AI extraction typically captures all data without needing form field enhancement',
-              ],
-        },
-      })
     }
 
     // ========================================================================
@@ -1156,97 +883,9 @@ export async function extractPolicyFromDocument(
 
     // ========================================================================
     // TABLE-BASED COVERAGE ENHANCEMENT
-    // Parse Document AI tables to extract structured coverage information
+    // Parse tables to extract structured coverage information
     // ========================================================================
-    let tableCoveragesUsed = 0
-
-    // ========== TABLE PARSING STAGE ==========
-    if (ocrTables && ocrTables.length > 0) {
-      logger?.startStage('table_parsing', {
-        tables_count: ocrTables.length,
-        tables_structure: ocrTables.map((t) => ({
-          rows: t.rows?.length || 0,
-          cols: t.rows?.[0]?.cells?.length || 0,
-        })),
-      })
-
-      try {
-        const tableData = parseTablesForCoverages(ocrTables)
-
-        if (tableData.coverages.length > 0) {
-          if (import.meta.env.DEV) {
-            console.warn(
-              `[Table Parser] Extracted ${tableData.coverages.length} coverages from ${ocrTables.length} tables`
-            )
-          }
-
-          // Merge table coverages with AI-extracted coverages
-          const mergedCoverages = mergeCoveragesWithTableData(
-            enhancedExtractedData.coverages,
-            tableData.coverages,
-            tableData.confidence, // Table parsing confidence
-            0.7 // Minimum confidence threshold
-          )
-
-          // Count how many table coverages were actually used
-          tableCoveragesUsed = mergedCoverages.length - enhancedExtractedData.coverages.length
-          if (tableCoveragesUsed < 0) tableCoveragesUsed = 0
-
-          // Update enhanced data with merged coverages
-          enhancedExtractedData = {
-            ...enhancedExtractedData,
-            coverages: mergedCoverages as ExtractedCoverage[],
-          }
-
-          // Log table parsing success
-          logger?.completeStage({
-            output: {
-              coverages_extracted: tableData.coverages.length,
-              coverages_merged: tableCoveragesUsed,
-              total_coverages: mergedCoverages.length,
-              table_confidence: tableData.confidence,
-            },
-            metadata: {
-              extracted_coverages: tableData.coverages.slice(0, 5), // First 5 for preview
-            },
-          })
-
-          if (import.meta.env.DEV && tableCoveragesUsed > 0) {
-            console.warn(`[Table Parser] Added ${tableCoveragesUsed} new coverages from tables`)
-          }
-        } else {
-          logger?.completeStage({
-            output: { coverages_extracted: 0, reason: 'no_coverage_tables_found' },
-          })
-        }
-      } catch (error) {
-        // Table parsing is optional, continue without it
-        console.warn('Table coverage parsing failed:', error)
-        logger?.failStage(
-          'Table parsing failed: ' + (error instanceof Error ? error.message : 'Unknown error')
-        )
-      }
-    } else {
-      // Provide detailed decision context for why table parsing was skipped
-      logger?.skipStage('table_parsing', {
-        reason: 'No tables available',
-        decision_context: {
-          assessment_performed: 'Check for Document AI tables from OCR stage',
-          actual_values: {
-            tables_count: ocrTables?.length || 0,
-            ocr_used: usedOCR,
-            ocr_backend: 'document-ai',
-            has_tables: !!(ocrTables && ocrTables.length > 0),
-            ai_coverages_count: enhancedExtractedData.coverages?.length || 0,
-          },
-          decision_logic: `OCR was performed with Document AI backend, but no tables were detected in the document. The AI extraction found ${enhancedExtractedData.coverages?.length || 0} coverages from the text.`,
-          alternatives: [
-            'Document may not contain structured coverage tables',
-            'Coverage information may be in paragraph form rather than tables',
-          ],
-        },
-      })
-    }
+    const tableCoveragesUsed = 0
 
     // ========== VALIDATION STAGE ==========
     logger?.startStage('validation', {
@@ -1520,31 +1159,18 @@ export async function extractPolicyFromDocument(
             enhanced: Object.keys(patternValidation.enhancements),
           }
         : undefined,
-      // Document AI OCR data (when available) or pdf.js extraction info
-      documentOCR: documentAIOcrData
-        ? {
-            pdfHash: documentAIOcrData.pdfHash,
-            pages: documentAIOcrData.pages,
-            confidence: documentAIOcrData.confidence,
-            formFields: ocrFormFields,
-            tables: ocrTables,
-            fieldsUsed: formFieldsUsed,
-            tableCoveragesUsed,
-            processingTimeMs: documentAIOcrData.metadata.processingTimeMs,
-            warnings: documentAIOcrData.metadata.warnings,
-          }
-        : {
-            // pdf.js fallback - minimal data
-            pdfHash: '',
-            pages: [] as PageText[],
-            confidence: 0.9, // Assumed good quality for native text
-            formFields: [] as FormField[],
-            tables: [] as Table[],
-            fieldsUsed: 0, // No form fields used in pdf.js extraction
-            tableCoveragesUsed: 0,
-            processingTimeMs: 0,
-            warnings: ['Extracted with pdf.js (Document AI unavailable)'],
-          },
+      // OCR or pdf.js extraction info
+      documentOCR: {
+        pdfHash: '',
+        pages: [] as PageText[],
+        confidence: 0.9,
+        formFields: [] as FormField[],
+        tables: [] as Table[],
+        fieldsUsed: 0,
+        tableCoveragesUsed: 0,
+        processingTimeMs: 0,
+        warnings: ['Extracted without Google Document AI'],
+      },
     }
   } catch (error) {
     markClientPhase('aiExtraction_ms', aiExtractionStart)

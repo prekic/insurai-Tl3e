@@ -28,7 +28,6 @@ let getAnthropicClient: () => any
 let getDeepSeekClient: () => any
 let getGeminiClient: () => any
 let getGCPCredentialsPath: () => string | null
-let getDocumentAIAccessToken: () => Promise<string | null>
 
 const svcLog = logger.child('provider-health-monitor')
 
@@ -47,14 +46,12 @@ export function setDiagnosticsImports(imports: {
   getDeepSeekClient: () => any
   getGeminiClient: () => any
   getGCPCredentialsPath: () => string | null
-  getDocumentAIAccessToken: () => Promise<string | null>
 }): void {
   getOpenAIClient = imports.getOpenAIClient
   getAnthropicClient = imports.getAnthropicClient
   getDeepSeekClient = imports.getDeepSeekClient
   getGeminiClient = imports.getGeminiClient
   getGCPCredentialsPath = imports.getGCPCredentialsPath
-  getDocumentAIAccessToken = imports.getDocumentAIAccessToken
 }
 
 /**
@@ -328,18 +325,10 @@ async function checkGoogleVision(results: Record<string, string>): Promise<void>
   results.google_vision = 'healthy'
 
   try {
-    // Try OAuth first, then API key
-    let token: string | null = null
-    if (hasServiceAccount) {
-      token = (await getDocumentAIAccessToken?.()) ?? null
-    }
-
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     let url = 'https://vision.googleapis.com/v1/images:annotate'
 
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`
-    } else if (hasApiKey) {
+    if (hasApiKey) {
       url += `?key=${process.env.GOOGLE_CLOUD_API_KEY}`
     } else {
       results.google_vision = 'AUTH_FAILED'
@@ -348,7 +337,7 @@ async function checkGoogleVision(results: Record<string, string>): Promise<void>
         category: 'api_error',
         title: 'Google Cloud Vision Auth Failed',
         message:
-          'No valid OAuth token or API key for Google Cloud Vision. OCR via Document AI/Vision will fail.',
+          'No Google Cloud API key configured. OCR via Vision API will fail.',
         provider: 'google_vision',
         dedupKey: 'health:google_vision:auth_failed',
       })

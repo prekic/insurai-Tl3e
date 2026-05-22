@@ -10,7 +10,6 @@ import Anthropic from '@anthropic-ai/sdk'
 import { GoogleGenAI } from '@google/genai'
 import { Request, Response, Router } from 'express'
 import * as fs from 'fs'
-import { GoogleAuth } from 'google-auth-library'
 import OpenAI from 'openai'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
@@ -169,42 +168,8 @@ function getGeminiClient(): GoogleGenAI | null {
   return geminiClient
 }
 
-// ============================================================================
-// DOCUMENT AI CONFIGURATION
-// ============================================================================
 
-const GCP_CONFIG = {
-  projectId: process.env.GCP_PROJECT_ID || 'gen-lang-client-0171803889',
-  location: process.env.GCP_LOCATION || 'us',
-  processorId: process.env.GCP_DOCAI_PROCESSOR_ID || 'c2741b178ab61433',
-}
 
-/**
- * Cleanup temp GCP credentials file on process exit.
- * The file is written from base64 env var and should not persist on disk.
- */
-function cleanupTempCredentials(): void {
-  const tempPath = path.join(process.cwd(), '.gcp-credentials-temp.json')
-  try {
-    if (fs.existsSync(tempPath)) {
-      fs.unlinkSync(tempPath)
-      log.debug('Cleaned up temp credentials file')
-    }
-  } catch {
-    // Best-effort cleanup - don't crash on exit
-  }
-}
-
-// Register cleanup handlers (runs on normal exit and signals)
-process.on('exit', cleanupTempCredentials)
-process.on('SIGINT', () => {
-  cleanupTempCredentials()
-  process.exit(0)
-})
-process.on('SIGTERM', () => {
-  cleanupTempCredentials()
-  process.exit(0)
-})
 
 /**
  * Get the path to GCP service account credentials
@@ -264,45 +229,7 @@ function getGCPCredentialsPath(): string | null {
   return null
 }
 
-/**
- * Check if Document AI is configured
- */
-function isDocumentAIConfigured(): boolean {
-  const credentialsPath = getGCPCredentialsPath()
-  return !!credentialsPath && !!GCP_CONFIG.projectId && !!GCP_CONFIG.processorId
-}
 
-/**
- * Get access token for Document AI
- */
-async function getDocumentAIAccessToken(): Promise<string | null> {
-  log.debug('getDocumentAIAccessToken called')
-  const credentialsPath = getGCPCredentialsPath()
-  log.debug('Credentials path resolved', { credentialsPath })
-  if (!credentialsPath) {
-    log.error('No credentials file found')
-    return null
-  }
-
-  try {
-    log.debug('Creating GoogleAuth instance')
-    const auth = new GoogleAuth({
-      keyFile: credentialsPath,
-      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-    })
-    log.debug('GoogleAuth created, getting access token')
-    const token = await auth.getAccessToken()
-    log.debug('Access token obtained successfully', {
-      tokenLength: token ? String(token).length : 0,
-    })
-    return token as string
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    const errorStack = error instanceof Error ? error.stack : ''
-    log.error('Failed to get access token', { error: errorMessage, stack: errorStack })
-    return null
-  }
-}
 
 /**
  * POST /api/ai/sense-check
@@ -481,7 +408,6 @@ router.get('/providers', generalLimiter, (_req: Request, res: Response) => {
     anthropic: !!process.env.ANTHROPIC_API_KEY,
     google: hasGoogleVision,
     gemini: !!process.env.GEMINI_API_KEY,
-    documentAI: isDocumentAIConfigured(),
   })
 })
 /**
@@ -640,128 +566,51 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
   }
 
   // Test Google Cloud Vision (OCR)
-  // Check both OAuth (service account) and API key authentication
   const googleApiKey = process.env.GOOGLE_CLOUD_API_KEY
-  const hasServiceAccount = !!getGCPCredentialsPath()
 
-  if (googleApiKey || hasServiceAccount) {
+  if (googleApiKey) {
     diagnostics.google.configured = true
     const startTime = Date.now()
     try {
-      // Try OAuth token first (most secure)
-      const oauthToken = hasServiceAccount ? await getDocumentAIAccessToken() : null
-
-      if (hasServiceAccount && !oauthToken) {
-        log.warn(
-          'Google Vision diagnostic: service account found but OAuth token retrieval failed — falling back to API key'
-        )
-      }
-
-      // Build request with appropriate authentication
-      let url = 'https://vision.googleapis.com/v1/images:annotate'
+      let url = `https://vision.googleapis.com/v1/images:annotate?key=${googleApiKey}`
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       }
 
-      let authMethod = 'none'
-      if (oauthToken) {
-        headers['Authorization'] = `Bearer ${oauthToken}`
-        authMethod = 'oauth'
-      } else if (googleApiKey) {
-        url = `${url}?key=${googleApiKey}`
-        authMethod = 'api_key'
-      }
+      let authMethod = 'api_key'
 
-      if (authMethod === 'none') {
-        // Both auth methods failed — report clearly
+      // Make a minimal API call to verify credentials work
+      // Using a tiny 1x1 white PNG to minimize cost
+      const testImage =
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR2mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          requests: [
+            {
+              image: { content: testImage },
+              features: [{ type: 'TEXT_DETECTION', maxResults: 1 }],
+            },
+          ],
+        }),
+      })
+
+      if (response.ok) {
+        diagnostics.google.valid = true
+        diagnostics.google.latencyMs = Date.now() - startTime
+      } else {
+        const errorBody = (await response.json().catch(() => ({ error: { message: 'Unknown error' } }))) as { error?: { message?: string } }
+        const errorMsg = errorBody.error?.message || `HTTP ${response.status}`
         diagnostics.google.valid = false
         diagnostics.google.latencyMs = Date.now() - startTime
-        diagnostics.google.errorCode = 'INVALID_CREDENTIALS'
-        diagnostics.google.error = sanitizeDiagnosticError(
-          'Authentication failed - no valid OAuth token or API key',
-          IS_PRODUCTION
-        )
-        log.warn('Google Vision diagnostic: no valid authentication method available', {
-          hasServiceAccount,
-          hasApiKey: !!googleApiKey,
+        diagnostics.google.errorCode = classifyDiagnosticError(errorMsg)
+        diagnostics.google.error = sanitizeDiagnosticError(errorMsg, IS_PRODUCTION)
+        log.warn('Google Vision diagnostic failed', {
+          errorCode: diagnostics.google.errorCode,
+          error: errorMsg,
+          authMethod,
         })
-      } else {
-        // Make a minimal API call to verify credentials work
-        // Using a tiny 1x1 white PNG to minimize cost
-        const testImage =
-          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
-        const response = await fetch(url, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            requests: [
-              {
-                image: { content: testImage },
-                features: [{ type: 'TEXT_DETECTION', maxResults: 1 }],
-              },
-            ],
-          }),
-        })
-        diagnostics.google.latencyMs = Date.now() - startTime
-
-        // Always report auth method (no secret exposure — just 'oauth' or 'api_key')
-        diagnostics.google.authMethod = authMethod
-
-        if (response.ok) {
-          diagnostics.google.valid = true
-          if (!IS_PRODUCTION) {
-            diagnostics.google.model = 'cloud-vision-v1'
-          }
-        } else {
-          const errorData = (await response.json().catch(() => ({}))) as {
-            error?: { message?: string; status?: string; code?: number }
-          }
-          diagnostics.google.valid = false
-
-          // Check both message and status fields from Google Cloud API response
-          const errorMessage = errorData.error?.message || ''
-          const errorStatus = errorData.error?.status || ''
-          const httpStatus = response.status
-
-          let errorMsg = errorMessage || `HTTP ${httpStatus}`
-
-          // Map Google Cloud error statuses to actionable messages
-          if (errorMsg.includes('API key not valid') || (httpStatus === 400 && !errorStatus)) {
-            errorMsg = 'Invalid API key - check GOOGLE_CLOUD_API_KEY in .env'
-          } else if (
-            errorStatus === 'PERMISSION_DENIED' ||
-            errorMsg.includes('PERMISSION_DENIED') ||
-            errorMsg.includes('has not been used')
-          ) {
-            errorMsg = 'Cloud Vision API not enabled - enable it in Google Cloud Console'
-          } else if (errorStatus === 'UNAUTHENTICATED' || httpStatus === 401) {
-            errorMsg = 'Authentication failed - check GOOGLE_CLOUD_API_KEY'
-          } else if (
-            errorStatus === 'FAILED_PRECONDITION' ||
-            errorMsg.includes('Billing') ||
-            errorMsg.includes('BILLING')
-          ) {
-            errorMsg = 'Billing not enabled on Google Cloud project'
-          } else if (errorStatus === 'RESOURCE_EXHAUSTED' || httpStatus === 429) {
-            errorMsg = 'Rate limit exceeded - try again later'
-          } else if (errorStatus === 'NOT_FOUND' || httpStatus === 404) {
-            errorMsg = 'Vision API endpoint not found - check API configuration'
-          } else if (httpStatus === 403) {
-            errorMsg = `Permission denied (${errorStatus || 'unknown'}) - check API key permissions`
-          }
-
-          diagnostics.google.errorCode = classifyDiagnosticError(errorMsg)
-          diagnostics.google.error = sanitizeDiagnosticError(errorMsg, IS_PRODUCTION)
-
-          // Always log the real error server-side (visible in Railway logs)
-          log.warn('Google Vision diagnostic failed', {
-            errorCode: diagnostics.google.errorCode,
-            authMethod,
-            httpStatus,
-            errorStatus,
-            errorMessage,
-          })
-        }
       }
     } catch (error) {
       diagnostics.google.valid = false
@@ -1038,13 +887,6 @@ router.get('/provider-health', generalLimiter, async (_req: Request, res: Respon
         process.env.GOOGLE_CLOUD_API_KEY || process.env.GOOGLE_APPLICATION_CREDENTIALS
       ),
       status: getProviderStatus('google_vision'),
-    },
-    google_document_ai: {
-      configured: !!(
-        (process.env.GOOGLE_CLOUD_API_KEY || process.env.GOOGLE_APPLICATION_CREDENTIALS) &&
-        process.env.DOCUMENT_AI_PROCESSOR_ID
-      ),
-      status: getProviderStatus('google_document_ai'),
     },
   }
 

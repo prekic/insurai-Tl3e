@@ -8,10 +8,8 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import { GoogleGenAI, createPartFromBase64 } from '@google/genai'
-import crypto from 'node:crypto'
 import { Request, Response, Router } from 'express'
 import * as fs from 'fs'
-import { GoogleAuth } from 'google-auth-library'
 import OpenAI from 'openai'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
@@ -22,12 +20,10 @@ import { calculateCost, recordUsage } from '../../middleware/cost-control.js'
 import { aiExtractionLimiter, ocrLimiter } from '../../middleware/rate-limit.js'
 import {
   validateAnthropicExtraction,
-  validateDocumentAI,
   validateJSON,
   validateOCR,
   validateOpenAIExtraction,
   type AnthropicExtractionInput,
-  type DocumentAIInput,
   type OCRInput,
   type OpenAIExtractionInput,
 } from '../../middleware/validation.js'
@@ -37,7 +33,6 @@ import { alertBilling, dispatchAlert } from '../../lib/alert-service.js'
 import { loadPrompts, getPromptVersionTag } from '../../lib/prompt-loader.js'
 import { classifyDocument, checkTypeConsistency } from '../../lib/classifier-gate.js'
 import { BillingError, classifyProviderError } from '../../lib/errors.js'
-import { hashOcrInput, lookupOcrCache, storeOcrCache } from '../../services/ocr-cache.js'
 import { sendExtractionCompleteNotification } from '../../services/notification-service.js'
 import { validateExtractionFields } from '../../lib/self-healing.js'
 import { recordExtractionEvent, recordOverviewMetrics } from './shared.js'
@@ -148,15 +143,6 @@ export function getGeminiClient(): GoogleGenAI | null {
   return geminiClient
 }
 
-// ============================================================================
-// DOCUMENT AI CONFIGURATION
-// ============================================================================
-
-const GCP_CONFIG = {
-  projectId: process.env.GCP_PROJECT_ID || 'gen-lang-client-0171803889',
-  location: process.env.GCP_LOCATION || 'us',
-  processorId: process.env.GCP_DOCAI_PROCESSOR_ID || 'c2741b178ab61433',
-}
 
 /**
  * Cleanup temp GCP credentials file on process exit.
@@ -241,46 +227,6 @@ export function getGCPCredentialsPath(): string | null {
   }
 
   return null
-}
-
-/**
- * Check if Document AI is configured
- */
-function isDocumentAIConfigured(): boolean {
-  const credentialsPath = getGCPCredentialsPath()
-  return !!credentialsPath && !!GCP_CONFIG.projectId && !!GCP_CONFIG.processorId
-}
-
-/**
- * Get access token for Document AI
- */
-export async function getDocumentAIAccessToken(): Promise<string | null> {
-  log.debug('getDocumentAIAccessToken called')
-  const credentialsPath = getGCPCredentialsPath()
-  log.debug('Credentials path resolved', { credentialsPath })
-  if (!credentialsPath) {
-    log.error('No credentials file found')
-    return null
-  }
-
-  try {
-    log.debug('Creating GoogleAuth instance')
-    const auth = new GoogleAuth({
-      keyFile: credentialsPath,
-      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-    })
-    log.debug('GoogleAuth created, getting access token')
-    const token = await auth.getAccessToken()
-    log.debug('Access token obtained successfully', {
-      tokenLength: token ? String(token).length : 0,
-    })
-    return token as string
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    const errorStack = error instanceof Error ? error.stack : ''
-    log.error('Failed to get access token', { error: errorMessage, stack: errorStack })
-    return null
-  }
 }
 
 /**
@@ -1491,23 +1437,10 @@ router.post(
   }
 )
 
-interface DocumentAIResponse {
-  error?: { message: string; code?: string; status?: string }
-  document?: any
-}
-
 router.post('/ocr', validateJSON, ocrLimiter, validateOCR, async (req: Request, res: Response) => {
   try {
-    // Only attempt OAuth if service account credentials exist (avoids wasted async call)
-    const hasServiceAccount = !!getGCPCredentialsPath()
-    const oauthToken = hasServiceAccount ? await getDocumentAIAccessToken() : null
+    const oauthToken = null
     const apiKey = process.env.GOOGLE_CLOUD_API_KEY
-
-    if (hasServiceAccount && !oauthToken) {
-      log.warn(
-        'Vision OCR: service account found but OAuth token retrieval failed — falling back to API key'
-      )
-    }
 
     if (!oauthToken && !apiKey) {
       return res.status(503).json({
@@ -1696,424 +1629,6 @@ router.post('/ocr', validateJSON, ocrLimiter, validateOCR, async (req: Request, 
   }
 })
 
-/**
- * POST /api/ai/ocr/document-ai
- * Google Document AI OCR with form field and table extraction
- * Rate limited: 30 requests per hour
- * Validated: documentBase64 required, max 20MB
- * Returns enhanced OCR results with form fields and tables
- */
-router.post(
-  '/ocr/document-ai',
-  validateJSON,
-  ocrLimiter,
-  validateDocumentAI,
-  async (req: Request, res: Response) => {
-    // Version marker for debugging deployments (v4 = Jan 28 2026, enableImagelessMode fix)
-    // Version marker: v5 = removed unsupported enableImagelessMode (standard OCR processor, 15-page limit)
-    log.info('OCR route invoked', { version: 'v5', processor: 'standard', pageLimit: 15 })
-    const IS_PRODUCTION = process.env.NODE_ENV === 'production'
-    const startTime = Date.now()
-
-    try {
-      // Check if Document AI is configured
-      log.debug('Checking configuration')
-      if (!isDocumentAIConfigured()) {
-        log.warn('Not configured, returning 503')
-        return res.status(503).json({
-          error: IS_PRODUCTION
-            ? 'Document processing service unavailable'
-            : 'Document AI not configured',
-          code: 'PROVIDER_NOT_CONFIGURED',
-        })
-      }
-
-      // Get access token
-      log.debug('Getting access token')
-      const accessToken = await getDocumentAIAccessToken()
-      if (!accessToken) {
-        log.error('Access token is null/empty, returning 503')
-        return res.status(503).json({
-          error: IS_PRODUCTION
-            ? 'Document processing service unavailable'
-            : 'Failed to get Document AI access token',
-          code: 'AUTH_FAILED',
-        })
-      }
-      log.debug('Access token received')
-
-      const { documentBase64, mimeType, languageHints, cacheKey } = req.body as DocumentAIInput
-
-      // Cache lookup BEFORE the live Document AI call (cost-control PR, May 3 2026).
-      // Document AI is deterministic on identical input. The challenge: pdf-lib's
-      // save() is non-deterministic across Node processes, so sha256(documentBase64)
-      // changes every run for the same source PDF (cross-process date/PID-based
-      // randomness inside pdf-lib). When the client supplies a stable `cacheKey`
-      // (e.g. `${sha256(sourceFileBytes)}:${chunkIdx}/${totalChunks}`), we hash that
-      // instead — which IS stable across runs and produces real cache hits.
-      // Cache failures never block the live OCR path (lookup returns null on error).
-      const cacheSha = cacheKey
-        ? crypto.createHash('sha256').update(cacheKey).digest('hex')
-        : hashOcrInput(documentBase64)
-      const cached = await lookupOcrCache(cacheSha)
-      if (cached) {
-        const cachedProcessingMs = Date.now() - startTime
-        log.info('OCR cache hit', {
-          sha256: cacheSha.slice(0, 16),
-          via: cacheKey ? 'cacheKey' : 'documentBase64',
-          textBytes: cached.text.length,
-          processingTimeMs: cachedProcessingMs,
-        })
-        return res.json({
-          success: true,
-          data: {
-            text: cached.text,
-            confidence: cached.confidence ?? 0.85,
-            pageCount: cached.pageCount ?? 1,
-            processingTimeMs: cachedProcessingMs,
-            cached: true,
-          },
-          cost: 0,
-        })
-      }
-
-      // Build Document AI endpoint
-      const endpoint = `https://${GCP_CONFIG.location}-documentai.googleapis.com/v1/projects/${GCP_CONFIG.projectId}/locations/${GCP_CONFIG.location}/processors/${GCP_CONFIG.processorId}:process`
-
-      // Resolve timeout from config (DB-overridable, defaults to 90 s).
-      // Replaces the hardcoded 60 000 ms ceiling that aborted Allianz at
-      // exactly 60.057 s in production. See migration 044 and findings F0.
-      const aiCfg = await getAIConfig()
-      const ocrFetchTimeoutMs = aiCfg.ocrFetchTimeoutMs
-
-      log.info('Calling Document AI API', {
-        location: GCP_CONFIG.location,
-        project: GCP_CONFIG.projectId,
-        processor: GCP_CONFIG.processorId,
-        setupMs: Date.now() - startTime,
-        ocrFetchTimeoutMs,
-      })
-
-      const requestBody = JSON.stringify({
-        rawDocument: {
-          content: documentBase64,
-          mimeType,
-        },
-        skipHumanReview: true,
-        // Note: enableImagelessMode is only available on Enterprise Document OCR processors
-        // Standard OCR processors have a 15-page limit
-        // For documents >15 pages, the fallback to pdf.js will be used
-        processOptions: {
-          ocrConfig: {
-            hints: {
-              languageHints: languageHints || ['tr', 'en'],
-            },
-          },
-        },
-      })
-
-      // Single attempt against Document AI. Aborts on the configured timeout.
-      // Throws AbortError when the timeout fires; any other rejection (network,
-      // GCP 5xx surfacing as fetch error) is rethrown unchanged.
-      const callDocumentAI = async (): Promise<globalThis.Response> => {
-        const controller = new AbortController()
-        const fetchTimeout = setTimeout(() => controller.abort(), ocrFetchTimeoutMs)
-        try {
-          return await fetch(endpoint, {
-            method: 'POST',
-            signal: controller.signal,
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-            },
-            body: requestBody,
-          })
-        } finally {
-          clearTimeout(fetchTimeout)
-        }
-      }
-
-      // ONE retry on AbortError (timeout). Document AI cold-starts can spike
-      // well past the steady-state latency, and the second attempt almost
-      // always succeeds because the processor is warm. We do NOT retry on
-      // genuine HTTP 4xx/5xx (those aren't cold-start), and we do NOT retry
-      // beyond once (would compound latency unacceptably for the user).
-      let response: globalThis.Response
-      try {
-        response = await callDocumentAI()
-      } catch (err) {
-        const isAbort =
-          err instanceof Error && (err.name === 'AbortError' || err.message?.includes('aborted'))
-        if (!isAbort) throw err
-        log.warn('[OCR] cold-start retry: document-ai', {
-          firstAttemptMs: Date.now() - startTime,
-          ocrFetchTimeoutMs,
-        })
-        response = await callDocumentAI()
-      }
-
-      if (!response.ok) {
-        const errorData = (await response
-          .json()
-          .catch(() => ({ error: { message: `HTTP ${response.status}` } }))) as DocumentAIResponse
-        // Enhanced error logging for debugging
-        log.error('API call failed', {
-          status: response.status,
-          statusText: response.statusText,
-          errorMessage: errorData.error?.message,
-          errorCode: errorData.error?.code,
-          errorStatus: errorData.error?.status,
-          processingTimeMs: Date.now() - startTime,
-        })
-        throw new Error(errorData.error?.message || `Document AI error: ${response.status}`)
-      }
-
-      const result = (await response.json()) as DocumentAIResponse
-
-      if (!result.document) {
-        throw new Error('Empty response from Document AI')
-      }
-
-      const processingTimeMs = Date.now() - startTime
-
-      // Extract form fields
-      const formFields: Array<{
-        name: string
-        value: string
-        confidence: number
-        boundingBox?: { x: number; y: number; width: number; height: number }
-      }> = []
-
-      for (const page of result.document.pages || []) {
-        for (const field of page.formFields || []) {
-          const name = field.fieldName?.textAnchor?.content?.trim() || ''
-          const value = field.fieldValue?.textAnchor?.content?.trim() || ''
-          const confidence =
-            (field.fieldName?.confidence || 0 + (field.fieldValue?.confidence || 0)) / 2
-
-          if (name || value) {
-            formFields.push({
-              name,
-              value,
-              confidence,
-              boundingBox: field.boundingPoly?.normalizedVertices
-                ? {
-                    x: field.boundingPoly.normalizedVertices[0]?.x || 0,
-                    y: field.boundingPoly.normalizedVertices[0]?.y || 0,
-                    width:
-                      (field.boundingPoly.normalizedVertices[2]?.x || 0) -
-                      (field.boundingPoly.normalizedVertices[0]?.x || 0),
-                    height:
-                      (field.boundingPoly.normalizedVertices[2]?.y || 0) -
-                      (field.boundingPoly.normalizedVertices[0]?.y || 0),
-                  }
-                : undefined,
-            })
-          }
-        }
-      }
-
-      // Extract tables
-      const tables: Array<{
-        rows: Array<{
-          cells: Array<{ text: string; rowSpan: number; colSpan: number; confidence: number }>
-        }>
-        headerRows: number
-        confidence: number
-      }> = []
-
-      for (const page of result.document.pages || []) {
-        for (const table of page.tables || []) {
-          const rows: Array<{
-            cells: Array<{ text: string; rowSpan: number; colSpan: number; confidence: number }>
-          }> = []
-
-          // Process header rows
-          const headerRowCount = table.headerRows?.length || 0
-          for (const row of table.headerRows || []) {
-            const cells = (row.cells || []).map((cell: any) => ({
-              text: cell.layout?.textAnchor?.content?.trim() || '',
-              rowSpan: cell.rowSpan || 1,
-              colSpan: cell.colSpan || 1,
-              confidence: cell.layout?.confidence || 0,
-            }))
-            rows.push({ cells })
-          }
-
-          // Process body rows
-          for (const row of table.bodyRows || []) {
-            const cells = (row.cells || []).map((cell: any) => ({
-              text: cell.layout?.textAnchor?.content?.trim() || '',
-              rowSpan: cell.rowSpan || 1,
-              colSpan: cell.colSpan || 1,
-              confidence: cell.layout?.confidence || 0,
-            }))
-            rows.push({ cells })
-          }
-
-          if (rows.length > 0) {
-            // Calculate average confidence
-            let totalConfidence = 0
-            let cellCount = 0
-            for (const row of rows) {
-              for (const cell of row.cells) {
-                totalConfidence += cell.confidence
-                cellCount++
-              }
-            }
-
-            tables.push({
-              rows,
-              headerRows: headerRowCount,
-              confidence: cellCount > 0 ? totalConfidence / cellCount : 0,
-            })
-          }
-        }
-      }
-
-      // Calculate overall confidence
-      let totalConfidence = 0
-      let blockCount = 0
-      for (const page of result.document.pages || []) {
-        for (const block of page.blocks || []) {
-          if (block.confidence !== undefined) {
-            totalConfidence += block.confidence
-            blockCount++
-          }
-        }
-      }
-      const avgConfidence = blockCount > 0 ? totalConfidence / blockCount : 0.8
-
-      // Track cost usage (Document AI charges per page)
-      // General OCR processor: ~$0.0015 per page
-      const pageCount = result.document.pages?.length || 1
-      const docaiCost = pageCount * 0.0015
-
-      // Record usage asynchronously
-      recordUsage({
-        provider: 'google',
-        model: 'document-ai-v1',
-        operation: 'ocr-document-ai',
-        inputTokens: 0,
-        outputTokens: 0,
-        totalTokens: 0,
-        inputCost: 0,
-        outputCost: 0,
-        totalCost: docaiCost,
-        timestamp: new Date().toISOString(),
-      }).catch((err) => {
-        if (!IS_PRODUCTION)
-          log.debug('Cost tracking failed', {
-            error: err instanceof Error ? err.message : String(err),
-          })
-      })
-
-      log.info('Document AI OCR complete', {
-        pageCount,
-        formFields: formFields.length,
-        tables: tables.length,
-        processingTimeMs,
-      })
-
-      // Cache write — fire-and-forget. Failure to store does not invalidate
-      // the live OCR result we already have to return to the caller.
-      void storeOcrCache(
-        cacheSha,
-        result.document.text || '',
-        pageCount,
-        avgConfidence,
-        mimeType,
-        languageHints
-      )
-
-      res.json({
-        success: true,
-        data: {
-          text: result.document.text || '',
-          confidence: avgConfidence,
-          pageCount,
-          formFields: formFields.length > 0 ? formFields : undefined,
-          tables: tables.length > 0 ? tables : undefined,
-          processingTimeMs,
-        },
-        cost: docaiCost,
-      })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error'
-      const errorDetails = {
-        timestamp: new Date().toISOString(),
-        provider: 'google-document-ai',
-        errorType: error instanceof Error ? error.constructor.name : 'Unknown',
-        message,
-        processingTimeMs: Date.now() - startTime,
-      }
-
-      // ALWAYS log Document AI errors (needed to debug production issues)
-      log.error('Processing failed', errorDetails)
-
-      let code = 'DOCUMENT_AI_FAILED'
-      let userMessage = IS_PRODUCTION
-        ? 'Unable to process document'
-        : 'Document AI processing failed'
-
-      if (error instanceof Error && error.name === 'AbortError') {
-        code = 'TIMEOUT'
-        userMessage = IS_PRODUCTION
-          ? 'Request timed out, please try again'
-          : 'Document AI timed out after 60s - try a smaller document'
-      } else if (message.includes('PERMISSION_DENIED')) {
-        code = 'PERMISSION_DENIED'
-        userMessage = IS_PRODUCTION
-          ? 'Document processing service unavailable'
-          : 'Document AI permission denied - check service account permissions'
-      } else if (message.includes('NOT_FOUND')) {
-        code = 'PROCESSOR_NOT_FOUND'
-        userMessage = IS_PRODUCTION
-          ? 'Document processing service unavailable'
-          : 'Document AI processor not found - check processor ID'
-      } else if (message.includes('RESOURCE_EXHAUSTED') || message.includes('429')) {
-        code = 'RATE_LIMIT_EXCEEDED'
-        userMessage = IS_PRODUCTION
-          ? 'Service busy, please try again later'
-          : 'Document AI rate limit exceeded'
-      } else if (message.includes('exceed the limit') || message.includes('exceed limit')) {
-        // Standard OCR processor has a 15-page limit per request.
-        // Documents >15 pages should be split client-side via pdf-splitter.ts.
-        code = 'PAGE_LIMIT_EXCEEDED'
-        log.error('Page limit exceeded - document should have been split before sending', {
-          errorMessage: message,
-        })
-        userMessage = IS_PRODUCTION
-          ? 'Document exceeds page limit. Please upload a document with 15 or fewer pages per chunk.'
-          : `Document AI page limit exceeded: ${message}. Documents >15 pages must be split via pdf-splitter.ts.`
-      } else if (message.includes('INVALID_ARGUMENT')) {
-        code = 'INVALID_DOCUMENT'
-        userMessage = IS_PRODUCTION
-          ? 'Unable to process this document format'
-          : 'Invalid document format for Document AI'
-      }
-
-      // Fire alert for non-transient Document AI errors
-      if (code === 'PERMISSION_DENIED' || code === 'PROCESSOR_NOT_FOUND') {
-        dispatchAlert({
-          severity: 'error',
-          category: 'api_error',
-          title: 'Document AI Failed — ' + code,
-          message: `Document AI OCR rejected with ${code}: ${message.slice(0, 300)}`,
-          provider: 'google_document_ai',
-          dedupKey: 'ocr:document-ai:' + code,
-        }).catch(() => {})
-      }
-
-      res.status(500).json({
-        error: userMessage,
-        code,
-        ...(!IS_PRODUCTION && { details: message }),
-        timestamp: errorDetails.timestamp,
-      })
-    }
-  }
-)
 // ============================================================================
 // GEMINI MULTIMODAL OCR
 // ============================================================================

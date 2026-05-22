@@ -52,13 +52,6 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     outputPer1K: 0.075, // $75 per 1M output tokens
     contextLimit: 200000,
   },
-
-  // Google Document AI (per page)
-  'google-document-ai': {
-    inputPer1K: 1.5, // $1.50 per 1000 pages
-    outputPer1K: 0,
-    contextLimit: 0,
-  },
 }
 
 // =============================================================================

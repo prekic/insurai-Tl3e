@@ -975,8 +975,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
 export function initializeDefaultAlertRules(): void {
   // High response time alert
   // Raised from 5000ms after observing real extraction workloads land at
-  // 18-30s end-to-end (Document AI OCR + Anthropic). The old threshold fired
-  // on every successful extraction.
+  // 18-30s end-to-end. The old threshold fired on every successful extraction.
   if (!Array.from(alertRules.values()).find((r) => r.metric === 'response_time')) {
     createAlertRule({
       name: 'High Response Time',

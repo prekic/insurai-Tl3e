@@ -494,7 +494,6 @@ import('../server/routes/ai/extraction.js')
       getDeepSeekClient: extraction.getDeepSeekClient,
       getGeminiClient: extraction.getGeminiClient,
       getGCPCredentialsPath: extraction.getGCPCredentialsPath,
-      getDocumentAIAccessToken: extraction.getDocumentAIAccessToken,
     })
 
     // Wire the diagnostics endpoint's status update function

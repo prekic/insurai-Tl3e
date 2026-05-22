@@ -1,13 +1,9 @@
 /**
  * OCR module for scanned PDF documents
  *
- * Supports two OCR backends:
- * 1. Google Document AI (primary) - Form field extraction, table detection, high accuracy
- * 2. Google Cloud Vision API (fallback) - Simpler text extraction
+ * Uses Vision API via proxy for OCR text extraction.
  *
  * Features:
- * - Automatic backend selection based on configuration
- * - Form field and table extraction from Document AI
  * - Caching for cost reduction on repeated documents
  * - Turkish language optimization
  */
@@ -24,11 +20,11 @@ export interface OCRResult {
   confidence: number
   pageCount: number
   isScanned: boolean
-  // Document AI enhanced fields
+  // Enhanced fields from OCR processing
   formFields?: FormField[]
   tables?: Table[]
   // Processing metadata
-  backend?: 'document-ai' | 'vision-api'
+  backend?: 'vision-api'
   processingTimeMs?: number
 }
 
@@ -64,26 +60,14 @@ export interface BoundingBox {
 }
 
 export interface OCRError {
-  code: 'NO_OCR_CONFIG' | 'OCR_FAILED' | 'INVALID_DOCUMENT' | 'DOCUMENT_AI_ERROR' | 'VISION_API_ERROR'
+  code: 'NO_OCR_CONFIG' | 'OCR_FAILED' | 'INVALID_DOCUMENT' | 'VISION_API_ERROR'
   message: string
-  backend?: 'document-ai' | 'vision-api'
+  backend?: 'vision-api'
 }
-
-// Note: Document AI response types are defined on the server side
-// The frontend receives processed results via the /api/ai/ocr/document-ai endpoint
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
-
-/**
- * Check if Document AI is configured
- * Requires GCP project, location, and processor ID
- */
-export function isDocumentAIConfigured(): boolean {
-  // Document AI requires server-side processing via proxy
-  return isProxyConfigured()
-}
 
 /**
  * Check if a PDF appears to be scanned (image-based)
@@ -99,100 +83,7 @@ export function isLikelyScannedPDF(extractedText: string, pageCount: number): bo
 }
 
 // ============================================================================
-// DOCUMENT AI PROCESSING
-// ============================================================================
-
-/**
- * Perform OCR using Google Document AI via server proxy
- * Returns enhanced results with form fields and tables
- */
-async function performDocumentAIOCR(
-  file: File
-): Promise<{ success: true; data: OCRResult } | { success: false; error: OCRError }> {
-  const proxyUrl = getProxyUrl()
-  if (!proxyUrl) {
-    return {
-      success: false,
-      error: {
-        code: 'NO_OCR_CONFIG',
-        message: 'API proxy not configured for Document AI',
-        backend: 'document-ai',
-      },
-    }
-  }
-
-  const startTime = Date.now()
-
-  try {
-    // Convert file to base64
-    const arrayBuffer = await file.arrayBuffer()
-    const base64Content = btoa(
-      new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-    )
-
-    // Determine MIME type
-    let mimeType = 'application/pdf'
-    if (file.type) {
-      mimeType = file.type
-    } else if (file.name.endsWith('.png')) {
-      mimeType = 'image/png'
-    } else if (file.name.endsWith('.jpg') || file.name.endsWith('.jpeg')) {
-      mimeType = 'image/jpeg'
-    }
-
-    // Call Document AI via server proxy
-    const response = await fetch(`${proxyUrl}/api/ai/ocr/document-ai`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        documentBase64: base64Content,
-        mimeType,
-        languageHints: ['tr', 'en'],
-      }),
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-      throw new Error(errorData.error || `API error: ${response.status}`)
-    }
-
-    const result = await response.json()
-
-    if (!result.success) {
-      throw new Error(result.error || 'Document AI processing failed')
-    }
-
-    const processingTimeMs = Date.now() - startTime
-
-    return {
-      success: true,
-      data: {
-        text: result.data.text || '',
-        confidence: result.data.confidence || 0,
-        pageCount: result.data.pageCount || 1,
-        isScanned: true,
-        formFields: result.data.formFields,
-        tables: result.data.tables,
-        backend: 'document-ai',
-        processingTimeMs,
-      },
-    }
-  } catch (error) {
-    return {
-      success: false,
-      error: {
-        code: 'DOCUMENT_AI_ERROR',
-        message: error instanceof Error ? error.message : 'Document AI processing failed',
-        backend: 'document-ai',
-      },
-    }
-  }
-}
-
-// ============================================================================
-// VISION API PROCESSING (FALLBACK)
+// VISION API PROCESSING
 // ============================================================================
 
 /**
@@ -325,7 +216,7 @@ async function performVisionAPIOCR(
 
 export interface OCROptions {
   /** Force a specific backend */
-  backend?: 'document-ai' | 'vision-api' | 'auto'
+  backend?: 'vision-api' | 'auto'
   /** Skip cache lookup */
   skipCache?: boolean
 }
@@ -367,22 +258,8 @@ export async function performOCR(
     }
   }
 
-  let result: { success: true; data: OCRResult } | { success: false; error: OCRError }
-
-  // Select backend
-  if (backend === 'document-ai' || (backend === 'auto' && isDocumentAIConfigured())) {
-    // Try Document AI first
-    result = await performDocumentAIOCR(file)
-
-    // Fall back to Vision API if Document AI fails
-    if (!result.success && backend === 'auto') {
-      console.warn('[OCR] Document AI failed, falling back to Vision API:', result.error.message)
-      result = await performVisionAPIOCR(file)
-    }
-  } else {
-    // Use Vision API
-    result = await performVisionAPIOCR(file)
-  }
+  // Use Vision API
+  const result = await performVisionAPIOCR(file)
 
   // Cache successful results
   if (result.success && !skipCache) {
@@ -395,20 +272,11 @@ export async function performOCR(
 /**
  * Process multiple pages of a PDF for OCR
  * For multi-page PDFs, we need to process each page separately with Vision API
- * Document AI handles multi-page PDFs natively
  */
 export async function performMultiPageOCR(
   pages: Blob[],
   options: OCROptions = {}
 ): Promise<{ success: true; data: OCRResult } | { success: false; error: OCRError }> {
-  const { backend = 'auto' } = options
-
-  // Document AI handles multi-page PDFs natively, so convert pages to single file
-  if (backend === 'document-ai' || (backend === 'auto' && isDocumentAIConfigured())) {
-    // For Document AI, we'd need to combine pages - for now, process sequentially
-    // This is a limitation; ideally the original PDF would be sent
-    console.warn('[OCR] Multi-page OCR with Document AI - processing pages sequentially')
-  }
 
   const proxyUrl = getProxyUrl()
 

@@ -131,13 +131,6 @@ export class ConfigurationManager {
       settings.ocr_providers.available.google_vision.confidence_threshold =
         dbConfig.googleVisionConfidence
     }
-    if (
-      dbConfig.documentAiConfidence !== undefined &&
-      settings.ocr_providers.available.google_document_ai
-    ) {
-      settings.ocr_providers.available.google_document_ai.confidence_threshold =
-        dbConfig.documentAiConfidence
-    }
     if (dbConfig.tesseractConfidence !== undefined && settings.ocr_providers.available.tesseract) {
       settings.ocr_providers.available.tesseract.confidence_threshold = dbConfig.tesseractConfidence
     }
