@@ -37,6 +37,7 @@ import { sendExtractionCompleteNotification } from '../../services/notification-
 import { validateExtractionFields } from '../../lib/self-healing.js'
 import { recordExtractionEvent, recordOverviewMetrics } from './shared.js'
 import { runStage2Validation } from '../../../src/lib/policy-pipeline/stage2-validate/orchestrator.js'
+import { runParallelExtraction } from '../../lib/parallel-extraction.js'
 
 const log = logger.child('AI')
 
@@ -811,669 +812,180 @@ router.post(
       phaseTiming,
     })
 
-    // ── DeepSeek Extraction (only working provider) ─────────────────
-    const dsClient = getDeepSeekClient()
-    if (!dsClient) {
-      log.error('No DeepSeek client available', { requestId })
+    // ── Parallel dual extraction (DeepSeek + OpenAI) ────────────
+    // Both providers run simultaneously via Promise.all, then results are merged:
+    // - Coverage union by canonical name (prefer numeric limit)
+    // - Entity fields: fill nulls from the other
+    // - Limit mismatches >20% are re-checked via a targeted model query
+    const parallelStart = Date.now()
+    const parallelResult = await runParallelExtraction(
+      { documentText, model, policyType },
+      {
+        deepseekClient: getDeepSeekClient(),
+        openaiClient: getOpenAIClient(),
+        systemPrompt: openaiSystemPrompt,
+        maxTokens: aiConfig.maxTokens,
+        temperature: aiConfig.temperature,
+      }
+    )
+    markPhase('parallel_extraction_ms', parallelStart)
+
+    log.info('Parallel extraction result', {
+      requestId,
+      success: parallelResult.success,
+      dsOk: parallelResult.providers[0]?.success,
+      oaOk: parallelResult.providers[1]?.success,
+      dsCoverages: parallelResult.providers[0]?.data?.coverages?.length ?? 0,
+      oaCoverages: parallelResult.providers[1]?.data?.coverages?.length ?? 0,
+      mergedCoverages: parallelResult.data.coverages.length,
+      mergeLog: parallelResult.mergeLog.slice(0, 10),
+    })
+
+    if (!parallelResult.success) {
       return res.status(503).json({
-        error: 'Extraction unavailable — no AI provider configured',
-        code: 'NO_PROVIDER_AVAILABLE',
+        error: 'All AI providers failed',
+        code: 'ALL_PROVIDERS_FAILED',
         requestId,
         elapsedMs: Date.now() - startTime,
+        mergeLog: parallelResult.mergeLog,
       })
     }
 
-    const dsStart = Date.now()
+    const rawParsed = parallelResult.data as unknown as Record<string, unknown>
+
+    // ── Inject policyType if missing ──
+    if (!rawParsed.policyType && !rawParsed.policy_type) {
+      rawParsed.policyType = classification.type
+    }
+
+    // ── Stage2 validation ──
+    let stage2Data: unknown
     try {
-      // Sanitize: replace 'Birleşik Kasko' with ASCII equivalent in BOTH system prompt
-      // and document text. DeepSeek's tokenizer treats Turkish characters
-      // (ş, ü) differently — the string 'Birleşik Kasko' with Turkish chars causes
-      // token-level context interference → 0 coverages for ALL providers tested.
-      //
-      // Step 1: Normalize Turkish characters to ASCII in both prompt and document.
-      const turkishToAscii = (s: string) =>
-        s.replace(/ş/gi, 's').replace(/Ş/gi, 'S').replace(/ü/gi, 'u').replace(/Ü/gi, 'U')
-      const dsSystemPromptSanitized = turkishToAscii(openaiSystemPrompt)
-      const dsDocTextSanitized = turkishToAscii(finalUserPrompt)
-
-      // Step 2: Replace the combined phrase just in case normalization misses edge cases
-      const sanitizedSystemPrompt = dsSystemPromptSanitized.replace(
-        /Birlesik Kasko/gi,
-        'Combined Kasko'
-      )
-      const sanitizedDocument = dsDocTextSanitized.replace(/Birlesik Kasko/gi, 'Combined Kasko')
-
-      // Append JSON instruction to system prompt, plus anti-training-data guard
-      const dsSystemPrompt =
-        sanitizedSystemPrompt.includes('json') || sanitizedSystemPrompt.includes('JSON')
-          ? sanitizedSystemPrompt
-          : sanitizedSystemPrompt + '\n\nRespond with valid JSON only.'
-
-      const dsSystemPromptFinal =
-        dsSystemPrompt +
-        '\n\nNEVER use training data defaults. Every value comes from the document text in the user message.'
-
-      // DeepSeek json_object mode: type-hint template to enforce flat output format.
-      // 'null' placeholders cause DeepSeek to output null — use type hints instead ("string", "number").
-      // Turkish coverage field labels help DeepSeek map Turkish document text correctly.
-      const dsOutputSchema =
-        '\n\nOutput flat JSON ONLY — use EXACTLY this flat structure with values from document. NO nested objects.\n' +
-        '{\n' +
-        '  "policyNumber": "string or null",\n' +
-        '  "insurer": "string or null",\n' +
-        '  "insuredName": "string or null",\n' +
-        '  "startDate": "YYYY-MM-DD or null",\n' +
-        '  "endDate": "YYYY-MM-DD or null",\n' +
-        '  "premium": 0 as number or null,\n' +
-        '  "vehicleMake": "string or null",\n' +
-        '  "vehicleModel": "string or null",\n' +
-        '  "vehicleYear": "string or null",\n' +
-        '  "vehiclePlate": "string or null",\n' +
-        '  "NCD": "number or null",\n' +
-        '  "policyType": "string or null",\n' +
-        '  "coverages": [\n' +
-        '    { "name": "Teminat adı", "limit": sayi, "currency": "TRY" },\n' +
-        '    { "name": "Teminat adı", "limit": sayi, "currency": "TRY" }\n' +
-        '  ],\n' +
-        '  "exclusions": [\n' +
-        '    { "type": "exclusion or sublimit", "text": "açıklama" }\n' +
-        '  ]\n' +
-        '}\n' +
-        'CRITICAL: Read ALL values from the document above. Do NOT use training defaults. Extract every coverage listed in the document. Add all coverages found.'
-
-      const response = await dsClient.chat.completions.create(
-        {
-          model: model || 'deepseek-v4-pro',
-          messages: [
-            { role: 'system', content: dsSystemPromptFinal },
-            { role: 'user', content: sanitizedDocument + dsOutputSchema },
-          ],
-          response_format: { type: 'json_object' },
-          max_tokens: aiConfig.maxTokens,
-          temperature: aiConfig.temperature,
-        },
-        { signal: AbortSignal.timeout(aiConfig.requestBudgetMs || 120_000) }
-      )
-
-      const content = response.choices[0]?.message?.content
-      if (!content) {
-        throw new Error('Empty response from DeepSeek')
-      }
-
-      markPhase('deepseek_ms', dsStart)
-
-      // Parse JSON
-      let rawParsed: Record<string, unknown>
-      try {
-        rawParsed = JSON.parse(content) as Record<string, unknown>
-      } catch {
-        log.error('DeepSeek returned invalid JSON', {
-          requestId,
-          contentPreview: content.slice(0, 200),
-        })
-        throw new Error('AI returned invalid JSON — response could not be parsed')
-      }
-
-      // ── Normalize DeepSeek output format ───────────────────────────
-      // DeepSeek's json_object mode can use a COMPLETELY DIFFERENT schema
-      // (insurerName, policyholderName, grossPremium, vehicles[], errors[], etc.)
-      // instead of our flat expected schema. Handle three cases:
-      //   1) Nested objects (policy: {...}, parties: {...}, premiums: {...})
-      //   2) Alternative top-level field names (insurerName → insurer, etc.)
-      //   3) Extra arrays (errors[], taxes[], installments[]) to clean up
-
-      // ── Case 1: Flatten nested object patterns ──────────────────────
-      if (rawParsed.policy && typeof rawParsed.policy === 'object' && !rawParsed.policyNumber) {
-        const p = rawParsed.policy as Record<string, unknown>
-        if (p.policyNumber) rawParsed.policyNumber = p.policyNumber
-        if (p.startDate) rawParsed.startDate = p.startDate
-        if (p.endDate) rawParsed.endDate = p.endDate
-      }
-      if (rawParsed.parties && typeof rawParsed.parties === 'object') {
-        const pa = rawParsed.parties as Record<string, unknown>
-        const insured = pa.insured as Record<string, unknown> | undefined
-        if (insured?.name && !rawParsed.insuredName) rawParsed.insuredName = insured.name
-        if (insured?.idNumber && !rawParsed.insuredId) rawParsed.insuredId = insured.idNumber
-        // Also check policyholder (alternative DeepSeek naming)
-        const polholder = pa.policyholder as Record<string, unknown> | undefined
-        if (polholder?.name && !rawParsed.insuredName) rawParsed.insuredName = polholder.name
-      }
-      if (
-        typeof rawParsed.insurer === 'object' &&
-        rawParsed.insurer !== null &&
-        !Array.isArray(rawParsed.insurer)
-      ) {
-        const ins = rawParsed.insurer as Record<string, unknown>
-        if (ins.name) rawParsed.insurer = ins.name
-      }
-      if (rawParsed.premiums && typeof rawParsed.premiums === 'object') {
-        const pr = rawParsed.premiums as Record<string, unknown>
-        if (pr.totalPayable && !rawParsed.premium) rawParsed.premium = pr.totalPayable
-        if (pr.grossPremium && !rawParsed.premium) rawParsed.premium = pr.grossPremium
-        if (pr.currency && !rawParsed.currency) rawParsed.currency = pr.currency
-      }
-      if (
-        rawParsed.vehicles &&
-        Array.isArray(rawParsed.vehicles) &&
-        rawParsed.vehicles.length > 0
-      ) {
-        const v = rawParsed.vehicles[0] as Record<string, unknown>
-        if (v.plate && !rawParsed.vehiclePlate) rawParsed.vehiclePlate = v.plate
-        if (v.make && !rawParsed.vehicleMake) rawParsed.vehicleMake = v.make
-        if (v.model && !rawParsed.vehicleModel) rawParsed.vehicleModel = v.model
-        if (v.year && !rawParsed.vehicleYear) rawParsed.vehicleYear = v.year
-        if (v.vin && !rawParsed.vin) rawParsed.vin = v.vin
-      }
-
-      // ── Case 2: Map alternative field names DeepSeek uses ──────────
-      // DeepSeek sometimes uses a completely different schema at the top level
-      // (insurerName, grossPremium, policyholderName, etc.) instead of ours.
-      const altFieldMap: Record<string, string> = {
-        insurerName: 'insurer',
-        policyholderName: 'insuredName',
-        policyholderIdNumber: 'insuredId',
-        policyholderAddress: 'insuredAddress',
-        policyholderTaxNumber: 'insuredTaxNumber',
-        grossPremium: 'premium',
-        netPremium: 'premiumNet',
-        totalPayable: 'premium',
-        premiumsCurrency: 'currency',
-        issueDateTime: 'startDate',
-        durationDays: 'durationDays',
-      }
-      for (const [altKey, targetKey] of Object.entries(altFieldMap)) {
-        const val = rawParsed[altKey]
-        if (val !== undefined && val !== null) {
-          // Only set target if it's not already populated
-          if (rawParsed[targetKey] === undefined || rawParsed[targetKey] === null) {
-            rawParsed[targetKey] = val
-          }
-          delete rawParsed[altKey]
-        }
-      }
-
-      // ── Case 3: Clean up DeepSeek extra arrays that confuse stage2 ──
-      for (const extraKey of ['clauses', 'taxes', 'installments', 'errors', 'endorsements']) {
-        delete rawParsed[extraKey]
-      }
-
-      // ── Case 4: Normalize coverage limit format ───────────────────
-      // DeepSeek sometimes outputs limit as {"amount": 500000, "currency": "TRY"}
-      // instead of a simple number. Normalize to plain number for stage2.
-      const coverageList = rawParsed.coverages as Array<Record<string, unknown>> | undefined
-      if (coverageList) {
-        for (const c of coverageList) {
-          const lim = c.limit
-          if (lim !== null && typeof lim === 'object' && !Array.isArray(lim)) {
-            // Extract amount from {amount: number, currency: string}
-            const limObj = lim as Record<string, unknown>
-            c.limit = (typeof limObj.amount === 'number' ? limObj.amount : null) as number | null
-          }
-        }
-      }
-
-      // ── Inject policyType if DeepSeek dropped it ──────────────────
-      if (!rawParsed.policyType && !rawParsed.policy_type) {
-        rawParsed.policyType = classification.type
-      }
-
-      // Track cost
-      const usedModel = 'deepseek-v4-pro'
-      const inputTokens = response.usage?.prompt_tokens || 0
-      const outputTokens = response.usage?.completion_tokens || 0
-      const cost = calculateCost(usedModel, inputTokens, outputTokens)
-
-      recordUsage({
-        provider: 'deepseek',
-        model: usedModel,
-        operation: 'extraction',
-        inputTokens,
-        outputTokens,
-        totalTokens: inputTokens + outputTokens,
-        inputCost: cost.inputCost,
-        outputCost: cost.outputCost,
-        totalCost: cost.totalCost,
-        timestamp: new Date().toISOString(),
-      }).catch((err) =>
-        log.warn('Failed to record DeepSeek usage', {
-          requestId,
-          error: err instanceof Error ? err.message : String(err),
-        })
-      )
-
-      // ── Stage2 validation ──
-      let stage2Data: unknown
-      try {
-        stage2Data = runStage2Validation(rawParsed)
-      } catch (stage2Err: any) {
-        log.error('Stage2 validation failed', {
-          requestId,
-          error: stage2Err.message?.substring(0, 200),
-        })
-        stage2Data = rawParsed // Fall back to raw LLM output
-        degradedReason = 'stage2_validation_failed'
-      }
-
-      log.info('Provider succeeded', {
+      stage2Data = runStage2Validation(rawParsed)
+    } catch (stage2Err: any) {
+      log.error('Stage2 validation failed', {
         requestId,
-        provider: 'deepseek',
-        coverageCount: ((stage2Data || rawParsed) as any)?.coverages?.length ?? 0,
-        validationPassed: true,
-        durationMs: Date.now() - dsStart,
+        error: stage2Err.message?.substring(0, 200),
       })
+      stage2Data = rawParsed
+      degradedReason = 'stage2_validation_failed'
+    }
 
-      // Record extraction metric
-      recordExtractionEvent({
-        requestId,
-        timestamp: new Date().toISOString(),
-        provider: 'deepseek',
-        success: true,
-        durationMs: Date.now() - startTime,
-        documentLength: documentText?.length ?? 0,
-      })
-      recordOverviewMetrics({
-        requestId,
-        provider: 'deepseek',
-        model: usedModel,
-        operation: 'extraction',
-        success: true,
-        durationMs: Date.now() - startTime,
-        inputTokens,
-        outputTokens,
-        cost: cost.totalCost,
-        documentLength: documentText?.length ?? 0,
-        userId: req.headers['x-user-id'] as string | undefined,
-      })
+    // Log merge info
+    for (const msg of parallelResult.mergeLog) {
+      log.debug('Merge: ' + msg, { requestId })
+    }
 
-      // Fire push notification if user is authenticated
-      const notifyUserId = req.headers['x-user-id'] as string | undefined
-      if (notifyUserId) {
-        sendExtractionCompleteNotification(
-          notifyUserId,
-          String(rawParsed.policyType || classification.type),
-          (rawParsed.policyNumber as string | null | undefined) ?? null
-        ).catch((err) =>
-          log.warn('Push notification failed after extraction', {
+    log.info('Provider succeeded (parallel)', {
+      requestId,
+      provider: 'deepseek+openai',
+      coverageCount: ((stage2Data || rawParsed) as any)?.coverages?.length ?? 0,
+      durationMs: Date.now() - parallelStart,
+    })
+
+    // Record usage for both providers
+    for (const p of parallelResult.providers) {
+      if (p.success) {
+        const usedModel = p.provider === 'deepseek' ? 'deepseek-v4-pro' : 'gpt-5.4-mini'
+        const cost = calculateCost(usedModel, p.inputTokens, p.outputTokens)
+        recordUsage({
+          provider: p.provider,
+          model: usedModel,
+          operation: 'extraction',
+          inputTokens: p.inputTokens,
+          outputTokens: p.outputTokens,
+          totalTokens: p.inputTokens + p.outputTokens,
+          inputCost: cost.inputCost,
+          outputCost: cost.outputCost,
+          totalCost: cost.totalCost,
+          timestamp: new Date().toISOString(),
+        }).catch((err) =>
+          log.warn('Failed to record ' + p.provider + ' usage', {
             requestId,
             error: err instanceof Error ? err.message : String(err),
           })
         )
-      }
-
-      // ── Type consistency check ──
-      const consistency = checkTypeConsistency(
-        classification,
-        rawParsed.policyType as string | null | undefined
-      )
-      if (!consistency.consistent) {
-        log.warn('Type mismatch in response: ' + consistency.mismatchDescription, { requestId })
-        degradedReason = degradedReason
-          ? degradedReason + '; Type mismatch: ' + consistency.mismatchDescription
-          : 'Type mismatch: ' + consistency.mismatchDescription
-        dispatchAlert({
-          severity: 'warning',
-          category: 'api_error',
-          title: 'Policy Type Mismatch (DeepSeek)',
-          message: consistency.mismatchDescription || 'Unknown mismatch',
-          provider: 'deepseek',
-          dedupKey:
-            'type_mismatch:' + classification.type + '->' + String(rawParsed.policyType || '?'),
-        }).catch(() => {})
-      }
-
-      log.info('Extraction completed', {
-        requestId,
-        finalProvider: 'deepseek',
-        promptVersion,
-        degradedReason,
-        totalDurationMs: Date.now() - startTime,
-        success: true,
-      })
-
-      return res.json({
-        success: true,
-        data: stage2Data,
-        usage: { input_tokens: inputTokens, output_tokens: outputTokens },
-        model: usedModel,
-        provider: 'deepseek',
-        cost: cost.totalCost,
-        requestId,
-        route: '/api/ai/extract',
-        elapsedMs: Date.now() - startTime,
-        phaseTiming,
-        degradedReason,
-        promptVersion,
-      })
-    } catch (dsError) {
-      let lastError: unknown = dsError
-      let lastProvider: 'deepseek' | 'openai' | 'gemini' | 'anthropic' = 'deepseek'
-      markPhase('deepseek_ms', dsStart)
-      log.warn('DeepSeek extraction failed, attempting fallbacks', {
-        requestId,
-        error: dsError instanceof Error ? dsError.message : String(dsError),
-        durationMs: Date.now() - dsStart,
-      })
-
-      // ── Helper to attempt a provider's extraction ──
-      async function tryProvider(
-        providerName: 'deepseek' | 'openai' | 'gemini' | 'anthropic',
-        providerModel: string,
-        caller: () => Promise<{
-          content: string
-          usage: { inputTokens: number; outputTokens: number; cost: number; model: string }
-        }>
-      ): Promise<boolean> {
-        const pStart = Date.now()
-        try {
-          const result = await caller()
-          const { content, usage: u } = result
-          if (!content || content.trim().length === 0) {
-            log.warn(providerName + ' returned empty content, falling through', { requestId })
-            return false
-          }
-
-          let rawParsed: Record<string, unknown>
-          try {
-            rawParsed = JSON.parse(content) as Record<string, unknown>
-          } catch {
-            log.error(providerName + ' returned invalid JSON', {
-              requestId,
-              contentPreview: content.slice(0, 200),
-            })
-            return false
-          }
-
-          // Inject policyType if missing
-          if (!rawParsed.policyType && !rawParsed.policy_type) {
-            rawParsed.policyType = classification.type
-          }
-
-          const usedModel = u.model || providerModel
-          const inputTokens = u.inputTokens
-          const outputTokens = u.outputTokens
-          const cost = calculateCost(usedModel, inputTokens, outputTokens)
-
-          // Record usage
-          recordUsage({
-            provider: providerName,
-            model: usedModel,
-            operation: 'extraction',
-            inputTokens,
-            outputTokens,
-            totalTokens: inputTokens + outputTokens,
-            inputCost: cost.inputCost,
-            outputCost: cost.outputCost,
-            totalCost: cost.totalCost,
-            timestamp: new Date().toISOString(),
-          }).catch(() => {})
-
-          // Stage2 validation
-          let stage2Data: unknown
-          try {
-            stage2Data = runStage2Validation(rawParsed)
-          } catch (stage2Err: any) {
-            log.error('Stage2 validation failed on ' + providerName + ' result', {
-              requestId,
-              error: stage2Err.message?.substring(0, 200),
-            })
-            stage2Data = rawParsed
-            degradedReason = 'stage2_validation_failed'
-          }
-
-          log.info('Provider succeeded', {
-            requestId,
-            provider: providerName,
-            coverageCount: ((stage2Data || rawParsed) as any)?.coverages?.length ?? 0,
-            durationMs: Date.now() - pStart,
-          })
-
-          recordExtractionEvent({
-            requestId,
-            timestamp: new Date().toISOString(),
-            provider: providerName,
-            success: true,
-            durationMs: Date.now() - startTime,
-            documentLength: documentText?.length ?? 0,
-          })
-          recordOverviewMetrics({
-            requestId,
-            provider: providerName,
-            model: usedModel,
-            operation: 'extraction',
-            success: true,
-            durationMs: Date.now() - startTime,
-            inputTokens,
-            outputTokens,
-            cost: cost.totalCost,
-            documentLength: documentText?.length ?? 0,
-            userId: req.headers['x-user-id'] as string | undefined,
-          })
-
-          // Push notification
-          const notifyUserId2 = req.headers['x-user-id'] as string | undefined
-          if (notifyUserId2) {
-            sendExtractionCompleteNotification(
-              notifyUserId2,
-              String(rawParsed.policyType || classification.type),
-              (rawParsed.policyNumber as string | null | undefined) ?? null
-            ).catch(() => {})
-          }
-
-          // Type consistency
-          const consistency = checkTypeConsistency(
-            classification,
-            rawParsed.policyType as string | null | undefined
-          )
-          if (!consistency.consistent) {
-            log.warn(
-              'Type mismatch in ' + providerName + ' response: ' + consistency.mismatchDescription,
-              {
-                requestId,
-              }
-            )
-            degradedReason = degradedReason
-              ? degradedReason + '; Type mismatch: ' + consistency.mismatchDescription
-              : 'Type mismatch: ' + consistency.mismatchDescription
-          }
-
-          log.info('Extraction completed (fallback)', {
-            requestId,
-            finalProvider: providerName,
-            promptVersion,
-            degradedReason,
-            totalDurationMs: Date.now() - startTime,
-            success: true,
-          })
-
-          res.json({
-            success: true,
-            data: stage2Data,
-            usage: { input_tokens: inputTokens, output_tokens: outputTokens },
-            model: usedModel,
-            provider: providerName,
-            cost: cost.totalCost,
-            requestId,
-            route: '/api/ai/extract',
-            elapsedMs: Date.now() - startTime,
-            phaseTiming,
-            degradedReason,
-            promptVersion,
-          })
-          return true
-        } catch (err) {
-          lastError = err
-          lastProvider = providerName
-          log.warn(providerName + ' extraction failed in fallback', {
-            requestId,
-            error: err instanceof Error ? err.message : String(err),
-            durationMs: Date.now() - pStart,
-          })
-          return false
-        }
-      }
-
-      // ── FALLBACK 1: OpenAI (gpt-5.4) ──
-      const openaiClient = getOpenAIClient()
-      if (openaiClient) {
-        const succeeded = await tryProvider('openai', 'gpt-5.4', async () => {
-          const oaSystemPrompt =
-            (openaiSystemPrompt.includes('json') || openaiSystemPrompt.includes('JSON')
-              ? openaiSystemPrompt
-              : openaiSystemPrompt + '\n\nRespond with valid JSON only.') +
-            '\n\nNEVER use training data defaults. Every value comes from the document text in the user message.'
-
-          const oaResponse = await openaiClient.chat.completions.create(
-            {
-              model: 'gpt-5.4',
-              messages: [
-                { role: 'system', content: oaSystemPrompt },
-                { role: 'user', content: finalUserPrompt },
-              ],
-              response_format: { type: 'json_object' },
-              max_tokens: aiConfig.maxTokens,
-              temperature: aiConfig.temperature,
-            },
-            { signal: AbortSignal.timeout(aiConfig.requestBudgetMs || 120_000) }
-          )
-
-          const content = oaResponse.choices[0]?.message?.content || ''
-          const usedModel = oaResponse.model || 'gpt-5.4'
-          const inputTokens = oaResponse.usage?.prompt_tokens || 0
-          const outputTokens = oaResponse.usage?.completion_tokens || 0
-          return {
-            content,
-            usage: {
-              inputTokens,
-              outputTokens,
-              cost: calculateCost(usedModel, inputTokens, outputTokens).totalCost,
-              model: usedModel,
-            },
-          }
-        })
-        if (succeeded) {
-          log.info('Fallback to OpenAI succeeded', { requestId })
-          return
-        }
-      } else {
-        log.warn('OpenAI client not available for fallback', { requestId })
-      }
-
-      // ── FALLBACK 2: Gemini (gemini-2.5-flash) ──
-      const geminiClient = getGeminiClient()
-      if (geminiClient) {
-        const succeeded = await tryProvider('gemini', 'gemini-2.5-flash', async () => {
-          const geminiPrompt =
-            'Extract policy information from this insurance document into JSON.\n\n' +
-            openaiSystemPrompt +
-            '\n\nDocument text:\n' +
-            finalUserPrompt +
-            '\n\nRespond with valid JSON only. Use null for missing values.'
-
-          const response = await geminiClient.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: [{ role: 'user', parts: [{ text: geminiPrompt }] }],
-            config: {
-              temperature: aiConfig.temperature,
-              maxOutputTokens: aiConfig.maxTokens,
-              responseMimeType: 'application/json',
-            },
-          })
-
-          const content = response.text || ''
-          return {
-            content,
-            usage: {
-              inputTokens: response.usageMetadata?.promptTokenCount || 0,
-              outputTokens: response.usageMetadata?.candidatesTokenCount || 0,
-              cost: calculateCost(
-                'gemini-2.5-flash',
-                response.usageMetadata?.promptTokenCount || 0,
-                response.usageMetadata?.candidatesTokenCount || 0
-              ).totalCost,
-              model: 'gemini-2.5-flash',
-            },
-          }
-        })
-        if (succeeded) {
-          log.info('Fallback to Gemini succeeded', { requestId })
-          return
-        }
-      } else {
-        log.warn('Gemini client not available for fallback', { requestId })
-      }
-
-      // ── ALL PROVIDERS FAILED ──
-      const failMsg = lastError instanceof Error ? lastError.message : String(lastError)
-      const classified = classifyProviderError(lastError, lastProvider, requestId)
-      const errorCode =
-        classified instanceof BillingError
-          ? lastProvider.toUpperCase() + '_BILLING_ERROR'
-          : lastProvider.toUpperCase() +
-            '_ERROR_' +
-            (lastError instanceof Error ? lastError.name : 'UNKNOWN')
-
-      log.info('Extraction completed — all providers failed', {
-        requestId,
-        lastProvider,
-        promptVersion,
-        degradedReason,
-        totalDurationMs: Date.now() - startTime,
-        success: false,
-        errorCode,
-      })
-
-      captureServerError(lastError instanceof Error ? lastError : new Error(failMsg), {
-        requestId,
-        provider: lastProvider,
-        errorCode,
-        documentLength: documentText?.length ?? 0,
-      })
-
-      recordExtractionEvent({
-        requestId,
-        timestamp: new Date().toISOString(),
-        provider: lastProvider,
-        success: false,
-        durationMs: Date.now() - startTime,
-        errorCode,
-        errorMessage: failMsg.substring(0, 200),
-        documentLength: documentText?.length ?? 0,
-      })
-
-      if (classified instanceof BillingError) {
-        alertBilling(lastProvider, failMsg, {
-          requestId,
-          fallbackReason: errorCode,
-          phaseTiming,
-        }).catch(() => {})
-      }
-
-      if (classified instanceof BillingError) {
-        return res.status(503).json({
-          error: 'Extraction unavailable — AI provider billing exhausted',
-          code: 'EXTRACTION_UNAVAILABLE_BILLING',
-          details: failMsg,
-          elapsedMs: Date.now() - startTime,
-          phaseTiming,
+        recordExtractionEvent({
           requestId,
           timestamp: new Date().toISOString(),
+          provider: p.provider,
+          success: true,
+          durationMs: Date.now() - startTime,
+          documentLength: documentText?.length ?? 0,
         })
       }
-
-      return res.status(500).json({
-        error: 'Extraction failed',
-        code: errorCode,
-        details: failMsg,
-        elapsedMs: Date.now() - startTime,
-        phaseTiming,
-        requestId,
-        timestamp: new Date().toISOString(),
-      })
     }
-  }
-)
 
-router.post('/ocr', validateJSON, ocrLimiter, validateOCR, async (req: Request, res: Response) => {
+    // Fire push notification if user is authenticated
+    const notifyUserId = req.headers['x-user-id'] as string | undefined
+    if (notifyUserId) {
+      sendExtractionCompleteNotification(
+        notifyUserId,
+        String(rawParsed.policyType || classification.type),
+        (rawParsed.policyNumber as string | null | undefined) ?? null
+      ).catch((err) =>
+        log.warn('Push notification failed after extraction', {
+          requestId,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      )
+    }
+
+    // ── Type consistency check ──
+    const consistency = checkTypeConsistency(
+      classification,
+      rawParsed.policyType as string | null | undefined
+    )
+    if (!consistency.consistent) {
+      log.warn('Type mismatch in response: ' + consistency.mismatchDescription, { requestId })
+      degradedReason = degradedReason
+        ? degradedReason + '; Type mismatch: ' + consistency.mismatchDescription
+        : 'Type mismatch: ' + consistency.mismatchDescription
+      dispatchAlert({
+        severity: 'warning',
+        category: 'api_error',
+        title: 'Policy Type Mismatch (Parallel)',
+        message: consistency.mismatchDescription || 'Unknown mismatch',
+        provider: 'parallel',
+        dedupKey:
+          'type_mismatch:' + classification.type + '->' + String(rawParsed.policyType || '?'),
+      }).catch(() => {})
+    }
+
+    log.info('Extraction completed (parallel)', {
+      requestId,
+      finalProvider: 'deepseek+openai',
+      promptVersion,
+      degradedReason,
+      totalDurationMs: Date.now() - startTime,
+      success: true,
+    })
+
+    // Compute merged costs
+    const totalInputTokens = parallelResult.inputTokens
+    const totalOutputTokens = parallelResult.outputTokens
+    const totalCost = calculateCost(
+      'deepseek-v4-pro+gpt-5.4-mini',
+      totalInputTokens,
+      totalOutputTokens
+    )
+
+    return res.json({
+      success: true,
+      data: stage2Data,
+      usage: { input_tokens: totalInputTokens, output_tokens: totalOutputTokens },
+      model: 'deepseek-v4-pro+gpt-5.4-mini',
+      provider: 'parallel',
+      cost: totalCost.totalCost,
+      requestId,
+      route: '/api/ai/extract',
+      elapsedMs: Date.now() - startTime,
+      phaseTiming,
+      degradedReason,
+      promptVersion,
+      mergeLog: parallelResult.mergeLog,
+    })
+      let lastError: unknown = dsError
   try {
     const oauthToken = null
     const apiKey = process.env.GOOGLE_CLOUD_API_KEY
