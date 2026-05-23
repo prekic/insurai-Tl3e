@@ -343,33 +343,18 @@ router.post(
         maxTokens: aiConfig.maxTokens,
       })
 
-      // Sanitize: replace 'Birleşik Kasko' with synonym to prevent context interference
-      // Sanitize: normalize Turkish chars + replace 'Birleşik Kasko' phrase
-      // DeepSeek's tokenizer treats Turkish characters (ş, ü) differently —
-      // the Turkish-char variant causes 0 coverages across all providers.
-      const turkishToAscii = (s: string) =>
-        s.replace(/ş/gi, 's').replace(/Ş/gi, 'S').replace(/ü/gi, 'u').replace(/Ü/gi, 'U')
-      const sanitizedSystemPrompt = turkishToAscii(finalSystemPrompt).replace(
-        /Birlesik Kasko/gi,
-        'Combined Kasko'
-      )
-      const sanitizedDocument = turkishToAscii(finalUserPrompt).replace(
-        /Birlesik Kasko/gi,
-        'Combined Kasko'
-      )
-
       // Ensure "json" is in the prompt (required by OpenAI when using response_format: json_object)
       const jsonReminder = '\n\nRespond with valid JSON only.'
       const systemPromptWithJson =
-        sanitizedSystemPrompt.includes('json') || sanitizedSystemPrompt.includes('JSON')
-          ? sanitizedSystemPrompt
-          : sanitizedSystemPrompt + jsonReminder
+        finalSystemPrompt.includes('json') || finalSystemPrompt.includes('JSON')
+          ? finalSystemPrompt
+          : finalSystemPrompt + jsonReminder
       const userPromptWithJson =
-        sanitizedDocument.includes('json') ||
-        sanitizedDocument.includes('JSON') ||
+        finalUserPrompt.includes('json') ||
+        finalUserPrompt.includes('JSON') ||
         systemPromptWithJson.includes('json')
-          ? sanitizedDocument
-          : sanitizedDocument + jsonReminder
+          ? finalUserPrompt
+          : finalUserPrompt + jsonReminder
 
       // ── DeepSeek → OpenAI → Gemini fallback chain ──
       //
