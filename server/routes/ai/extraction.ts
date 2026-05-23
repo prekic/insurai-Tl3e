@@ -29,10 +29,10 @@ import {
 } from '../../middleware/validation.js'
 import * as adminNotificationService from '../../services/admin-notification-service.js'
 import { getAIConfig } from '../../services/config-service.js'
-import { alertBilling, dispatchAlert } from '../../lib/alert-service.js'
+import { dispatchAlert } from '../../lib/alert-service.js'
 import { loadPrompts, getPromptVersionTag } from '../../lib/prompt-loader.js'
 import { classifyDocument, checkTypeConsistency } from '../../lib/classifier-gate.js'
-import { BillingError, classifyProviderError } from '../../lib/errors.js'
+
 import { sendExtractionCompleteNotification } from '../../services/notification-service.js'
 import { validateExtractionFields } from '../../lib/self-healing.js'
 import { recordExtractionEvent, recordOverviewMetrics } from './shared.js'
@@ -796,7 +796,7 @@ router.post(
     markPhase('promptLoad_ms', promptStart)
     const {
       openaiSystemPrompt,
-      userPrompt: finalUserPrompt,
+      userPrompt: _finalUserPrompt,
       templateMeta: promptMeta,
     } = loadedPrompts
     const promptVersion = getPromptVersionTag(promptMeta)
@@ -985,7 +985,6 @@ router.post(
       promptVersion,
       mergeLog: parallelResult.mergeLog,
     })
-      let lastError: unknown = dsError
   try {
     const oauthToken = null
     const apiKey = process.env.GOOGLE_CLOUD_API_KEY
@@ -1052,7 +1051,7 @@ router.post(
       response = await callVision()
     } catch (err) {
       const isAbort =
-        err instanceof Error && (err.name === 'AbortError' || err.message?.includes('aborted'))
+        err instanceof Error && ((err as Error).name === 'AbortError' || (err as Error).message?.includes('aborted'))
       if (!isAbort) throw err
       log.warn('[OCR] cold-start retry: vision', { ocrFetchTimeoutMs })
       response = await callVision()
@@ -1109,7 +1108,7 @@ router.post(
       },
       cost: ocrCost,
     })
-  } catch (error) {
+  } catch (error: any) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     const errorDetails = {
       timestamp: new Date().toISOString(),
