@@ -153,8 +153,8 @@ export interface CostConfig {
 // =============================================================================
 
 const DEFAULT_AI_CONFIG: AIConfig = {
-  openaiExtractionModel: 'gpt-5.4',
-  openaiBackupModel: 'gpt-5.4-mini',
+  openaiExtractionModel: 'gpt-4o',
+  openaiBackupModel: 'gpt-4o-mini',
   anthropicExtractionModel: 'claude-sonnet-4-6',
   anthropicBackupModel: 'claude-haiku-4-5',
   geminiModel: 'gemini-2.5-flash',
@@ -217,13 +217,12 @@ const DEFAULT_WEBHOOKS_CONFIG: WebhooksConfig = {
 const DEFAULT_COST_CONFIG: CostConfig = {
   tokenPricing: {
     // Current models (April 2026)
-    'gpt-5.4': { input: 0.003, output: 0.012 },
+    'gpt-4o': { input: 0.0025, output: 0.01 },
     'claude-sonnet-4-6': { input: 0.003, output: 0.015 },
     'claude-haiku-4-5': { input: 0.001, output: 0.005 },
     'gemini-2.5-flash': { input: 0.0003, output: 0.0025 },
     // Legacy models (retained for historical cost tracking)
-    'gpt-4o': { input: 0.0025, output: 0.01 },
-    'gpt-5.4-mini': { input: 0.00075, output: 0.0045 },
+    'gpt-4o-mini': { input: 0.00075, output: 0.0045 },
     'gpt-4-turbo': { input: 0.01, output: 0.03 },
     'gpt-4': { input: 0.03, output: 0.06 },
     'gpt-3.5-turbo': { input: 0.0005, output: 0.0015 },

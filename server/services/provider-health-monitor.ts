@@ -108,7 +108,7 @@ async function checkOpenAI(results: Record<string, string>): Promise<void> {
     }
 
     await client.chat.completions.create({
-      model: 'gpt-5.4-mini',
+      model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: 'OK' }],
       max_completion_tokens: 5,
     })

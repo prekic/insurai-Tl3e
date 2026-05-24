@@ -378,13 +378,13 @@ router.get('/cost/pricing', authenticateAdmin, (_req: AuthenticatedRequest, res:
   // Return pricing info for all known models
   const models = [
     // Current models (April 2026)
-    'gpt-5.4',
+    'gpt-4o',
     'claude-sonnet-4-6',
     'claude-haiku-4-5',
     'gemini-2.5-flash',
     // Legacy models
     'gpt-4o',
-    'gpt-5.4-mini',
+    'gpt-4o-mini',
     'gpt-4-turbo',
     'gpt-4',
     'gpt-3.5-turbo',

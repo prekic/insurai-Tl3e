@@ -54,8 +54,8 @@ const EXTRACTION_MODEL_ALLOWLIST = new Set([
   'claude-haiku-4-5-20251001',
   'claude-sonnet-4-6',
   'claude-sonnet-4-6-20251022',
-  'gpt-5.4',
-  'gpt-5.4-mini',
+  'gpt-4o',
+  'gpt-4o-mini',
   'gpt-4o',
   'deepseek-v4-pro',
 ])
@@ -319,7 +319,7 @@ router.post(
         requestId,
         chars: documentText?.length || 0,
         type: policyType || 'auto-detect',
-        model: model || 'gpt-5.4',
+        model: model || 'gpt-4o',
       })
 
       // ── FIX 2: Centralised prompt loading (same prompt across all endpoints) ──
@@ -417,7 +417,7 @@ router.post(
         try {
           const response = await oa.chat.completions.create(
             {
-              model: 'gpt-5.4',
+              model: 'gpt-4o',
               messages: [
                 { role: 'system', content: systemPromptWithJson },
                 { role: 'user', content: userPromptWithJson },
@@ -436,11 +436,11 @@ router.post(
             inputTokens: response.usage?.prompt_tokens || 0,
             outputTokens: response.usage?.completion_tokens || 0,
             cost: calculateCost(
-              'gpt-5.4',
+              'gpt-4o',
               response.usage?.prompt_tokens || 0,
               response.usage?.completion_tokens || 0
             ).totalCost,
-            model: response.model || 'gpt-5.4',
+            model: response.model || 'gpt-4o',
           }
           successProvider = 'openai'
           return true
@@ -682,7 +682,7 @@ router.post(
       recordOverviewMetrics({
         requestId,
         provider: 'openai',
-        model: 'gpt-5.4',
+        model: 'gpt-4o',
         operation: 'extraction',
         success: false,
         durationMs: Date.now() - startTime,
@@ -871,7 +871,7 @@ router.post(
     // Record usage for both providers
     for (const p of parallelResult.providers) {
       if (p.success) {
-        const usedModel = p.provider === 'deepseek' ? 'deepseek-v4-pro' : 'gpt-5.4-mini'
+        const usedModel = p.provider === 'deepseek' ? 'deepseek-v4-pro' : 'gpt-4o-mini'
         const cost = calculateCost(usedModel, p.inputTokens, p.outputTokens)
         recordUsage({
           provider: p.provider,
@@ -950,7 +950,7 @@ router.post(
     const totalInputTokens = parallelResult.inputTokens
     const totalOutputTokens = parallelResult.outputTokens
     const totalCost = calculateCost(
-      'deepseek-v4-pro+gpt-5.4-mini',
+      'deepseek-v4-pro+gpt-4o-mini',
       totalInputTokens,
       totalOutputTokens
     )
@@ -959,7 +959,7 @@ router.post(
       success: true,
       data: stage2Data,
       usage: { input_tokens: totalInputTokens, output_tokens: totalOutputTokens },
-      model: 'deepseek-v4-pro+gpt-5.4-mini',
+      model: 'deepseek-v4-pro+gpt-4o-mini',
       provider: 'parallel',
       cost: totalCost.totalCost,
       requestId,

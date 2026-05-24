@@ -64,16 +64,13 @@ export interface AIUsageCost {
 // Used as sync fallback when DB config is unavailable
 const DEFAULT_COST_PER_1K_TOKENS: Record<string, { input: number; output: number }> = {
   // Current models (April 2026)
-  'gpt-5.4': { input: 0.003, output: 0.012 },
+  'gpt-4o': { input: 0.0025, output: 0.01 },
   'claude-sonnet-4-6': { input: 0.003, output: 0.015 },
   'claude-haiku-4-5': { input: 0.001, output: 0.005 },
   'gemini-2.5-flash': { input: 0.0003, output: 0.0025 },
   // DeepSeek
   'deepseek-v4-pro': { input: 0.000435, output: 0.00087 },
   // Legacy models (retained for historical cost tracking)
-  // OpenAI
-  'gpt-4o': { input: 0.0025, output: 0.01 },
-  'gpt-5.4-mini': { input: 0.00075, output: 0.0045 },
   'gpt-4-turbo': { input: 0.01, output: 0.03 },
   'gpt-4': { input: 0.03, output: 0.06 },
   'gpt-3.5-turbo': { input: 0.0005, output: 0.0015 },
@@ -873,7 +870,7 @@ export function estimateTokensFromRequest(req: Request): { inputTokens: number; 
   const inputTokens = messageTokens + contextTokens + historyTokens
 
   // Determine model
-  const model = body.model || (req.path.includes('anthropic') ? 'claude-haiku-4-5' : 'gpt-5.4-mini')
+  const model = body.model || (req.path.includes('anthropic') ? 'claude-haiku-4-5' : 'gpt-4o-mini')
 
   return { inputTokens, model }
 }

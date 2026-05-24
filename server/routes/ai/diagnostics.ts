@@ -487,7 +487,7 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
       if (client) {
         // Make a minimal API call to verify the key works
         const response = await client.chat.completions.create({
-          model: 'gpt-5.4-mini',
+          model: 'gpt-4o-mini',
           messages: [{ role: 'user', content: 'Say "OK"' }],
           max_completion_tokens: 5,
         })
